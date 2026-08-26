@@ -1,0 +1,28 @@
+# Phase 0 の 002 / 003 を潰すための探り棒。**製品ではありません。**
+# D6 が決まったら消します。
+#
+# 親のワークスペースから外してあります。ssh2 が OpenSSL を source からビルドするため、
+# 本体の `cargo test` を毎回数分遅くしないためです。
+[workspace]
+
+[package]
+name = "sshboard-ssh-probe"
+description = "Phase 0 探り棒。russh と ssh2 の両方で実機へ繋ぎ、結果だけを出す。"
+version = "0.0.0"
+edition = "2021"
+license = "MIT"
+publish = false
+
+[dependencies]
+anyhow = "1"
+clap = { version = "4", features = ["derive"] }
+chardetng = "1"
+encoding_rs = "0.8"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "io-util", "time"] }
+# 既定のままだと aws-lc-rs を引く。dbboard の ADR-0034 が避けている依存なので、
+# ring 側へ寄せて揃える（採用したら cargo tree で毎回確かめること）。
+russh = { version = "0.63", default-features = false, features = ["ring", "flate2", "rsa"] }
+russh-sftp = "2"
+ssh2 = { version = "0.9", features = ["vendored-openssl"] }
+rpassword = "7"
+base64 = "0.22"
