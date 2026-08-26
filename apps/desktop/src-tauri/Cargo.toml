@@ -16,6 +16,7 @@ tauri-build = { version = "2", features = [] }
 [dependencies]
 sshboard-band = { path = "../../../crates/sshboard-band" }
 sshboard-mcp = { path = "../../../crates/sshboard-mcp" }
+sshboard-stream = { path = "../../../crates/sshboard-stream" }
 tauri = { version = "2", features = [] }
 tokio = { workspace = true, features = ["rt-multi-thread"] }
 serde = { version = "1", features = ["derive"] }

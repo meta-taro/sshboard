@@ -4,12 +4,14 @@
 //! 返してから画面が追いつく形にすると、AI は人より先に動けてしまう。
 //! それは PRD §4-2 の「誰が触ったかが画面に出る」を満たさない。
 
+use std::sync::Arc;
 use std::time::Duration;
 
 use rmcp::handler::server::router::tool::ToolRouter;
 use rmcp::model::{ServerCapabilities, ServerInfo};
 use rmcp::{tool, tool_handler, tool_router, ErrorData, ServerHandler};
 use sshboard_band::{Actor, Band, DeliveryOutcome};
+use sshboard_stream::OutputStream;
 
 /// 帯が受け取りを返すまで待つ上限。
 /// 画面が固まっていることを、ここで初めて検出する。
@@ -19,18 +21,21 @@ pub const DEFAULT_ACK_TIMEOUT: Duration = Duration::from_secs(2);
 #[derive(Clone)]
 pub struct SshboardMcp {
     band: Band,
+    /// 追尾している出力。**GUI と同じ 1 本**（PRD §4-1）。
+    stream: Arc<OutputStream>,
     ack_timeout: Duration,
     tool_router: ToolRouter<Self>,
 }
 
 impl SshboardMcp {
-    pub fn new(band: Band) -> Self {
-        Self::with_ack_timeout(band, DEFAULT_ACK_TIMEOUT)
+    pub fn new(band: Band, stream: Arc<OutputStream>) -> Self {
+        Self::with_ack_timeout(band, stream, DEFAULT_ACK_TIMEOUT)
     }
 
-    pub fn with_ack_timeout(band: Band, ack_timeout: Duration) -> Self {
+    pub fn with_ack_timeout(band: Band, stream: Arc<OutputStream>, ack_timeout: Duration) -> Self {
         Self {
             band,
+            stream,
             ack_timeout,
             tool_router: Self::tool_router(),
         }
@@ -63,6 +68,18 @@ impl SshboardMcp {
     pub async fn ping(&self) -> Result<String, ErrorData> {
         self.show("ping").await?;
         Ok("pong".to_string())
+    }
+
+    /// 追尾している出力の末尾を、**素のテキストで**返す。
+    ///
+    /// GUI には同じ出力が ANSI のまま流れている。**同じ 1 本を面ごとに違う形で出す**
+    /// （Issue 005）。
+    #[tool(
+        description = "Read the plain-text tail of the output sshboard is following. Never contains ANSI escapes."
+    )]
+    pub async fn read_stream(&self) -> Result<String, ErrorData> {
+        self.show("read_stream").await?;
+        Ok(self.stream.plain_tail())
     }
 }
 

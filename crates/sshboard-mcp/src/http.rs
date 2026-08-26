@@ -10,11 +10,13 @@
 //! トークンを必須にすること。**Phase 0 の `ping` は何も触らないので今は無害。**
 
 use std::net::SocketAddr;
+use std::sync::Arc;
 use std::time::Duration;
 
 use rmcp::transport::streamable_http_server::session::local::LocalSessionManager;
 use rmcp::transport::streamable_http_server::{StreamableHttpServerConfig, StreamableHttpService};
 use sshboard_band::Band;
+use sshboard_stream::OutputStream;
 use tokio_util::sync::CancellationToken;
 
 use crate::server::SshboardMcp;
@@ -50,7 +52,12 @@ impl McpEndpoint {
 /// MCP を立ち上げ、bind が済んでから返る。
 ///
 /// `port` に 0 を渡すと空きポートを OS が選ぶ。
-pub async fn serve(band: Band, port: u16, ack_timeout: Duration) -> std::io::Result<McpEndpoint> {
+pub async fn serve(
+    band: Band,
+    stream: Arc<OutputStream>,
+    port: u16,
+    ack_timeout: Duration,
+) -> std::io::Result<McpEndpoint> {
     let cancel = CancellationToken::new();
 
     // SSE ではなく JSON で返す。Phase 0 に server → client の通知は無く、
@@ -61,7 +68,13 @@ pub async fn serve(band: Band, port: u16, ack_timeout: Duration) -> std::io::Res
 
     let service: StreamableHttpService<SshboardMcp, LocalSessionManager> =
         StreamableHttpService::new(
-            move || Ok(SshboardMcp::with_ack_timeout(band.clone(), ack_timeout)),
+            move || {
+                Ok(SshboardMcp::with_ack_timeout(
+                    band.clone(),
+                    Arc::clone(&stream),
+                    ack_timeout,
+                ))
+            },
             Default::default(),
             config,
         );

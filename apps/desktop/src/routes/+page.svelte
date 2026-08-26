@@ -4,10 +4,35 @@
 	import { onMount, tick } from 'svelte';
 
 	import { appendLine, type BandLine } from '$lib/band';
+	import { createTerminal, writeChunk } from '$lib/terminal.svelte';
+	import '@xterm/xterm/css/xterm.css';
+	import type { Terminal } from '@xterm/xterm';
 
 	let lines = $state<BandLine[]>([]);
 	let mcpUrl = $state<string | null>(null);
 	let failure = $state<string | null>(null);
+	let streaming = $state(false);
+
+	let terminalHost: HTMLDivElement | undefined = $state();
+	let terminal: Terminal | undefined;
+
+	async function startDemoStream() {
+		try {
+			await invoke('start_demo_stream');
+			streaming = true;
+		} catch (error: unknown) {
+			failure = `出力を流せませんでした: ${String(error)}`;
+		}
+	}
+
+	async function stopStream() {
+		try {
+			await invoke('stop_stream');
+			streaming = false;
+		} catch (error: unknown) {
+			failure = `出力を止められませんでした: ${String(error)}`;
+		}
+	}
 
 	/**
 	 * 「帯へ入れた」と返す。
@@ -28,6 +53,19 @@
 
 	onMount(() => {
 		const stops: Array<() => void> = [];
+
+		if (terminalHost) {
+			terminal = createTerminal(terminalHost);
+		}
+
+		// **ANSI を落とさずに渡す。**色は人の側にだけ残す（Issue 005）。
+		listen<number[]>('stream://raw', (event) => {
+			if (terminal) writeChunk(terminal, event.payload);
+		})
+			.then((stop) => stops.push(stop))
+			.catch((error: unknown) => {
+				failure = `出力を購読できませんでした: ${String(error)}`;
+			});
 
 		listen<BandLine>('band://line', async (event) => {
 			lines = appendLine(lines, event.payload);
@@ -56,7 +94,10 @@
 				failure = `MCP の状態を取得できませんでした: ${String(error)}`;
 			});
 
-		return () => stops.forEach((stop) => stop());
+		return () => {
+			stops.forEach((stop) => stop());
+			terminal?.dispose();
+		};
 	});
 </script>
 
@@ -77,6 +118,17 @@
 	{#if failure}
 		<p class="failure" role="alert">{failure}</p>
 	{/if}
+
+	<section class="stream" aria-label="追尾している出力">
+		<div class="stream-head">
+			<span class="label">出力（GUI は色付き / MCP はプレーン）</span>
+			<button type="button" onclick={startDemoStream} disabled={streaming}>
+				Phase 0 の確認用に流す
+			</button>
+			<button type="button" onclick={stopStream}>止める</button>
+		</div>
+		<div class="terminal" bind:this={terminalHost}></div>
+	</section>
 
 	<section class="band" aria-label="操作の帯">
 		{#if lines.length === 0}
@@ -137,8 +189,52 @@
 		font-size: 0.8rem;
 	}
 
+	.stream {
+		display: flex;
+		flex-direction: column;
+		flex: 2;
+		min-height: 0;
+		border-top: 1px solid #262a31;
+		padding-top: 0.75rem;
+		gap: 0.5rem;
+	}
+
+	.stream-head {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		font-size: 0.75rem;
+		color: #8b929e;
+	}
+
+	.stream-head .label {
+		flex: 1;
+	}
+
+	.stream-head button {
+		font: inherit;
+		color: #d7dae0;
+		background: #22262e;
+		border: 1px solid #333944;
+		border-radius: 3px;
+		padding: 0.2rem 0.6rem;
+		cursor: pointer;
+	}
+
+	.stream-head button:disabled {
+		opacity: 0.5;
+		cursor: default;
+	}
+
+	.terminal {
+		flex: 1;
+		min-height: 0;
+		overflow: hidden;
+	}
+
 	.band {
 		flex: 1;
+		min-height: 0;
 		overflow-y: auto;
 		border-top: 1px solid #262a31;
 		padding-top: 0.75rem;

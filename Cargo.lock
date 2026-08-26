@@ -3798,6 +3798,7 @@ dependencies = [
  "serde",
  "sshboard-band",
  "sshboard-mcp",
+ "sshboard-stream",
  "tauri",
  "tauri-build",
  "tokio",
@@ -3812,6 +3813,7 @@ dependencies = [
  "rmcp",
  "serde_json",
  "sshboard-band",
+ "sshboard-stream",
  "tokio",
  "tokio-util",
 ]

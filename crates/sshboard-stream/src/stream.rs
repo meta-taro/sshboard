@@ -13,6 +13,12 @@ use crate::plain::PlainFilter;
 /// 追いつかない購読者を切るまでの猶予。
 const CHANNEL_CAPACITY: usize = 1024;
 
+/// 素のテキストを保持しておく上限（バイト）。
+///
+/// **なぜ要るか**: MCP は途中から尋ねてくる。購読していなかった分が消えていると
+/// `read_log` が空を返す。**なぜ上限が要るか**: `tail -f` は何時間も流れる。
+pub const PLAIN_TAIL_LIMIT: usize = 64 * 1024;
+
 /// 止まっているのに流そうとした。
 #[derive(Debug, PartialEq, Eq)]
 pub struct StreamStopped;
@@ -30,6 +36,8 @@ pub struct OutputStream {
     raw: broadcast::Sender<Vec<u8>>,
     plain: broadcast::Sender<String>,
     filter: Mutex<PlainFilter>,
+    /// 直近の素のテキスト。**上限を超えたら古い方から捨てる。**
+    plain_tail: Mutex<String>,
     stopped: AtomicBool,
 }
 
@@ -41,6 +49,7 @@ impl OutputStream {
             raw,
             plain,
             filter: Mutex::new(PlainFilter::new()),
+            plain_tail: Mutex::new(String::new()),
             stopped: AtomicBool::new(false),
         }
     }
@@ -77,6 +86,7 @@ impl OutputStream {
 
         // 空文字を送らない。エスケープだけのチャンクで購読者を起こさない。
         if !text.is_empty() {
+            self.remember(&text);
             let _ = self.plain.send(text);
         }
 
@@ -90,6 +100,33 @@ impl OutputStream {
 
     pub fn is_stopped(&self) -> bool {
         self.stopped.load(Ordering::SeqCst)
+    }
+
+    /// 直近の素のテキスト。**ANSI は 1 つも混ざらない。**
+    pub fn plain_tail(&self) -> String {
+        self.plain_tail
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .clone()
+    }
+
+    fn remember(&self, text: &str) {
+        let mut tail = self
+            .plain_tail
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        tail.push_str(text);
+
+        if tail.len() <= PLAIN_TAIL_LIMIT {
+            return;
+        }
+
+        // 文字の途中で切らない。`is_char_boundary` が真になるところまで前へ送る。
+        let mut cut = tail.len() - PLAIN_TAIL_LIMIT;
+        while cut < tail.len() && !tail.is_char_boundary(cut) {
+            cut += 1;
+        }
+        tail.drain(..cut);
     }
 }
 

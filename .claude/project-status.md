@@ -3,109 +3,107 @@
 - **現在フェーズ**: Phase 0（未知を潰す）**着手中**
 - **最終更新**: 2026-08-26
 
-## 完了した作業
+## いまの状態を一言で
 
-**001 はまだ「完了」ではありません。**自動で確かめられる範囲は通りました。
-**残っているのは人にしかできない 2 つ**（macOS の目視・Windows の実機）です。
+**Phase 0 のうち、実機と Windows が要らない部分はすべて通しました。**
+**残りは全部、人にしかできない工程です。**（product-baseline §29）
 
-| 出来たもの | 中身 |
+## 出来ているもの
+
+| | 中身 |
 |---|---|
-| `crates/sshboard-band` | 人と AI の操作が流れる 1 本の帯。`[AI]` / `[Human]` の前置、購読、**受け取り待ち（ack）**。Tauri・MCP・SSH のどれにも依存しない |
-| `crates/sshboard-mcp` | アプリ同居の MCP サーバー。ツールは `ping` 1 つだけ。**帯が受け取ってから応答を返す。**127.0.0.1 の Streamable HTTP（D15） |
-| `apps/desktop` | SvelteKit + Tauri 2。帯 1 本だけの画面。MCP を**同じプロセスの中で**立てる（D8） |
-| `.github/workflows/ci.yml` | format / clippy / test。core は 3 OS、desktop は Windows + macOS |
-
-### 実機で確かめた値（macOS・2026-08-26）
-
-`curl` で生の JSON-RPC を投げ（MCP クライアント SDK を使わずに）、
-`initialize → notifications/initialized → tools/call ping` を通した結果です。
-
-| 経路 | 応答 | 所要 |
-|---|---|---|
-| dev（`pnpm tauri dev`） | `{"content":[{"type":"text","text":"pong"}],"isError":false}` | 0.083 秒 |
-| 本番フロント（`tauri build --debug --no-bundle`） | 同上 | 0.077 秒 |
-
-**増えたプロセスは 0 本です。**MCP は `sshboard-desktop` 自身が listen しています。
-
-`pong` が返ること自体が帯へ出た証明になります。画面が「受け取った」と返さない限り、
-ツールは応答ではなく失敗を返す作りだからです（D16）。実際、権限を入れる前は
-`sshboard did not confirm the operation on screen (0/1 views acknowledged)` が返っていました。
+| `crates/sshboard-band` | 人と AI の操作が流れる 1 本の帯。`[AI]` / `[Human]`・購読・**受け取り待ち（ack）** |
+| `crates/sshboard-stream` | 1 本の出力を **GUI へは生・MCP へは素**で流す。ANSI 除去（境界の持ち越し込み）・末尾保持・停止 |
+| `crates/sshboard-credentials` | OS 資格情報ストアと ssh-agent。**自前の鍵ストアを持たない**（D11） |
+| `crates/sshboard-mcp` | アプリ同居の MCP。ツールは `ping` と `read_stream` の 2 つだけ |
+| `apps/desktop` | SvelteKit + Tauri 2。帯 ＋ xterm.js の端末。MCP を**同じプロセスで**立てる |
+| `tools/ssh-probe` | 002 / 003 用の探り棒。**製品ではない**（D6 が決まったら消す） |
+| `tools/check-005.sh` | 005 の確認スクリプト |
+| `.github/workflows/ci.yml` | format / clippy / test。core は 3 OS、desktop と資格情報は Windows + macOS |
 
 ## テスト状況
 
-**19 本。全部通っています。**
+**58 本。全部通っています。**
 
 ```
-cargo test --workspace                                    →  19 passed; 0 failed
-cargo fmt --all -- --check                                →  差分なし
-cargo clippy --workspace --all-targets -- -D warnings     →  警告なし
-pnpm --filter desktop check                               →  168 files, 0 errors, 0 warnings
+cargo test --workspace                                 →  58 passed; 0 failed
+cargo fmt --all -- --check                             →  差分なし
+cargo clippy --workspace --all-targets -- -D warnings  →  警告なし
+pnpm --filter desktop check                            →  170 files, 0 errors, 0 warnings
+（別ワークスペース）tools/ssh-probe: cargo test        →  10 passed
 ```
 
-| どこ | 本数 | 何を見張っているか |
-|---|---|---|
-| `sshboard-band` | 9 | `[AI]` の前置・通し番号・全購読者の ack を待つ・詰まったら期限切れにする |
-| `sshboard-mcp`（直接呼び） | 4 | `ping` が帯へ `[AI] ping` を載せる・**帯が受け取る前に応答を返さない**・画面が返さないときは失敗する |
-| `sshboard-mcp`（HTTP 経由） | 3 | 生の JSON-RPC で `ping` が通る・**ツールが `ping` 1 つだけ**（D3 の見張り）・**loopback にしか bind していない** |
-| `sshboard-desktop` | 3 | 画面が返した ack が帯へ届く・知らない行の ack を黙って捨てない・**溢れて落とした行を ack しない** |
+| どこ | 本数 |
+|---|---|
+| `sshboard-band` | 9 |
+| `sshboard-stream` | 21 |
+| `sshboard-credentials` | 16 |
+| `sshboard-mcp` | 9 |
+| `sshboard-desktop` | 3 |
+| `tools/ssh-probe`（別ワークスペース） | 10 |
 
-## 未完了の作業
+## Phase 0 の 5 本
 
-| # | 未知 | 状態 |
-|---|---|---|
-| 001 | Tauri 2 に MCP を同居させ、GUI の帯へリアルタイムに出す | **人の確認待ち**（下記 2 点） |
-| 002 | 稼働中サーバーへ実際に SSH で繋ぐ | 未着手 |
-| 003 | SSH ライブラリの選定（D6） | 未着手（002 の結果待ち） |
-| 004 | 資格情報を OS ストア / ssh-agent から読む | 未着手 |
-| 005 | `tail -f` を GUI と MCP へ同時に流す | 未着手 |
+| # | 未知 | 自動で確かめた範囲 | 人にしかできない残り |
+|---|---|---|---|
+| 001 | MCP を同居させ帯へ出す | **通った。**dev / 本番ビルドの両方で `pong`（0.08 秒） | macOS の目視・**Windows 実機** |
+| 002 | 実機 SSH | 探り棒を用意。KEXINIT 読み取りは実サーバーで確認済み | **実機に走らせる** |
+| 003 | SSH ライブラリ（D6） | russh / ssh2 の両方を同じ形で試せる状態 | **002 の結果で決める** |
+| 004 | 資格情報 | **通った。**mock 検出テストが macOS の実 Keychain で往復。ssh-agent へ実接続 | 実機接続・**Windows 実機** |
+| 005 | GUI と MCP へ同時に流す | **通った。**同じ 1 本から GUI に ANSI 付き・MCP に素のテキスト | 実機の `tail -f`・**色の目視** |
 
-### 001 で人にしかできない残り
+**チェックボックスは AI が埋めていません**（product-baseline §19）。各 Issue の「実行結果」に、
+私が実際に取った値だけを置いてあります。
 
-1. **macOS の目視。**帯に `[AI]    ping` の行が出ていることを、実物の画面で確認する
-2. **Windows の実機確認。**CI で Windows のビルドと `cargo test` は回るが、
-   **画面を見ての確認はできない。**手元は macOS のみ
+## 次にやること（人の手が要ります）
 
-`.claude/issues/001-mcp-in-tauri-live-band.md` の完了条件は、**AI が埋めていません**
-（product-baseline §19）。
+1. **探り棒を実機に走らせる**（002 / 003）
 
-## 次のタスク
+   ```sh
+   cd tools/ssh-probe
+   cargo run --release -- --host <ホスト> --offer-only          # まず提示だけ見る
+   cargo run --release -- --host <ホスト> --user <利用者> \
+     --sftp-path /var/log --sniff /var/log/<何かのログ>
+   ```
 
-1. 001 の目視 2 件（人）
-2. 通ったら 002。002 の結果で 003 が決まる
+   **出力に接続先は 1 文字も出ません。そのまま貼れます。**
+
+2. **001 / 005 の目視**（macOS）— 帯に `[AI]` の行が出ているか、端末に色が残っているか
+3. **Windows 実機**（001 / 004）— CI はビルドとテストを回すが、画面は見られない
+4. **push の最終確認** — commit は済んでいる。push はしていない
 
 ## 技術的決定
 
-`.claude/decisions.md` を参照（D1〜D16）。
+`.claude/decisions.md`（D1〜D17）。**未決は D6（SSH ライブラリ）と D10（実装体制）のみ。**
 
-**未決は 2 つだけです。**
+## Phase 0 で拾えた未知
 
-- **D6** — SSH ライブラリ（`russh` / `ssh2`）。Phase 0 の 003 で決める
-- **D10** — 誰が実装するか
-
-## Phase 0 で拾えた未知（001）
-
-1. **Tauri 2 は `capabilities/` を書かないと IPC が通らない。**`listen()` は
-   `plugin:event|listen` なので、権限が無いと購読ごと拒否される。
-   **拒否は画面側の `catch` に落ちるだけで、Rust 側には何も出ない**
+1. **Tauri 2 は `capabilities/` を書かないと IPC が通らない。**拒否は画面側の `catch` に
+   落ちるだけで、Rust 側には何も出ない
 2. **本番の CSP に `connect-src ... ipc: http://ipc.localhost` が要る。**
-   入れ忘れると本番ビルドでだけ IPC が死ぬ。**dev では CSP がヘッダに入らないので気づけない**
+   dev では CSP がヘッダに入らないので、入れ忘れに気づけない
 3. **描画（`requestAnimationFrame`）を ack の条件にしてはいけない。**
-   WKWebView はウィンドウが前面に無いと rAF を止める。この製品は
-   「人はエディタを見ていて、AI が裏で動く」使い方が普通なので、背面にした瞬間に全部失敗する
+   WKWebView は背面のウィンドウで rAF を止めるため、背面にした瞬間に MCP が全部失敗する
+4. **`keyring` 3.x は既定バックエンドが無いと mock に落ちる**（dbboard ADR-0033）。
+   書き込みは `Ok` を返すのに永続化されない。**テストの設計まで変わる**
+5. **`russh` の既定は `aws-lc-rs` を引く。**dbboard の ADR-0034 と食い違うので
+   `default-features = false` ＋ `ring` へ寄せる
+6. **`russh` に SFTP は無い**（別 crate）。`ssh2` は内蔵。**D6 はここで割れる**
 
 ## 既知の問題
 
-- **MCP の口に認証がありません。**loopback にしか bind していませんが、同じ端末の
-  別プロセスからは叩けます。**Phase 1 で実際にサーバーを触るツールを載せる前に
-  トークンを必須にすること**（D15）。Phase 0 の `ping` は何も触らないので今は無害
-- **MCP のポート番号の扱いが未決。**いまは OS に空きを選ばせています。
-  MCP クライアントへ登録する形が決まっていません（D15）
-- **アイコンと帯の画面は仮置きです**（DESIGN.md）。人が決め直す前提
-- **002 / 004 / 005 は実機のサーバーが要ります。**手元で代用できません
+- **MCP の口に認証がありません。**loopback 限定ですが、同じ端末の別プロセスからは叩けます。
+  **Phase 1 で実際にサーバーを触るツールを載せる前にトークンを必須にすること**（D15）
+- **MCP のポート番号の扱いが未決。**いまは OS に空きを選ばせています（D15）
+- **アイコン・帯・端末の見た目は仮置き**（DESIGN.md）。人が決め直す前提
+- **`SSHBOARD_PHASE0_DEMO` と `start_demo_stream` は Phase 0 限り。**
+  002 が通って本物の `tail -f` に差し替えたら消すこと
+- **Windows 11 の Snap Layouts は落とす**（D17）。dbboard も解いていないので揃える
+- **文字コードの扱いが未決。**EUC-JP / Shift_JIS が出るかは 002 で分かる。
+  `PlainFilter` はいま U+FFFD に置換するだけで、変換していません
 
 ## 人にしかできない工程で、止まっているもの
 
-（product-baseline §29）
-
-- **001 の macOS 目視**と **Windows 実機確認**
-- **push の最終確認**（commit は AI、push は人間）
+- **実機への探り棒**（002 / 003）
+- **macOS の目視**（001 / 005）と **Windows 実機**（001 / 004）
+- **push の最終確認**

@@ -6,4 +6,7 @@ mod plain;
 mod stream;
 
 pub use plain::PlainFilter;
-pub use stream::{OutputStream, StreamStopped};
+pub use stream::{OutputStream, StreamStopped, PLAIN_TAIL_LIMIT};
+
+/// 購読が追いつかなかった / 閉じたことを表す。利用側が tokio を直接知らずに済むように出す。
+pub use tokio::sync::broadcast::error::RecvError;

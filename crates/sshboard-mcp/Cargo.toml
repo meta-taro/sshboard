@@ -8,6 +8,7 @@ repository.workspace = true
 
 [dependencies]
 sshboard-band = { path = "../sshboard-band" }
+sshboard-stream = { path = "../sshboard-stream" }
 rmcp = { version = "3.1.4", features = [
     "server",
     "macros",

@@ -74,3 +74,73 @@ async fn a_face_that_nobody_is_watching_does_not_stop_the_other() {
     // Assert
     assert_eq!(plain.recv().await.expect("来ていない"), "only mcp\n");
 }
+
+#[tokio::test]
+async fn the_plain_tail_keeps_what_was_streamed_before_anyone_asked() {
+    // MCP は途中から尋ねてくる。購読していなかった分が消えていると `read_log` が空になる。
+    // Arrange
+    let stream = OutputStream::new();
+
+    // Act
+    stream.push(b"\x1b[31mfirst\x1b[0m\n").expect("流せない");
+    stream.push(b"second\n").expect("流せない");
+
+    // Assert
+    assert_eq!(stream.plain_tail(), "first\nsecond\n");
+}
+
+#[tokio::test]
+async fn the_plain_tail_never_carries_an_escape_byte() {
+    // Arrange
+    let stream = OutputStream::new();
+
+    // Act
+    stream
+        .push(b"\x1b]0;title\x07\x1b[1;32mok\x1b[0m\r\n")
+        .expect("流せない");
+
+    // Assert
+    let tail = stream.plain_tail();
+    assert!(!tail.contains('\x1b'), "ANSI が混ざっている: {tail:?}");
+    assert_eq!(tail, "ok\n");
+}
+
+#[tokio::test]
+async fn the_plain_tail_is_bounded_and_drops_the_oldest() {
+    // `tail -f` を何時間も流す。青天井にしない。
+    // Arrange
+    let stream = OutputStream::new();
+    let chunk = "x".repeat(8 * 1024);
+
+    // Act — 上限を明らかに超えるまで流す
+    for _ in 0..32 {
+        stream.push(chunk.as_bytes()).expect("流せない");
+    }
+
+    // Assert
+    let tail = stream.plain_tail();
+    assert!(
+        tail.len() <= sshboard_stream::PLAIN_TAIL_LIMIT,
+        "上限を超えている: {}",
+        tail.len()
+    );
+    assert!(!tail.is_empty());
+}
+
+#[tokio::test]
+async fn trimming_the_tail_never_splits_a_character_in_half() {
+    // 日本語のログで上限を超えたときに、文字を割らない。
+    // Arrange
+    let stream = OutputStream::new();
+    let japanese = "設定ファイルを読み込みました\n".repeat(64);
+
+    // Act
+    for _ in 0..64 {
+        stream.push(japanese.as_bytes()).expect("流せない");
+    }
+
+    // Assert — String である時点で妥当だが、切り方を間違えると panic するので走らせる意味がある
+    let tail = stream.plain_tail();
+    assert!(tail.len() <= sshboard_stream::PLAIN_TAIL_LIMIT);
+    assert!(tail.ends_with('\n'), "末尾が壊れている");
+}

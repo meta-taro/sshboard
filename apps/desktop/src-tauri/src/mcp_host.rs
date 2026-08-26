@@ -3,8 +3,11 @@
 //! **別バイナリにしない。別プロセスにしない。**
 //! GUI と MCP が同じ帯・同じ Operation Engine を共有することが製品の前提（PRD §4-1）。
 
+use std::sync::Arc;
+
 use sshboard_band::Band;
 use sshboard_mcp::DEFAULT_ACK_TIMEOUT;
+use sshboard_stream::OutputStream;
 use tauri::{AppHandle, Emitter, Manager};
 
 use crate::commands::McpUrl;
@@ -17,9 +20,10 @@ pub const MCP_READY_EVENT: &str = "mcp://ready";
 /// 実際に試してから決める。
 const MCP_PORT: u16 = 0;
 
-pub fn spawn(app: AppHandle, band: Band) {
+pub fn spawn(app: AppHandle, band: Band, stream: Arc<OutputStream>) {
     tauri::async_runtime::spawn(async move {
-        let endpoint = match sshboard_mcp::serve(band, MCP_PORT, DEFAULT_ACK_TIMEOUT).await {
+        let endpoint = match sshboard_mcp::serve(band, stream, MCP_PORT, DEFAULT_ACK_TIMEOUT).await
+        {
             Ok(endpoint) => endpoint,
             Err(error) => {
                 // 立たなかったことを黙らない。GUI だけ動いて MCP が死んでいる状態が

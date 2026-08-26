@@ -1,10 +1,13 @@
 //! 画面から呼ばれる口。
 
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 use tauri::State;
 
+use sshboard_stream::OutputStream;
+
 use crate::pending::PendingLines;
+use crate::stream_host;
 
 /// MCP の口の URL。立ち上がるまでは `None`。
 #[derive(Default)]
@@ -33,4 +36,21 @@ pub fn band_ack(seq: u64, pending: State<'_, PendingLines>) -> Result<(), String
 #[tauri::command]
 pub fn mcp_url(url: State<'_, McpUrl>) -> Option<String> {
     url.get()
+}
+
+/// **Phase 0 限りの確認用。**サーバーへ繋がずに色付きの出力を流す。
+/// 002 が通ったら本物の `tail -f` に差し替える。
+#[tauri::command]
+pub fn start_demo_stream(stream: State<'_, Arc<OutputStream>>) -> Result<(), String> {
+    if stream.is_stopped() {
+        return Err("この出力は止められています".to_owned());
+    }
+    stream_host::spawn_demo(Arc::clone(&stream));
+    Ok(())
+}
+
+/// 人が止める（PRD §4-3）。**止めたあとは流れない。**
+#[tauri::command]
+pub fn stop_stream(stream: State<'_, Arc<OutputStream>>) {
+    stream.stop();
 }
