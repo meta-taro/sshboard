@@ -244,3 +244,54 @@ MCP ツールは、操作を帯へ載せ、**画面が受け取りを返して�
   WKWebView はウィンドウが前面に無いと rAF を止める。この製品は「人はエディタを見ていて、
   AI が裏で動く」使い方が普通なので、描画を待つ作りにすると**背面にした瞬間に
   MCP が全部失敗する。**2026-08-26 に実機で踏んだ
+
+---
+
+## D17. ウィンドウのヘッダーは自前にする — 【決定・2026-08-26】
+
+Windows / macOS とも自前のタイトルバーにする（`decorations: false`）。
+ただし **sshboard で新規に書かない。**dbboard の実装を `boardkit`（仮）へ
+引き上げてから使う（D5）。
+
+**Why:**
+
+- **house style。**dbboard / md-business / 連動くん が全部自前。
+  Windows だけネイティブにすると**別製品に見える**
+- **PRD §1 の 2 ユーザーで基準が割れている。**
+  主（AI と保守する開発者）が一日中見ている窓は VSCode で、**VSCode は Windows でも自前**。
+  副（従来の慣習でないと作業できない担当者）は WinSCP / Tera Term でネイティブ。
+  **割れは主ユーザー側＝自前に倒す**
+- 初版は「Windows はネイティブのまま」と起草したが、**副ユーザーしか数えていなかった**ため変更した
+
+**How to apply:**
+
+- **実装は Phase 1-A。**Phase 0 では触らない
+- **sshboard で書き下ろさない。**dbboard の実装を引き上げる。
+  3 本目で 3 つ目の実装を作らないため（D5）
+- **Windows 11 の Snap Layouts を落とさないこと。**
+  Electron には `titleBarOverlay` があり、キャプションボタンだけシステムに描かせられる
+  （VSCode はこれ）。**Tauri 2 に同等の機能は無い。**`decorations: false` のままだと、
+  最大化ボタンのホバーで出るレイアウト候補が消える。
+  `WM_NCHITTEST` で `HTMAXBUTTON` を返す処理が要る
+- 既存プラグイン（`tauri-plugin-decorum` 等）を使うかは、
+  メンテ状況・ライセンス・代替を見てから決める（baseline §12）
+
+**dbboard の実物を見て分かったこと（2026-08-26・追記）:**
+
+- **dbboard は Tauri 2 + SvelteKit。**構成も `apps/desktop/src-tauri` + `crates/*` で
+  sshboard と同型。**そのまま流用できる**
+- ヘッダーは `decorations: false` + `<header data-tauri-drag-region>`。
+  ボタンは `@tauri-apps/api/window` の `minimize` / `toggleMaximize` / `close`、
+  `onResized` で `isMaximized` を追う。**Rust 側は 1 行も無い**
+  （`apps/desktop/src/lib/window/titlebar.svelte.ts` 約 90 行 ＋ `TopBar.svelte`）
+- 要る権限: `core:window:allow-minimize` / `allow-toggle-maximize` / `allow-close` /
+  `allow-start-dragging` / `allow-is-maximized`
+- **Snap Layouts は解いていない。**`WM_NCHITTEST` も `HTMAXBUTTON` も `decorum` も
+  リポジトリに無い。**既存製品でも Windows 11 のレイアウト候補は出ていない。**
+  解決済みではなく、未解決のまま揃っている
+
+**Snap Layouts をどうするか — 揃える（＝落とす）。**
+
+Phase 1 の勝敗は「往復が消えるか」（PRD §2）で決まり、ここでは決まらない。
+Win32 を書くコストは今の段階では高すぎる。**製品間で挙動が揃うこと自体が利点**でもある。
+実利用者から要望が出たら、**boardkit で 1 回だけ解く**（D5 の順序）。
