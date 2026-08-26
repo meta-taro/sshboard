@@ -2,7 +2,11 @@
 # 2 本目（git-qa）を書くときに、実測で重複した部分だけを引き上げられる形にしておく。
 [workspace]
 resolver = "2"
-members = ["crates/sshboard-band", "crates/sshboard-mcp"]
+members = [
+    "apps/desktop/src-tauri",
+    "crates/sshboard-band",
+    "crates/sshboard-mcp",
+]
 
 [workspace.package]
 version = "0.0.0"

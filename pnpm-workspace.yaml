@@ -1,0 +1,10 @@
+packages:
+  - apps/*
+
+# npm はサプライチェーン攻撃の標的になりやすい。pnpm 側の防御を明示的に入れる
+# （product-baseline §1）。
+#   onlyBuiltDependencies … install script を走らせてよいパッケージの許可リスト。
+#                           空 = どれも走らせない。必要になったものだけ足す
+#   minimumReleaseAge     … 公開直後のバージョンを隔離する分数（1440 = 24 時間）
+onlyBuiltDependencies: []
+minimumReleaseAge: 1440

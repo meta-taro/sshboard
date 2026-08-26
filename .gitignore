@@ -6,9 +6,11 @@ build/
 coverage/
 
 # Rust / Tauri
+# 中間にスラッシュを含むパターンはリポジトリルート固定になる。
+# apps/ の下にも src-tauri があるので ** を付ける。
 target/
-src-tauri/target/
-src-tauri/gen/
+**/src-tauri/target/
+**/src-tauri/gen/
 
 # 環境
 .env

@@ -1,0 +1,83 @@
+name: ci
+
+# 手元のゲートが環境要因で動かないときも、ここが最終ゲートになる
+# （product-baseline §5）。**落ちたまま放置しない。無効化して通したことにしない。**
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - master
+      - develop
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  # 帯と MCP は GUI に依存しない。だから 3 OS すべてで素直に走る。
+  core:
+    name: core (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Rust をツールチェイン指定で用意
+        run: rustup show
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: format
+        run: cargo fmt --all -- --check
+
+      - name: clippy
+        run: cargo clippy -p sshboard-band -p sshboard-mcp --all-targets -- -D warnings
+
+      - name: test
+        run: cargo test -p sshboard-band -p sshboard-mcp
+
+  # Tauri のアプリ本体。Windows / macOS が対象 OS（PRD §7）。
+  # Linux は対象外なので、GUI 依存のビルドを Linux へ持ち込まない。
+  desktop:
+    name: desktop (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Rust をツールチェイン指定で用意
+        run: rustup show
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: 依存を入れる
+        run: pnpm install --frozen-lockfile
+
+      - name: 型検査
+        run: pnpm --filter desktop check
+
+      - name: フロントをビルド
+        run: pnpm --filter desktop build
+
+      - name: clippy
+        run: cargo clippy -p sshboard-desktop --all-targets -- -D warnings
+
+      - name: test
+        run: cargo test -p sshboard-desktop

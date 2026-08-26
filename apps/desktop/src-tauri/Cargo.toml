@@ -1,0 +1,24 @@
+[package]
+name = "sshboard-desktop"
+description = "sshboard のデスクトップアプリ。GUI と MCP が同じプロセスに同居する。"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lib]
+name = "sshboard_desktop_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+sshboard-band = { path = "../../../crates/sshboard-band" }
+sshboard-mcp = { path = "../../../crates/sshboard-mcp" }
+tauri = { version = "2", features = [] }
+tokio = { workspace = true, features = ["rt-multi-thread"] }
+serde = { version = "1", features = ["derive"] }
+
+[dev-dependencies]
+tokio = { version = "1", features = ["sync", "time", "macros", "rt", "rt-multi-thread"] }
