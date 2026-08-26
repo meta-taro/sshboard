@@ -1,0 +1,5 @@
+# ツールチェインを固定する。CI と手元で別のコンパイラが走ると、
+# 「手元では通るが CI で落ちる」を型エラーで踏む。
+[toolchain]
+channel = "1.98.0"
+components = ["rustfmt", "clippy"]

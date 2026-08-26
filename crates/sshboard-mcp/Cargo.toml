@@ -1,0 +1,24 @@
+[package]
+name = "sshboard-mcp"
+description = "アプリに同居する MCP サーバーの殻。GUI には依存しない。"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+sshboard-band = { path = "../sshboard-band" }
+rmcp = { version = "3.1.4", features = [
+    "server",
+    "macros",
+    "transport-streamable-http-server",
+] }
+tokio = { workspace = true, features = ["net"] }
+axum = "0.8"
+tokio-util = "0.7"
+
+[dev-dependencies]
+tokio = { version = "1", features = ["sync", "time", "macros", "rt", "rt-multi-thread"] }
+# 実際の MCP クライアントと同じく、生の JSON-RPC を HTTP で投げて確かめる。
+reqwest = { version = "0.12", default-features = false, features = ["json"] }
+serde_json = "1"

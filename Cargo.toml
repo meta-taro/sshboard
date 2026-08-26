@@ -1,0 +1,14 @@
+# ワークスペース。配管は crate 境界へ置く（decisions D5）。
+# 2 本目（git-qa）を書くときに、実測で重複した部分だけを引き上げられる形にしておく。
+[workspace]
+resolver = "2"
+members = ["crates/sshboard-band", "crates/sshboard-mcp"]
+
+[workspace.package]
+version = "0.0.0"
+edition = "2021"
+license = "MIT"
+repository = "https://github.com/meta-taro/sshboard"
+
+[workspace.dependencies]
+tokio = { version = "1", features = ["sync", "time", "macros", "rt"] }
