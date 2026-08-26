@@ -6,6 +6,7 @@ members = [
     "apps/desktop/src-tauri",
     "crates/sshboard-band",
     "crates/sshboard-mcp",
+    "crates/sshboard-stream",
 ]
 
 [workspace.package]

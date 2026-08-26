@@ -1,0 +1,13 @@
+[package]
+name = "sshboard-stream"
+description = "1 本の出力を、GUI へは生のまま・MCP へは素のテキストで流す。"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+tokio = { workspace = true }
+
+[dev-dependencies]
+tokio = { version = "1", features = ["sync", "time", "macros", "rt", "rt-multi-thread"] }
