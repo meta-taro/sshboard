@@ -1,0 +1,28 @@
+[package]
+name = "sshboard-credentials"
+description = "資格情報を OS ストアと ssh-agent へ委譲する。自前の鍵ストアを持たない（D11）。"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+base64 = "0.22"
+sha2 = "0.10"
+# keyring 3.x は既定の資格情報バックエンドを 1 つも持たない。
+# `keyring = "3"` だけだと **in-memory の mock** に解決され、書き込みは Ok を返すのに
+# 永続化されない（dbboard ADR-0033 が Windows の初回実機で踏んでいる）。
+# 実物は target ごとに明示して opt-in する（下）。この 1 行は、3 つの cfg の
+# どれにも当たらない環境でもコンパイルが通るようにするためだけのもの。
+keyring = "3"
+
+# Linux の secret-service バックエンドは dbus の C バインディングを引く。
+# Windows / macOS でビルドさせないため target ごとに分ける。
+[target.'cfg(windows)'.dependencies]
+keyring = { version = "3", features = ["windows-native"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+keyring = { version = "3", features = ["apple-native"] }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+keyring = { version = "3", features = ["linux-native-sync-persistent", "crypto-rust"] }

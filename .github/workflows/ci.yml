@@ -38,10 +38,17 @@ jobs:
         run: cargo fmt --all -- --check
 
       - name: clippy
-        run: cargo clippy -p sshboard-band -p sshboard-mcp --all-targets -- -D warnings
+        run: cargo clippy -p sshboard-band -p sshboard-mcp -p sshboard-stream -p sshboard-credentials --all-targets -- -D warnings
 
       - name: test
-        run: cargo test -p sshboard-band -p sshboard-mcp
+        run: cargo test -p sshboard-band -p sshboard-mcp -p sshboard-stream
+
+      # 資格情報は OS のストアを実際に触る。**対象 OS は Windows と macOS**（PRD §7）で、
+      # Linux ランナーには当てにできる資格情報ストアが無い。
+      # ここで走らせないと、keyring が mock に落ちていても検出できない（dbboard ADR-0033）。
+      - name: test (資格情報・Windows / macOS のみ)
+        if: runner.os != 'Linux'
+        run: cargo test -p sshboard-credentials
 
   # Tauri のアプリ本体。Windows / macOS が対象 OS（PRD §7）。
   # Linux は対象外なので、GUI 依存のビルドを Linux へ持ち込まない。
