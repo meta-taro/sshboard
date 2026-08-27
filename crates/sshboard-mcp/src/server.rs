@@ -177,6 +177,8 @@ impl SshboardMcp {
             keyring_passphrase_ref: None,
             fingerprint: None,
             known_hosts: None,
+            color: request.color.filter(|value| !value.trim().is_empty()),
+            tag: request.tag.filter(|value| !value.trim().is_empty()),
         };
 
         let next = Connections {
@@ -199,6 +201,66 @@ impl SshboardMcp {
         Ok(format!("registered `{}`", request.id))
     }
 
+    /// 既にある接続に**印（タグと色）だけ**を付ける。
+    ///
+    /// **ホストも利用者名も鍵も変えられません**（D21）。
+    /// サーバーへは 1 バイトも書きません。
+    #[tool(
+        description = "Set the tag and colour mark on an existing connection. Changes only the mark - never the host, user, or key. Writes only to the local config file."
+    )]
+    pub async fn mark_connection(
+        &self,
+        Parameters(request): Parameters<MarkConnection>,
+    ) -> Result<String, ErrorData> {
+        check_id(&request.id)?;
+        self.show(&format!("mark_connection {}", request.id))
+            .await?;
+
+        let path = self.connections_file()?;
+        let held = Connections::load_or_empty(&path).map_err(|error| {
+            ErrorData::internal_error(format!("cannot read connections: {error}"), None)
+        })?;
+
+        if held.get(&request.id).is_none() {
+            return Err(ErrorData::invalid_params(
+                format!("connection `{}` is not registered", request.id),
+                None,
+            ));
+        }
+
+        // **作り直して差し替える。**元の一覧を書き換えない。
+        let marked: Vec<ConnectionEntry> = held
+            .connections
+            .into_iter()
+            .map(|entry| {
+                if entry.id != request.id {
+                    return entry;
+                }
+                ConnectionEntry {
+                    color: blank_to_none(request.color.clone()),
+                    tag: blank_to_none(request.tag.clone()),
+                    ..entry
+                }
+            })
+            .collect();
+
+        // 配色に無い色・長すぎるタグは、ここで save が弾く。
+        Connections {
+            version: held.version,
+            connections: marked,
+        }
+        .save(&path)
+        .map_err(|error| {
+            ErrorData::invalid_params(format!("cannot save connections: {error}"), None)
+        })?;
+
+        if let Some(watch) = &self.connections_watch {
+            watch.notify();
+        }
+
+        Ok(format!("marked `{}`", request.id))
+    }
+
     /// 登録された接続の一覧。
     ///
     /// **識別子と名前だけを返します。**ホスト名・IP・利用者名・鍵のパス・
@@ -214,6 +276,23 @@ impl SshboardMcp {
             ErrorData::internal_error(format!("cannot render connections: {error}"), None)
         })
     }
+}
+
+/// `mark_connection` の引数。**印だけを変えます。**
+///
+/// ホストも利用者名も鍵も変えられません。**接続先を書き換える口にしない。**
+#[derive(Debug, Deserialize, rmcp::schemars::JsonSchema)]
+#[schemars(crate = "rmcp::schemars")]
+pub struct MarkConnection {
+    /// 印を付ける接続の識別子。
+    pub id: String,
+    /// タグ。`prod` / `本番` / `開発2` など。**12 文字まで。**空文字で外す。
+    #[serde(default)]
+    pub tag: Option<String>,
+    /// 色。`red` `orange` `yellow` `green` `teal` `blue` `purple` `pink` のどれか。
+    /// **16 進数は受け付けません。**空文字で外す。
+    #[serde(default)]
+    pub color: Option<String>,
 }
 
 /// `register_connection` の引数。
@@ -234,6 +313,13 @@ pub struct RegisterConnection {
     /// 秘密鍵のパス。**省略すると ssh-agent を使う**（推奨）。
     #[serde(default)]
     pub key_path: Option<String>,
+    /// 印のタグ。`prod` / `本番` / `開発2` など。**12 文字まで。**
+    #[serde(default)]
+    pub tag: Option<String>,
+    /// 印の色。`red` `orange` `yellow` `green` `teal` `blue` `purple` `pink` のどれか。
+    /// **16 進数は受け付けません**（配色側が明暗を選ぶため）。
+    #[serde(default)]
+    pub color: Option<String>,
 }
 
 fn default_ssh_port() -> u16 {
@@ -245,6 +331,11 @@ impl ServerHandler for SshboardMcp {
     fn get_info(&self) -> ServerInfo {
         ServerInfo::new(ServerCapabilities::builder().enable_tools().build())
     }
+}
+
+/// 空文字は「印なし」。**空文字をそのまま保存すると、空のタグが行に出る。**
+fn blank_to_none(value: Option<String>) -> Option<String> {
+    value.filter(|held| !held.trim().is_empty())
 }
 
 /// 識別子はファイルにも帯にも出る。**変な文字を通さない。**

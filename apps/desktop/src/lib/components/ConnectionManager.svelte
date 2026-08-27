@@ -3,7 +3,14 @@
 	import { listen } from '@tauri-apps/api/event';
 	import { onMount } from 'svelte';
 
-	import { emptyConnection, isPuttyKey, whyNotSavable, type Connection } from '$lib/connections';
+	import {
+		CONNECTION_COLORS,
+		CONNECTION_TAG_MAX_CHARS,
+		emptyConnection,
+		isPuttyKey,
+		whyNotSavable,
+		type Connection
+	} from '$lib/connections';
 
 	let items = $state<Connection[]>([]);
 	let draft = $state<Connection>(emptyConnection());
@@ -105,7 +112,20 @@
 							class:selected={item.id === selectedId}
 							onclick={() => edit(item)}
 						>
-							<span class="row-name">{item.name || item.id}</span>
+							<span class="row-top">
+								<span
+									class="chip"
+									style:background={item.color ? `var(--mark-${item.color})` : 'transparent'}
+									style:border-color={item.color ? `var(--mark-${item.color})` : '#3a4049'}
+									aria-hidden="true"
+								></span>
+								<span class="row-name">{item.name || item.id}</span>
+								{#if item.tag}
+									<span class="row-tag" style:color={item.color ? `var(--mark-${item.color})` : '#8b929e'}>
+										{item.tag}
+									</span>
+								{/if}
+							</span>
 							<span class="row-id">{item.id}</span>
 						</button>
 					</li>
@@ -161,6 +181,38 @@
 			</small>
 		</label>
 
+		<div class="pair">
+			<label>
+				<span>タグ（{CONNECTION_TAG_MAX_CHARS} 文字まで）</span>
+				<input bind:value={draft.tag} placeholder="本番 / 開発 / 開発2" />
+				<small>色が見えなくても効く方の印です。白黒の画面写真でも読めます。</small>
+			</label>
+			<label>
+				<span>色</span>
+				<div class="swatches">
+					<button
+						type="button"
+						class="swatch none"
+						class:picked={!draft.color}
+						title="印なし"
+						aria-label="印なし"
+						onclick={() => (draft.color = null)}
+					></button>
+					{#each CONNECTION_COLORS as color (color)}
+						<button
+							type="button"
+							class="swatch"
+							class:picked={draft.color === color}
+							style:background="var(--mark-{color})"
+							title={color}
+							aria-label={color}
+							onclick={() => (draft.color = color)}
+						></button>
+					{/each}
+				</div>
+			</label>
+		</div>
+
 		{#if puttyWarning}
 			<p class="warning" role="alert">
 				<strong>これは PuTTY 形式（.ppk）です。</strong>OpenSSH 系は読めません。先に変換してください。
@@ -184,6 +236,20 @@
 <style>
 	/* 見た目は決まっていません（DESIGN.md）。
 	   左に一覧・右に入力の 2 面は HeidiSQL / WinSCP のサイトマネージャに合わせています。 */
+	/* 印の色。**16 進数を設定ファイルに書かず、名前で持つ**（Rust 側の CONNECTION_COLORS）。
+	   ここが「名前 → 実際の色」の対応表で、明暗のテーマを足すときはここだけ増やす。
+	   **配色そのものは仮置きです**（DESIGN.md）。 */
+	.manager {
+		--mark-red: #d9534f;
+		--mark-orange: #e08a3c;
+		--mark-yellow: #d9b03c;
+		--mark-green: #4fa85f;
+		--mark-teal: #3a8f7a;
+		--mark-blue: #4a86c8;
+		--mark-purple: #8a6fc4;
+		--mark-pink: #c46f9e;
+	}
+
 	.manager {
 		display: grid;
 		grid-template-columns: 220px 1fr;
@@ -238,6 +304,59 @@
 	.row.selected {
 		border-color: #3a8f7a;
 		background: #1d2129;
+	}
+
+	.row-top {
+		display: flex;
+		align-items: center;
+		gap: 0.35rem;
+	}
+
+	.chip {
+		width: 8px;
+		height: 8px;
+		border-radius: 2px;
+		border: 1px solid;
+		flex: none;
+	}
+
+	.row-name {
+		flex: 1;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	.row-tag {
+		font-size: 0.68rem;
+		border: 1px solid currentColor;
+		border-radius: 2px;
+		padding: 0 0.25rem;
+		flex: none;
+	}
+
+	.swatches {
+		display: flex;
+		gap: 0.25rem;
+		flex-wrap: wrap;
+	}
+
+	.swatch {
+		width: 18px;
+		height: 18px;
+		padding: 0;
+		border-radius: 3px;
+		border: 1px solid #333944;
+		cursor: pointer;
+	}
+
+	.swatch.none {
+		background: repeating-linear-gradient(45deg, #22262e, #22262e 3px, #2c313a 3px, #2c313a 6px);
+	}
+
+	.swatch.picked {
+		outline: 2px solid #d7dae0;
+		outline-offset: 1px;
 	}
 
 	.row-id {

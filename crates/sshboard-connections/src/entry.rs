@@ -47,6 +47,16 @@ pub struct ConnectionEntry {
     /// `known_hosts` のパス。無ければ既定の場所を使う。
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub known_hosts: Option<String>,
+
+    /// 印の色。**16 進数ではなく [`CONNECTION_COLORS`](crate::CONNECTION_COLORS) の名前。**
+    /// `None` が普通の状態（印なし）。
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub color: Option<String>,
+
+    /// 印のタグ。人が自分で書く数文字（`prod` / `本番` / `開発2`）。
+    /// **色が見えなくても効く方**の印。
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tag: Option<String>,
 }
 
 /// **AI へ渡す形。**
@@ -58,6 +68,10 @@ pub struct ConnectionEntry {
 pub struct ConnectionSummary {
     pub id: String,
     pub name: String,
+    /// **タグは AI にも見せます。**`本番` と `開発` の区別が付くこと自体が安全側に効くため。
+    /// 人が自分で書いたラベルであって、認証情報でもホスト名でもありません。
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tag: Option<String>,
 }
 
 impl ConnectionEntry {
@@ -66,6 +80,7 @@ impl ConnectionEntry {
         ConnectionSummary {
             id: self.id.clone(),
             name: self.name.clone(),
+            tag: self.tag.clone(),
         }
     }
 

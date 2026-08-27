@@ -6,4 +6,4 @@ mod http;
 mod server;
 
 pub use http::{serve, McpEndpoint, MCP_PATH};
-pub use server::{RegisterConnection, SshboardMcp, DEFAULT_ACK_TIMEOUT};
+pub use server::{MarkConnection, RegisterConnection, SshboardMcp, DEFAULT_ACK_TIMEOUT};

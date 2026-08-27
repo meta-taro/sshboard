@@ -229,6 +229,8 @@ fn registration(id: &str) -> Parameters<RegisterConnection> {
         port: 2222,
         user: "secret-user".to_owned(),
         key_path: None,
+        tag: Some("本番".to_owned()),
+        color: Some("red".to_owned()),
     })
 }
 
@@ -322,4 +324,82 @@ async fn register_connection_rejects_an_unusable_id() {
 
     // Assert
     assert!(result.is_err(), "空白入りの識別子を通している");
+}
+
+#[tokio::test]
+async fn mark_connection_changes_only_the_mark() {
+    // **接続先を書き換える口にしない**（D21）。
+    // Arrange
+    let dir = tempfile::tempdir().expect("一時ディレクトリを作れない");
+    let path = dir.path().join("connections.toml");
+    let server =
+        SshboardMcp::new(Band::new(), Arc::new(OutputStream::new())).with_connections(path.clone());
+    server
+        .register_connection(registration("web-prod"))
+        .await
+        .expect("登録できない");
+
+    // Act
+    server
+        .mark_connection(Parameters(sshboard_mcp::MarkConnection {
+            id: "web-prod".to_owned(),
+            tag: Some("開発2".to_owned()),
+            color: Some("blue".to_owned()),
+        }))
+        .await
+        .expect("印を付けられない");
+
+    // Assert
+    let written = std::fs::read_to_string(&path).expect("ファイルが無い");
+    assert!(written.contains("開発2"), "タグが入っていない: {written}");
+    assert!(written.contains("blue"), "色が入っていない: {written}");
+    assert!(
+        written.contains("secret-host"),
+        "ホストが消えている: {written}"
+    );
+}
+
+#[tokio::test]
+async fn a_colour_outside_the_palette_is_refused() {
+    // 16 進数を書くと、対応する配色の定義が無い値がファイルに入る。
+    // Arrange
+    let dir = tempfile::tempdir().expect("一時ディレクトリを作れない");
+    let server = SshboardMcp::new(Band::new(), Arc::new(OutputStream::new()))
+        .with_connections(dir.path().join("connections.toml"));
+    server
+        .register_connection(registration("web-prod"))
+        .await
+        .expect("登録できない");
+
+    // Act
+    let result = server
+        .mark_connection(Parameters(sshboard_mcp::MarkConnection {
+            id: "web-prod".to_owned(),
+            tag: None,
+            color: Some("#1a73e8".to_owned()),
+        }))
+        .await;
+
+    // Assert
+    assert!(result.is_err(), "配色に無い色を通している");
+}
+
+#[tokio::test]
+async fn marking_a_connection_that_is_not_registered_fails() {
+    // Arrange
+    let dir = tempfile::tempdir().expect("一時ディレクトリを作れない");
+    let server = SshboardMcp::new(Band::new(), Arc::new(OutputStream::new()))
+        .with_connections(dir.path().join("connections.toml"));
+
+    // Act
+    let result = server
+        .mark_connection(Parameters(sshboard_mcp::MarkConnection {
+            id: "nope".to_owned(),
+            tag: Some("本番".to_owned()),
+            color: None,
+        }))
+        .await;
+
+    // Assert
+    assert!(result.is_err(), "知らない接続に印を付けている");
 }

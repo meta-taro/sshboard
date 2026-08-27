@@ -10,6 +10,7 @@ use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize};
 
 use crate::entry::{ConnectionEntry, ConnectionSummary};
+use crate::mark::{is_connection_color, is_connection_tag, CONNECTION_TAG_MAX_CHARS};
 
 /// いまの書式。**上げたら、読めない版を黙って捨てない。**
 pub const CURRENT_VERSION: u32 = 1;
@@ -25,6 +26,10 @@ pub enum ConnectionsError {
     DuplicateId { id: String },
     /// 識別子が空。
     EmptyId,
+    /// 配色に無い色。**書くと、対応する定義が無い値がファイルに入る。**
+    UnknownColor { id: String, color: String },
+    /// タグが行に載らない長さ。
+    TagTooLong { id: String, chars: usize },
     /// ファイルを触れない。
     Io { detail: String },
     /// 置き場所が分からない。
@@ -40,6 +45,12 @@ impl std::fmt::Display for ConnectionsError {
             }
             ConnectionsError::DuplicateId { id } => write!(f, "識別子が重複しています: {id}"),
             ConnectionsError::EmptyId => write!(f, "識別子が空の接続があります"),
+            ConnectionsError::UnknownColor { id, color } => {
+                write!(f, "`{id}` の色 `{color}` は配色にありません")
+            }
+            ConnectionsError::TagTooLong { id, chars } => {
+                write!(f, "`{id}` のタグが長すぎます（{chars} 文字・上限 {CONNECTION_TAG_MAX_CHARS} 文字）")
+            }
             ConnectionsError::Io { detail } => write!(f, "接続の一覧を触れません: {detail}"),
             ConnectionsError::NoConfigDirectory => write!(f, "設定の置き場所が分かりません"),
         }
@@ -123,6 +134,26 @@ impl Connections {
                 return Err(ConnectionsError::DuplicateId {
                     id: entry.id.clone(),
                 });
+            }
+
+            // **配色に無い色を書かせない。**書くと、対応する定義が無い値がファイルに入る。
+            if let Some(color) = &entry.color {
+                if !is_connection_color(color) {
+                    return Err(ConnectionsError::UnknownColor {
+                        id: entry.id.clone(),
+                        color: color.clone(),
+                    });
+                }
+            }
+
+            // **文字数で測る。**バイトで測ると、漢字の短いラベルを弾いてしまう。
+            if let Some(tag) = &entry.tag {
+                if !is_connection_tag(tag) {
+                    return Err(ConnectionsError::TagTooLong {
+                        id: entry.id.clone(),
+                        chars: tag.chars().count(),
+                    });
+                }
             }
         }
         Ok(())

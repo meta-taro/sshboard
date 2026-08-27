@@ -251,3 +251,90 @@ async fn the_notice_carries_no_connection_details() {
     let received: () = watcher.recv().await.expect("届いていない");
     assert_eq!(received, ());
 }
+
+const MARKED: &str = r#"
+version = 1
+
+[[connections]]
+id = "prod"
+name = "本番"
+host = "secret-host.invalid"
+user = "secret-user"
+color = "red"
+tag = "本番"
+"#;
+
+#[test]
+fn a_mark_is_read_back() {
+    // Arrange & Act
+    let connections = Connections::parse(MARKED).expect("読めない");
+
+    // Assert
+    let entry = connections.get("prod").expect("prod が無い");
+    assert_eq!(entry.color.as_deref(), Some("red"));
+    assert_eq!(entry.tag.as_deref(), Some("本番"));
+}
+
+#[test]
+fn the_tag_reaches_the_ai_but_the_host_still_does_not() {
+    // **本番と開発の区別が付くこと自体が安全側に効く。**
+    // ただしホスト名と利用者名は、これまでどおり渡さない。
+    // Arrange
+    let connections = Connections::parse(MARKED).expect("読めない");
+
+    // Act
+    let json = serde_json::to_string(&connections.summaries()).expect("serialize できない");
+
+    // Assert
+    assert!(json.contains("本番"), "タグが渡っていない: {json}");
+    assert!(
+        !json.contains("secret-host"),
+        "ホスト名が漏れている: {json}"
+    );
+    assert!(
+        !json.contains("secret-user"),
+        "利用者名が漏れている: {json}"
+    );
+    assert!(!json.contains("red"), "色は AI に要らない: {json}");
+}
+
+#[test]
+fn a_colour_outside_the_palette_is_rejected() {
+    // 16 進数や勝手な名前を書くと、**対応する配色の定義が無い値がファイルに入る。**
+    // Arrange
+    let input = MARKED.replace(r#"color = "red""#, r##"color = "#1a73e8""##);
+
+    // Act
+    let result = Connections::parse(&input);
+
+    // Assert
+    assert!(
+        matches!(result, Err(ConnectionsError::UnknownColor { .. })),
+        "実際: {result:?}"
+    );
+}
+
+#[test]
+fn a_tag_is_measured_in_characters_not_bytes() {
+    // 漢字 12 文字は 36 バイト。**バイトで測ると短い方のラベルを弾く。**
+    // Arrange
+    let just_fits = "本番環境検証開発予備一二"; // 12 文字
+    let one_too_many = "本番環境検証開発予備一二三"; // 13 文字
+    assert_eq!(just_fits.chars().count(), 12, "テストの前提が崩れている");
+    assert_eq!(one_too_many.chars().count(), 13, "テストの前提が崩れている");
+    // 12 文字の漢字は 36 バイト。**バイトで測る実装なら、ここで弾かれる。**
+    assert!(just_fits.len() > 12, "テストの前提が崩れている");
+
+    let ok = MARKED.replace(r#"tag = "本番""#, &format!(r#"tag = "{just_fits}""#));
+    let too_long = MARKED.replace(r#"tag = "本番""#, &format!(r#"tag = "{one_too_many}""#));
+
+    // Act & Assert
+    assert!(Connections::parse(&ok).is_ok(), "12 文字を弾いている");
+    assert!(
+        matches!(
+            Connections::parse(&too_long),
+            Err(ConnectionsError::TagTooLong { .. })
+        ),
+        "13 文字を通している"
+    );
+}
