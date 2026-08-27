@@ -4,6 +4,7 @@
 	import { onMount, tick } from 'svelte';
 
 	import { appendLine, type BandLine } from '$lib/band';
+	import ConnectionManager from '$lib/components/ConnectionManager.svelte';
 	import { createTerminal, writeChunk } from '$lib/terminal.svelte';
 	import '@xterm/xterm/css/xterm.css';
 	import type { Terminal } from '@xterm/xterm';
@@ -12,6 +13,7 @@
 	let mcpUrl = $state<string | null>(null);
 	let failure = $state<string | null>(null);
 	let streaming = $state(false);
+	let view = $state<'connections' | 'band'>('connections');
 
 	let terminalHost: HTMLDivElement | undefined = $state();
 	let terminal: Terminal | undefined;
@@ -124,6 +126,18 @@
 		<p class="failure" role="alert">{failure}</p>
 	{/if}
 
+	<nav class="tabs">
+		<button type="button" class:active={view === 'connections'} onclick={() => (view = 'connections')}>
+			接続
+		</button>
+		<button type="button" class:active={view === 'band'} onclick={() => (view = 'band')}>
+			帯と出力
+		</button>
+	</nav>
+
+	{#if view === 'connections'}
+		<ConnectionManager />
+	{:else}
 	<section class="stream" aria-label="追尾している出力">
 		<div class="stream-head">
 			<span class="label">出力（GUI は色付き / MCP はプレーン）</span>
@@ -147,6 +161,7 @@
 			</ol>
 		{/if}
 	</section>
+	{/if}
 </main>
 
 <style>
@@ -193,6 +208,30 @@
 		background: #3a1d1d;
 		color: #ffb4b4;
 		font-size: 0.8rem;
+	}
+
+	.tabs {
+		display: flex;
+		gap: 0.35rem;
+		border-top: 1px solid #262a31;
+		padding-top: 0.6rem;
+	}
+
+	.tabs button {
+		font: inherit;
+		font-size: 0.78rem;
+		color: #8b929e;
+		background: none;
+		border: 1px solid transparent;
+		border-radius: 3px;
+		padding: 0.2rem 0.7rem;
+		cursor: pointer;
+	}
+
+	.tabs button.active {
+		color: #d7dae0;
+		border-color: #333944;
+		background: #1d2129;
 	}
 
 	.stream {

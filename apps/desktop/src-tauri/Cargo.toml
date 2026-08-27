@@ -15,6 +15,7 @@ tauri-build = { version = "2", features = [] }
 
 [dependencies]
 sshboard-band = { path = "../../../crates/sshboard-band" }
+sshboard-connections = { path = "../../../crates/sshboard-connections" }
 sshboard-mcp = { path = "../../../crates/sshboard-mcp" }
 sshboard-stream = { path = "../../../crates/sshboard-stream" }
 tauri = { version = "2", features = [] }

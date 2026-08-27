@@ -1,0 +1,122 @@
+//! 接続の登録・編集・削除。**人が使う口です。**
+//!
+//! **ここは AI へ渡す口ではありません。**画面（人）はホスト名も利用者名も見ます。
+//! AI が見るのは `list_connections`（MCP 側）が返す識別子と名前だけです
+//! （CLAUDE.md 禁止事項 5）。
+//!
+//! 中身の検証・保存・権限は `sshboard-connections` が持っています。
+//! **ここは薄い橋渡しだけ**にして、試験はそちらに置きます。
+
+use std::path::PathBuf;
+
+use sshboard_band::{Actor, Band};
+use sshboard_connections::{ConnectionEntry, Connections};
+use tauri::State;
+
+/// 接続一覧の置き場所。起動時に決めて持っておく。
+pub struct ConnectionsPath(pub PathBuf);
+
+fn load(path: &ConnectionsPath) -> Result<Connections, String> {
+    Connections::load_or_empty(&path.0).map_err(|error| error.to_string())
+}
+
+/// 人が触ったことも帯へ出す（PRD §4-2「面が違っても記録は 1 本」）。
+///
+/// **識別子だけを載せる。**ホスト名を帯へ出すと、画面の写真に接続先が写る（PRD §8）。
+fn record(band: &Band, text: String) {
+    band.record(Actor::Human, text);
+}
+
+#[tauri::command]
+pub fn connections_list(path: State<'_, ConnectionsPath>) -> Result<Vec<ConnectionEntry>, String> {
+    Ok(load(&path)?.connections)
+}
+
+/// 追加と更新の両方。同じ識別子があれば置き換える。
+#[tauri::command]
+pub fn connection_save(
+    entry: ConnectionEntry,
+    path: State<'_, ConnectionsPath>,
+    band: State<'_, Band>,
+) -> Result<(), String> {
+    let mut connections = load(&path)?;
+
+    let existed = connections
+        .connections
+        .iter()
+        .any(|held| held.id == entry.id);
+    let id = entry.id.clone();
+
+    // **作り直して差し替える。**元の Vec を書き換えない。
+    let next: Vec<ConnectionEntry> = if existed {
+        connections
+            .connections
+            .into_iter()
+            .map(|held| {
+                if held.id == entry.id {
+                    entry.clone()
+                } else {
+                    held
+                }
+            })
+            .collect()
+    } else {
+        connections
+            .connections
+            .into_iter()
+            .chain(std::iter::once(entry))
+            .collect()
+    };
+    connections = Connections {
+        version: connections.version,
+        connections: next,
+    };
+
+    connections
+        .save(&path.0)
+        .map_err(|error| error.to_string())?;
+
+    record(
+        &band,
+        format!(
+            "{} 接続: {id}",
+            if existed {
+                "更新した"
+            } else {
+                "登録した"
+            }
+        ),
+    );
+    Ok(())
+}
+
+#[tauri::command]
+pub fn connection_delete(
+    id: String,
+    path: State<'_, ConnectionsPath>,
+    band: State<'_, Band>,
+) -> Result<(), String> {
+    let connections = load(&path)?;
+
+    let next: Vec<ConnectionEntry> = connections
+        .connections
+        .into_iter()
+        .filter(|held| held.id != id)
+        .collect();
+
+    Connections {
+        version: connections.version,
+        connections: next,
+    }
+    .save(&path.0)
+    .map_err(|error| error.to_string())?;
+
+    record(&band, format!("消した接続: {id}"));
+    Ok(())
+}
+
+/// 一覧の置き場所を画面へ見せる。**人が直接開けるように。**
+#[tauri::command]
+pub fn connections_path(path: State<'_, ConnectionsPath>) -> String {
+    path.0.display().to_string()
+}

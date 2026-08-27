@@ -5,6 +5,7 @@
 
 mod bridge;
 mod commands;
+mod connections_cmd;
 mod mcp_host;
 mod pending;
 mod stream_host;
@@ -29,7 +30,11 @@ pub fn run() {
             commands::band_ack,
             commands::mcp_url,
             commands::start_demo_stream,
-            commands::stop_stream
+            commands::stop_stream,
+            connections_cmd::connections_list,
+            connections_cmd::connections_path,
+            connections_cmd::connection_save,
+            connections_cmd::connection_delete
         ])
         .setup(|app| {
             let band = Band::new();
@@ -37,6 +42,16 @@ pub fn run() {
             // **購読は MCP を立てる前に済ませる。**
             // 逆にすると、画面が繋がる前に来た呼び出しが帯へ出ないまま通ってしまう。
             let subscriber = band.subscribe();
+
+            // 接続一覧の置き場所。**OS の既定の場所**（Windows / macOS で別）。
+            match sshboard_connections::default_path() {
+                Ok(path) => {
+                    app.manage(connections_cmd::ConnectionsPath(path));
+                }
+                // 置き場所が分からないなら、接続管理だけが使えない。
+                // **アプリ全体を止めない。**
+                Err(error) => eprintln!("[sshboard] 接続一覧の置き場所が分かりません: {error}"),
+            }
 
             app.manage(PendingLines::new());
             app.manage(McpUrl::default());

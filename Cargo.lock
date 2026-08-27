@@ -3840,6 +3840,7 @@ version = "0.0.0"
 dependencies = [
  "serde",
  "sshboard-band",
+ "sshboard-connections",
  "sshboard-mcp",
  "sshboard-stream",
  "tauri",
