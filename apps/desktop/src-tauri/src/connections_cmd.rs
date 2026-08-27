@@ -8,9 +8,10 @@
 //! **ここは薄い橋渡しだけ**にして、試験はそちらに置きます。
 
 use std::path::PathBuf;
+use std::sync::Arc;
 
 use sshboard_band::{Actor, Band};
-use sshboard_connections::{ConnectionEntry, Connections};
+use sshboard_connections::{ConnectionEntry, Connections, ConnectionsWatch};
 use tauri::State;
 
 /// 接続一覧の置き場所。起動時に決めて持っておく。
@@ -38,6 +39,7 @@ pub fn connection_save(
     entry: ConnectionEntry,
     path: State<'_, ConnectionsPath>,
     band: State<'_, Band>,
+    watch: State<'_, Arc<ConnectionsWatch>>,
 ) -> Result<(), String> {
     let mut connections = load(&path)?;
 
@@ -87,6 +89,7 @@ pub fn connection_save(
             }
         ),
     );
+    watch.notify();
     Ok(())
 }
 
@@ -95,6 +98,7 @@ pub fn connection_delete(
     id: String,
     path: State<'_, ConnectionsPath>,
     band: State<'_, Band>,
+    watch: State<'_, Arc<ConnectionsWatch>>,
 ) -> Result<(), String> {
     let connections = load(&path)?;
 
@@ -112,6 +116,7 @@ pub fn connection_delete(
     .map_err(|error| error.to_string())?;
 
     record(&band, format!("消した接続: {id}"));
+    watch.notify();
     Ok(())
 }
 
@@ -120,3 +125,23 @@ pub fn connection_delete(
 pub fn connections_path(path: State<'_, ConnectionsPath>) -> String {
     path.0.display().to_string()
 }
+
+/// 一覧が変わったことを画面へ流し続ける。
+///
+/// **中身は流さない。**「変わった」だけを送り、画面が読み直す。
+/// 中身を流すと、イベントに接続先が乗る（PRD §8）。
+pub fn spawn_bridge(app: tauri::AppHandle, watch: Arc<ConnectionsWatch>) {
+    use tauri::Emitter;
+
+    let mut changes = watch.subscribe();
+    tauri::async_runtime::spawn(async move {
+        while changes.recv().await.is_ok() {
+            if let Err(error) = app.emit(CONNECTIONS_CHANGED_EVENT, ()) {
+                eprintln!("[sshboard] 接続一覧の変更を画面へ渡せません: {error}");
+            }
+        }
+    });
+}
+
+/// 画面が待ち受けるイベント名。
+pub const CONNECTIONS_CHANGED_EVENT: &str = "connections://changed";

@@ -6,6 +6,7 @@
 use std::sync::Arc;
 
 use sshboard_band::Band;
+use sshboard_connections::ConnectionsWatch;
 use sshboard_mcp::DEFAULT_ACK_TIMEOUT;
 use sshboard_stream::OutputStream;
 use tauri::{AppHandle, Emitter, Manager};
@@ -20,9 +21,21 @@ pub const MCP_READY_EVENT: &str = "mcp://ready";
 /// 実際に試してから決める。
 const MCP_PORT: u16 = 0;
 
-pub fn spawn(app: AppHandle, band: Band, stream: Arc<OutputStream>) {
+pub fn spawn(
+    app: AppHandle,
+    band: Band,
+    stream: Arc<OutputStream>,
+    connections_watch: Arc<ConnectionsWatch>,
+) {
     tauri::async_runtime::spawn(async move {
-        let endpoint = match sshboard_mcp::serve(band, stream, MCP_PORT, DEFAULT_ACK_TIMEOUT).await
+        let endpoint = match sshboard_mcp::serve(
+            band,
+            stream,
+            connections_watch,
+            MCP_PORT,
+            DEFAULT_ACK_TIMEOUT,
+        )
+        .await
         {
             Ok(endpoint) => endpoint,
             Err(error) => {

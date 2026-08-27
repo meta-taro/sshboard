@@ -216,3 +216,38 @@ fn the_saved_file_is_readable_only_by_its_owner() {
         & 0o777;
     assert_eq!(mode, 0o600, "他の利用者に読めます: {mode:o}");
 }
+
+#[tokio::test]
+async fn a_change_notice_reaches_whoever_is_watching() {
+    // 一覧は人（GUI）と AI（MCP）の両方が書き換える。
+    // **押し出さないと、AI が足した接続を人が知らないままになる**（PRD §4-2）。
+    // Arrange
+    let watch = sshboard_connections::ConnectionsWatch::new();
+    let mut watcher = watch.subscribe();
+
+    // Act
+    watch.notify();
+
+    // Assert
+    assert!(watcher.recv().await.is_ok(), "変更が届いていない");
+}
+
+#[tokio::test]
+async fn notifying_with_nobody_watching_is_not_an_error() {
+    // 画面をまだ開いていないだけ。
+    let watch = sshboard_connections::ConnectionsWatch::new();
+
+    watch.notify(); // panic しなければよい
+}
+
+#[tokio::test]
+async fn the_notice_carries_no_connection_details() {
+    // 中身を流すと、購読者ごとに接続先が配られる（PRD §8）。
+    // 型が `()` である時点で運べないが、**変えたら気づけるように**置いておく。
+    let watch = sshboard_connections::ConnectionsWatch::new();
+    let mut watcher = watch.subscribe();
+    watch.notify();
+
+    let received: () = watcher.recv().await.expect("届いていない");
+    assert_eq!(received, ());
+}

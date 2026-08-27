@@ -16,6 +16,7 @@ use std::time::Duration;
 use rmcp::transport::streamable_http_server::session::local::LocalSessionManager;
 use rmcp::transport::streamable_http_server::{StreamableHttpServerConfig, StreamableHttpService};
 use sshboard_band::Band;
+use sshboard_connections::ConnectionsWatch;
 use sshboard_stream::OutputStream;
 use tokio_util::sync::CancellationToken;
 
@@ -55,6 +56,7 @@ impl McpEndpoint {
 pub async fn serve(
     band: Band,
     stream: Arc<OutputStream>,
+    connections_watch: Arc<ConnectionsWatch>,
     port: u16,
     ack_timeout: Duration,
 ) -> std::io::Result<McpEndpoint> {
@@ -69,11 +71,10 @@ pub async fn serve(
     let service: StreamableHttpService<SshboardMcp, LocalSessionManager> =
         StreamableHttpService::new(
             move || {
-                Ok(SshboardMcp::with_ack_timeout(
-                    band.clone(),
-                    Arc::clone(&stream),
-                    ack_timeout,
-                ))
+                Ok(
+                    SshboardMcp::with_ack_timeout(band.clone(), Arc::clone(&stream), ack_timeout)
+                        .with_connections_watch(Arc::clone(&connections_watch)),
+                )
             },
             Default::default(),
             config,

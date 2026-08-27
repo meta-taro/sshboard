@@ -14,7 +14,7 @@ use rmcp::model::{ServerCapabilities, ServerInfo};
 use rmcp::{tool, tool_handler, tool_router, ErrorData, ServerHandler};
 use serde::Deserialize;
 use sshboard_band::{Actor, Band, DeliveryOutcome};
-use sshboard_connections::{ConnectionEntry, ConnectionSummary, Connections};
+use sshboard_connections::{ConnectionEntry, ConnectionSummary, Connections, ConnectionsWatch};
 use sshboard_stream::OutputStream;
 
 /// 帯が受け取りを返すまで待つ上限。
@@ -29,6 +29,9 @@ pub struct SshboardMcp {
     stream: Arc<OutputStream>,
     /// 接続一覧の置き場所。`None` なら OS の既定の場所。
     connections_path: Option<PathBuf>,
+    /// 一覧が変わったことを画面へ押し出す口。
+    /// **無ければ通知しないだけ**（ヘッドレスのテストではそれでよい）。
+    connections_watch: Option<Arc<ConnectionsWatch>>,
     ack_timeout: Duration,
     tool_router: ToolRouter<Self>,
 }
@@ -43,6 +46,7 @@ impl SshboardMcp {
             band,
             stream,
             connections_path: None,
+            connections_watch: None,
             ack_timeout,
             tool_router: Self::tool_router(),
         }
@@ -51,6 +55,14 @@ impl SshboardMcp {
     /// 接続一覧の置き場所を差し替える。**テストで OS の設定を汚さないため。**
     pub fn with_connections(mut self, path: PathBuf) -> Self {
         self.connections_path = Some(path);
+        self
+    }
+
+    /// 一覧が変わったことを押し出す口を渡す。
+    ///
+    /// **これが無いと、AI が足した接続を人が知らないままになる**（PRD §4-2）。
+    pub fn with_connections_watch(mut self, watch: Arc<ConnectionsWatch>) -> Self {
+        self.connections_watch = Some(watch);
         self
     }
 
@@ -178,6 +190,11 @@ impl SshboardMcp {
         next.save(&path).map_err(|error| {
             ErrorData::internal_error(format!("cannot save connections: {error}"), None)
         })?;
+
+        // **画面へ押し出す。**ファイルに入っただけでは、人は知らないまま。
+        if let Some(watch) = &self.connections_watch {
+            watch.notify();
+        }
 
         Ok(format!("registered `{}`", request.id))
     }

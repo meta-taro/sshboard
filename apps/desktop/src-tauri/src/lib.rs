@@ -13,6 +13,7 @@ mod stream_host;
 use std::sync::Arc;
 
 use sshboard_band::Band;
+use sshboard_connections::ConnectionsWatch;
 use sshboard_stream::OutputStream;
 use tauri::Manager;
 
@@ -43,6 +44,12 @@ pub fn run() {
             // 逆にすると、画面が繋がる前に来た呼び出しが帯へ出ないまま通ってしまう。
             let subscriber = band.subscribe();
 
+            // 接続一覧が変わったことを配る口。**人と AI の両方が書き換える**ので、
+            // 画面へ押し出さないと、AI が足した接続を人が知らないままになる（PRD §4-2）。
+            let connections_watch = Arc::new(ConnectionsWatch::new());
+            app.manage(Arc::clone(&connections_watch));
+            connections_cmd::spawn_bridge(app.handle().clone(), Arc::clone(&connections_watch));
+
             // 接続一覧の置き場所。**OS の既定の場所**（Windows / macOS で別）。
             match sshboard_connections::default_path() {
                 Ok(path) => {
@@ -70,7 +77,7 @@ pub fn run() {
             if std::env::var_os(PHASE0_DEMO_ENV).is_some() {
                 stream_host::spawn_demo(Arc::clone(&stream));
             }
-            mcp_host::spawn(app.handle().clone(), band, stream);
+            mcp_host::spawn(app.handle().clone(), band, stream, connections_watch);
 
             Ok(())
         })

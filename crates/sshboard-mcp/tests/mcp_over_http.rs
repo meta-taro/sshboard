@@ -8,6 +8,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use sshboard_band::{Actor, Band};
+use sshboard_connections::ConnectionsWatch;
 use sshboard_mcp::serve;
 use sshboard_stream::OutputStream;
 
@@ -54,6 +55,7 @@ async fn an_external_client_calling_ping_over_http_puts_a_line_on_the_band() {
     let endpoint = serve(
         band,
         Arc::new(OutputStream::new()),
+        Arc::new(ConnectionsWatch::new()),
         0,
         Duration::from_secs(5),
     )
@@ -103,6 +105,7 @@ async fn the_server_advertises_only_the_phase_zero_tools() {
     let endpoint = serve(
         Band::new(),
         Arc::new(OutputStream::new()),
+        Arc::new(ConnectionsWatch::new()),
         0,
         Duration::from_secs(5),
     )
@@ -173,6 +176,7 @@ async fn the_mcp_port_is_bound_to_loopback_only() {
     let endpoint = serve(
         Band::new(),
         Arc::new(OutputStream::new()),
+        Arc::new(ConnectionsWatch::new()),
         0,
         Duration::from_secs(5),
     )

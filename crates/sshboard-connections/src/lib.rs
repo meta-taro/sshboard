@@ -6,6 +6,8 @@
 
 mod entry;
 mod store;
+mod watch;
 
 pub use entry::{ConnectionEntry, ConnectionSummary};
 pub use store::{default_path, Connections, ConnectionsError, CURRENT_VERSION};
+pub use watch::ConnectionsWatch;

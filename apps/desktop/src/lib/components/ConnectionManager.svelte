@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { invoke } from '@tauri-apps/api/core';
+	import { listen } from '@tauri-apps/api/event';
 	import { onMount } from 'svelte';
 
 	import { emptyConnection, isPuttyKey, whyNotSavable, type Connection } from '$lib/connections';
@@ -61,12 +62,27 @@
 	}
 
 	onMount(() => {
+		const stops: Array<() => void> = [];
+
 		reload();
 		invoke<string>('connections_path')
 			.then((path) => (storePath = path))
 			.catch(() => {
 				/* 置き場所が分からなくても一覧は出す */
 			});
+
+		// **人と AI の両方が一覧を書き換える。**
+		// 開いたときに 1 回読むだけだと、AI が足した接続を人が知らないままになる
+		// （PRD §4-2「AI の操作が人の画面にその場で流れる」）。
+		listen('connections://changed', () => {
+			reload();
+		})
+			.then((stop) => stops.push(stop))
+			.catch((error: unknown) => {
+				failure = `一覧の更新を購読できません: ${String(error)}`;
+			});
+
+		return () => stops.forEach((stop) => stop());
 	});
 </script>
 
