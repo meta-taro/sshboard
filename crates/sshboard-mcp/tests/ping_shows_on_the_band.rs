@@ -137,3 +137,83 @@ async fn read_stream_puts_an_ai_line_on_the_band_before_answering() {
     assert_eq!(line.actor(), Actor::Ai);
     assert_eq!(line.text(), "read_stream");
 }
+
+/// 接続一覧の中身。**ホスト名も利用者名も入れてある。**
+/// AI 側へ漏れないことを見張るために、あえて入れている。
+const CONNECTIONS: &str = r#"
+version = 1
+
+[[connections]]
+id = "web-prod"
+name = "Web (prod)"
+host = "secret-host.invalid"
+port = 2222
+user = "secret-user"
+"#;
+
+fn connections_file() -> (tempfile::TempDir, std::path::PathBuf) {
+    let dir = tempfile::tempdir().expect("一時ディレクトリを作れない");
+    let path = dir.path().join("connections.toml");
+    std::fs::write(&path, CONNECTIONS).expect("書けない");
+    (dir, path)
+}
+
+#[tokio::test]
+async fn list_connections_returns_identifiers_and_nothing_else() {
+    // **これが D11 と CLAUDE.md 禁止事項 5 の見張りです。**
+    // Arrange
+    let (_dir, path) = connections_file();
+    let server =
+        SshboardMcp::new(Band::new(), Arc::new(OutputStream::new())).with_connections(path);
+
+    // Act
+    let rendered = server.list_connections().await.expect("読めない");
+    let listed: serde_json::Value = serde_json::from_str(&rendered).expect("JSON でない");
+
+    // Assert
+    assert_eq!(listed.as_array().expect("配列でない").len(), 1);
+    assert_eq!(listed[0]["id"], "web-prod");
+    assert_eq!(listed[0]["name"], "Web (prod)");
+    assert!(
+        !rendered.contains("secret-host"),
+        "ホスト名が漏れている: {rendered}"
+    );
+    assert!(
+        !rendered.contains("secret-user"),
+        "利用者名が漏れている: {rendered}"
+    );
+    assert!(!rendered.contains("2222"), "ポートが漏れている: {rendered}");
+}
+
+#[tokio::test]
+async fn list_connections_with_nothing_registered_is_empty_not_an_error() {
+    // まだ 1 件も登録していないだけ。
+    // Arrange
+    let dir = tempfile::tempdir().expect("一時ディレクトリを作れない");
+    let server = SshboardMcp::new(Band::new(), Arc::new(OutputStream::new()))
+        .with_connections(dir.path().join("connections.toml"));
+
+    // Act
+    let rendered = server.list_connections().await.expect("読めない");
+
+    // Assert
+    assert_eq!(rendered, "[]");
+}
+
+#[tokio::test]
+async fn list_connections_puts_an_ai_line_on_the_band() {
+    // 接続一覧を見たことも帯に出る（PRD §4-2）。
+    // Arrange
+    let (_dir, path) = connections_file();
+    let band = Band::new();
+    let mut subscriber = band.subscribe();
+    let server = SshboardMcp::new(band, Arc::new(OutputStream::new())).with_connections(path);
+
+    // Act
+    tokio::spawn(async move { server.list_connections().await });
+    let event = subscriber.recv().await.expect("帯へ出ていない");
+
+    // Assert
+    assert_eq!(event.line().actor(), Actor::Ai);
+    assert_eq!(event.line().text(), "list_connections");
+}

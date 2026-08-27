@@ -18,6 +18,42 @@
 
 **出力はそのまま貼れます。**
 
+## 接続先をどう渡すか
+
+**コマンドラインに書かないでください。**シェルの履歴と `ps` の出力に残ります。
+
+**本筋は、sshboard に登録した接続を識別子で呼ぶことです。**
+
+```sh
+cargo run --release -- --connection web-prod --offer-only
+```
+
+接続一覧の置き場所（人が書く / これから GUI からも登録できるようにする）:
+
+| | |
+|---|---|
+| macOS | `~/Library/Application Support/dev.sshboard.sshboard/connections.toml` |
+| Windows | `%APPDATA%\sshboard\sshboard\config\connections.toml` |
+
+```toml
+version = 1
+
+[[connections]]
+id = "web-prod"
+name = "Web (prod)"
+host = "..."
+port = 22
+user = "..."
+# key_path = "~/.ssh/id_ed25519"      # 省略すると ssh-agent（推奨）
+# keyring_passphrase_ref = "..."      # OS ストアの参照名。パスフレーズそのものではない
+```
+
+**このファイルは秘密を持ちません。**鍵のパスフレーズは OS の資格情報ストアにあり、
+ここにあるのはその参照名だけです（D11）。Unix では `0o600` で書かれます。
+
+`--connection` を使えないときの逃げ道として `probe.env`（gitignore 済み）も使えます。
+`probe.env.example` を写して使ってください。**example には変数名だけを置いています。**
+
 ## 使い方
 
 親のワークスペースから外してあります。ここで直接動かしてください。

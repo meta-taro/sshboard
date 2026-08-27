@@ -34,7 +34,10 @@ impl std::fmt::Display for KexInitError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             KexInitError::NotKexInit { first_byte } => {
-                write!(f, "SSH_MSG_KEXINIT ではありません（先頭バイト {first_byte}）")
+                write!(
+                    f,
+                    "SSH_MSG_KEXINIT ではありません（先頭バイト {first_byte}）"
+                )
             }
             KexInitError::Truncated { at } => write!(f, "{at} バイト目で尽きました"),
             KexInitError::NotUtf8 { list_index } => {
@@ -74,7 +77,11 @@ pub fn parse(payload: &[u8]) -> Result<ServerOffer, KexInitError> {
     }
 
     let mut lists = lists.into_iter();
-    let mut next = || lists.next().expect("10 本読んだことは上のループが保証している");
+    let mut next = || {
+        lists
+            .next()
+            .expect("10 本読んだことは上のループが保証している")
+    };
 
     Ok(ServerOffer {
         kex_algorithms: next(),
@@ -98,16 +105,23 @@ fn read_name_list(
     index: usize,
 ) -> Result<(Vec<String>, usize), KexInitError> {
     let after_len = at + 4;
-    let raw_len = bytes.get(at..after_len).ok_or(KexInitError::Truncated { at })?;
+    let raw_len = bytes
+        .get(at..after_len)
+        .ok_or(KexInitError::Truncated { at })?;
     let len = u32::from_be_bytes(raw_len.try_into().expect("4 バイト取れている")) as usize;
 
     let end = after_len + len;
-    let raw = bytes.get(after_len..end).ok_or(KexInitError::Truncated { at: after_len })?;
+    let raw = bytes
+        .get(after_len..end)
+        .ok_or(KexInitError::Truncated { at: after_len })?;
     let text = std::str::from_utf8(raw).map_err(|_| KexInitError::NotUtf8 { list_index: index })?;
 
     // 空リストは「空の Vec」。ここで `[""]` にすると、出力が嘘になる。
-    let list =
-        if text.is_empty() { Vec::new() } else { text.split(',').map(str::to_owned).collect() };
+    let list = if text.is_empty() {
+        Vec::new()
+    } else {
+        text.split(',').map(str::to_owned).collect()
+    };
 
     Ok((list, end))
 }
@@ -158,9 +172,15 @@ mod tests {
             vec!["diffie-hellman-group14-sha1", "curve25519-sha256"]
         );
         assert_eq!(offer.host_key_algorithms, vec!["ssh-rsa", "rsa-sha2-512"]);
-        assert_eq!(offer.encryption_client_to_server, vec!["aes128-ctr", "3des-cbc"]);
+        assert_eq!(
+            offer.encryption_client_to_server,
+            vec!["aes128-ctr", "3des-cbc"]
+        );
         assert_eq!(offer.mac_server_to_client, vec!["hmac-sha1"]);
-        assert_eq!(offer.compression_client_to_server, vec!["none", "zlib@openssh.com"]);
+        assert_eq!(
+            offer.compression_client_to_server,
+            vec!["none", "zlib@openssh.com"]
+        );
     }
 
     #[test]
@@ -168,7 +188,9 @@ mod tests {
         // languages_* はたいてい空。ここで "" が 1 件入ると、出力が嘘になる。
         let offer = parse(&payload_with(&ten_lists())).expect("読めない");
 
-        assert!(offer.compression_server_to_client.contains(&"none".to_string()));
+        assert!(offer
+            .compression_server_to_client
+            .contains(&"none".to_string()));
     }
 
     #[test]
@@ -178,7 +200,10 @@ mod tests {
         payload[0] = 21;
 
         // Act & Assert
-        assert_eq!(parse(&payload), Err(KexInitError::NotKexInit { first_byte: 21 }));
+        assert_eq!(
+            parse(&payload),
+            Err(KexInitError::NotKexInit { first_byte: 21 })
+        );
     }
 
     #[test]
@@ -191,6 +216,9 @@ mod tests {
         let result = parse(cut);
 
         // Assert
-        assert!(matches!(result, Err(KexInitError::Truncated { .. })), "実際: {result:?}");
+        assert!(
+            matches!(result, Err(KexInitError::Truncated { .. })),
+            "実際: {result:?}"
+        );
     }
 }

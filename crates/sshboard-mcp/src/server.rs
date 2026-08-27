@@ -4,6 +4,7 @@
 //! 返してから画面が追いつく形にすると、AI は人より先に動けてしまう。
 //! それは PRD §4-2 の「誰が触ったかが画面に出る」を満たさない。
 
+use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -11,6 +12,7 @@ use rmcp::handler::server::router::tool::ToolRouter;
 use rmcp::model::{ServerCapabilities, ServerInfo};
 use rmcp::{tool, tool_handler, tool_router, ErrorData, ServerHandler};
 use sshboard_band::{Actor, Band, DeliveryOutcome};
+use sshboard_connections::{ConnectionSummary, Connections};
 use sshboard_stream::OutputStream;
 
 /// 帯が受け取りを返すまで待つ上限。
@@ -23,6 +25,8 @@ pub struct SshboardMcp {
     band: Band,
     /// 追尾している出力。**GUI と同じ 1 本**（PRD §4-1）。
     stream: Arc<OutputStream>,
+    /// 接続一覧の置き場所。`None` なら OS の既定の場所。
+    connections_path: Option<PathBuf>,
     ack_timeout: Duration,
     tool_router: ToolRouter<Self>,
 }
@@ -36,9 +40,36 @@ impl SshboardMcp {
         Self {
             band,
             stream,
+            connections_path: None,
             ack_timeout,
             tool_router: Self::tool_router(),
         }
+    }
+
+    /// 接続一覧の置き場所を差し替える。**テストで OS の設定を汚さないため。**
+    pub fn with_connections(mut self, path: PathBuf) -> Self {
+        self.connections_path = Some(path);
+        self
+    }
+
+    /// 登録された接続の**識別子と名前だけ**を取り出す。
+    ///
+    /// **ここにホスト名を混ぜないこと**（CLAUDE.md 禁止事項 5）。
+    /// 混ぜてよいかどうかは `ConnectionSummary` の側で守っている。
+    pub fn connection_summaries(&self) -> Result<Vec<ConnectionSummary>, ErrorData> {
+        let path = match &self.connections_path {
+            Some(path) => path.clone(),
+            None => sshboard_connections::default_path().map_err(|error| {
+                ErrorData::internal_error(format!("cannot locate connections: {error}"), None)
+            })?,
+        };
+
+        Connections::load_or_empty(&path)
+            .map(|connections| connections.summaries())
+            .map_err(|error| {
+                // 中身を載せない。**接続先が混ざりうる**（PRD §8）。
+                ErrorData::internal_error(format!("cannot read connections: {error}"), None)
+            })
     }
 
     /// 帯へ 1 行載せ、**画面が受け取るまで待つ。**
@@ -80,6 +111,22 @@ impl SshboardMcp {
     pub async fn read_stream(&self) -> Result<String, ErrorData> {
         self.show("read_stream").await?;
         Ok(self.stream.plain_tail())
+    }
+
+    /// 登録された接続の一覧。
+    ///
+    /// **識別子と名前だけを返します。**ホスト名・IP・利用者名・鍵のパス・
+    /// 認証情報は 1 つも返しません（D11 / CLAUDE.md 禁止事項 5）。
+    #[tool(
+        description = "List the connections registered in sshboard. Returns identifiers and display names only - never hosts, users, or credentials."
+    )]
+    pub async fn list_connections(&self) -> Result<String, ErrorData> {
+        self.show("list_connections").await?;
+
+        let summaries = self.connection_summaries()?;
+        serde_json::to_string(&summaries).map_err(|error| {
+            ErrorData::internal_error(format!("cannot render connections: {error}"), None)
+        })
     }
 }
 

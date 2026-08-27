@@ -8,6 +8,7 @@ repository.workspace = true
 
 [dependencies]
 sshboard-band = { path = "../sshboard-band" }
+sshboard-connections = { path = "../sshboard-connections" }
 sshboard-stream = { path = "../sshboard-stream" }
 rmcp = { version = "3.1.4", features = [
     "server",
@@ -16,10 +17,12 @@ rmcp = { version = "3.1.4", features = [
 ] }
 tokio = { workspace = true, features = ["net"] }
 axum = "0.8"
+serde_json = "1"
 tokio-util = "0.7"
 
 [dev-dependencies]
 tokio = { version = "1", features = ["sync", "time", "macros", "rt", "rt-multi-thread"] }
 # 実際の MCP クライアントと同じく、生の JSON-RPC を HTTP で投げて確かめる。
 reqwest = { version = "0.12", default-features = false, features = ["json"] }
+tempfile = "3"
 serde_json = "1"

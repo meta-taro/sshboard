@@ -69,7 +69,10 @@ fn connect(host: &str, port: u16) -> Result<Session, String> {
 
 fn fingerprint(session: &Session) -> Option<String> {
     let raw = session.host_key_hash(HashType::Sha256)?;
-    Some(format!("SHA256:{}", base64::engine::general_purpose::STANDARD_NO_PAD.encode(raw)))
+    Some(format!(
+        "SHA256:{}",
+        base64::engine::general_purpose::STANDARD_NO_PAD.encode(raw)
+    ))
 }
 
 fn negotiated(session: &Session) -> Vec<(&'static str, String)> {
@@ -81,27 +84,43 @@ fn negotiated(session: &Session) -> Vec<(&'static str, String)> {
         ("圧縮(c2s)", MethodType::CompCs),
     ]
     .into_iter()
-    .filter_map(|(label, kind)| session.methods(kind).map(|value| (label, value.to_string())))
+    .filter_map(|(label, kind)| {
+        session
+            .methods(kind)
+            .map(|value| (label, value.to_string()))
+    })
     .collect()
 }
 
 fn authenticate(session: &Session, user: &str, auth: &Auth) -> Result<(), String> {
     match auth {
-        Auth::Agent => session.userauth_agent(user).map_err(|error| error.to_string()),
+        Auth::Agent => session
+            .userauth_agent(user)
+            .map_err(|error| error.to_string()),
         Auth::Key { path, passphrase } => session
             .userauth_pubkey_file(user, None, Path::new(path), passphrase.as_deref())
             .map_err(|error| error.to_string()),
     }?;
 
-    if session.authenticated() { Ok(()) } else { Err("認証が通りませんでした".into()) }
+    if session.authenticated() {
+        Ok(())
+    } else {
+        Err("認証が通りませんでした".into())
+    }
 }
 
 fn exec(session: &Session) -> Result<String, String> {
-    let mut channel = session.channel_session().map_err(|error| error.to_string())?;
-    channel.exec(&format!("echo {EXEC_MARKER}")).map_err(|error| error.to_string())?;
+    let mut channel = session
+        .channel_session()
+        .map_err(|error| error.to_string())?;
+    channel
+        .exec(&format!("echo {EXEC_MARKER}"))
+        .map_err(|error| error.to_string())?;
 
     let mut output = String::new();
-    channel.read_to_string(&mut output).map_err(|error| error.to_string())?;
+    channel
+        .read_to_string(&mut output)
+        .map_err(|error| error.to_string())?;
     let _ = channel.wait_close();
 
     let trimmed = output.trim().to_string();
@@ -115,14 +134,19 @@ fn exec(session: &Session) -> Result<String, String> {
 
 fn sftp_ls(session: &Session, path: &str) -> Result<usize, String> {
     let sftp = session.sftp().map_err(|error| error.to_string())?;
-    let entries = sftp.readdir(Path::new(path)).map_err(|error| error.to_string())?;
+    let entries = sftp
+        .readdir(Path::new(path))
+        .map_err(|error| error.to_string())?;
     Ok(entries.len())
 }
 
 fn sniff_remote(session: &Session, path: &str) -> Result<sniff::Sniff, String> {
     let sftp = session.sftp().map_err(|error| error.to_string())?;
-    let mut file = sftp.open(Path::new(path)).map_err(|error| error.to_string())?;
+    let mut file = sftp
+        .open(Path::new(path))
+        .map_err(|error| error.to_string())?;
     let mut bytes = Vec::new();
-    file.read_to_end(&mut bytes).map_err(|error| error.to_string())?;
+    file.read_to_end(&mut bytes)
+        .map_err(|error| error.to_string())?;
     Ok(sniff::sniff(&bytes))
 }

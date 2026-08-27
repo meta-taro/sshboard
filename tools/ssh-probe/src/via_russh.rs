@@ -7,8 +7,8 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use russh::client::{self, Handle};
+use russh::keys::{load_secret_key, PrivateKeyWithHashAlg, PublicKeyOrCertificate};
 use russh::ChannelMsg;
-use russh::keys::{PrivateKeyWithHashAlg, PublicKeyOrCertificate, load_secret_key};
 use russh_sftp::client::SftpSession;
 
 use crate::report::BackendReport;
@@ -34,7 +34,9 @@ impl client::Handler for Probe {
         server_public_key: &PublicKeyOrCertificate,
     ) -> Result<bool, Self::Error> {
         let seen = match server_public_key {
-            PublicKeyOrCertificate::PublicKey { key, .. } => key.fingerprint(Default::default()).to_string(),
+            PublicKeyOrCertificate::PublicKey { key, .. } => {
+                key.fingerprint(Default::default()).to_string()
+            }
             PublicKeyOrCertificate::Certificate(certificate) => {
                 format!("certificate({})", certificate.key_id())
             }
@@ -65,7 +67,9 @@ pub async fn run(
     let mut session = match client::connect(
         config,
         (host, port),
-        Probe { fingerprint: Arc::clone(&fingerprint) },
+        Probe {
+            fingerprint: Arc::clone(&fingerprint),
+        },
     )
     .await
     {
@@ -93,11 +97,7 @@ pub async fn run(
     report
 }
 
-async fn authenticate(
-    session: &mut Handle<Probe>,
-    user: &str,
-    auth: &Auth,
-) -> Result<(), String> {
+async fn authenticate(session: &mut Handle<Probe>, user: &str, auth: &Auth) -> Result<(), String> {
     let result = match auth {
         Auth::Agent => {
             let mut agent = russh::keys::agent::client::AgentClient::connect_env()
@@ -136,12 +136,22 @@ async fn authenticate(
         }
     };
 
-    if result.success() { Ok(()) } else { Err("認証が通りませんでした".into()) }
+    if result.success() {
+        Ok(())
+    } else {
+        Err("認証が通りませんでした".into())
+    }
 }
 
 async fn exec(session: &Handle<Probe>) -> Result<String, String> {
-    let mut channel = session.channel_open_session().await.map_err(|e| e.to_string())?;
-    channel.exec(true, format!("echo {EXEC_MARKER}")).await.map_err(|e| e.to_string())?;
+    let mut channel = session
+        .channel_open_session()
+        .await
+        .map_err(|e| e.to_string())?;
+    channel
+        .exec(true, format!("echo {EXEC_MARKER}"))
+        .await
+        .map_err(|e| e.to_string())?;
 
     let mut output = Vec::new();
     while let Some(message) = channel.wait().await {
@@ -164,9 +174,17 @@ async fn exec(session: &Handle<Probe>) -> Result<String, String> {
 
 /// 同じセッションの上に sftp サブシステムを開く。**2 本目の接続を張らない。**
 async fn open_sftp(session: &Handle<Probe>) -> Result<SftpSession, String> {
-    let channel = session.channel_open_session().await.map_err(|e| e.to_string())?;
-    channel.request_subsystem(true, "sftp").await.map_err(|e| e.to_string())?;
-    SftpSession::new(channel.into_stream()).await.map_err(|e| e.to_string())
+    let channel = session
+        .channel_open_session()
+        .await
+        .map_err(|e| e.to_string())?;
+    channel
+        .request_subsystem(true, "sftp")
+        .await
+        .map_err(|e| e.to_string())?;
+    SftpSession::new(channel.into_stream())
+        .await
+        .map_err(|e| e.to_string())
 }
 
 async fn sftp_ls(session: &Handle<Probe>, path: &str) -> Result<usize, String> {
@@ -181,6 +199,8 @@ async fn sniff_remote(session: &Handle<Probe>, path: &str) -> Result<sniff::Snif
     let sftp = open_sftp(session).await?;
     let mut file = sftp.open(path).await.map_err(|e| e.to_string())?;
     let mut bytes = Vec::new();
-    file.read_to_end(&mut bytes).await.map_err(|e| e.to_string())?;
+    file.read_to_end(&mut bytes)
+        .await
+        .map_err(|e| e.to_string())?;
     Ok(sniff::sniff(&bytes))
 }

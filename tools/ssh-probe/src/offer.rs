@@ -4,7 +4,7 @@
 
 use std::time::Duration;
 
-use anyhow::{Context, Result, bail};
+use anyhow::{bail, Context, Result};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 
@@ -47,7 +47,10 @@ async fn read_banner(stream: &mut TcpStream) -> Result<String> {
     let mut byte = [0u8; 1];
 
     for _ in 0..MAX_PACKET {
-        stream.read_exact(&mut byte).await.context("バナーが読めません")?;
+        stream
+            .read_exact(&mut byte)
+            .await
+            .context("バナーが読めません")?;
         if byte[0] == b'\n' {
             let text = String::from_utf8_lossy(&line).trim_end().to_string();
             if text.starts_with("SSH-") {
@@ -65,7 +68,10 @@ async fn read_banner(stream: &mut TcpStream) -> Result<String> {
 /// 暗号化前のバイナリパケットを 1 つ読む（RFC 4253 §6）。
 async fn read_packet_payload(stream: &mut TcpStream) -> Result<Vec<u8>> {
     let mut length = [0u8; 4];
-    stream.read_exact(&mut length).await.context("パケット長が読めません")?;
+    stream
+        .read_exact(&mut length)
+        .await
+        .context("パケット長が読めません")?;
     let packet_len = u32::from_be_bytes(length) as usize;
 
     if packet_len == 0 || packet_len > MAX_PACKET {
@@ -73,7 +79,10 @@ async fn read_packet_payload(stream: &mut TcpStream) -> Result<Vec<u8>> {
     }
 
     let mut rest = vec![0u8; packet_len];
-    stream.read_exact(&mut rest).await.context("パケット本体が読めません")?;
+    stream
+        .read_exact(&mut rest)
+        .await
+        .context("パケット本体が読めません")?;
 
     let padding = *rest.first().context("パディング長が読めません")? as usize;
     if padding + 1 > rest.len() {

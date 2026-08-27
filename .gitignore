@@ -24,6 +24,10 @@ SECRETS.local.md
 # ベースルール完全版（内部事例を含むため公開しない）— commit 禁止
 .claude/rules/product-baseline.full.md
 
+# 探り棒へ渡す接続先 — commit 禁止
+probe.env
+**/probe.env
+
 # 接続先の控え — commit 禁止
 # 本製品は画面そのものに接続先が写り込む。ホスト名 / IP / ユーザー名を
 # リポジトリへ入れない（PRD §8）。

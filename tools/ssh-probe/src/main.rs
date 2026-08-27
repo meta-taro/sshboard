@@ -16,8 +16,11 @@ mod sniff;
 mod via_russh;
 mod via_ssh2;
 
-use anyhow::Result;
+use std::path::PathBuf;
+
+use anyhow::{bail, Result};
 use clap::Parser;
+use sshboard_connections::Connections;
 
 /// `exec` が通ったことを確かめるための固定文字列。
 /// **こちらが決めた文字列なので、出力に載せても接続先が漏れない。**
@@ -26,7 +29,10 @@ pub const EXEC_MARKER: &str = "sshboard-probe-ok";
 /// 認証のやり方。**パスワード認証は用意しません**（履歴に残る経路を作らない）。
 pub enum Auth {
     Agent,
-    Key { path: String, passphrase: Option<String> },
+    Key {
+        path: String,
+        passphrase: Option<String>,
+    },
 }
 
 #[derive(Parser)]
@@ -35,15 +41,26 @@ pub enum Auth {
     about = "Phase 0 探り棒。russh と ssh2 の両方で実機へ繋ぎ、結果だけを出す。"
 )]
 struct Cli {
-    /// 接続先。**出力には出ません。**
-    #[arg(long)]
-    host: String,
+    /// sshboard に登録した接続の識別子。**これを使うのが本筋です。**
+    ///
+    /// アプリで 1 回登録すれば、以後どこにも接続先を書かずに済みます。
+    #[arg(long, conflicts_with = "host")]
+    connection: Option<String>,
 
-    #[arg(long, default_value_t = 22)]
+    /// 接続一覧の置き場所。省略すると OS の既定の場所。
+    #[arg(long)]
+    connections_file: Option<PathBuf>,
+
+    /// 接続先を直接指定する。**`--connection` を使えるならそちらを使ってください。**
+    /// コマンドラインに書くと、シェルの履歴と `ps` の出力に残ります。
+    #[arg(long, env = "SSHBOARD_PROBE_HOST", hide_env_values = true)]
+    host: Option<String>,
+
+    #[arg(long, env = "SSHBOARD_PROBE_PORT", default_value_t = 22)]
     port: u16,
 
-    /// KEXINIT を読むだけなら不要。
-    #[arg(long, required_unless_present = "offer_only")]
+    /// KEXINIT を読むだけなら不要。`--connection` を使うなら不要。
+    #[arg(long, env = "SSHBOARD_PROBE_USER", hide_env_values = true)]
     user: Option<String>,
 
     /// 提示された方式を読むだけで終える。**認証も接続もしない。**
@@ -51,8 +68,9 @@ struct Cli {
     #[arg(long, default_value_t = false)]
     offer_only: bool,
 
-    /// 秘密鍵のパス。省略すると ssh-agent を使う。
-    #[arg(long)]
+    /// 秘密鍵のパス。省略すると ssh-agent を使う。**鍵そのものは読み込まれるだけで、
+    /// どこにも出力されません。**
+    #[arg(long, env = "SSHBOARD_PROBE_KEY", hide_env_values = true)]
     key: Option<String>,
 
     /// 鍵にパスフレーズがある場合に、その場で入力を求める。
@@ -60,31 +78,85 @@ struct Cli {
     ask_passphrase: bool,
 
     /// `sftp` の `ls` を試すパス。**件数だけ出ます。**
-    #[arg(long, default_value = ".")]
+    #[arg(
+        long,
+        env = "SSHBOARD_PROBE_SFTP_PATH",
+        hide_env_values = true,
+        default_value = "."
+    )]
     sftp_path: String,
 
     /// 文字コードを見たいファイルのパス（ログや設定ファイル）。
     /// **中身は出ません。**判定と統計だけ出ます。
-    #[arg(long)]
+    #[arg(long, env = "SSHBOARD_PROBE_SNIFF", hide_env_values = true)]
     sniff: Option<String>,
+}
+
+/// 実際に使う接続先。**画面にも履歴にも出さない。**
+struct Target {
+    host: String,
+    port: u16,
+    user: Option<String>,
+    key: Option<String>,
+}
+
+/// `--connection` が指定されていれば登録済みの一覧から、無ければ引数から組み立てる。
+fn resolve_target(cli: &Cli) -> Result<Target> {
+    let Some(id) = &cli.connection else {
+        let Some(host) = cli.host.clone() else {
+            bail!("--connection か --host のどちらかが要ります");
+        };
+        return Ok(Target {
+            host,
+            port: cli.port,
+            user: cli.user.clone(),
+            key: cli.key.clone(),
+        });
+    };
+
+    let path = match &cli.connections_file {
+        Some(path) => path.clone(),
+        None => sshboard_connections::default_path()?,
+    };
+    let connections = Connections::load_or_empty(&path)?;
+
+    let Some(entry) = connections.get(id) else {
+        // **登録名は出してよい。**接続先ではない。
+        let known: Vec<&str> = connections
+            .connections
+            .iter()
+            .map(|entry| entry.id.as_str())
+            .collect();
+        bail!("`{id}` という接続は登録されていません。登録済み: {known:?}");
+    };
+
+    Ok(Target {
+        host: entry.host.clone(),
+        port: entry.port,
+        user: Some(entry.user.clone()),
+        key: entry.key_path.clone().or_else(|| cli.key.clone()),
+    })
 }
 
 #[tokio::main]
 async fn main() -> Result<()> {
     let cli = Cli::parse();
+    let target = resolve_target(&cli)?;
 
     println!("# sshboard Phase 0 探り棒\n");
     println!("接続先は出力に含まれません。**このまま貼って構いません。**\n");
 
-    print_offer(&cli).await;
+    print_offer(&target).await;
 
     if cli.offer_only {
         return Ok(());
     }
 
-    let user = cli.user.clone().expect("--offer-only でなければ clap が必須にしている");
+    let Some(user) = target.user.clone() else {
+        bail!("利用者名がありません。--connection か --user を指定してください");
+    };
 
-    let auth = match &cli.key {
+    let auth = match &target.key {
         None => Auth::Agent,
         Some(path) => {
             let passphrase = if cli.ask_passphrase {
@@ -92,20 +164,32 @@ async fn main() -> Result<()> {
             } else {
                 None
             };
-            Auth::Key { path: path.clone(), passphrase }
+            Auth::Key {
+                path: path.clone(),
+                passphrase,
+            }
         }
     };
 
-    let russh_report =
-        via_russh::run(&cli.host, cli.port, &user, &auth, &cli.sftp_path, cli.sniff.as_deref())
-            .await;
+    let russh_report = via_russh::run(
+        &target.host,
+        target.port,
+        &user,
+        &auth,
+        &cli.sftp_path,
+        cli.sniff.as_deref(),
+    )
+    .await;
     println!("{}", russh_report.render());
 
     // ssh2 は同期 API。async のスレッドを塞がないよう別スレッドへ出す。
     let ssh2_report = {
-        let (host, sftp_path, sniff_path) =
-            (cli.host.clone(), cli.sftp_path.clone(), cli.sniff.clone());
-        let port = cli.port;
+        let (host, sftp_path, sniff_path) = (
+            target.host.clone(),
+            cli.sftp_path.clone(),
+            cli.sniff.clone(),
+        );
+        let port = target.port;
         tokio::task::spawn_blocking(move || {
             via_ssh2::run(&host, port, &user, &auth, &sftp_path, sniff_path.as_deref())
         })
@@ -122,10 +206,10 @@ async fn main() -> Result<()> {
 
 /// サーバーが提示している方式を、ライブラリを通さずに出す。
 /// **002 の「古い鍵交換方式・暗号方式が残っているか」はここに出る。**
-async fn print_offer(cli: &Cli) {
+async fn print_offer(target: &Target) {
     println!("## サーバーが提示した方式（KEXINIT を直接読んだもの）\n");
 
-    match offer::fetch(&cli.host, cli.port).await {
+    match offer::fetch(&target.host, target.port).await {
         Ok(contact) => {
             println!("- 名乗り: `{}`", contact.banner);
             let offer = contact.offer;

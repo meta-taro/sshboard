@@ -27,12 +27,16 @@ pub fn sniff(bytes: &[u8]) -> Sniff {
     // ISO-2022-JP を許可する。ブラウザ向けの既定では禁止だが、
     // ここが読むのはサーバー上のログと設定ファイルで、スクリプトは走らない。
     // Tera Term の漢字コード一覧にも JIS が入っている。
-    let mut detector =
-        chardetng::EncodingDetector::new(chardetng::Iso2022JpDetection::Allow);
+    let mut detector = chardetng::EncodingDetector::new(chardetng::Iso2022JpDetection::Allow);
     detector.feed(bytes, true);
     let detected = detector.guess(None, chardetng::Utf8Detection::Allow).name();
 
-    Sniff { bytes: bytes.len(), non_ascii_bytes, is_valid_utf8, detected }
+    Sniff {
+        bytes: bytes.len(),
+        non_ascii_bytes,
+        is_valid_utf8,
+        detected,
+    }
 }
 
 #[cfg(test)]
@@ -77,7 +81,10 @@ mod tests {
         let result = sniff(&encoded);
 
         // Assert
-        assert!(!result.is_valid_utf8, "Shift_JIS が UTF-8 として通ってしまっている");
+        assert!(
+            !result.is_valid_utf8,
+            "Shift_JIS が UTF-8 として通ってしまっている"
+        );
         assert_eq!(result.detected, "Shift_JIS");
     }
 
@@ -91,7 +98,10 @@ mod tests {
         let result = sniff(&encoded);
 
         // Assert
-        assert!(!result.is_valid_utf8, "EUC-JP が UTF-8 として通ってしまっている");
+        assert!(
+            !result.is_valid_utf8,
+            "EUC-JP が UTF-8 として通ってしまっている"
+        );
         assert_eq!(result.detected, "EUC-JP");
     }
 
@@ -115,6 +125,9 @@ mod tests {
         let result = sniff(JAPANESE.as_bytes());
         let rendered = format!("{result:?}");
 
-        assert!(!rendered.contains("設定"), "本文が結果に混ざっている: {rendered}");
+        assert!(
+            !rendered.contains("設定"),
+            "本文が結果に混ざっている: {rendered}"
+        );
     }
 }
