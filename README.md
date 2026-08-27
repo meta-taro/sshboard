@@ -27,6 +27,43 @@ AI : ではこの設定ファイルの中身も見せてください
 **この往復を消すための道具です。**
 AI にサーバーを操作させる必要はありません。**見せるだけで消えます。**
 
+## どう使うものか
+
+**画面のボタンを押す道具ではありません。**あなたはターミナルの AI エージェントに話しかけ、
+エージェントが sshboard の内蔵 MCP を呼びます。
+
+```
+あなた → ターミナルの AI エージェントへ「メールが届かない。調べて」
+              │
+              │  MCP（アプリ内蔵・別プロセスを立てない）
+              ▼
+        sshboard  ── SSH 1 本 ──▶  サーバー
+              │      （sftp / exec）
+              ▼
+   sshboard の画面に [AI] の行が流れる
+   ── あなたは見ているだけ。何を読んで何を打ったかが、その場で分かる
+```
+
+```
+[Human] $ cd /var/www
+[AI]    $ df -h
+Filesystem      Size  Used Avail Use% Mounted on
+/dev/vda1        50G   38G   10G  80% /
+[AI]    read /etc/postfix/main.cf  (4.1 KB)
+```
+
+**人の側は制限しません。**ファイル 2 ペインとターミナルタブは、普通の SFTP クライアント /
+ターミナルとして自由に使えます。**制限するのは AI の口だけ**です。
+
+### AI が呼べるもの（Phase 1・読み取りのみ）
+
+`list_connections` / `list_directory` / `stat` / `read_file` / `search` / `download` /
+`disk_usage` / `process_list` / `service_status` / `runtime_versions` / `read_log` /
+`network_listen` / `run_readonly`（許可リスト方式）
+
+**`run_command(cmd)` を作りません。**1 つ置けば全部できてしまい、破壊的操作を防ぐ手段が
+「使わない約束」しか残らないからです。**約束は手順書であって、ゲートではありません。**
+
 ## 成功条件（唯一）
 
 > **AI が「サーバー側の状態を教えてください」と言わなくなること。**

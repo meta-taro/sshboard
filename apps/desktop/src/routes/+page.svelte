@@ -104,7 +104,12 @@
 <main>
 	<header>
 		<h1>sshboard</h1>
-		<p class="phase">Phase 0 — 帯だけ。SSH には繋いでいません。</p>
+		<p class="phase">
+			Phase 0 — 帯だけ。<strong>SSH には繋いでいません。</strong>
+		</p>
+		<p class="phase">
+			本来はここを人が操作しません。外の AI エージェントが MCP を呼び、その操作が帯に流れます。
+		</p>
 		<p class="mcp">
 			MCP:
 			{#if mcpUrl}
@@ -122,8 +127,9 @@
 	<section class="stream" aria-label="追尾している出力">
 		<div class="stream-head">
 			<span class="label">出力（GUI は色付き / MCP はプレーン）</span>
+			<span class="scaffold">足場 — 002 が通ったら消えます</span>
 			<button type="button" onclick={startDemoStream} disabled={streaming}>
-				Phase 0 の確認用に流す
+				合成の出力を流す
 			</button>
 			<button type="button" onclick={stopStream}>止める</button>
 		</div>
@@ -209,6 +215,14 @@
 
 	.stream-head .label {
 		flex: 1;
+	}
+
+	/* このボタンは製品の操作ではない。**002 が通ったら消える足場。** */
+	.stream-head .scaffold {
+		padding: 0.1rem 0.4rem;
+		border: 1px dashed #4a3f2a;
+		border-radius: 3px;
+		color: #b9a06a;
 	}
 
 	.stream-head button {
