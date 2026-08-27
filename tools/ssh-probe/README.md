@@ -74,6 +74,21 @@ cargo run --release -- --host <ホスト> --offer-only
 **002 の「古い鍵交換方式・暗号方式が残っているか」は、ここに出ます。**
 `diffie-hellman-group1-sha1` や `3des-cbc` や `ssh-dss` が並んでいたら、そのサーバーは古い側です。
 
+### 鍵にパスフレーズがある場合
+
+**ssh-agent を使ってください。**そうすれば、**探り棒も sshboard も
+パスフレーズを一度も受け取りません**（D11）。
+
+```sh
+ssh-add --apple-use-keychain ~/.ssh/<鍵>   # macOS。Keychain に預ける
+ssh-add -l                                  # 入ったか確認
+```
+
+`connections.toml` に **`key_path` を書かなければ** ssh-agent を使います。
+
+agent を使わない場合は、`key_path` を書けば**必要なときだけその場で聞きます。**
+引数でパスフレーズを渡す口は**ありません**（シェルの履歴に平文で残るため）。
+
 ### 2. 実際に繋ぐ
 
 **ssh-agent 経由が既定です。**鍵ファイルを直接使う場合だけ `--key` を付けます。

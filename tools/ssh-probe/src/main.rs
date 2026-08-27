@@ -6,8 +6,9 @@
 //! ディレクトリの中身・ファイルの中身は、どれも表示しません。
 //! 出るのは「繋がったか」「どの方式か」「何件か」「どの文字コードか」だけです。
 //!
-//! **パスフレーズを引数で渡さないでください。**シェルの履歴に平文で残ります。
-//! `--ask-passphrase` を付けると、その場で入力を求めます。
+//! **パスフレーズを引数で渡す口はありません。**シェルの履歴に平文で残るためです。
+//! 鍵に必要なときだけ、その場で聞きます。
+//! **ssh-agent を使えば、そもそも聞かれません**（D11・パスフレーズを受け取らない）。
 
 mod kexinit;
 mod offer;
@@ -138,6 +139,29 @@ fn resolve_target(cli: &Cli) -> Result<Target> {
     })
 }
 
+/// 鍵にパスフレーズが要るかを調べ、要るならその場で聞く。
+///
+/// **引数で受け取る口は作りません。**シェルの履歴に平文で残ります
+/// （product-baseline §14）。
+///
+/// **そもそも ssh-agent を使えば、ここは通りません。**
+/// パスフレーズを一度も受け取らないのが本来の形です（D11）。
+fn passphrase_for(path: &str, asked: bool) -> Result<Option<String>> {
+    if asked {
+        return Ok(Some(rpassword::prompt_password("鍵のパスフレーズ: ")?));
+    }
+
+    // 平文の鍵なら聞かない。読めないなら、暗号化されているとみなして聞く。
+    // 別の理由で読めない場合は、聞いたあとに本来のエラーが出る。
+    match russh::keys::load_secret_key(path, None) {
+        Ok(_) => Ok(None),
+        Err(_) => {
+            eprintln!("鍵にパスフレーズが要るようです。ssh-agent を使えば聞かれません。");
+            Ok(Some(rpassword::prompt_password("鍵のパスフレーズ: ")?))
+        }
+    }
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     let cli = Cli::parse();
@@ -158,17 +182,10 @@ async fn main() -> Result<()> {
 
     let auth = match &target.key {
         None => Auth::Agent,
-        Some(path) => {
-            let passphrase = if cli.ask_passphrase {
-                Some(rpassword::prompt_password("鍵のパスフレーズ: ")?)
-            } else {
-                None
-            };
-            Auth::Key {
-                path: path.clone(),
-                passphrase,
-            }
-        }
+        Some(path) => Auth::Key {
+            path: path.clone(),
+            passphrase: passphrase_for(path, cli.ask_passphrase)?,
+        },
     };
 
     let russh_report = via_russh::run(
