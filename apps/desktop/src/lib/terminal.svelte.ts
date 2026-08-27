@@ -18,7 +18,12 @@ export function createTerminal(host: HTMLElement): Terminal {
 		cursorBlink: false,
 		disableStdin: true,
 		fontSize: 12,
-		fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace',
+		// 日本語のグリフを持つ等幅フォントを候補に入れる。
+		// **入れないと、xterm.js が 2 桁分を確保したところへ 1 桁幅の字が描かれ、
+		// 文字と文字の間が空く。**対象が国内サーバーなので、ここは実務で必ず踏む。
+		// **どのフォントを既定にするかは人が決める領域**（DESIGN.md）。ここは仮置き。
+		fontFamily:
+			'ui-monospace, SFMono-Regular, Menlo, Consolas, "Osaka-Mono", "BIZ UDGothic", "MS Gothic", "Noto Sans Mono CJK JP", monospace',
 		scrollback: 5000,
 		theme: PLACEHOLDER_THEME
 	});

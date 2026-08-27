@@ -144,3 +144,56 @@ async fn trimming_the_tail_never_splits_a_character_in_half() {
     assert!(tail.len() <= sshboard_stream::PLAIN_TAIL_LIMIT);
     assert!(tail.ends_with('\n'), "末尾が壊れている");
 }
+
+#[tokio::test]
+async fn a_human_can_carry_on_in_the_same_session_after_stopping() {
+    // PRD §4-3「止めた後、人が同じセッションで続きをやれる」。
+    // **止めたら二度と流せない、では満たしていない。**
+    // Arrange
+    let stream = OutputStream::new();
+    let mut plain = stream.subscribe_plain();
+    stream.push(b"before\n").expect("流せない");
+    stream.stop();
+
+    // Act
+    stream.resume();
+    let after_resume = stream.push(b"after\n");
+
+    // Assert
+    assert!(
+        after_resume.is_ok(),
+        "止めたあと再開できない: {after_resume:?}"
+    );
+    assert!(!stream.is_stopped());
+    assert_eq!(plain.recv().await.expect("来ていない"), "before\n");
+    assert_eq!(plain.recv().await.expect("来ていない"), "after\n");
+}
+
+#[tokio::test]
+async fn resuming_keeps_what_was_already_streamed() {
+    // 再開で帯や末尾を消さない。**止める前の記録が消えると、何が起きたか追えない。**
+    // Arrange
+    let stream = OutputStream::new();
+    stream.push(b"before\n").expect("流せない");
+    stream.stop();
+
+    // Act
+    stream.resume();
+    stream.push(b"after\n").expect("流せない");
+
+    // Assert
+    assert_eq!(stream.plain_tail(), "before\nafter\n");
+}
+
+#[tokio::test]
+async fn resuming_a_stream_that_was_never_stopped_changes_nothing() {
+    // Arrange
+    let stream = OutputStream::new();
+
+    // Act
+    stream.resume();
+
+    // Assert
+    assert!(!stream.is_stopped());
+    assert!(stream.push(b"ok\n").is_ok());
+}

@@ -52,17 +52,23 @@ pub fn spawn_demo(stream: Arc<OutputStream>) {
     });
 }
 
-/// 実際のログに出てくる形を並べる。
-/// 色・タイトル変更（OSC）・CRLF・日本語。**どれも境界の踏み方が違う。**
+/// **合成の出力。サーバーへは 1 台も繋いでいない。**
+///
+/// 本物のログに見える偽データを画面へ出さないこと。**見た人が本物と誤解する。**
+/// ここで確かめたいのは中身ではなく、色・OSC・CRLF・日本語という
+/// **境界の踏み方が違う並びが、面ごとに正しく分かれるか**だけ。
 fn demo_lines() -> Vec<&'static [u8]> {
     vec![
         b"\x1b]0;sshboard demo\x07",
-        b"\x1b[2m2026-08-26 19:40:01\x1b[0m \x1b[32mINFO\x1b[0m  service started\r\n",
-        b"\x1b[2m2026-08-26 19:40:02\x1b[0m \x1b[32mINFO\x1b[0m  listening\r\n",
-        b"\x1b[2m2026-08-26 19:40:05\x1b[0m \x1b[33mWARN\x1b[0m  queue is filling up\r\n",
-        "\x1b[2m2026-08-26 19:40:07\x1b[0m \x1b[36mINFO\x1b[0m  設定ファイルを読み込みました\r\n"
+        "\x1b[1;33m--- ここから下は合成の出力です。サーバーへは繋いでいません ---\x1b[0m\r\n"
             .as_bytes(),
-        b"\x1b[2m2026-08-26 19:40:09\x1b[0m \x1b[31mERROR\x1b[0m disk usage 92%\r\n",
-        b"\x1b[2m2026-08-26 19:40:11\x1b[0m \x1b[31mERROR\x1b[0m \x1b[1mno space left\x1b[0m\r\n",
+        b"\x1b[2mDEMO\x1b[0m \x1b[32mINFO\x1b[0m  \x1b[2m(fake)\x1b[0m green text\r\n",
+        b"\x1b[2mDEMO\x1b[0m \x1b[33mWARN\x1b[0m  \x1b[2m(fake)\x1b[0m yellow text\r\n",
+        b"\x1b[2mDEMO\x1b[0m \x1b[31mERROR\x1b[0m \x1b[2m(fake)\x1b[0m red text\r\n",
+        b"\x1b[2mDEMO\x1b[0m \x1b[31mERROR\x1b[0m \x1b[1mbold red text\x1b[0m\r\n",
+        "\x1b[2mDEMO\x1b[0m \x1b[36mINFO\x1b[0m  \x1b[2m(fake)\x1b[0m 日本語の幅を見るための行です\r\n"
+            .as_bytes(),
+        "\x1b[1;33m--- ここまで。実機のログは 002 が通ってから流します ---\x1b[0m\r\n"
+            .as_bytes(),
     ]
 }

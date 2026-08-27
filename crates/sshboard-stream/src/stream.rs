@@ -98,6 +98,15 @@ impl OutputStream {
         self.stopped.store(true, Ordering::SeqCst);
     }
 
+    /// 止めたあと、**人が同じセッションで続きをやる**（PRD §4-3）。
+    ///
+    /// **止めたら二度と流せない、にしないこと。**それは「止められる」ではなく
+    /// 「壊れる」であり、人が続けられない。
+    /// 既に流れた分は消さない。**消すと、何が起きたか追えなくなる。**
+    pub fn resume(&self) {
+        self.stopped.store(false, Ordering::SeqCst);
+    }
+
     pub fn is_stopped(&self) -> bool {
         self.stopped.load(Ordering::SeqCst)
     }

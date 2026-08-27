@@ -42,9 +42,9 @@ pub fn mcp_url(url: State<'_, McpUrl>) -> Option<String> {
 /// 002 が通ったら本物の `tail -f` に差し替える。
 #[tauri::command]
 pub fn start_demo_stream(stream: State<'_, Arc<OutputStream>>) -> Result<(), String> {
-    if stream.is_stopped() {
-        return Err("この出力は止められています".to_owned());
-    }
+    // **止めたあとでも、人が押したら流す**（PRD §4-3「止めた後、人が同じセッションで
+    // 続きをやれる」）。止めたら二度と流せない、では「止められる」ではなく「壊れる」。
+    stream.resume();
     stream_host::spawn_demo(Arc::clone(&stream));
     Ok(())
 }
