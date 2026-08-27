@@ -217,3 +217,109 @@ async fn list_connections_puts_an_ai_line_on_the_band() {
     assert_eq!(event.line().actor(), Actor::Ai);
     assert_eq!(event.line().text(), "list_connections");
 }
+
+use rmcp::handler::server::wrapper::Parameters;
+use sshboard_mcp::RegisterConnection;
+
+fn registration(id: &str) -> Parameters<RegisterConnection> {
+    Parameters(RegisterConnection {
+        id: id.to_owned(),
+        name: format!("{id} の名前"),
+        host: "secret-host.invalid".to_owned(),
+        port: 2222,
+        user: "secret-user".to_owned(),
+        key_path: None,
+    })
+}
+
+#[tokio::test]
+async fn register_connection_writes_to_the_local_file() {
+    // Arrange
+    let dir = tempfile::tempdir().expect("一時ディレクトリを作れない");
+    let path = dir.path().join("connections.toml");
+    let server =
+        SshboardMcp::new(Band::new(), Arc::new(OutputStream::new())).with_connections(path.clone());
+
+    // Act
+    server
+        .register_connection(registration("web-prod"))
+        .await
+        .expect("登録できない");
+
+    // Assert
+    let written = std::fs::read_to_string(&path).expect("ファイルが無い");
+    assert!(written.contains("web-prod"), "書かれていない: {written}");
+    assert!(
+        written.contains("2222"),
+        "ポートが書かれていない: {written}"
+    );
+}
+
+#[tokio::test]
+async fn register_connection_tells_the_band_the_id_but_not_the_host() {
+    // **帯は画面に出る。**接続先を帯へ出すと、画面の写真に写る（PRD §8）。
+    // Arrange
+    let dir = tempfile::tempdir().expect("一時ディレクトリを作れない");
+    let band = Band::new();
+    let mut subscriber = band.subscribe();
+    let server = SshboardMcp::new(band, Arc::new(OutputStream::new()))
+        .with_connections(dir.path().join("connections.toml"));
+
+    // Act
+    tokio::spawn(async move { server.register_connection(registration("web-prod")).await });
+    let event = subscriber.recv().await.expect("帯へ出ていない");
+    let rendered = event.line().render();
+    event.ack();
+
+    // Assert
+    assert_eq!(event.line().actor(), Actor::Ai);
+    assert!(
+        rendered.contains("web-prod"),
+        "識別子が出ていない: {rendered}"
+    );
+    assert!(
+        !rendered.contains("secret-host"),
+        "ホスト名が帯に出ている: {rendered}"
+    );
+    assert!(
+        !rendered.contains("secret-user"),
+        "利用者名が帯に出ている: {rendered}"
+    );
+}
+
+#[tokio::test]
+async fn register_connection_refuses_a_duplicate_id_instead_of_overwriting() {
+    // 黙って上書きすると、人が登録したものが消える。
+    // Arrange
+    let dir = tempfile::tempdir().expect("一時ディレクトリを作れない");
+    let path = dir.path().join("connections.toml");
+    let server =
+        SshboardMcp::new(Band::new(), Arc::new(OutputStream::new())).with_connections(path);
+
+    // Act
+    server
+        .register_connection(registration("same"))
+        .await
+        .expect("1 回目が失敗した");
+    let second = server.register_connection(registration("same")).await;
+
+    // Assert
+    assert!(second.is_err(), "重複を黙って受け入れている");
+}
+
+#[tokio::test]
+async fn register_connection_rejects_an_unusable_id() {
+    // 識別子はファイルにも帯にも出る。**変な文字を通さない。**
+    // Arrange
+    let dir = tempfile::tempdir().expect("一時ディレクトリを作れない");
+    let server = SshboardMcp::new(Band::new(), Arc::new(OutputStream::new()))
+        .with_connections(dir.path().join("connections.toml"));
+
+    // Act
+    let mut bad = registration("web prod");
+    bad.0.id = "web prod".to_owned();
+    let result = server.register_connection(bad).await;
+
+    // Assert
+    assert!(result.is_err(), "空白入りの識別子を通している");
+}

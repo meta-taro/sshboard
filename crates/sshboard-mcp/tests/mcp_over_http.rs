@@ -126,11 +126,42 @@ async fn the_server_advertises_only_the_phase_zero_tools() {
         .unwrap();
 
     // Assert
-    assert!(listed.contains("\"ping\""), "ping が一覧に無い: {listed}");
-    assert!(
-        !listed.contains("run_command"),
-        "任意コマンドの口がある: {listed}"
-    );
+    for expected in [
+        "ping",
+        "read_stream",
+        "list_connections",
+        "register_connection",
+    ] {
+        assert!(
+            listed.contains(expected),
+            "{expected} が一覧に無い: {listed}"
+        );
+    }
+
+    // **ここが D3 の見張り。**引数で任意の文字列をシェルへ渡す口を 1 つも作らない。
+    for forbidden in ["run_command", "shell", "system"] {
+        assert!(
+            !listed.contains(forbidden),
+            "任意コマンドの口がある（{forbidden}）: {listed}"
+        );
+    }
+
+    // **ここが D11 の見張り。**AI に秘密を渡す口を作らない。
+    // **引数名だけを見る。**説明文には「パスフレーズを受け取らない」と書いてあるので、
+    // 素朴に部分一致させると説明文に当たってしまう（実際に当たった）。
+    for secret in [
+        "passphrase",
+        "password",
+        "secret",
+        "private_key",
+        "credential",
+    ] {
+        let as_json_key = format!("\"{secret}\":");
+        assert!(
+            !listed.contains(&as_json_key),
+            "秘密を受け取る引数が生えている（{secret}）: {listed}"
+        );
+    }
 
     endpoint.shutdown();
 }

@@ -9,10 +9,12 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use rmcp::handler::server::router::tool::ToolRouter;
+use rmcp::handler::server::wrapper::Parameters;
 use rmcp::model::{ServerCapabilities, ServerInfo};
 use rmcp::{tool, tool_handler, tool_router, ErrorData, ServerHandler};
+use serde::Deserialize;
 use sshboard_band::{Actor, Band, DeliveryOutcome};
-use sshboard_connections::{ConnectionSummary, Connections};
+use sshboard_connections::{ConnectionEntry, ConnectionSummary, Connections};
 use sshboard_stream::OutputStream;
 
 /// 帯が受け取りを返すまで待つ上限。
@@ -57,12 +59,7 @@ impl SshboardMcp {
     /// **ここにホスト名を混ぜないこと**（CLAUDE.md 禁止事項 5）。
     /// 混ぜてよいかどうかは `ConnectionSummary` の側で守っている。
     pub fn connection_summaries(&self) -> Result<Vec<ConnectionSummary>, ErrorData> {
-        let path = match &self.connections_path {
-            Some(path) => path.clone(),
-            None => sshboard_connections::default_path().map_err(|error| {
-                ErrorData::internal_error(format!("cannot locate connections: {error}"), None)
-            })?,
-        };
+        let path = self.connections_file()?;
 
         Connections::load_or_empty(&path)
             .map(|connections| connections.summaries())
@@ -70,6 +67,16 @@ impl SshboardMcp {
                 // 中身を載せない。**接続先が混ざりうる**（PRD §8）。
                 ErrorData::internal_error(format!("cannot read connections: {error}"), None)
             })
+    }
+
+    /// 接続一覧のファイルの場所。
+    fn connections_file(&self) -> Result<PathBuf, ErrorData> {
+        match &self.connections_path {
+            Some(path) => Ok(path.clone()),
+            None => sshboard_connections::default_path().map_err(|error| {
+                ErrorData::internal_error(format!("cannot locate connections: {error}"), None)
+            }),
+        }
     }
 
     /// 帯へ 1 行載せ、**画面が受け取るまで待つ。**
@@ -113,6 +120,68 @@ impl SshboardMcp {
         Ok(self.stream.plain_tail())
     }
 
+    /// 接続を 1 件登録する。**ローカルの設定ファイルにだけ書きます。**
+    ///
+    /// **サーバーへは 1 バイトも書きません**（D2 / D21）。
+    /// 秘密は受け取りません。パスフレーズは ssh-agent か OS ストアにあります（D11）。
+    #[tool(
+        description = "Register one connection in sshboard's local list. Writes only to the local config file - never to any remote server. Accepts no passwords or passphrases."
+    )]
+    pub async fn register_connection(
+        &self,
+        Parameters(request): Parameters<RegisterConnection>,
+    ) -> Result<String, ErrorData> {
+        // 弾くものは帯へ載せる前に弾く。**書けない要求で帯を埋めない。**
+        check_id(&request.id)?;
+        check_present("host", &request.host)?;
+        check_present("user", &request.user)?;
+
+        // **識別子だけを帯へ載せる。**帯は画面に出るので、
+        // ホスト名を載せると画面の写真に接続先が写る（PRD §8）。
+        self.show(&format!("register_connection {}", request.id))
+            .await?;
+
+        let path = self.connections_file()?;
+        let held = Connections::load_or_empty(&path).map_err(|error| {
+            ErrorData::internal_error(format!("cannot read connections: {error}"), None)
+        })?;
+
+        // **黙って上書きしない。**人が登録したものが消える。
+        if held.get(&request.id).is_some() {
+            return Err(ErrorData::invalid_params(
+                format!("connection `{}` already exists", request.id),
+                None,
+            ));
+        }
+
+        let entry = ConnectionEntry {
+            id: request.id.clone(),
+            name: request.name,
+            host: request.host,
+            port: request.port,
+            user: request.user,
+            // 空文字は「指定なし」として扱う。ssh-agent を使う（D11）。
+            key_path: request.key_path.filter(|path| !path.trim().is_empty()),
+            keyring_passphrase_ref: None,
+            fingerprint: None,
+            known_hosts: None,
+        };
+
+        let next = Connections {
+            version: held.version,
+            connections: held
+                .connections
+                .into_iter()
+                .chain(std::iter::once(entry))
+                .collect(),
+        };
+        next.save(&path).map_err(|error| {
+            ErrorData::internal_error(format!("cannot save connections: {error}"), None)
+        })?;
+
+        Ok(format!("registered `{}`", request.id))
+    }
+
     /// 登録された接続の一覧。
     ///
     /// **識別子と名前だけを返します。**ホスト名・IP・利用者名・鍵のパス・
@@ -130,9 +199,61 @@ impl SshboardMcp {
     }
 }
 
+/// `register_connection` の引数。
+///
+/// **秘密は受け取りません。**パスフレーズもパスワードも項目にありません。
+/// 鍵は ssh-agent か、鍵ファイルのパスだけです（D11）。
+#[derive(Debug, Deserialize, rmcp::schemars::JsonSchema)]
+#[schemars(crate = "rmcp::schemars")]
+pub struct RegisterConnection {
+    /// 機械が使う識別子。英数字と `.` `_` `-` のみ。
+    pub id: String,
+    /// 人が読む名前。
+    pub name: String,
+    pub host: String,
+    #[serde(default = "default_ssh_port")]
+    pub port: u16,
+    pub user: String,
+    /// 秘密鍵のパス。**省略すると ssh-agent を使う**（推奨）。
+    #[serde(default)]
+    pub key_path: Option<String>,
+}
+
+fn default_ssh_port() -> u16 {
+    22
+}
+
 #[tool_handler(router = self.tool_router)]
 impl ServerHandler for SshboardMcp {
     fn get_info(&self) -> ServerInfo {
         ServerInfo::new(ServerCapabilities::builder().enable_tools().build())
+    }
+}
+
+/// 識別子はファイルにも帯にも出る。**変な文字を通さない。**
+fn check_id(id: &str) -> Result<(), ErrorData> {
+    let usable = !id.trim().is_empty()
+        && id
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '_' | '-'));
+
+    if usable {
+        Ok(())
+    } else {
+        Err(ErrorData::invalid_params(
+            "id must be non-empty and use only A-Z a-z 0-9 . _ -".to_string(),
+            None,
+        ))
+    }
+}
+
+fn check_present(field: &str, value: &str) -> Result<(), ErrorData> {
+    if value.trim().is_empty() {
+        Err(ErrorData::invalid_params(
+            format!("{field} must not be empty"),
+            None,
+        ))
+    } else {
+        Ok(())
     }
 }
