@@ -19,7 +19,7 @@ const en = {
 	'tab.band': 'Band & output',
 
 	'conn.heading': 'Connections',
-	'conn.new': '+ New',
+	'conn.new': 'New',
 	'conn.empty': 'Nothing registered yet.',
 	'conn.id': 'Identifier',
 	'conn.id.help': 'The AI sees only this and the name. The host is never passed.',
@@ -92,7 +92,7 @@ const ja: Catalog = {
 	'tab.band': '帯と出力',
 
 	'conn.heading': '接続',
-	'conn.new': '＋ 新規',
+	'conn.new': '新規',
 	'conn.empty': 'まだ 1 件も登録されていません。',
 	'conn.id': '識別子',
 	'conn.id.help': 'AI に見えるのは、これと名前だけです。ホスト名は渡りません。',

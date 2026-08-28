@@ -127,19 +127,18 @@
 			</button>
 		</nav>
 
-		<span class="gap"></span>
-
 		<div class="settings">
 			<span class="settings-icon"><Icon name="globe" size={13} /></span>
 			{#each ['auto', 'light', 'dark'] as const as mode (mode)}
 				<button
 					type="button"
+					class="icon-only"
 					class:active={theme.mode === mode}
-					title={i18n.t('theme.label')}
+					title={`${i18n.t('theme.label')}: ${i18n.t(`theme.${mode}`)}`}
+					aria-label={`${i18n.t('theme.label')}: ${i18n.t(`theme.${mode}`)}`}
 					onclick={() => theme.set(mode as ThemeMode)}
 				>
 					<Icon name={mode === 'auto' ? 'contrast' : mode === 'light' ? 'sun' : 'moon'} />
-					{i18n.t(`theme.${mode}`)}
 				</button>
 			{/each}
 			<select
@@ -213,12 +212,14 @@
 	}
 
 	/* **上の帯は 1 行。**折り返しても 2 行までに収まる高さにする。 */
+	/* **折り返さない。**折り返すと帯が 2 段になり、本文の面積が減る。
+	   入りきらないときは、説明 → MCP の順に縮める。 */
 	header {
 		display: flex;
 		align-items: center;
 		gap: 0.5rem;
-		flex-wrap: wrap;
-		row-gap: 0.35rem;
+		flex-wrap: nowrap;
+		min-width: 0;
 	}
 
 	/* 長い説明は常時出さない。**ここに置くと本文の面積が消える。**
@@ -229,13 +230,8 @@
 		white-space: nowrap;
 		overflow: hidden;
 		text-overflow: ellipsis;
-		max-width: 22rem;
-		flex: 0 1 auto;
-	}
-
-	.gap {
-		flex: 1 1 auto;
 		min-width: 0;
+		flex: 1 1 auto;
 	}
 
 	.mcp {
@@ -246,7 +242,88 @@
 		font-size: 0.62rem;
 		color: var(--fg-faint);
 		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		min-width: 0;
+		flex: 0 1 auto;
+	}
+
+	/* 設定と切替は、浮いた 1 本のピルにまとめる。 */
+	.settings,
+	.tabs {
+		display: flex;
+		align-items: center;
+		gap: 0.2rem;
+		flex-wrap: nowrap;
 		flex: none;
+		background: var(--shell);
+		border: 1px solid var(--hairline);
+		border-radius: 999px;
+		padding: 3px;
+	}
+
+	.settings-icon {
+		display: inline-flex;
+		align-items: center;
+		padding: 0 0.15rem 0 0.4rem;
+		color: var(--fg-faint);
+	}
+
+	/* **アイコンと文字を横に並べる。**これが無いと、SVG が block なので
+	   文字の上に乗ってしまう（実際に乗った）。 */
+	.settings button,
+	.tabs button {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.32rem;
+		font: inherit;
+		font-size: 0.74rem;
+		color: var(--fg-muted);
+		background: transparent;
+		border: 1px solid transparent;
+		border-radius: 999px;
+		padding: 0.2rem 0.7rem;
+		white-space: nowrap;
+		cursor: pointer;
+		transition:
+			background var(--fast) var(--ease),
+			color var(--fast) var(--ease),
+			transform var(--fast) var(--ease);
+	}
+
+	.settings button.icon-only {
+		padding: 0.26rem 0.4rem;
+	}
+
+	.settings button:active,
+	.tabs button:active {
+		transform: scale(0.97);
+	}
+
+	.settings button.active,
+	.tabs button.active {
+		color: var(--fg);
+		background: var(--surface);
+		box-shadow: var(--inner-highlight), var(--lift-1);
+	}
+
+	.settings button:focus-visible,
+	.tabs button:focus-visible,
+	.settings select:focus-visible {
+		outline: 2px solid var(--accent);
+		outline-offset: 1px;
+	}
+
+	.settings select {
+		font: inherit;
+		font-size: 0.74rem;
+		color: var(--fg);
+		background: var(--surface);
+		border: 1px solid var(--hairline);
+		border-radius: 999px;
+		padding: 0.16rem 0.5rem;
+		margin-left: 0.15rem;
+		box-shadow: var(--inner-highlight);
 	}
 
 	.failure {

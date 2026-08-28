@@ -432,6 +432,9 @@
 	.row {
 		display: flex;
 		flex-direction: column;
+		/* **中央寄せにしない。**あとから足した `button { align-items: center }` が
+		   ここにも当たり、列方向の flex なので全部が中央へ寄っていた。 */
+		align-items: stretch;
 		gap: 1px;
 		width: 100%;
 		text-align: left;
