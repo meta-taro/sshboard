@@ -23,12 +23,20 @@ export type Connection = {
 export const CONNECTION_COLORS = [
 	'red',
 	'orange',
+	'amber',
 	'yellow',
+	'lime',
 	'green',
+	'emerald',
 	'teal',
+	'cyan',
+	'sky',
 	'blue',
+	'indigo',
+	'violet',
 	'purple',
-	'pink'
+	'magenta',
+	'pink',
 ] as const;
 
 /** タグの上限。**バイトではなく文字数。**漢字 12 文字は 36 バイト。 */

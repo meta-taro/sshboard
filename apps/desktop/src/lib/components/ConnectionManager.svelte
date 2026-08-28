@@ -30,6 +30,8 @@
 	let listWidth = $state(DEFAULT_LIST_WIDTH);
 	let manager: HTMLElement | undefined = $state();
 	let dragging = $state(false);
+	/** **いきなり消さない**（product-baseline §13）。押してから、もう一度確かめる。 */
+	let confirmingDelete = $state(false);
 
 	function containerWidth(): number {
 		return manager?.getBoundingClientRect().width ?? 0;
@@ -87,12 +89,14 @@
 		draft = emptyConnection();
 		selectedId = null;
 		notice = null;
+		confirmingDelete = false;
 	}
 
 	function edit(item: Connection) {
 		draft = { ...item };
 		selectedId = item.id;
 		notice = null;
+		confirmingDelete = false;
 	}
 
 	async function save() {
@@ -109,6 +113,7 @@
 
 	async function remove(id: string) {
 		failure = null;
+		confirmingDelete = false;
 		try {
 			await invoke('connection_delete', { id });
 			notice = `${id} を消しました`;
@@ -305,13 +310,29 @@
 
 		<div class="actions">
 			<button type="button" onclick={save} disabled={blocker !== ''}>保存</button>
-			{#if selectedId}
-				<button type="button" class="danger" onclick={() => remove(selectedId ?? '')}>削除</button>
+			{#if selectedId && !confirmingDelete}
+				<button type="button" class="danger" onclick={() => (confirmingDelete = true)}>
+					削除
+				</button>
 			{/if}
 			{#if blocker}
 				<span class="blocker">{blocker}</span>
 			{/if}
 		</div>
+
+		{#if selectedId && confirmingDelete}
+			<p class="confirm" role="alert">
+				<strong>{selectedId} を消します。</strong>
+				一覧から消えるだけで、<strong>サーバー側には何も起きません。</strong>
+				OS の資格情報ストアに入れた秘密も残ります。
+				<span class="confirm-actions">
+					<button type="button" class="danger" onclick={() => remove(selectedId ?? '')}>
+						消す
+					</button>
+					<button type="button" onclick={() => (confirmingDelete = false)}>やめる</button>
+				</span>
+			</p>
+		{/if}
 	</div>
 </section>
 
@@ -507,13 +528,13 @@
 
 	.swatches {
 		display: grid;
-		grid-template-columns: repeat(4, 20px);
+		grid-template-columns: repeat(8, 18px);
 		gap: 0.25rem;
 	}
 
 	.swatch {
-		width: 20px;
-		height: 20px;
+		width: 18px;
+		height: 18px;
 		padding: 0;
 		border-radius: 3px;
 		border: 1px solid var(--border-strong);
@@ -564,6 +585,21 @@
 	.danger {
 		color: var(--danger-fg);
 		border-color: var(--danger-fg);
+	}
+
+	.confirm {
+		margin: 0;
+		padding: 0.5rem 0.6rem;
+		background: var(--danger-bg);
+		color: var(--danger-fg);
+		font-size: 0.78rem;
+		line-height: 1.7;
+	}
+
+	.confirm-actions {
+		display: inline-flex;
+		gap: 0.4rem;
+		margin-left: 0.5rem;
 	}
 
 	.blocker,

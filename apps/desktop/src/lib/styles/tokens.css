@@ -26,14 +26,22 @@
 	--ok-fg: #1f6f57;
 
 	/* 接続の印。**16 進数を設定ファイルに書かず、名前で持つ**（Rust 側の CONNECTION_COLORS）。 */
-	--mark-red: #c8443f;
-	--mark-orange: #c2722c;
-	--mark-yellow: #a98a17;
+--mark-red: #c8443f;
+	--mark-orange: #b8702c;
+	--mark-amber: #a9821f;
+	--mark-yellow: #8f8419;
+	--mark-lime: #6f8c22;
 	--mark-green: #3f8b4d;
-	--mark-teal: #2f7d68;
-	--mark-blue: #3a70a8;
-	--mark-purple: #6f57a8;
-	--mark-pink: #a85585;
+	--mark-emerald: #2f8f65;
+	--mark-teal: #2f7d78;
+	--mark-cyan: #2f7f8f;
+	--mark-sky: #2f74ab;
+	--mark-blue: #3a66b0;
+	--mark-indigo: #5a5cb0;
+	--mark-violet: #7452ab;
+	--mark-purple: #8c4fa8;
+	--mark-magenta: #a44b93;
+	--mark-pink: #b04f77;
 
 	/* 端末は暗いままにする。ログは暗い背景で読むのが普通で、
 	   明るくすると ANSI の既定色（黒に載る前提の色）が読めなくなる。 */
@@ -59,14 +67,22 @@
 		--warning-fg: #ffe0a0;
 		--ok-fg: #7fd1b9;
 
-		--mark-red: #d9534f;
+--mark-red: #e05252;
 		--mark-orange: #e08a3c;
-		--mark-yellow: #d9b03c;
+		--mark-amber: #d9a13c;
+		--mark-yellow: #d9c53c;
+		--mark-lime: #a8c93f;
 		--mark-green: #4fa85f;
-		--mark-teal: #3a8f7a;
-		--mark-blue: #4a86c8;
-		--mark-purple: #8a6fc4;
-		--mark-pink: #c46f9e;
+		--mark-emerald: #3fb07d;
+		--mark-teal: #3a9f95;
+		--mark-cyan: #3fa8b8;
+		--mark-sky: #4a9ad4;
+		--mark-blue: #5a86d6;
+		--mark-indigo: #7a7ad6;
+		--mark-violet: #9a70d0;
+		--mark-purple: #b06fd0;
+		--mark-magenta: #cc6bb8;
+		--mark-pink: #d96f96;
 	}
 }
 
@@ -87,12 +103,20 @@
 	--warning-fg: #ffe0a0;
 	--ok-fg: #7fd1b9;
 
-	--mark-red: #d9534f;
+--mark-red: #e05252;
 	--mark-orange: #e08a3c;
-	--mark-yellow: #d9b03c;
+	--mark-amber: #d9a13c;
+	--mark-yellow: #d9c53c;
+	--mark-lime: #a8c93f;
 	--mark-green: #4fa85f;
-	--mark-teal: #3a8f7a;
-	--mark-blue: #4a86c8;
-	--mark-purple: #8a6fc4;
-	--mark-pink: #c46f9e;
+	--mark-emerald: #3fb07d;
+	--mark-teal: #3a9f95;
+	--mark-cyan: #3fa8b8;
+	--mark-sky: #4a9ad4;
+	--mark-blue: #5a86d6;
+	--mark-indigo: #7a7ad6;
+	--mark-violet: #9a70d0;
+	--mark-purple: #b06fd0;
+	--mark-magenta: #cc6bb8;
+	--mark-pink: #d96f96;
 }

@@ -14,9 +14,14 @@
 //! ここで列挙できるものではない。**
 
 /// 付けられる色。**並び順は選択画面に出る順**（スペクトル順なので、
-/// 8 つのラベルを読まなくても「緑のやつ」を探せる）。
-pub const CONNECTION_COLORS: [&str; 8] = [
-    "red", "orange", "yellow", "green", "teal", "blue", "purple", "pink",
+/// 名前を読まなくても「緑のやつ」を探せる）。
+///
+/// **16 色。**dbboard は 8 色だが、こちらは対象サーバーが 13 台以上あり、
+/// 8 だと色がぶつかる（実測・2026-08-27）。
+/// 増やすほど 1 色ずつの区別は付きにくくなるので、**タグと併せて使う前提**。
+pub const CONNECTION_COLORS: [&str; 16] = [
+    "red", "orange", "amber", "yellow", "lime", "green", "emerald", "teal", "cyan", "sky", "blue",
+    "indigo", "violet", "purple", "magenta", "pink",
 ];
 
 /// タグの上限。**バイトではなく文字数で数える。**
