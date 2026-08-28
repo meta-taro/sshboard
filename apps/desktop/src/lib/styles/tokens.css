@@ -1,0 +1,98 @@
+/*
+ * 配色のトークン。**明るい方を既定にし、暗い方を上書きで持つ。**
+ *
+ * `data-theme` が付いていないときは OS の設定（`prefers-color-scheme`）に従います。
+ * 明示的に選んだときだけ `data-theme` が付き、**両方向に**メディアクエリを上書きします。
+ *
+ * **値そのものは仮置きです**（DESIGN.md）。Phase 1-A で人が決めます。
+ * ここが「名前 → 実際の色」の対応表で、増やすときはここだけ触ります。
+ */
+
+:root {
+	--bg: #ffffff;
+	--bg-raised: #f4f5f7;
+	--bg-input: #ffffff;
+	--fg: #1c1f24;
+	--fg-muted: #5c636e;
+	--fg-faint: #868d97;
+	--border: #d8dbe0;
+	--border-strong: #b6bcc4;
+
+	--accent: #2f7d68;
+	--danger-bg: #fdeaea;
+	--danger-fg: #a12a2a;
+	--warning-bg: #fdf4e0;
+	--warning-fg: #7a5a12;
+	--ok-fg: #1f6f57;
+
+	/* 接続の印。**16 進数を設定ファイルに書かず、名前で持つ**（Rust 側の CONNECTION_COLORS）。 */
+	--mark-red: #c8443f;
+	--mark-orange: #c2722c;
+	--mark-yellow: #a98a17;
+	--mark-green: #3f8b4d;
+	--mark-teal: #2f7d68;
+	--mark-blue: #3a70a8;
+	--mark-purple: #6f57a8;
+	--mark-pink: #a85585;
+
+	/* 端末は暗いままにする。ログは暗い背景で読むのが普通で、
+	   明るくすると ANSI の既定色（黒に載る前提の色）が読めなくなる。 */
+	--terminal-bg: #16181d;
+	--terminal-fg: #d7dae0;
+}
+
+@media (prefers-color-scheme: dark) {
+	:root:not([data-theme='light']) {
+		--bg: #16181d;
+		--bg-raised: #1d2129;
+		--bg-input: #1d2129;
+		--fg: #d7dae0;
+		--fg-muted: #8b929e;
+		--fg-faint: #6f7681;
+		--border: #262a31;
+		--border-strong: #333944;
+
+		--accent: #3a8f7a;
+		--danger-bg: #3a1d1d;
+		--danger-fg: #ffb4b4;
+		--warning-bg: #3a331d;
+		--warning-fg: #ffe0a0;
+		--ok-fg: #7fd1b9;
+
+		--mark-red: #d9534f;
+		--mark-orange: #e08a3c;
+		--mark-yellow: #d9b03c;
+		--mark-green: #4fa85f;
+		--mark-teal: #3a8f7a;
+		--mark-blue: #4a86c8;
+		--mark-purple: #8a6fc4;
+		--mark-pink: #c46f9e;
+	}
+}
+
+:root[data-theme='dark'] {
+	--bg: #16181d;
+	--bg-raised: #1d2129;
+	--bg-input: #1d2129;
+	--fg: #d7dae0;
+	--fg-muted: #8b929e;
+	--fg-faint: #6f7681;
+	--border: #262a31;
+	--border-strong: #333944;
+
+	--accent: #3a8f7a;
+	--danger-bg: #3a1d1d;
+	--danger-fg: #ffb4b4;
+	--warning-bg: #3a331d;
+	--warning-fg: #ffe0a0;
+	--ok-fg: #7fd1b9;
+
+	--mark-red: #d9534f;
+	--mark-orange: #e08a3c;
+	--mark-yellow: #d9b03c;
+	--mark-green: #4fa85f;
+	--mark-teal: #3a8f7a;
+	--mark-blue: #4a86c8;
+	--mark-purple: #8a6fc4;
+	--mark-pink: #c46f9e;
+}

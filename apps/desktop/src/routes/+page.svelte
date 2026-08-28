@@ -5,6 +5,7 @@
 
 	import { appendLine, type BandLine } from '$lib/band';
 	import ConnectionManager from '$lib/components/ConnectionManager.svelte';
+	import { theme, type ThemeMode } from '$lib/theme/theme.svelte';
 	import { createTerminal, writeChunk } from '$lib/terminal.svelte';
 	import '@xterm/xterm/css/xterm.css';
 	import type { Terminal } from '@xterm/xterm';
@@ -112,6 +113,19 @@
 		<p class="phase">
 			本来はここを人が操作しません。外の AI エージェントが MCP を呼び、その操作が帯に流れます。
 		</p>
+		<div class="settings">
+			<span class="settings-label">テーマ</span>
+			{#each [['auto', '自動'], ['light', '明るい'], ['dark', '暗い']] as [mode, label] (mode)}
+				<button
+					type="button"
+					class:active={theme.mode === mode}
+					onclick={() => theme.set(mode as ThemeMode)}
+				>
+					{label}
+				</button>
+			{/each}
+		</div>
+
 		<p class="mcp">
 			MCP:
 			{#if mcpUrl}
@@ -165,14 +179,11 @@
 </main>
 
 <style>
-	/*
-	 * 見た目は決まっていません（DESIGN.md）。ここは Phase 0 で帯が出ることを
-	 * 確かめるための最低限で、配色・字送りの方向性は人が決めます。
-	 */
+	/* 色は tokens.css の変数だけを使う。**ここに 16 進数を書かない。** */
 	:global(body) {
 		margin: 0;
-		background: #16181d;
-		color: #d7dae0;
+		background: var(--bg);
+		color: var(--fg);
 		font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 	}
 
@@ -195,43 +206,59 @@
 	.mcp {
 		margin: 0.25rem 0 0;
 		font-size: 0.8rem;
-		color: #8b929e;
+		color: var(--fg-muted);
 	}
 
 	.waiting {
-		color: #8b929e;
+		color: var(--fg-muted);
+	}
+
+	.settings {
+		display: flex;
+		align-items: center;
+		gap: 0.3rem;
+		margin-top: 0.4rem;
+		font-size: 0.75rem;
+		color: var(--fg-muted);
+		flex-wrap: wrap;
+	}
+
+	.settings-label {
+		margin-right: 0.2rem;
+	}
+
+	.settings button,
+	.tabs button {
+		font: inherit;
+		font-size: 0.75rem;
+		color: var(--fg-muted);
+		background: none;
+		border: 1px solid transparent;
+		border-radius: 3px;
+		padding: 0.15rem 0.55rem;
+		cursor: pointer;
+	}
+
+	.settings button.active,
+	.tabs button.active {
+		color: var(--fg);
+		border-color: var(--border-strong);
+		background: var(--bg-raised);
 	}
 
 	.failure {
 		margin: 0;
 		padding: 0.5rem 0.75rem;
-		background: #3a1d1d;
-		color: #ffb4b4;
+		background: var(--danger-bg);
+		color: var(--danger-fg);
 		font-size: 0.8rem;
 	}
 
 	.tabs {
 		display: flex;
 		gap: 0.35rem;
-		border-top: 1px solid #262a31;
+		border-top: 1px solid var(--border);
 		padding-top: 0.6rem;
-	}
-
-	.tabs button {
-		font: inherit;
-		font-size: 0.78rem;
-		color: #8b929e;
-		background: none;
-		border: 1px solid transparent;
-		border-radius: 3px;
-		padding: 0.2rem 0.7rem;
-		cursor: pointer;
-	}
-
-	.tabs button.active {
-		color: #d7dae0;
-		border-color: #333944;
-		background: #1d2129;
 	}
 
 	.stream {
@@ -239,7 +266,7 @@
 		flex-direction: column;
 		flex: 2;
 		min-height: 0;
-		border-top: 1px solid #262a31;
+		border-top: 1px solid var(--border);
 		padding-top: 0.75rem;
 		gap: 0.5rem;
 	}
@@ -249,7 +276,8 @@
 		align-items: center;
 		gap: 0.5rem;
 		font-size: 0.75rem;
-		color: #8b929e;
+		color: var(--fg-muted);
+		flex-wrap: wrap;
 	}
 
 	.stream-head .label {
@@ -259,16 +287,17 @@
 	/* このボタンは製品の操作ではない。**002 が通ったら消える足場。** */
 	.stream-head .scaffold {
 		padding: 0.1rem 0.4rem;
-		border: 1px dashed #4a3f2a;
+		border: 1px dashed var(--warning-fg);
 		border-radius: 3px;
-		color: #b9a06a;
+		color: var(--warning-fg);
 	}
 
 	.stream-head button {
 		font: inherit;
-		color: #d7dae0;
-		background: #22262e;
-		border: 1px solid #333944;
+		font-size: 0.75rem;
+		color: var(--fg);
+		background: var(--bg-raised);
+		border: 1px solid var(--border-strong);
 		border-radius: 3px;
 		padding: 0.2rem 0.6rem;
 		cursor: pointer;
@@ -279,17 +308,19 @@
 		cursor: default;
 	}
 
+	/* 端末は暗いままにする。ANSI の既定色は暗い背景に載る前提で作られている。 */
 	.terminal {
 		flex: 1;
 		min-height: 0;
 		overflow: hidden;
+		background: var(--terminal-bg);
 	}
 
 	.band {
 		flex: 1;
 		min-height: 0;
 		overflow-y: auto;
-		border-top: 1px solid #262a31;
+		border-top: 1px solid var(--border);
 		padding-top: 0.75rem;
 	}
 
@@ -306,12 +337,12 @@
 	}
 
 	.band li.ai {
-		color: #7fd1b9;
+		color: var(--accent);
 	}
 
 	.empty {
 		margin: 0;
 		font-size: 0.8rem;
-		color: #6f7681;
+		color: var(--fg-faint);
 	}
 </style>

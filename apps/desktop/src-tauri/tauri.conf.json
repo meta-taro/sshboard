@@ -14,8 +14,10 @@
       {
         "label": "main",
         "title": "sshboard",
-        "width": 900,
-        "height": 560
+        "width": 1100,
+        "height": 700,
+        "minWidth": 640,
+        "minHeight": 420
       }
     ],
     "security": {

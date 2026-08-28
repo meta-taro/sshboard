@@ -110,6 +110,7 @@
 							type="button"
 							class="row"
 							class:selected={item.id === selectedId}
+							style:--row-mark={item.color ? `var(--mark-${item.color})` : 'var(--accent)'}
 							onclick={() => edit(item)}
 						>
 							<span class="row-top">
@@ -181,23 +182,19 @@
 			</small>
 		</label>
 
-		<div class="pair">
-			<label>
+		<div class="mark-row">
+			<label class="tag">
 				<span>タグ（{CONNECTION_TAG_MAX_CHARS} 文字まで）</span>
-				<input bind:value={draft.tag} placeholder="本番 / 開発 / 開発2" />
+				<input
+					bind:value={draft.tag}
+					maxlength={CONNECTION_TAG_MAX_CHARS}
+					placeholder="本番 / 開発2"
+				/>
 				<small>色が見えなくても効く方の印です。白黒の画面写真でも読めます。</small>
 			</label>
 			<label>
 				<span>色</span>
 				<div class="swatches">
-					<button
-						type="button"
-						class="swatch none"
-						class:picked={!draft.color}
-						title="印なし"
-						aria-label="印なし"
-						onclick={() => (draft.color = null)}
-					></button>
 					{#each CONNECTION_COLORS as color (color)}
 						<button
 							type="button"
@@ -210,6 +207,9 @@
 						></button>
 					{/each}
 				</div>
+				<button type="button" class="clear-mark" onclick={() => (draft.color = null)}>
+					印なし
+				</button>
 			</label>
 		</div>
 
@@ -234,35 +234,36 @@
 </section>
 
 <style>
-	/* 見た目は決まっていません（DESIGN.md）。
-	   左に一覧・右に入力の 2 面は HeidiSQL / WinSCP のサイトマネージャに合わせています。 */
-	/* 印の色。**16 進数を設定ファイルに書かず、名前で持つ**（Rust 側の CONNECTION_COLORS）。
-	   ここが「名前 → 実際の色」の対応表で、明暗のテーマを足すときはここだけ増やす。
-	   **配色そのものは仮置きです**（DESIGN.md）。 */
-	.manager {
-		--mark-red: #d9534f;
-		--mark-orange: #e08a3c;
-		--mark-yellow: #d9b03c;
-		--mark-green: #4fa85f;
-		--mark-teal: #3a8f7a;
-		--mark-blue: #4a86c8;
-		--mark-purple: #8a6fc4;
-		--mark-pink: #c46f9e;
-	}
-
+	/* 色は tokens.css の変数だけを使う。**ここに 16 進数を書かない。**
+	   書くと、テーマを切り替えたときにそこだけ取り残される。 */
 	.manager {
 		display: grid;
-		grid-template-columns: 220px 1fr;
+		grid-template-columns: minmax(180px, 22%) 1fr;
 		gap: 1rem;
 		flex: 1;
 		min-height: 0;
+	}
+
+	/* 窓が狭いときは 2 面をやめて縦に積む。**小さく使う人を締め出さない。** */
+	@media (max-width: 720px) {
+		.manager {
+			grid-template-columns: 1fr;
+			grid-template-rows: minmax(120px, 30%) 1fr;
+		}
+
+		.list {
+			border-right: none;
+			border-bottom: 1px solid var(--border);
+			padding-right: 0;
+			padding-bottom: 0.6rem;
+		}
 	}
 
 	.list {
 		display: flex;
 		flex-direction: column;
 		gap: 0.5rem;
-		border-right: 1px solid #262a31;
+		border-right: 1px solid var(--border);
 		padding-right: 0.75rem;
 		min-height: 0;
 	}
@@ -272,7 +273,7 @@
 		align-items: center;
 		justify-content: space-between;
 		font-size: 0.8rem;
-		color: #8b929e;
+		color: var(--fg-muted);
 	}
 
 	.list ul {
@@ -292,18 +293,19 @@
 		border: 1px solid transparent;
 		border-radius: 3px;
 		padding: 0.35rem 0.5rem;
-		color: #d7dae0;
+		color: var(--fg);
 		font: inherit;
 		cursor: pointer;
 	}
 
 	.row:hover {
-		background: #1d2129;
+		background: var(--bg-raised);
 	}
 
+	/* **選択の枠はその接続の印の色。**印が無いときだけ既定色にする。 */
 	.row.selected {
-		border-color: #3a8f7a;
-		background: #1d2129;
+		border-color: var(--row-mark);
+		background: var(--bg-raised);
 	}
 
 	.row-top {
@@ -335,33 +337,9 @@
 		flex: none;
 	}
 
-	.swatches {
-		display: flex;
-		gap: 0.25rem;
-		flex-wrap: wrap;
-	}
-
-	.swatch {
-		width: 18px;
-		height: 18px;
-		padding: 0;
-		border-radius: 3px;
-		border: 1px solid #333944;
-		cursor: pointer;
-	}
-
-	.swatch.none {
-		background: repeating-linear-gradient(45deg, #22262e, #22262e 3px, #2c313a 3px, #2c313a 6px);
-	}
-
-	.swatch.picked {
-		outline: 2px solid #d7dae0;
-		outline-offset: 1px;
-	}
-
 	.row-id {
 		font-size: 0.72rem;
-		color: #6f7681;
+		color: var(--fg-faint);
 	}
 
 	.form {
@@ -377,15 +355,15 @@
 		flex-direction: column;
 		gap: 0.2rem;
 		font-size: 0.78rem;
-		color: #8b929e;
+		color: var(--fg-muted);
 	}
 
 	input {
 		font: inherit;
 		font-size: 0.85rem;
-		color: #d7dae0;
-		background: #1d2129;
-		border: 1px solid #333944;
+		color: var(--fg);
+		background: var(--bg-input);
+		border: 1px solid var(--border-strong);
 		border-radius: 3px;
 		padding: 0.3rem 0.45rem;
 	}
@@ -395,7 +373,7 @@
 	}
 
 	small {
-		color: #6f7681;
+		color: var(--fg-faint);
 		font-size: 0.7rem;
 	}
 
@@ -405,19 +383,65 @@
 		gap: 0.6rem;
 	}
 
+	/* タグは 12 文字までなので、入力欄も 12 文字分でよい。
+	   **色見本は 2 行 × 4。**3 行にすると縦が伸びる。 */
+	.mark-row {
+		display: flex;
+		align-items: flex-start;
+		gap: 1rem;
+		flex-wrap: wrap;
+	}
+
+	.mark-row .tag input {
+		width: 11rem;
+	}
+
+	.swatches {
+		display: grid;
+		grid-template-columns: repeat(4, 20px);
+		gap: 0.25rem;
+	}
+
+	.swatch {
+		width: 20px;
+		height: 20px;
+		padding: 0;
+		border-radius: 3px;
+		border: 1px solid var(--border-strong);
+		cursor: pointer;
+	}
+
+	.swatch.picked {
+		outline: 2px solid var(--fg);
+		outline-offset: 1px;
+	}
+
+	.clear-mark {
+		align-self: flex-start;
+		margin-top: 0.3rem;
+		font-size: 0.7rem;
+		background: none;
+		border: none;
+		color: var(--fg-faint);
+		text-decoration: underline;
+		padding: 0;
+		cursor: pointer;
+	}
+
 	.actions {
 		display: flex;
 		align-items: center;
 		gap: 0.5rem;
 		margin-top: 0.3rem;
+		flex-wrap: wrap;
 	}
 
 	button {
 		font: inherit;
 		font-size: 0.78rem;
-		color: #d7dae0;
-		background: #22262e;
-		border: 1px solid #333944;
+		color: var(--fg);
+		background: var(--bg-raised);
+		border: 1px solid var(--border-strong);
 		border-radius: 3px;
 		padding: 0.25rem 0.7rem;
 		cursor: pointer;
@@ -429,15 +453,15 @@
 	}
 
 	.danger {
-		color: #ffb4b4;
-		border-color: #5a2d2d;
+		color: var(--danger-fg);
+		border-color: var(--danger-fg);
 	}
 
 	.blocker,
 	.empty,
 	.path {
 		font-size: 0.72rem;
-		color: #6f7681;
+		color: var(--fg-faint);
 	}
 
 	.path {
@@ -448,22 +472,22 @@
 	.notice {
 		margin: 0;
 		font-size: 0.78rem;
-		color: #7fd1b9;
+		color: var(--ok-fg);
 	}
 
 	.failure {
 		margin: 0;
 		padding: 0.4rem 0.6rem;
-		background: #3a1d1d;
-		color: #ffb4b4;
+		background: var(--danger-bg);
+		color: var(--danger-fg);
 		font-size: 0.78rem;
 	}
 
 	.warning {
 		margin: 0;
 		padding: 0.5rem 0.6rem;
-		background: #3a331d;
-		color: #ffe0a0;
+		background: var(--warning-bg);
+		color: var(--warning-fg);
 		font-size: 0.75rem;
 		line-height: 1.6;
 	}
@@ -471,6 +495,6 @@
 	.warning code {
 		display: block;
 		margin-top: 0.3rem;
-		color: #d7dae0;
+		color: var(--fg);
 	}
 </style>
