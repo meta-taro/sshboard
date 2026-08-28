@@ -7,6 +7,7 @@ members = [
     "crates/sshboard-band",
     "crates/sshboard-connections",
     "crates/sshboard-credentials",
+    "crates/sshboard-engine",
     "crates/sshboard-mcp",
     "crates/sshboard-ssh",
     "crates/sshboard-stream",

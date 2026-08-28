@@ -7,11 +7,12 @@ use std::sync::Arc;
 
 use sshboard_band::Band;
 use sshboard_connections::ConnectionsWatch;
+use sshboard_engine::Engine;
 use sshboard_mcp::DEFAULT_ACK_TIMEOUT;
 use sshboard_stream::OutputStream;
 use tauri::{AppHandle, Emitter, Manager};
 
-use crate::commands::McpUrl;
+use crate::commands::{McpAccess, McpUrl};
 
 /// 画面が待ち受けるイベント名。
 pub const MCP_READY_EVENT: &str = "mcp://ready";
@@ -26,12 +27,14 @@ pub fn spawn(
     band: Band,
     stream: Arc<OutputStream>,
     connections_watch: Arc<ConnectionsWatch>,
+    engine: Arc<Engine>,
 ) {
     tauri::async_runtime::spawn(async move {
         let endpoint = match sshboard_mcp::serve(
             band,
             stream,
             connections_watch,
+            Some(engine),
             MCP_PORT,
             DEFAULT_ACK_TIMEOUT,
         )
@@ -47,15 +50,19 @@ pub fn spawn(
         };
 
         let url = endpoint.url();
+        let token = endpoint.token().to_string();
 
         // 端末にも出す。MCP クライアントへ登録するときに、画面を見ずに拾えるようにする。
         // **接続先ではなく loopback のポートなので、伏せる対象ではない**（PRD §8）。
+        // **合言葉はここに出さない。**端末の記録に残る（product-baseline §14）。
+        // 画面で見せて、人が手元で貼る。
         eprintln!("[sshboard] MCP listening on {url}");
+        eprintln!("[sshboard] トークンは画面の「MCP」から取ってください（起動ごとに変わります）");
 
-        app.state::<McpUrl>().set(url.clone());
+        app.state::<McpUrl>().set(url.clone(), token.clone());
 
-        if let Err(error) = app.emit(MCP_READY_EVENT, url) {
-            eprintln!("[sshboard] MCP の URL を画面へ渡せません: {error}");
+        if let Err(error) = app.emit(MCP_READY_EVENT, McpAccess { url, token }) {
+            eprintln!("[sshboard] MCP の口を画面へ渡せません: {error}");
         }
 
         // 止められるように持っておく。

@@ -9,12 +9,14 @@ mod connections_cmd;
 mod mcp_host;
 mod menu;
 mod pending;
+mod session_cmd;
 mod stream_host;
 
 use std::sync::Arc;
 
 use sshboard_band::Band;
 use sshboard_connections::ConnectionsWatch;
+use sshboard_engine::Engine;
 use sshboard_stream::OutputStream;
 use tauri::Manager;
 
@@ -37,6 +39,13 @@ pub fn run() {
             connections_cmd::connections_path,
             connections_cmd::connection_save,
             connections_cmd::connection_delete,
+            session_cmd::session_connect,
+            session_cmd::session_disconnect,
+            session_cmd::session_status,
+            session_cmd::remote_list_dir,
+            session_cmd::remote_read_file,
+            session_cmd::remote_ensure_dir,
+            session_cmd::remote_upload,
             menu::set_menu_labels
         ])
         .setup(|app| {
@@ -53,14 +62,18 @@ pub fn run() {
             connections_cmd::spawn_bridge(app.handle().clone(), Arc::clone(&connections_watch));
 
             // 接続一覧の置き場所。**OS の既定の場所**（Windows / macOS で別）。
-            match sshboard_connections::default_path() {
+            let connections_path = match sshboard_connections::default_path() {
                 Ok(path) => {
-                    app.manage(connections_cmd::ConnectionsPath(path));
+                    app.manage(connections_cmd::ConnectionsPath(path.clone()));
+                    Some(path)
                 }
                 // 置き場所が分からないなら、接続管理だけが使えない。
                 // **アプリ全体を止めない。**
-                Err(error) => eprintln!("[sshboard] 接続一覧の置き場所が分かりません: {error}"),
-            }
+                Err(error) => {
+                    eprintln!("[sshboard] 接続一覧の置き場所が分かりません: {error}");
+                    None
+                }
+            };
 
             app.manage(PendingLines::new());
             app.manage(McpUrl::default());
@@ -79,7 +92,27 @@ pub fn run() {
             if std::env::var_os(PHASE0_DEMO_ENV).is_some() {
                 stream_host::spawn_demo(Arc::clone(&stream));
             }
-            mcp_host::spawn(app.handle().clone(), band, stream, connections_watch);
+
+            // **すべての操作が通る 1 か所**（PRD §4-1）。
+            // GUI も MCP もここを共有する。ここを迂回した経路を作った瞬間に
+            // 「裏で見えない SSH」が生まれる。
+            let engine = Arc::new(Engine::new(
+                band.clone(),
+                Arc::clone(&stream),
+                // 置き場所が分からないときは、存在しないパスを渡して
+                // **「登録されていません」と正直に断らせる。**繋げてしまうよりよい。
+                connections_path.unwrap_or_else(|| std::path::PathBuf::from("connections.toml")),
+            ));
+            app.manage(Arc::clone(&engine));
+            session_cmd::spawn_bridge(app.handle().clone(), Arc::clone(&engine));
+
+            mcp_host::spawn(
+                app.handle().clone(),
+                band,
+                stream,
+                connections_watch,
+                engine,
+            );
 
             Ok(())
         })

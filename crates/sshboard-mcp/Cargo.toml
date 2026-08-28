@@ -9,6 +9,7 @@ repository.workspace = true
 [dependencies]
 sshboard-band = { path = "../sshboard-band" }
 sshboard-connections = { path = "../sshboard-connections" }
+sshboard-engine = { path = "../sshboard-engine" }
 sshboard-stream = { path = "../sshboard-stream" }
 rmcp = { version = "3.1.4", features = [
     "server",
@@ -20,6 +21,8 @@ axum = "0.8"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tokio-util = "0.7"
+# 起動ごとの合言葉に OS の乱数を使う（D23）。既に依存木にある。
+getrandom = "0.3"
 
 [dev-dependencies]
 tokio = { version = "1", features = ["sync", "time", "macros", "rt", "rt-multi-thread"] }
@@ -27,5 +30,6 @@ tokio = { version = "1", features = ["sync", "time", "macros", "rt", "rt-multi-t
 reqwest = { version = "0.12", default-features = false, features = ["json"] }
 tempfile = "3"
 sshboard-connections = { path = "../sshboard-connections" }
+sshboard-engine = { path = "../sshboard-engine" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

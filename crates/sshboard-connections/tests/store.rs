@@ -338,3 +338,79 @@ fn a_tag_is_measured_in_characters_not_bytes() {
         "13 文字を通している"
     );
 }
+
+#[test]
+fn the_write_roots_survive_a_round_trip_and_default_to_empty() {
+    // **既定が空でないと、設定を忘れた接続で AI が書けてしまう**（D22）。
+    // Arrange
+    let with_roots = r#"
+version = 1
+
+[[connections]]
+id = "app"
+name = "App"
+host = "192.0.2.10"
+user = "deploy"
+write_roots = ["/srv/app/releases", "/srv/app/shared"]
+
+[[connections]]
+id = "plain"
+name = "Plain"
+host = "192.0.2.11"
+user = "deploy"
+"#;
+
+    // Act
+    let connections = Connections::parse(with_roots).expect("読めない");
+    let again =
+        Connections::parse(&connections.to_toml().expect("書けない")).expect("読み直せない");
+
+    // Assert
+    assert_eq!(
+        again.get("app").expect("app が無い").write_roots,
+        vec![
+            "/srv/app/releases".to_string(),
+            "/srv/app/shared".to_string()
+        ]
+    );
+    assert!(
+        again
+            .get("plain")
+            .expect("plain が無い")
+            .write_roots
+            .is_empty(),
+        "書き込み許可を書いていない接続に許可が生えている"
+    );
+}
+
+#[test]
+fn the_ai_is_told_where_it_may_write_but_still_not_where_the_server_is() {
+    // 許可ディレクトリを隠すと、AI は毎回断られて理由が分からない。
+    // ただし**ホストと利用者名は依然として渡さない**（CLAUDE.md 禁止事項 5）。
+    // Arrange
+    let source = r#"
+version = 1
+
+[[connections]]
+id = "app"
+name = "App"
+host = "secret.example.invalid"
+user = "deployuser"
+write_roots = ["/srv/app/releases"]
+"#;
+    let connections = Connections::parse(source).expect("読めない");
+
+    // Act
+    let json = serde_json::to_string(&connections.summaries()).expect("JSON にできない");
+
+    // Assert
+    assert!(
+        json.contains("/srv/app/releases"),
+        "許可先が伝わらない: {json}"
+    );
+    assert!(
+        !json.contains("secret.example.invalid"),
+        "ホストが漏れている: {json}"
+    );
+    assert!(!json.contains("deployuser"), "利用者名が漏れている: {json}");
+}

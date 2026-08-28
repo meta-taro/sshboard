@@ -57,6 +57,12 @@ pub struct ConnectionEntry {
     /// **色が見えなくても効く方**の印。
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tag: Option<String>,
+
+    /// **AI が書いてよいディレクトリ**（D22）。
+    /// 空 ＝ AI はこの接続へ 1 バイトも書けない。**既定は空。**
+    /// 人（GUI）はここに関係なく自由に書ける（PRD §3）。
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub write_roots: Vec<String>,
 }
 
 /// **AI へ渡す形。**
@@ -72,6 +78,11 @@ pub struct ConnectionSummary {
     /// 人が自分で書いたラベルであって、認証情報でもホスト名でもありません。
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tag: Option<String>,
+    /// **AI が書いてよいディレクトリ**（D22）。
+    /// これを隠すと、AI は毎回「書けませんでした」に当たって理由が分からない。
+    /// サーバー上のパスであって、接続先でも認証情報でもありません。
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub write_roots: Vec<String>,
 }
 
 impl ConnectionEntry {
@@ -81,6 +92,7 @@ impl ConnectionEntry {
             id: self.id.clone(),
             name: self.name.clone(),
             tag: self.tag.clone(),
+            write_roots: self.write_roots.clone(),
         }
     }
 

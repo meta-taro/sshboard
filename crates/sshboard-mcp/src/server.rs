@@ -15,6 +15,7 @@ use rmcp::{tool, tool_handler, tool_router, ErrorData, ServerHandler};
 use serde::Deserialize;
 use sshboard_band::{Actor, Band, DeliveryOutcome};
 use sshboard_connections::{ConnectionEntry, ConnectionSummary, Connections, ConnectionsWatch};
+use sshboard_engine::Engine;
 use sshboard_stream::OutputStream;
 
 /// 帯が受け取りを返すまで待つ上限。
@@ -32,6 +33,10 @@ pub struct SshboardMcp {
     /// 一覧が変わったことを画面へ押し出す口。
     /// **無ければ通知しないだけ**（ヘッドレスのテストではそれでよい）。
     connections_watch: Option<Arc<ConnectionsWatch>>,
+    /// サーバーへ触るための唯一の経路（PRD §4-1）。
+    /// **無ければ SSH 系のツールが「繋げません」と正直に断るだけ**で、
+    /// 帯・出力・接続一覧のツールはそのまま使える（ヘッドレスのテストがそれ）。
+    engine: Option<Arc<Engine>>,
     ack_timeout: Duration,
     tool_router: ToolRouter<Self>,
 }
@@ -47,9 +52,27 @@ impl SshboardMcp {
             stream,
             connections_path: None,
             connections_watch: None,
+            engine: None,
             ack_timeout,
-            tool_router: Self::tool_router(),
+            // 帯・出力・接続一覧の口と、サーバーへ触る口。**同じ 1 つのサーバーに載る。**
+            tool_router: Self::tool_router() + Self::ssh_tool_router(),
         }
+    }
+
+    /// サーバーへ触る経路を渡す。**これが無いと SSH 系のツールは動かない。**
+    pub fn with_engine(mut self, engine: Arc<Engine>) -> Self {
+        self.engine = Some(engine);
+        self
+    }
+
+    /// サーバーへ触る経路。**無いことを黙って握り潰さない。**
+    pub(crate) fn engine(&self) -> Result<&Arc<Engine>, ErrorData> {
+        self.engine.as_ref().ok_or_else(|| {
+            ErrorData::internal_error(
+                "this sshboard build has no SSH engine attached".to_string(),
+                None,
+            )
+        })
     }
 
     /// 接続一覧の置き場所を差し替える。**テストで OS の設定を汚さないため。**
@@ -94,7 +117,7 @@ impl SshboardMcp {
     /// 帯へ 1 行載せ、**画面が受け取るまで待つ。**
     ///
     /// 受け取りが返らないときはツールを失敗させる。見えないまま先へ進ませない。
-    async fn show(&self, text: &str) -> Result<(), ErrorData> {
+    pub(crate) async fn show(&self, text: &str) -> Result<(), ErrorData> {
         let delivery = self.band.record(Actor::Ai, text);
 
         match delivery.wait_acked(self.ack_timeout).await {
@@ -179,6 +202,10 @@ impl SshboardMcp {
             known_hosts: None,
             color: request.color.filter(|value| !value.trim().is_empty()),
             tag: request.tag.filter(|value| !value.trim().is_empty()),
+            // **AI が登録した接続では、AI は書けない**（D22）。
+            // 自分で登録して自分に許可を出せるなら、囲いは意味を持たない。
+            // 書き込み許可を出すのは、画面を見ている人だけ。
+            write_roots: Vec::new(),
         };
 
         let next = Connections {

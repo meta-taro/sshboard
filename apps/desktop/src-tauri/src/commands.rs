@@ -9,19 +9,28 @@ use sshboard_stream::OutputStream;
 use crate::pending::PendingLines;
 use crate::stream_host;
 
-/// MCP の口の URL。立ち上がるまでは `None`。
+/// MCP クライアントへ渡すもの一式。
+///
+/// **合言葉はこの起動の間だけ有効**（D23）。ファイルには書きません。
+#[derive(Clone, serde::Serialize)]
+pub struct McpAccess {
+    pub url: String,
+    pub token: String,
+}
+
+/// MCP の口。立ち上がるまでは `None`。
 #[derive(Default)]
-pub struct McpUrl(Mutex<Option<String>>);
+pub struct McpUrl(Mutex<Option<McpAccess>>);
 
 impl McpUrl {
-    pub fn set(&self, url: String) {
+    pub fn set(&self, url: String, token: String) {
         match self.0.lock() {
-            Ok(mut held) => *held = Some(url),
-            Err(_) => eprintln!("[sshboard] MCP の URL を保持できません"),
+            Ok(mut held) => *held = Some(McpAccess { url, token }),
+            Err(_) => eprintln!("[sshboard] MCP の口を保持できません"),
         }
     }
 
-    pub fn get(&self) -> Option<String> {
+    pub fn get(&self) -> Option<McpAccess> {
         self.0.lock().ok().and_then(|held| held.clone())
     }
 }
@@ -32,9 +41,9 @@ pub fn band_ack(seq: u64, pending: State<'_, PendingLines>) -> Result<(), String
     pending.release(seq).map_err(|error| error.to_string())
 }
 
-/// MCP クライアントへ登録する URL を画面に見せるため。
+/// MCP クライアントへ登録する URL と合言葉を画面に見せるため。
 #[tauri::command]
-pub fn mcp_url(url: State<'_, McpUrl>) -> Option<String> {
+pub fn mcp_url(url: State<'_, McpUrl>) -> Option<McpAccess> {
     url.get()
 }
 

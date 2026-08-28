@@ -4,6 +4,8 @@
 
 mod http;
 mod server;
+mod ssh_tools;
 
 pub use http::{serve, McpEndpoint, MCP_PATH};
 pub use server::{MarkConnection, RegisterConnection, SshboardMcp, DEFAULT_ACK_TIMEOUT};
+pub use ssh_tools::{ConnectionId, RemotePath, UploadFile, WriteFile};

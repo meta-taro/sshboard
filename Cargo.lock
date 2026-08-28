@@ -4938,6 +4938,7 @@ dependencies = [
  "serde",
  "sshboard-band",
  "sshboard-connections",
+ "sshboard-engine",
  "sshboard-mcp",
  "sshboard-stream",
  "tauri",
@@ -4946,16 +4947,32 @@ dependencies = [
 ]
 
 [[package]]
+name = "sshboard-engine"
+version = "0.0.0"
+dependencies = [
+ "serde",
+ "sshboard-band",
+ "sshboard-connections",
+ "sshboard-credentials",
+ "sshboard-ssh",
+ "sshboard-stream",
+ "tempfile",
+ "tokio",
+]
+
+[[package]]
 name = "sshboard-mcp"
 version = "0.0.0"
 dependencies = [
  "axum",
+ "getrandom 0.3.4",
  "reqwest 0.12.28",
  "rmcp",
  "serde",
  "serde_json",
  "sshboard-band",
  "sshboard-connections",
+ "sshboard-engine",
  "sshboard-stream",
  "tempfile",
  "tokio",

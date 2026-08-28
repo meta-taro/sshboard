@@ -1,0 +1,20 @@
+[package]
+name = "sshboard-engine"
+description = "GUI と MCP が共有する 1 つの実行体。**SSH は 1 本しか張らない。**"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+sshboard-band = { path = "../sshboard-band" }
+sshboard-connections = { path = "../sshboard-connections" }
+sshboard-credentials = { path = "../sshboard-credentials" }
+sshboard-ssh = { path = "../sshboard-ssh" }
+sshboard-stream = { path = "../sshboard-stream" }
+tokio = { workspace = true, features = ["fs"] }
+serde = { version = "1", features = ["derive"] }
+
+[dev-dependencies]
+tokio = { version = "1", features = ["sync", "time", "macros", "rt", "rt-multi-thread", "net"] }
+tempfile = "3"

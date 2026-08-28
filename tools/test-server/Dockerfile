@@ -19,7 +19,12 @@ RUN sed -i 's/^#\?PasswordAuthentication.*/PasswordAuthentication no/' /etc/ssh/
     && sed -i 's/^#\?PubkeyAuthentication.*/PubkeyAuthentication yes/' /etc/ssh/sshd_config \
     && sed -i 's/^#\?PermitRootLogin.*/PermitRootLogin no/' /etc/ssh/sshd_config \
     # テストが並列に走ると既定の 10 を超える。**実際に弾かれた。**
-    && printf 'MaxStartups 100:30:200\nMaxSessions 50\n' >> /etc/ssh/sshd_config
+    # PerSourcePenalties（OpenSSH 9.8+）は「認証せずに切った接続」を罰する。
+    # sshboard は**ホスト鍵だけ見て、信用できなければ認証せず切る**（D6 の要）ので、
+    # その挙動がそのまま罰の対象になり、テストが Disconnected で落ちた。**実際に落ちた。**
+    # ここで切るのは手元のテスト用サーバーだけ。**実機では切れない**ので、
+    # 製品側は「同じ相手へ何度も探りに行かない」ことで避ける（decisions D24）。
+    && printf 'MaxStartups 100:30:200\nMaxSessions 50\nPerSourcePenalties no\n' >> /etc/ssh/sshd_config
 
 # ログインする利用者。**root ではない。**
 RUN useradd -m -s /bin/bash probe
