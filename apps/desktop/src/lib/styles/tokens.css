@@ -1,34 +1,64 @@
 /*
- * 配色のトークン。**明るい方を既定にし、暗い方を上書きで持つ。**
+ * 配色と質感のトークン。
  *
- * `data-theme` が付いていないときは OS の設定（`prefers-color-scheme`）に従います。
- * 明示的に選んだときだけ `data-theme` が付き、**両方向に**メディアクエリを上書きします。
+ * **「Double-Bezel」で組みます。**面をそのまま背景に置かず、
+ * 外殻（薄い面＋髪の毛の縁）の中に芯（別の面＋内側のハイライト）を入れ子にする。
+ * 角丸は同心円になるよう、内側を外側から padding ぶん引いて決めます。
  *
- * **値そのものは仮置きです**（DESIGN.md）。Phase 1-A で人が決めます。
- * ここが「名前 → 実際の色」の対応表で、増やすときはここだけ触ります。
+ * **ランディングページ向けの巨大な余白は入れません。**これは毎日 8 時間見る道具で、
+ * 1 画面に入る接続の数を減らすと道具として劣化します。
+ *
+ * 値そのものは Phase 1-A で見直します（DESIGN.md）。
  */
 
 :root {
-	--bg: #ffffff;
-	--bg-raised: #f4f5f7;
-	--bg-input: #ffffff;
-	--fg: #1c1f24;
-	--fg-muted: #5c636e;
-	--fg-faint: #868d97;
-	--border: #d8dbe0;
-	--border-strong: #b6bcc4;
+	/* 面 — 奥から手前へ */
+	--ground: #eef0f3;
+	--shell: #e4e7ec;
+	--surface: #ffffff;
+	--surface-2: #f7f8fa;
+	--surface-input: #ffffff;
 
-	--accent: #2f7d68;
-	--danger-bg: #fdeaea;
-	--danger-fg: #a12a2a;
-	--warning-bg: #fdf4e0;
-	--warning-fg: #7a5a12;
-	--ok-fg: #1f6f57;
+	/* 文字 */
+	--fg: #14181d;
+	--fg-muted: #545c67;
+	--fg-faint: #858d99;
 
-	/* 接続の印。**16 進数を設定ファイルに書かず、名前で持つ**（Rust 側の CONNECTION_COLORS）。
-	   **彩度は落とさない。**16 色を見分けるには彩度が要る。
-	   色覚特性への配慮は**タグ**の側で担保している（白黒でも読める・DESIGN.md）。 */
---mark-red: #e02b26;
+	/* 縁 — 単色の 1px グレーにしない。面に対する薄い重ねで作る */
+	--hairline: rgba(16, 22, 30, 0.09);
+	--hairline-strong: rgba(16, 22, 30, 0.16);
+	--inner-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+
+	/* 影 — 硬い黒を落とさない。広く拡散させる */
+	--lift-1: 0 1px 2px rgba(16, 22, 30, 0.05);
+	--lift-2: 0 1px 2px rgba(16, 22, 30, 0.05), 0 10px 28px -12px rgba(16, 22, 30, 0.22);
+	--lift-3: 0 2px 4px rgba(16, 22, 30, 0.06), 0 18px 44px -16px rgba(16, 22, 30, 0.3);
+
+	--accent: #1f6b58;
+	--accent-fg: #ffffff;
+	--accent-soft: rgba(31, 107, 88, 0.1);
+
+	--danger: #b0332f;
+	--danger-soft: rgba(176, 51, 47, 0.09);
+	--warning: #8a5a12;
+	--warning-soft: rgba(138, 90, 18, 0.1);
+	--ok: #1f6b58;
+
+	/* 角丸 — 外殻とその中の芯。**同心円になるよう芯は外殻 − padding** */
+	--r-shell: 14px;
+	--r-core: 10px;
+	--r-control: 8px;
+	--shell-pad: 4px;
+
+	/* 動き — 既定の ease を使わない。質量のある動きにする */
+	--ease: cubic-bezier(0.32, 0.72, 0, 1);
+	--fast: 160ms;
+	--slow: 420ms;
+
+	--font-ui: 'Zen Kaku Gothic New', 'Hiragino Sans', system-ui, sans-serif;
+	--font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+
+	--mark-red: #e02b26;
 	--mark-orange: #e2761a;
 	--mark-amber: #d99500;
 	--mark-yellow: #c9a800;
@@ -45,31 +75,42 @@
 	--mark-magenta: #e0399f;
 	--mark-pink: #e83a6d;
 
-	/* 端末は暗いままにする。ログは暗い背景で読むのが普通で、
-	   明るくすると ANSI の既定色（黒に載る前提の色）が読めなくなる。 */
-	--terminal-bg: #16181d;
+	/* 端末は暗いまま。ANSI の既定色は暗い背景に載る前提で作られている。 */
+	--terminal-bg: #0d1013;
 	--terminal-fg: #d7dae0;
 }
 
 @media (prefers-color-scheme: dark) {
 	:root:not([data-theme='light']) {
-		--bg: #16181d;
-		--bg-raised: #1d2129;
-		--bg-input: #1d2129;
-		--fg: #d7dae0;
-		--fg-muted: #8b929e;
-		--fg-faint: #6f7681;
-		--border: #262a31;
-		--border-strong: #333944;
+		--ground: #0b0e11;
+		--shell: #12161b;
+		--surface: #171c22;
+		--surface-2: #1c222a;
+		--surface-input: #12161b;
 
-		--accent: #3a8f7a;
-		--danger-bg: #3a1d1d;
-		--danger-fg: #ffb4b4;
-		--warning-bg: #3a331d;
-		--warning-fg: #ffe0a0;
-		--ok-fg: #7fd1b9;
+		--fg: #e8ecf1;
+		--fg-muted: #a3adb9;
+		--fg-faint: #737d89;
 
---mark-red: #ff5a52;
+		--hairline: rgba(255, 255, 255, 0.08);
+		--hairline-strong: rgba(255, 255, 255, 0.15);
+		--inner-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+
+		--lift-1: 0 1px 2px rgba(0, 0, 0, 0.4);
+		--lift-2: 0 1px 2px rgba(0, 0, 0, 0.4), 0 12px 30px -12px rgba(0, 0, 0, 0.7);
+		--lift-3: 0 2px 4px rgba(0, 0, 0, 0.45), 0 20px 48px -16px rgba(0, 0, 0, 0.8);
+
+		--accent: #4fd6ae;
+		--accent-fg: #06251c;
+		--accent-soft: rgba(79, 214, 174, 0.14);
+
+		--danger: #ff8b86;
+		--danger-soft: rgba(255, 139, 134, 0.12);
+		--warning: #e5bb6b;
+		--warning-soft: rgba(229, 187, 107, 0.12);
+		--ok: #4fd6ae;
+
+		--mark-red: #ff5a52;
 		--mark-orange: #ff9640;
 		--mark-amber: #ffb327;
 		--mark-yellow: #ffe14d;
@@ -89,23 +130,35 @@
 }
 
 :root[data-theme='dark'] {
-	--bg: #16181d;
-	--bg-raised: #1d2129;
-	--bg-input: #1d2129;
-	--fg: #d7dae0;
-	--fg-muted: #8b929e;
-	--fg-faint: #6f7681;
-	--border: #262a31;
-	--border-strong: #333944;
+	--ground: #0b0e11;
+	--shell: #12161b;
+	--surface: #171c22;
+	--surface-2: #1c222a;
+	--surface-input: #12161b;
 
-	--accent: #3a8f7a;
-	--danger-bg: #3a1d1d;
-	--danger-fg: #ffb4b4;
-	--warning-bg: #3a331d;
-	--warning-fg: #ffe0a0;
-	--ok-fg: #7fd1b9;
+	--fg: #e8ecf1;
+	--fg-muted: #a3adb9;
+	--fg-faint: #737d89;
 
---mark-red: #ff5a52;
+	--hairline: rgba(255, 255, 255, 0.08);
+	--hairline-strong: rgba(255, 255, 255, 0.15);
+	--inner-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+
+	--lift-1: 0 1px 2px rgba(0, 0, 0, 0.4);
+	--lift-2: 0 1px 2px rgba(0, 0, 0, 0.4), 0 12px 30px -12px rgba(0, 0, 0, 0.7);
+	--lift-3: 0 2px 4px rgba(0, 0, 0, 0.45), 0 20px 48px -16px rgba(0, 0, 0, 0.8);
+
+	--accent: #4fd6ae;
+	--accent-fg: #06251c;
+	--accent-soft: rgba(79, 214, 174, 0.14);
+
+	--danger: #ff8b86;
+	--danger-soft: rgba(255, 139, 134, 0.12);
+	--warning: #e5bb6b;
+	--warning-soft: rgba(229, 187, 107, 0.12);
+	--ok: #4fd6ae;
+
+	--mark-red: #ff5a52;
 	--mark-orange: #ff9640;
 	--mark-amber: #ffb327;
 	--mark-yellow: #ffe14d;
@@ -121,4 +174,40 @@
 	--mark-purple: #d264ff;
 	--mark-magenta: #ff5fd0;
 	--mark-pink: #ff5f96;
+}
+
+/* 動きを減らす設定を尊重する。 */
+@media (prefers-reduced-motion: reduce) {
+	:root {
+		--fast: 0ms;
+		--slow: 0ms;
+	}
+}
+
+/* ── 共通の部品 ─────────────────────────────── */
+
+/* 外殻。**中身をそのまま背景に置かない。** */
+.shell {
+	background: var(--shell);
+	border: 1px solid var(--hairline);
+	border-radius: var(--r-shell);
+	padding: var(--shell-pad);
+}
+
+/* 芯。角丸は外殻から padding ぶん引いて同心円にする。 */
+.core {
+	background: var(--surface);
+	border-radius: var(--r-core);
+	box-shadow: var(--inner-highlight), var(--lift-1);
+	height: 100%;
+	min-height: 0;
+}
+
+/* 見出しの前に置く極小のラベル。 */
+.eyebrow {
+	font-family: var(--font-mono);
+	font-size: 9.5px;
+	letter-spacing: 0.18em;
+	text-transform: uppercase;
+	color: var(--fg-faint);
 }

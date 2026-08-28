@@ -169,7 +169,9 @@
 			</button>
 			<button type="button" onclick={stopStream}>{i18n.t('stream.stop')}</button>
 		</div>
-		<div class="terminal" bind:this={terminalHost}></div>
+		<div class="terminal shell">
+			<div class="core terminal-core" bind:this={terminalHost}></div>
+		</div>
 	</section>
 
 	<section class="band" aria-label={i18n.t('band.label')}>
@@ -187,100 +189,141 @@
 </main>
 
 <style>
-	/* 色は tokens.css の変数だけを使う。**ここに 16 進数を書かない。** */
+	/* 色は tokens.css の変数だけ。**ここに 16 進数を書かない。** */
 	:global(body) {
 		margin: 0;
-		background: var(--bg);
+		background: var(--ground);
 		color: var(--fg);
-		font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+		font-family: var(--font-ui);
+		font-feature-settings: 'palt' 1;
 	}
 
 	main {
 		display: flex;
 		flex-direction: column;
 		height: 100vh;
-		padding: 1rem 1.25rem;
+		padding: 0.9rem 1rem 1rem;
 		box-sizing: border-box;
-		gap: 0.75rem;
+		gap: 0.7rem;
+	}
+
+	header {
+		display: flex;
+		flex-direction: column;
+		gap: 0.35rem;
 	}
 
 	h1 {
 		margin: 0;
-		font-size: 1rem;
-		font-weight: 600;
+		font-size: 0.95rem;
+		font-weight: 700;
+		letter-spacing: 0.01em;
 	}
 
-	.phase,
-	.mcp {
-		margin: 0.25rem 0 0;
-		font-size: 0.8rem;
+	.phase {
+		margin: 0;
+		font-size: 0.74rem;
+		line-height: 1.6;
 		color: var(--fg-muted);
+	}
+
+	.mcp {
+		margin: 0;
+		font-family: var(--font-mono);
+		font-size: 0.66rem;
+		color: var(--fg-faint);
 	}
 
 	.waiting {
-		color: var(--fg-muted);
+		color: var(--fg-faint);
+	}
+
+	/* 設定と切替は、浮いた 1 本の帯にまとめる。 */
+	.settings,
+	.tabs {
+		display: flex;
+		align-items: center;
+		gap: 0.25rem;
+		flex-wrap: wrap;
+		background: var(--shell);
+		border: 1px solid var(--hairline);
+		border-radius: 999px;
+		padding: 3px;
+		width: max-content;
+		max-width: 100%;
 	}
 
 	.settings {
-		display: flex;
-		align-items: center;
-		gap: 0.3rem;
-		margin-top: 0.4rem;
-		font-size: 0.75rem;
-		color: var(--fg-muted);
-		flex-wrap: wrap;
+		margin-top: 0.15rem;
 	}
 
 	.settings-label {
-		margin-right: 0.2rem;
+		font-family: var(--font-mono);
+		font-size: 9px;
+		letter-spacing: 0.16em;
+		text-transform: uppercase;
+		color: var(--fg-faint);
+		padding: 0 0.4rem 0 0.6rem;
 	}
 
 	.settings-label.lang {
-		margin-left: 0.6rem;
-	}
-
-	.settings select {
-		font: inherit;
-		font-size: 0.75rem;
-		color: var(--fg);
-		background: var(--bg-raised);
-		border: 1px solid var(--border-strong);
-		border-radius: 3px;
-		padding: 0.1rem 0.3rem;
+		margin-left: 0.5rem;
+		border-left: 1px solid var(--hairline);
 	}
 
 	.settings button,
 	.tabs button {
 		font: inherit;
-		font-size: 0.75rem;
+		font-size: 0.74rem;
 		color: var(--fg-muted);
-		background: none;
+		background: transparent;
 		border: 1px solid transparent;
-		border-radius: 3px;
-		padding: 0.15rem 0.55rem;
+		border-radius: 999px;
+		padding: 0.2rem 0.75rem;
 		cursor: pointer;
+		transition:
+			background var(--fast) var(--ease),
+			color var(--fast) var(--ease),
+			transform var(--fast) var(--ease);
+	}
+
+	.settings button:active,
+	.tabs button:active {
+		transform: scale(0.97);
 	}
 
 	.settings button.active,
 	.tabs button.active {
 		color: var(--fg);
-		border-color: var(--border-strong);
-		background: var(--bg-raised);
+		background: var(--surface);
+		box-shadow: var(--inner-highlight), var(--lift-1);
+	}
+
+	.settings button:focus-visible,
+	.tabs button:focus-visible,
+	.settings select:focus-visible {
+		outline: 2px solid var(--accent);
+		outline-offset: 1px;
+	}
+
+	.settings select {
+		font: inherit;
+		font-size: 0.74rem;
+		color: var(--fg);
+		background: var(--surface);
+		border: 1px solid var(--hairline);
+		border-radius: 999px;
+		padding: 0.15rem 0.5rem;
+		box-shadow: var(--inner-highlight);
 	}
 
 	.failure {
 		margin: 0;
-		padding: 0.5rem 0.75rem;
-		background: var(--danger-bg);
-		color: var(--danger-fg);
-		font-size: 0.8rem;
-	}
-
-	.tabs {
-		display: flex;
-		gap: 0.35rem;
-		border-top: 1px solid var(--border);
-		padding-top: 0.6rem;
+		padding: 0.55rem 0.8rem;
+		border-radius: var(--r-control);
+		background: var(--danger-soft);
+		color: var(--danger);
+		font-size: 0.78rem;
 	}
 
 	.stream {
@@ -288,62 +331,81 @@
 		flex-direction: column;
 		flex: 2;
 		min-height: 0;
-		border-top: 1px solid var(--border);
-		padding-top: 0.75rem;
-		gap: 0.5rem;
+		gap: 0.45rem;
 	}
 
 	.stream-head {
 		display: flex;
 		align-items: center;
-		gap: 0.5rem;
-		font-size: 0.75rem;
+		gap: 0.45rem;
+		font-size: 0.72rem;
 		color: var(--fg-muted);
 		flex-wrap: wrap;
 	}
 
 	.stream-head .label {
 		flex: 1;
+		font-family: var(--font-mono);
+		font-size: 9.5px;
+		letter-spacing: 0.16em;
+		text-transform: uppercase;
+		color: var(--fg-faint);
 	}
 
 	/* このボタンは製品の操作ではない。**002 が通ったら消える足場。** */
 	.stream-head .scaffold {
-		padding: 0.1rem 0.4rem;
-		border: 1px dashed var(--warning-fg);
-		border-radius: 3px;
-		color: var(--warning-fg);
+		font-family: var(--font-mono);
+		font-size: 9px;
+		letter-spacing: 0.1em;
+		padding: 0.1rem 0.5rem;
+		border: 1px dashed var(--warning);
+		border-radius: 999px;
+		color: var(--warning);
 	}
 
 	.stream-head button {
 		font: inherit;
-		font-size: 0.75rem;
+		font-size: 0.72rem;
 		color: var(--fg);
-		background: var(--bg-raised);
-		border: 1px solid var(--border-strong);
-		border-radius: 3px;
-		padding: 0.2rem 0.6rem;
+		background: var(--surface-2);
+		border: 1px solid var(--hairline);
+		border-radius: 999px;
+		padding: 0.22rem 0.75rem;
 		cursor: pointer;
+		box-shadow: var(--inner-highlight), var(--lift-1);
+		transition: transform var(--fast) var(--ease);
+	}
+
+	.stream-head button:active {
+		transform: scale(0.97);
 	}
 
 	.stream-head button:disabled {
-		opacity: 0.5;
+		opacity: 0.45;
 		cursor: default;
+		box-shadow: none;
 	}
 
-	/* 端末は暗いままにする。ANSI の既定色は暗い背景に載る前提で作られている。 */
+	/* 端末は暗いまま。ANSI の既定色は暗い背景に載る前提で作られている。 */
 	.terminal {
 		flex: 1;
 		min-height: 0;
-		overflow: hidden;
+	}
+
+	.terminal-core {
 		background: var(--terminal-bg);
+		overflow: hidden;
+		padding: 6px 8px;
 	}
 
 	.band {
 		flex: 1;
 		min-height: 0;
 		overflow-y: auto;
-		border-top: 1px solid var(--border);
-		padding-top: 0.75rem;
+		background: var(--shell);
+		border: 1px solid var(--hairline);
+		border-radius: var(--r-shell);
+		padding: 0.6rem 0.75rem;
 	}
 
 	.band ol {
@@ -354,8 +416,10 @@
 
 	.band li {
 		white-space: pre;
-		font-size: 0.85rem;
-		line-height: 1.6;
+		font-family: var(--font-mono);
+		font-size: 0.76rem;
+		line-height: 1.75;
+		color: var(--fg-muted);
 	}
 
 	.band li.ai {
@@ -364,7 +428,7 @@
 
 	.empty {
 		margin: 0;
-		font-size: 0.8rem;
+		font-size: 0.76rem;
 		color: var(--fg-faint);
 	}
 </style>

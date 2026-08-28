@@ -163,7 +163,8 @@
 	bind:this={manager}
 	aria-label="接続の登録"
 >
-	<aside class="list">
+	<aside class="list shell">
+		<div class="core list-core">
 		<div class="list-head">
 			<span>{i18n.t('conn.heading')}</span>
 			<button type="button" onclick={startNew}>{i18n.t('conn.new')}</button>
@@ -206,6 +207,7 @@
 		{#if storePath}
 			<p class="path" title={storePath}>{storePath}</p>
 		{/if}
+		</div>
 	</aside>
 
 	<!--
@@ -231,7 +233,8 @@
 		onkeydown={onSplitterKey}
 	></div>
 
-	<div class="form">
+	<div class="form shell">
+		<div class="core form-core">
 		{#if failure}
 			<p class="failure" role="alert">{failure}</p>
 		{:else if notice}
@@ -316,7 +319,10 @@
 		{/if}
 
 		<div class="actions">
-			<button type="button" onclick={save} disabled={blocker !== null}>{i18n.t('conn.save')}</button>
+			<button type="button" class="cta" onclick={save} disabled={blocker !== null}>
+				<span>{i18n.t('conn.save')}</span>
+				<span class="cta-icon" aria-hidden="true">↵</span>
+			</button>
 			{#if selectedId && !confirmingDelete}
 				<button type="button" class="danger" onclick={() => (confirmingDelete = true)}>
 					{i18n.t('conn.delete')}
@@ -341,77 +347,73 @@
 				</span>
 			</p>
 		{/if}
+		</div>
 	</div>
 </section>
 
 <style>
-	/* 色は tokens.css の変数だけを使う。**ここに 16 進数を書かない。**
-	   書くと、テーマを切り替えたときにそこだけ取り残される。 */
+	/* 面は入れ子（外殻 → 芯）。**背景に直接置かない。**
+	   色は tokens.css の変数だけ。**ここに 16 進数を書かない。** */
 	.manager {
 		display: grid;
-		/* 幅は掴んで動かせる。**定位置はダブルクリックで戻る。** */
-		grid-template-columns: var(--list-width) 6px 1fr;
-		gap: 0.5rem;
+		grid-template-columns: var(--list-width) 10px 1fr;
+		gap: 0;
 		flex: 1;
 		min-height: 0;
 	}
 
-	.splitter {
-		cursor: col-resize;
-		background: var(--border);
-		border-radius: 3px;
-		align-self: stretch;
-		border: none;
-		padding: 0;
+	.list,
+	.form {
+		min-height: 0;
+		display: flex;
+		flex-direction: column;
 	}
 
-	.splitter:hover,
-	.manager.dragging .splitter,
-	.splitter:focus-visible {
-		background: var(--accent);
-		outline: none;
+	.list-core,
+	.form-core {
+		display: flex;
+		flex-direction: column;
+		min-height: 0;
+		overflow: hidden;
 	}
 
-	/* 掴んでいる間は、下の文字が選択されないようにする。 */
-	.manager.dragging {
-		user-select: none;
+	.list-core {
+		padding: 0.7rem 0.55rem 0.5rem;
+		gap: 0.4rem;
 	}
 
-	/* 窓が狭いときは 2 面をやめて縦に積む。**小さく使う人を締め出さない。** */
-	/* 窓が狭いときは 2 面をやめて縦に積む。仕切りもここでは意味が無いので隠す。 */
+	.form-core {
+		padding: 1rem 1.1rem;
+		gap: 0.65rem;
+		overflow-y: auto;
+	}
+
 	@media (max-width: 720px) {
 		.manager {
 			grid-template-columns: 1fr;
-			grid-template-rows: minmax(120px, 30%) 1fr;
+			grid-template-rows: minmax(130px, 32%) 1fr;
+			gap: 0.5rem;
 		}
 
 		.splitter {
 			display: none;
 		}
-
-		.list {
-			border-right: none;
-			border-bottom: 1px solid var(--border);
-			padding-right: 0;
-			padding-bottom: 0.6rem;
-		}
-	}
-
-	.list {
-		display: flex;
-		flex-direction: column;
-		gap: 0.5rem;
-		border-right: 1px solid var(--border);
-		padding-right: 0.75rem;
-		min-height: 0;
 	}
 
 	.list-head {
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
-		font-size: 0.8rem;
-		color: var(--fg-muted);
+		gap: 0.4rem;
+		padding: 0 0.3rem 0.15rem;
+	}
+
+	.list-head span {
+		font-family: var(--font-mono);
+		font-size: 9.5px;
+		letter-spacing: 0.18em;
+		text-transform: uppercase;
+		color: var(--fg-faint);
 	}
 
 	.list ul {
@@ -420,41 +422,55 @@
 		padding: 0;
 		overflow-y: auto;
 		flex: 1;
+		display: flex;
+		flex-direction: column;
+		gap: 1px;
 	}
 
 	.row {
 		display: flex;
 		flex-direction: column;
+		gap: 1px;
 		width: 100%;
 		text-align: left;
-		background: none;
+		background: transparent;
 		border: 1px solid transparent;
-		border-radius: 3px;
-		padding: 0.35rem 0.5rem;
+		border-radius: var(--r-control);
+		padding: 0.38rem 0.5rem;
 		color: var(--fg);
 		font: inherit;
+		font-size: 0.84rem;
 		cursor: pointer;
+		transition:
+			background var(--fast) var(--ease),
+			border-color var(--fast) var(--ease),
+			transform var(--fast) var(--ease);
 	}
 
 	.row:hover {
-		background: var(--bg-raised);
+		background: var(--surface-2);
 	}
 
-	/* **選択の枠はその接続の印の色。**印が無いときだけ既定色にする。 */
+	.row:active {
+		transform: scale(0.99);
+	}
+
+	/* **選択の枠はその接続の印の色。** */
 	.row.selected {
-		border-color: var(--row-mark);
-		background: var(--bg-raised);
+		background: var(--surface-2);
+		border-color: color-mix(in srgb, var(--row-mark) 55%, transparent);
+		box-shadow: var(--lift-1);
 	}
 
 	.row-top {
 		display: flex;
 		align-items: center;
-		gap: 0.35rem;
+		gap: 0.4rem;
 	}
 
 	.chip {
-		width: 8px;
-		height: 8px;
+		width: 7px;
+		height: 7px;
 		border-radius: 2px;
 		border: 1px solid;
 		flex: none;
@@ -465,68 +481,117 @@
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
+		font-weight: 500;
 	}
 
 	.row-tag {
-		font-size: 0.68rem;
+		font-family: var(--font-mono);
+		font-size: 9px;
+		letter-spacing: 0.06em;
 		border: 1px solid currentColor;
-		border-radius: 2px;
-		padding: 0 0.25rem;
+		border-radius: 999px;
+		padding: 0 0.4rem;
 		flex: none;
+		opacity: 0.9;
 	}
 
 	.row-id {
-		font-size: 0.72rem;
+		font-family: var(--font-mono);
+		font-size: 0.66rem;
 		color: var(--fg-faint);
+		padding-left: 0.68rem;
 	}
 
-	.form {
-		display: flex;
-		flex-direction: column;
-		gap: 0.6rem;
-		overflow-y: auto;
-		padding-right: 0.25rem;
+	/* 仕切り。掴めることが見た目で分かるように、中央に細い印を出す。 */
+	.splitter {
+		position: relative;
+		cursor: col-resize;
+		background: transparent;
+		border: none;
+		padding: 0;
+		align-self: stretch;
+	}
+
+	.splitter::after {
+		content: '';
+		position: absolute;
+		inset: 25% 50% 25% 50%;
+		width: 2px;
+		margin-left: -1px;
+		border-radius: 999px;
+		background: var(--hairline-strong);
+		transition: background var(--fast) var(--ease);
+	}
+
+	.splitter:hover::after,
+	.splitter:focus-visible::after,
+	.manager.dragging .splitter::after {
+		background: var(--accent);
+		inset: 8% 50% 8% 50%;
+	}
+
+	.splitter:focus-visible {
+		outline: none;
+	}
+
+	.manager.dragging {
+		user-select: none;
 	}
 
 	label {
 		display: flex;
 		flex-direction: column;
-		gap: 0.2rem;
-		font-size: 0.78rem;
-		color: var(--fg-muted);
+		gap: 0.22rem;
+	}
+
+	label > span {
+		font-family: var(--font-mono);
+		font-size: 9.5px;
+		letter-spacing: 0.14em;
+		text-transform: uppercase;
+		color: var(--fg-faint);
 	}
 
 	input {
 		font: inherit;
 		font-size: 0.85rem;
 		color: var(--fg);
-		background: var(--bg-input);
-		border: 1px solid var(--border-strong);
-		border-radius: 3px;
-		padding: 0.3rem 0.45rem;
+		background: var(--surface-input);
+		border: 1px solid var(--hairline);
+		border-radius: var(--r-control);
+		padding: 0.42rem 0.6rem;
+		box-shadow: var(--inner-highlight);
+		transition:
+			border-color var(--fast) var(--ease),
+			box-shadow var(--fast) var(--ease);
+	}
+
+	input:focus {
+		outline: none;
+		border-color: var(--accent);
+		box-shadow: var(--inner-highlight), 0 0 0 3px var(--accent-soft);
 	}
 
 	input:disabled {
-		opacity: 0.6;
+		opacity: 0.55;
 	}
 
 	small {
 		color: var(--fg-faint);
 		font-size: 0.7rem;
+		line-height: 1.65;
 	}
 
 	.pair {
 		display: grid;
-		grid-template-columns: 1fr 90px;
-		gap: 0.6rem;
+		grid-template-columns: 1fr 96px;
+		gap: 0.65rem;
 	}
 
-	/* タグは 12 文字までなので、入力欄も 12 文字分でよい。
-	   **色見本は 2 行 × 4。**3 行にすると縦が伸びる。 */
 	.mark-row {
 		display: flex;
 		align-items: flex-start;
-		gap: 1rem;
+		gap: 1.1rem;
 		flex-wrap: wrap;
 	}
 
@@ -538,7 +603,7 @@
 	.swatches {
 		display: grid;
 		grid-template-columns: repeat(8, 18px);
-		gap: 0.25rem;
+		gap: 0.28rem;
 		width: max-content;
 		flex: none;
 	}
@@ -547,14 +612,20 @@
 		width: 18px;
 		height: 18px;
 		padding: 0;
-		border-radius: 3px;
-		border: 1px solid var(--border-strong);
+		border-radius: 5px;
+		border: 1px solid var(--hairline-strong);
 		cursor: pointer;
+		box-shadow: var(--lift-1);
+		transition: transform var(--fast) var(--ease);
+	}
+
+	.swatch:hover {
+		transform: scale(1.12);
 	}
 
 	.swatch.picked {
 		outline: 2px solid var(--fg);
-		outline-offset: 1px;
+		outline-offset: 2px;
 	}
 
 	.clear-mark {
@@ -565,6 +636,7 @@
 		border: none;
 		color: var(--fg-faint);
 		text-decoration: underline;
+		text-underline-offset: 3px;
 		padding: 0;
 		cursor: pointer;
 	}
@@ -573,7 +645,7 @@
 		display: flex;
 		align-items: center;
 		gap: 0.5rem;
-		margin-top: 0.3rem;
+		margin-top: 0.35rem;
 		flex-wrap: wrap;
 	}
 
@@ -581,36 +653,72 @@
 		font: inherit;
 		font-size: 0.78rem;
 		color: var(--fg);
-		background: var(--bg-raised);
-		border: 1px solid var(--border-strong);
-		border-radius: 3px;
-		padding: 0.25rem 0.7rem;
+		background: var(--surface-2);
+		border: 1px solid var(--hairline);
+		border-radius: 999px;
+		padding: 0.3rem 0.85rem;
 		cursor: pointer;
+		box-shadow: var(--inner-highlight), var(--lift-1);
+		transition:
+			transform var(--fast) var(--ease),
+			background var(--fast) var(--ease);
+	}
+
+	button:hover {
+		background: var(--surface);
+	}
+
+	button:active {
+		transform: scale(0.97);
 	}
 
 	button:disabled {
-		opacity: 0.5;
+		opacity: 0.45;
 		cursor: default;
+		box-shadow: none;
+	}
+
+	button:focus-visible {
+		outline: 2px solid var(--accent);
+		outline-offset: 2px;
+	}
+
+	/* 主ボタン。**矢印を裸で置かず、丸の中に入れる。** */
+	.cta {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.55rem;
+		background: var(--accent);
+		color: var(--accent-fg);
+		border-color: transparent;
+		padding: 0.32rem 0.35rem 0.32rem 0.95rem;
+		font-weight: 700;
+		box-shadow: var(--lift-2);
+	}
+
+	.cta:hover {
+		background: var(--accent);
+	}
+
+	.cta-icon {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 22px;
+		height: 22px;
+		border-radius: 999px;
+		background: color-mix(in srgb, var(--accent-fg) 18%, transparent);
+		font-size: 0.72rem;
+		transition: transform var(--fast) var(--ease);
+	}
+
+	.cta:hover .cta-icon {
+		transform: translateX(2px) scale(1.06);
 	}
 
 	.danger {
-		color: var(--danger-fg);
-		border-color: var(--danger-fg);
-	}
-
-	.confirm {
-		margin: 0;
-		padding: 0.5rem 0.6rem;
-		background: var(--danger-bg);
-		color: var(--danger-fg);
-		font-size: 0.78rem;
-		line-height: 1.7;
-	}
-
-	.confirm-actions {
-		display: inline-flex;
-		gap: 0.4rem;
-		margin-left: 0.5rem;
+		color: var(--danger);
+		border-color: color-mix(in srgb, var(--danger) 40%, transparent);
 	}
 
 	.blocker,
@@ -621,36 +729,57 @@
 	}
 
 	.path {
+		font-family: var(--font-mono);
+		font-size: 0.62rem;
 		word-break: break-all;
 		margin: 0;
+		padding: 0.3rem 0.3rem 0;
+		border-top: 1px solid var(--hairline);
+	}
+
+	.empty {
+		padding: 0.5rem 0.35rem;
 	}
 
 	.notice {
 		margin: 0;
 		font-size: 0.78rem;
-		color: var(--ok-fg);
+		color: var(--ok);
 	}
 
-	.failure {
+	.failure,
+	.warning,
+	.confirm {
 		margin: 0;
-		padding: 0.4rem 0.6rem;
-		background: var(--danger-bg);
-		color: var(--danger-fg);
+		padding: 0.55rem 0.7rem;
+		border-radius: var(--r-control);
 		font-size: 0.78rem;
+		line-height: 1.7;
+	}
+
+	.failure,
+	.confirm {
+		background: var(--danger-soft);
+		color: var(--danger);
 	}
 
 	.warning {
-		margin: 0;
-		padding: 0.5rem 0.6rem;
-		background: var(--warning-bg);
-		color: var(--warning-fg);
+		background: var(--warning-soft);
+		color: var(--warning);
 		font-size: 0.75rem;
-		line-height: 1.6;
 	}
 
 	.warning code {
 		display: block;
 		margin-top: 0.3rem;
+		font-family: var(--font-mono);
+		font-size: 0.68rem;
 		color: var(--fg);
+	}
+
+	.confirm-actions {
+		display: inline-flex;
+		gap: 0.4rem;
+		margin-left: 0.5rem;
 	}
 </style>
