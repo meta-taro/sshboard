@@ -5,21 +5,24 @@
 
 ## いまの状態を一言で
 
-**Phase 0 のうち、実機と Windows が要らない部分はすべて通しました。**
-**残りは全部、人にしかできない工程です。**（product-baseline §29）
+**Phase 0 は、実機と Windows が要らない部分をすべて通しました。**
+そのうえで、接続管理・多言語・意匠まで先へ進んでいます。
+
+**残っているのは、人にしかできない工程だけです。**（product-baseline §29）
 
 ## 出来ているもの
 
 | | 中身 |
 |---|---|
-| `crates/sshboard-band` | 人と AI の操作が流れる 1 本の帯。`[AI]` / `[Human]`・購読・**受け取り待ち（ack）** |
-| `crates/sshboard-stream` | 1 本の出力を **GUI へは生・MCP へは素**で流す。ANSI 除去（境界の持ち越し込み）・末尾保持・停止 |
-| `crates/sshboard-credentials` | OS 資格情報ストアと ssh-agent。**自前の鍵ストアを持たない**（D11） |
-| `crates/sshboard-mcp` | アプリ同居の MCP。ツールは `ping` と `read_stream` の 2 つだけ |
-| `apps/desktop` | SvelteKit + Tauri 2。帯 ＋ xterm.js の端末。MCP を**同じプロセスで**立てる |
-| `tools/ssh-probe` | 002 / 003 用の探り棒。**製品ではない**（D6 が決まったら消す） |
+| `crates/sshboard-band` | 人と AI の操作が流れる 1 本の帯。受け取り待ち（ack）込み |
+| `crates/sshboard-stream` | 1 本の出力を GUI へは生・MCP へは素で流す。ANSI 除去・末尾保持・停止と再開 |
+| `crates/sshboard-credentials` | OS 資格情報ストア ＋ ssh-agent。**自前の鍵ストアを持たない**（D11） |
+| `crates/sshboard-connections` | 接続の一覧。秘密はファイルに置かず参照名だけ。印（色・タグ）付き |
+| `crates/sshboard-mcp` | 同居 MCP。`ping` / `read_stream` / `list_connections` / `register_connection` / `mark_connection` |
+| `apps/desktop` | SvelteKit + Tauri 2。接続管理・帯・xterm.js の端末・11 言語・テーマ切替 |
+| `tools/ssh-probe` | 002 / 003 の確認コマンド（**製品ではない**。D6 が決まったので役目は終わり） |
 | `tools/check-005.sh` | 005 の確認スクリプト |
-| `.github/workflows/ci.yml` | format / clippy / test。core は 3 OS、desktop と資格情報は Windows + macOS |
+| `.github/workflows/ci.yml` | format / clippy / test |
 
 ## テスト状況
 
@@ -46,35 +49,25 @@ pnpm --filter desktop check                            →  170 files, 0 errors,
 
 | # | 未知 | 自動で確かめた範囲 | 人にしかできない残り |
 |---|---|---|---|
-| 001 | MCP を同居させ帯へ出す | **通った。**dev / 本番ビルドの両方で `pong`（0.08 秒） | macOS の目視・**Windows 実機** |
-| 002 | 実機 SSH | 探り棒を用意。KEXINIT 読み取りは実サーバーで確認済み | **実機に走らせる** |
-| 003 | SSH ライブラリ（D6） | russh / ssh2 の両方を同じ形で試せる状態 | **002 の結果で決める** |
-| 004 | 資格情報 | **通った。**mock 検出テストが macOS の実 Keychain で往復。ssh-agent へ実接続 | 実機接続・**Windows 実機** |
-| 005 | GUI と MCP へ同時に流す | **通った。**同じ 1 本から GUI に ANSI 付き・MCP に素のテキスト | 実機の `tail -f`・**色の目視** |
+| 001 | MCP を同居させ帯へ出す | **通った**（dev / 本番ビルド） | macOS 目視・**Windows 実機** |
+| 002 | 実機 SSH | **通った。**9 台・両ライブラリ・全項目 OK | — |
+| 003 | SSH ライブラリ（D6） | **決定 — `russh` + `russh-sftp`** | — |
+| 004 | 資格情報 | **通った。**mock 検出が実 Keychain で往復・ssh-agent へ実接続・接続管理も動く | **Windows 実機** |
+| 005 | GUI と MCP へ同時に流す | **通った**（合成の出力で） | **実機の `tail -f`**・色の目視 |
 
-**チェックボックスは AI が埋めていません**（product-baseline §19）。各 Issue の「実行結果」に、
-私が実際に取った値だけを置いてあります。
+**チェックボックスは AI が埋めていません**（product-baseline §19）。
 
-## 次にやること（人の手が要ります）
+## 次にやること
 
-1. **探り棒を実機に走らせる**（002 / 003）
-
-   ```sh
-   cd tools/ssh-probe
-   cargo run --release -- --host <ホスト> --offer-only          # まず提示だけ見る
-   cargo run --release -- --host <ホスト> --user <利用者> \
-     --sftp-path /var/log --sniff /var/log/<何かのログ>
-   ```
-
-   **出力に接続先は 1 文字も出ません。そのまま貼れます。**
-
-2. **001 / 005 の目視**（macOS）— 帯に `[AI]` の行が出ているか、端末に色が残っているか
-3. **Windows 実機**（001 / 004）— CI はビルドとテストを回すが、画面は見られない
-4. **push の最終確認** — commit は済んでいる。push はしていない
+1. **実機の `tail -f`**（005 の最後）。D6 が決まったので実装できる。
+   手元の Docker（colima）に RHEL 系のコンテナを建てて、
+   `/var/log` の権限問題（D20）と EUC-JP のログも再現する予定
+2. **Windows 実機**（001 / 004）。CI はビルドとテストを回すが、画面は見られない
+3. **push の最終確認**（人）
 
 ## 技術的決定
 
-`.claude/decisions.md`（D1〜D17）。**未決は D6（SSH ライブラリ）と D10（実装体制）のみ。**
+`.claude/decisions.md`（D1〜D21）＋ `DESIGN.md`。**未決は D6（SSH ライブラリ）と D10（実装体制）のみ。**
 
 ## Phase 0 で拾えた未知
 
