@@ -1,0 +1,21 @@
+[package]
+name = "sshboard-ssh"
+description = "SSH 1 本の上で sftp と exec を扱う層。**ホスト鍵を必ず検証する。**"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+sshboard-band = { path = "../sshboard-band" }
+sshboard-stream = { path = "../sshboard-stream" }
+# 既定は aws-lc-rs を引く。dbboard の ADR-0034 に合わせて ring へ寄せる。
+# **採用したら cargo tree で毎回確かめること**（D6）。
+russh = { version = "0.63", default-features = false, features = ["ring", "flate2", "rsa"] }
+russh-sftp = "2"
+tokio = { workspace = true, features = ["net", "io-util"] }
+base64 = "0.22"
+sha2 = "0.10"
+
+[dev-dependencies]
+tokio = { version = "1", features = ["sync", "time", "macros", "rt", "rt-multi-thread", "net"] }
