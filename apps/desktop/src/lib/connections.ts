@@ -13,6 +13,11 @@ export type Connection = {
 	color?: string | null;
 	/** 印のタグ。`本番` / `開発2` など。**12 文字まで。** */
 	tag?: string | null;
+	/**
+	 * **AI が書いてよいディレクトリ**（D22）。空 ＝ AI は 1 バイトも書けない。
+	 * 人（GUI）はこれに関係なく自由に書ける（PRD §3）。
+	 */
+	write_roots?: string[];
 };
 
 /**
@@ -49,7 +54,8 @@ export function isConnectionTag(tag: string | null | undefined): boolean {
 
 /** 新規登録の初期値。**ssh-agent を既定にする**（鍵のパスを空にしておく・D11）。 */
 export function emptyConnection(): Connection {
-	return { id: '', name: '', host: '', port: 22, user: '' };
+	// **書き込み許可は空で始める**（D22）。既定で書けるようにしない。
+	return { id: '', name: '', host: '', port: 22, user: '', write_roots: [] };
 }
 
 /** 保存してよいか。**理由を返す。**空文字なら問題なし。 */

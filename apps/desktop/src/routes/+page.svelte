@@ -5,6 +5,7 @@
 
 	import { appendLine, type BandLine } from '$lib/band';
 	import ConnectionManager from '$lib/components/ConnectionManager.svelte';
+	import FileBrowser from '$lib/components/FileBrowser.svelte';
 	import Icon from '$lib/components/Icon.svelte';
 	import { i18n } from '$lib/i18n/i18n.svelte';
 	import { LOCALES } from '$lib/i18n/locales';
@@ -13,11 +14,38 @@
 	import '@xterm/xterm/css/xterm.css';
 	import type { Terminal } from '@xterm/xterm';
 
+	type McpAccess = { url: string; token: string };
+
 	let lines = $state<BandLine[]>([]);
-	let mcpUrl = $state<string | null>(null);
+	let mcp = $state<McpAccess | null>(null);
+	let mcpCopied = $state(false);
 	let failure = $state<string | null>(null);
 	let streaming = $state(false);
-	let view = $state<'connections' | 'band'>('connections');
+	let view = $state<'files' | 'connections' | 'band'>('files');
+
+	/**
+	 * エージェントへ貼る 1 行。
+	 *
+	 * **合言葉は起動ごとに変わる**（D23）ので、覚えて書き写す形にしない。
+	 * ここを写して貼るだけで済むようにする。
+	 */
+	const mcpCommand = $derived(
+		mcp
+			? `claude mcp add --transport http sshboard ${mcp.url} --header "Authorization: Bearer ${mcp.token}"`
+			: ''
+	);
+
+	async function copyMcpCommand() {
+		if (!mcpCommand) return;
+		try {
+			await navigator.clipboard.writeText(mcpCommand);
+			mcpCopied = true;
+			setTimeout(() => (mcpCopied = false), 2000);
+		} catch (error: unknown) {
+			// 写せないことを黙らない。**押したのに何も起きない**が一番困る。
+			failure = String(error);
+		}
+	}
 
 	let terminalHost: HTMLDivElement | undefined = $state();
 	let terminal: Terminal | undefined;
@@ -83,8 +111,8 @@
 				failure = i18n.t('err.subscribe', { detail: String(error) });
 			});
 
-		listen<string>('mcp://ready', (event) => {
-			mcpUrl = event.payload;
+		listen<McpAccess>('mcp://ready', (event) => {
+			mcp = event.payload;
 		})
 			.then((stop) => stops.push(stop))
 			.catch(() => {
@@ -92,9 +120,9 @@
 			});
 
 		// 起動が速いと 'mcp://ready' を購読より先に取りこぼす。取り直す。
-		invoke<string | null>('mcp_url')
-			.then((url) => {
-				if (url) mcpUrl = url;
+		invoke<McpAccess | null>('mcp_url')
+			.then((access) => {
+				if (access) mcp = access;
 			})
 			.catch((error: unknown) => {
 				failure = i18n.t('err.mcp', { detail: String(error) });
@@ -113,6 +141,11 @@
 		<span class="phase" title={i18n.t('app.driven')}>{i18n.t('app.phase0')}</span>
 
 		<nav class="tabs">
+			<!-- **既定はファイル**（PRD §1）。副ユーザーに端末を覚えさせない。 -->
+			<button type="button" class:active={view === 'files'} onclick={() => (view = 'files')}>
+				<Icon name="folder" />
+				{i18n.t('tab.files')}
+			</button>
 			<button
 				type="button"
 				class:active={view === 'connections'}
@@ -152,16 +185,28 @@
 			</select>
 		</div>
 
-		<code class="mcp" title="MCP"><Icon name="link" size={12} />
-			{#if mcpUrl}{mcpUrl}{:else}{i18n.t('mcp.starting')}{/if}
-		</code>
+		<!-- **合言葉ごと写せる形にする**（D23）。起動ごとに変わるので、書き写させない。 -->
+		<button
+			type="button"
+			class="mcp"
+			onclick={copyMcpCommand}
+			disabled={!mcp}
+			title={mcp ? i18n.t('mcp.token.help') : 'MCP'}
+		>
+			<Icon name={mcpCopied ? 'check' : 'copy'} size={12} />
+			{#if !mcp}{i18n.t('mcp.starting')}{:else if mcpCopied}{i18n.t('mcp.copied')}{:else}{i18n.t(
+					'mcp.copy'
+				)}{/if}
+		</button>
 	</header>
 
 	{#if failure}
 		<p class="failure" role="alert">{failure}</p>
 	{/if}
 
-	{#if view === 'connections'}
+	{#if view === 'files'}
+		<FileBrowser />
+	{:else if view === 'connections'}
 		<ConnectionManager />
 	{:else}
 	<section class="stream" aria-label={i18n.t('stream.label')}>
@@ -234,18 +279,31 @@
 		flex: 1 1 auto;
 	}
 
+	/* **合言葉ごと写せるボタン。**起動ごとに変わる値を人に書き写させない（D23）。 */
 	.mcp {
 		display: inline-flex;
 		align-items: center;
 		gap: 0.28rem;
-		font-family: var(--font-mono);
-		font-size: 0.62rem;
-		color: var(--fg-faint);
+		font-family: var(--font-ui);
+		font-size: 0.66rem;
+		color: var(--fg-muted);
 		white-space: nowrap;
-		overflow: hidden;
-		text-overflow: ellipsis;
-		min-width: 0;
-		flex: 0 1 auto;
+		flex: none;
+		padding: 0.2rem 0.5rem;
+		border-radius: 999px;
+		border: 1px solid var(--hairline);
+		background: var(--shell);
+		cursor: pointer;
+		transition: background var(--fast) var(--ease);
+	}
+
+	.mcp:hover:not(:disabled) {
+		background: var(--surface-2);
+	}
+
+	.mcp:disabled {
+		opacity: 0.5;
+		cursor: default;
 	}
 
 	/* 設定と切替は、浮いた 1 本のピルにまとめる。 */

@@ -313,6 +313,24 @@
 			</label>
 		</div>
 
+		<!-- **囲いを人が決める**（D22）。空のままなら AI は 1 バイトも書けない。 -->
+		<label>
+			<span><Icon name="upload" size={12} />{i18n.t('conn.write')}</span>
+			<textarea
+				rows="2"
+				value={(draft.write_roots ?? []).join('\n')}
+				placeholder={i18n.t('conn.write.placeholder')}
+				spellcheck="false"
+				oninput={(event) => {
+					draft.write_roots = (event.currentTarget as HTMLTextAreaElement).value
+						.split('\n')
+						.map((line) => line.trim())
+						.filter((line) => line.length > 0);
+				}}
+			></textarea>
+			<small>{i18n.t('conn.write.help')}</small>
+		</label>
+
 		{#if puttyWarning}
 			<p class="warning" role="alert">
 				<Icon name="warning" size={13} /><strong>{i18n.t('conn.ppk.title')}</strong>

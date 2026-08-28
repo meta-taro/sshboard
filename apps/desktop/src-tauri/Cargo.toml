@@ -20,6 +20,8 @@ sshboard-engine = { path = "../../../crates/sshboard-engine" }
 sshboard-mcp = { path = "../../../crates/sshboard-mcp" }
 sshboard-stream = { path = "../../../crates/sshboard-stream" }
 tauri = { version = "2", features = [] }
+# ファイルを選ぶ窓（OS のもの）。**自前のファイル選択を作らない。**
+tauri-plugin-dialog = "2"
 tokio = { workspace = true, features = ["rt-multi-thread"] }
 serde = { version = "1", features = ["derive"] }
 
