@@ -4,6 +4,14 @@
 	import { onMount } from 'svelte';
 
 	import {
+		clampListWidth,
+		DEFAULT_LIST_WIDTH,
+		loadListWidth,
+		MIN_LIST_WIDTH,
+		saveListWidth
+	} from '$lib/splitter.svelte';
+
+	import {
 		CONNECTION_COLORS,
 		CONNECTION_TAG_MAX_CHARS,
 		emptyConnection,
@@ -18,6 +26,49 @@
 	let storePath = $state('');
 	let notice = $state<string | null>(null);
 	let failure = $state<string | null>(null);
+
+	let listWidth = $state(DEFAULT_LIST_WIDTH);
+	let manager: HTMLElement | undefined = $state();
+	let dragging = $state(false);
+
+	function containerWidth(): number {
+		return manager?.getBoundingClientRect().width ?? 0;
+	}
+
+	function applyWidth(next: number) {
+		listWidth = clampListWidth(next, containerWidth());
+		saveListWidth(listWidth);
+	}
+
+	function startDrag(event: PointerEvent) {
+		dragging = true;
+		(event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+	}
+
+	function onDrag(event: PointerEvent) {
+		if (!dragging || !manager) return;
+		applyWidth(event.clientX - manager.getBoundingClientRect().left);
+	}
+
+	function endDrag(event: PointerEvent) {
+		dragging = false;
+		(event.currentTarget as HTMLElement).releasePointerCapture(event.pointerId);
+	}
+
+	/** **ダブルクリックで定位置へ戻す。** */
+	function resetWidth() {
+		applyWidth(DEFAULT_LIST_WIDTH);
+	}
+
+	/** 掴めない人のために、矢印キーでも動かせるようにする。 */
+	function onSplitterKey(event: KeyboardEvent) {
+		const step = event.shiftKey ? 40 : 10;
+		if (event.key === 'ArrowLeft') applyWidth(listWidth - step);
+		else if (event.key === 'ArrowRight') applyWidth(listWidth + step);
+		else if (event.key === 'Home' || event.key === 'Enter') resetWidth();
+		else return;
+		event.preventDefault();
+	}
 
 	/** 編集中なら、自分自身の識別子は重複扱いにしない。 */
 	const takenIds = $derived(items.map((item) => item.id).filter((id) => id !== selectedId));
@@ -71,6 +122,8 @@
 	onMount(() => {
 		const stops: Array<() => void> = [];
 
+		listWidth = clampListWidth(loadListWidth(), containerWidth());
+
 		reload();
 		invoke<string>('connections_path')
 			.then((path) => (storePath = path))
@@ -93,7 +146,13 @@
 	});
 </script>
 
-<section class="manager" aria-label="接続の登録">
+<section
+	class="manager"
+	class:dragging
+	style:--list-width="{listWidth}px"
+	bind:this={manager}
+	aria-label="接続の登録"
+>
 	<aside class="list">
 		<div class="list-head">
 			<span>接続</span>
@@ -138,6 +197,29 @@
 			<p class="path" title={storePath}>{storePath}</p>
 		{/if}
 	</aside>
+
+	<!--
+		WAI-ARIA の「window splitter」は、**焦点を当てられる separator** がそのまま定義です
+		（矢印キーで動かせる必要がある）。lint は separator を非対話とみなすので、
+		ここだけ黙らせます。**キーボードで動かせる状態を保つこと。**
+	-->
+	<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+	<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+	<div
+		class="splitter"
+		role="separator"
+		aria-orientation="vertical"
+		aria-label="一覧の幅（ダブルクリックで定位置へ戻ります）"
+		aria-valuenow={listWidth}
+		aria-valuemin={MIN_LIST_WIDTH}
+		tabindex="0"
+		onpointerdown={startDrag}
+		onpointermove={onDrag}
+		onpointerup={endDrag}
+		onpointercancel={endDrag}
+		ondblclick={resetWidth}
+		onkeydown={onSplitterKey}
+	></div>
 
 	<div class="form">
 		{#if failure}
@@ -238,17 +320,44 @@
 	   書くと、テーマを切り替えたときにそこだけ取り残される。 */
 	.manager {
 		display: grid;
-		grid-template-columns: minmax(180px, 22%) 1fr;
-		gap: 1rem;
+		/* 幅は掴んで動かせる。**定位置はダブルクリックで戻る。** */
+		grid-template-columns: var(--list-width) 6px 1fr;
+		gap: 0.5rem;
 		flex: 1;
 		min-height: 0;
 	}
 
+	.splitter {
+		cursor: col-resize;
+		background: var(--border);
+		border-radius: 3px;
+		align-self: stretch;
+		border: none;
+		padding: 0;
+	}
+
+	.splitter:hover,
+	.manager.dragging .splitter,
+	.splitter:focus-visible {
+		background: var(--accent);
+		outline: none;
+	}
+
+	/* 掴んでいる間は、下の文字が選択されないようにする。 */
+	.manager.dragging {
+		user-select: none;
+	}
+
 	/* 窓が狭いときは 2 面をやめて縦に積む。**小さく使う人を締め出さない。** */
+	/* 窓が狭いときは 2 面をやめて縦に積む。仕切りもここでは意味が無いので隠す。 */
 	@media (max-width: 720px) {
 		.manager {
 			grid-template-columns: 1fr;
 			grid-template-rows: minmax(120px, 30%) 1fr;
+		}
+
+		.splitter {
+			display: none;
 		}
 
 		.list {
