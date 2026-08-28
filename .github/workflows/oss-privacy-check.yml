@@ -30,7 +30,13 @@ jobs:
           # 未設定なら禁止語検査はスキップされ、メール検査だけが走る。
           OSS_DENY_WORDS: ${{ secrets.OSS_DENY_WORDS }}
           OSS_ALLOWED_AUTHOR_EMAIL_REGEX: ${{ vars.OSS_ALLOWED_AUTHOR_EMAIL_REGEX }}
-          OSS_ALLOWED_EMAIL_DOMAINS: ${{ vars.OSS_ALLOWED_EMAIL_DOMAINS }}
+          # SSH のアルゴリズム名は RFC 4250 §4.6.1 で `name@domainname` 形式と定められている。
+          # `zlib@openssh.com` のような**プロトコル上の名前空間**であって、メールアドレスではない。
+          # SSH 製品なのでソースにも試験にも常時出る。ここで許可しないと恒常的に誤検出する。
+          OSS_ALLOWED_EMAIL_DOMAINS: >-
+            example.com example.org example.net users.noreply.github.com
+            openssh.com libssh.org tartarus.org
+            ${{ vars.OSS_ALLOWED_EMAIL_DOMAINS }}
           BASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
           HEAD_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
         run: bash .github/scripts/oss-privacy-check.sh "$BASE_SHA" "$HEAD_SHA"

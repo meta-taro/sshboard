@@ -5,6 +5,8 @@
 
 mod hostkey;
 mod session;
+mod write_scope;
 
 pub use hostkey::{decide, fingerprint, fingerprints_for, SeenHostKey, Trust};
 pub use session::{Auth, DirEntry, SshError, SshSession, Target};
+pub use write_scope::{Refusal, WriteScope};

@@ -18,6 +18,8 @@ fn target(pinned: Option<&str>) -> Target {
         pinned_fingerprint: pinned.map(str::to_owned),
         // **初見でも通るよう、known_hosts の代わりに指紋を渡す形で試す。**
         known_hosts: String::new(),
+        // **既定は AI 拒否。**書き込みを試すテストだけが明示的に開ける。
+        write_scope: sshboard_ssh::WriteScope::default(),
     }
 }
 
@@ -242,4 +244,172 @@ async fn following_a_log_feeds_both_faces_and_stops_when_the_human_stops_it() {
     stream.stop();
     let stopped = tokio::time::timeout(std::time::Duration::from_secs(15), following).await;
     assert!(stopped.is_ok(), "止めたのに追い続けている");
+}
+
+// --- 書き込み（D22） ---------------------------------------------------------
+// **AI の書き込みは囲いの中だけ。人は制限しない**（PRD §3）。
+
+/// 書き込み許可つきで繋ぐ。
+async fn writable_session(roots: &[&str]) -> SshSession {
+    let scope = sshboard_ssh::WriteScope::under(roots).expect("囲いを作れない");
+    let mut target = target(Some(known_fingerprint().await));
+    target.write_scope = scope;
+    SshSession::connect(&target, &Auth::Agent, Band::new())
+        .await
+        .expect("登録済みの指紋で繋がらない")
+}
+
+#[tokio::test]
+async fn a_human_upload_lands_on_the_server_and_reads_back_byte_for_byte() {
+    if !server_is_up().await {
+        println!("テスト用サーバーが建っていません（想定内・飛ばします）");
+        return;
+    }
+
+    let session = writable_session(&["/home/probe/upload"]).await;
+    let path = "/home/probe/upload/human.bin";
+    // 改行も非 ASCII も混ぜる。**テキストとして触ると壊れる中身で確かめる。**
+    let payload: Vec<u8> = b"\x00\x01line1\nline2\r\n\xe6\x97\xa5\xe6\x9c\xac\xe8\xaa\x9e".to_vec();
+
+    session
+        .ensure_dir(Actor::Human, "/home/probe/upload")
+        .await
+        .expect("ディレクトリを作れない");
+    session
+        .upload(Actor::Human, path, &payload)
+        .await
+        .expect("上げられない");
+
+    let back = session
+        .read_file(Actor::Human, path)
+        .await
+        .expect("読み戻せない");
+    assert_eq!(back, payload, "上げたものと落としたものが違う");
+}
+
+#[tokio::test]
+async fn an_ai_upload_outside_the_allowed_directory_is_refused_before_it_touches_the_server() {
+    // **ここが D22 の要。**許可の外は、サーバーへ届く前に断る。
+    if !server_is_up().await {
+        println!("テスト用サーバーが建っていません（想定内・飛ばします）");
+        return;
+    }
+
+    let session = writable_session(&["/home/probe/upload"]).await;
+    let outside = "/home/probe/elsewhere.bin";
+
+    let refused = session.upload(Actor::Ai, outside, b"x").await;
+    assert!(
+        matches!(refused, Err(SshError::WriteRefused(_))),
+        "囲いの外へ AI が書けてしまっている: {refused:?}"
+    );
+
+    // **本当に届いていないこと**を、サーバー側を見て確かめる。
+    let listed = session
+        .list_dir(Actor::Human, "/home/probe")
+        .await
+        .expect("一覧が取れない");
+    assert!(
+        !listed.iter().any(|e| e.name == "elsewhere.bin"),
+        "断ったはずのファイルがサーバーにある"
+    );
+}
+
+#[tokio::test]
+async fn an_ai_upload_inside_the_allowed_directory_goes_through() {
+    if !server_is_up().await {
+        println!("テスト用サーバーが建っていません（想定内・飛ばします）");
+        return;
+    }
+
+    let session = writable_session(&["/home/probe/upload"]).await;
+    session
+        .ensure_dir(Actor::Ai, "/home/probe/upload/ai")
+        .await
+        .expect("囲いの中なのに作れない");
+    session
+        .upload(Actor::Ai, "/home/probe/upload/ai/ok.txt", b"ok")
+        .await
+        .expect("囲いの中なのに上げられない");
+
+    let back = session
+        .read_file(Actor::Human, "/home/probe/upload/ai/ok.txt")
+        .await
+        .expect("読み戻せない");
+    assert_eq!(back, b"ok");
+}
+
+#[tokio::test]
+async fn a_connection_without_a_write_scope_lets_the_human_write_but_not_the_ai() {
+    // **既定は AI 拒否。**設定を忘れた接続で AI が書けてしまうのが一番まずい。
+    if !server_is_up().await {
+        println!("テスト用サーバーが建っていません（想定内・飛ばします）");
+        return;
+    }
+
+    let session = trusted_session(Band::new()).await; // write_scope は既定＝Denied
+    let path = "/home/probe/upload/default.txt";
+
+    session
+        .ensure_dir(Actor::Human, "/home/probe/upload")
+        .await
+        .expect("人が作れない");
+    session
+        .upload(Actor::Human, path, b"human")
+        .await
+        .expect("人が制限されている");
+
+    let refused = session.upload(Actor::Ai, path, b"ai").await;
+    assert!(
+        matches!(refused, Err(SshError::WriteRefused(_))),
+        "囲い未設定で AI が書けてしまっている: {refused:?}"
+    );
+}
+
+#[tokio::test]
+async fn an_upload_reaches_the_band_before_it_is_written() {
+    // **見えないまま書かない**（PRD §4-2・D16）。
+    if !server_is_up().await {
+        println!("テスト用サーバーが建っていません（想定内・飛ばします）");
+        return;
+    }
+
+    let band = Band::new();
+    let mut watching = band.subscribe();
+
+    let scope = sshboard_ssh::WriteScope::under(["/home/probe/upload"]).expect("囲い");
+    let mut wanted = target(Some(known_fingerprint().await));
+    wanted.write_scope = scope;
+    let session = SshSession::connect(&wanted, &Auth::Agent, band)
+        .await
+        .expect("繋がらない");
+
+    let writing = tokio::spawn(async move {
+        session
+            .ensure_dir(Actor::Ai, "/home/probe/upload")
+            .await
+            .expect("作れない");
+        session
+            .upload(Actor::Ai, "/home/probe/upload/seen.txt", b"seen")
+            .await
+    });
+
+    // **書き込みが終わる前に**帯へ出ていること。受け取りを返さない限り先へ進まない。
+    let mut seen = Vec::new();
+    for _ in 0..2 {
+        let event = tokio::time::timeout(std::time::Duration::from_secs(10), watching.recv())
+            .await
+            .expect("帯へ出ていない")
+            .expect("帯が閉じている");
+        assert_eq!(event.line().actor(), Actor::Ai);
+        seen.push(event.line().text().to_string());
+        event.ack();
+    }
+
+    let written = writing.await.expect("パニック").expect("上げられない");
+    assert_eq!(written, 4);
+    assert!(
+        seen.iter().any(|l| l.contains("seen.txt")),
+        "書き込みが帯に出ていない: {seen:?}"
+    );
 }

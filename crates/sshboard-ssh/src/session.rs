@@ -12,6 +12,7 @@ use russh::{keys, ChannelMsg};
 use sshboard_band::{Actor, Band};
 
 use crate::hostkey::{decide, fingerprint, fingerprints_for, SeenHostKey, Trust};
+use crate::write_scope::{Refusal, WriteScope};
 
 const TIMEOUT: Duration = Duration::from_secs(15);
 
@@ -28,6 +29,8 @@ pub enum SshError {
     Command(String),
     /// 帯が受け取りを返さなかった。**見えないまま実行しない**（D16）。
     NotShown(String),
+    /// **AI の書き込みを囲いが断った**（D22）。サーバーへは届いていない。
+    WriteRefused(Refusal),
 }
 
 impl std::fmt::Display for SshError {
@@ -49,6 +52,7 @@ impl std::fmt::Display for SshError {
             SshError::Authenticate(detail) => write!(f, "認証が通りません: {detail}"),
             SshError::Command(detail) => write!(f, "コマンドが通りません: {detail}"),
             SshError::NotShown(detail) => write!(f, "画面へ出せませんでした: {detail}"),
+            SshError::WriteRefused(why) => write!(f, "書き込みを断りました: {why}"),
         }
     }
 }
@@ -75,6 +79,8 @@ pub struct Target {
     pub pinned_fingerprint: Option<String>,
     /// `known_hosts` の中身。読めなければ空でよい。
     pub known_hosts: String,
+    /// **AI が書いてよい範囲**（D22）。既定は `Denied` ＝ AI は書けない。
+    pub write_scope: WriteScope,
 }
 
 /// ホスト鍵を見て覚えるだけのハンドラ。**判断は接続側が行う。**
@@ -109,6 +115,7 @@ pub struct SshSession {
     handle: Handle<Watcher>,
     band: Band,
     host_key: SeenHostKey,
+    write_scope: WriteScope,
 }
 
 impl SshSession {
@@ -158,12 +165,18 @@ impl SshSession {
             handle,
             band,
             host_key,
+            write_scope: target.write_scope.clone(),
         })
     }
 
     /// 繋がっている相手のホスト鍵。**人が known_hosts と突き合わせるため。**
     pub fn host_key(&self) -> &SeenHostKey {
         &self.host_key
+    }
+
+    /// この接続で AI が書いてよい範囲。**人へ見せるため。**
+    pub fn write_scope(&self) -> &WriteScope {
+        &self.write_scope
     }
 
     /// コマンドを実行し、出力を返す。**先に帯へ出す**（D16）。
@@ -325,6 +338,77 @@ impl SshSession {
         Ok(bytes)
     }
 
+    /// **書き込みの入口はここ 1 か所**（D22）。
+    ///
+    /// 囲いがかかるのは **AI だけ**です。人は普通の SFTP クライアントとして自由に使えます
+    /// （PRD §3「人（GUI）の側は制限しない」）。
+    fn allow_write(&self, actor: Actor, path: &str, as_dir: bool) -> Result<(), SshError> {
+        if actor == Actor::Human {
+            return Ok(());
+        }
+        let verdict = if as_dir {
+            self.write_scope.permits_dir(path)
+        } else {
+            self.write_scope.permits(path)
+        };
+        verdict.map_err(SshError::WriteRefused)
+    }
+
+    /// ディレクトリを（親ごと）用意する。**既に在るものは触りません。**
+    ///
+    /// AI のときは、囲いの中に入る階層だけを作ります。囲いの外の階層は
+    /// **既に在る前提**で飛ばし、無ければ下の階層の作成が正直に失敗します。
+    pub async fn ensure_dir(&self, actor: Actor, path: &str) -> Result<(), SshError> {
+        self.allow_write(actor, path, true)?;
+        self.show(actor, &format!("mkdir -p {path}")).await?;
+
+        let sftp = self.sftp().await?;
+        for dir in ancestors(path) {
+            if self.allow_write(actor, &dir, true).is_err() {
+                // 囲いの外の階層。**作らないが、断りもしない**（既に在るはずのもの）。
+                continue;
+            }
+            match sftp.metadata(&dir).await {
+                Ok(meta) if meta.is_dir() => continue,
+                Ok(_) => {
+                    return Err(SshError::Command(format!(
+                        "{dir} は既にファイルとして在ります"
+                    )))
+                }
+                Err(_) => sftp
+                    .create_dir(&dir)
+                    .await
+                    .map_err(|error| SshError::Command(format!("{dir}: {error}")))?,
+            }
+        }
+        Ok(())
+    }
+
+    /// ファイルを 1 つ上げる。**書く前に帯へ出します**（D16）。
+    ///
+    /// 中身は**バイト列のまま**渡します。ここで文字コードを決めません。
+    pub async fn upload(&self, actor: Actor, path: &str, bytes: &[u8]) -> Result<u64, SshError> {
+        use tokio::io::AsyncWriteExt;
+
+        // **サーバーへ触る前に断る。**断ったのに 0 バイトのファイルが残る、を起こさない。
+        self.allow_write(actor, path, false)?;
+        self.show(actor, &format!("upload {path} ({} bytes)", bytes.len()))
+            .await?;
+
+        let sftp = self.sftp().await?;
+        let mut file = sftp
+            .create(path)
+            .await
+            .map_err(|error| SshError::Command(format!("{path}: {error}")))?;
+        file.write_all(bytes)
+            .await
+            .map_err(|error| SshError::Command(format!("{path}: {error}")))?;
+        file.shutdown()
+            .await
+            .map_err(|error| SshError::Command(format!("{path}: {error}")))?;
+        Ok(bytes.len() as u64)
+    }
+
     /// ログを追う。**同じ 1 本の出力を、GUI へは生・MCP へは素で流します**（Issue 005）。
     ///
     /// 人が止めたら（`OutputStream::stop`）、**その場で追うのをやめます**（PRD §4-3）。
@@ -372,4 +456,36 @@ impl SshSession {
 /// 単引用符で囲み、中の単引用符だけを閉じ直す。
 fn shell_quote(value: &str) -> String {
     format!("'{}'", value.replace('\'', "'\\''"))
+}
+
+/// `/a/b/c` を `["/", "/a", "/a/b", "/a/b/c"]` へ。**浅い順。**
+fn ancestors(path: &str) -> Vec<String> {
+    let mut out = vec!["/".to_string()];
+    let mut current = String::new();
+    for component in path.split('/').filter(|c| !c.is_empty()) {
+        current.push('/');
+        current.push_str(component);
+        out.push(current.clone());
+    }
+    out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::ancestors;
+
+    #[test]
+    fn ancestors_are_listed_from_the_root_downwards() {
+        assert_eq!(
+            ancestors("/srv/app/release"),
+            vec!["/", "/srv", "/srv/app", "/srv/app/release"]
+        );
+    }
+
+    #[test]
+    fn a_trailing_or_doubled_slash_does_not_produce_an_empty_level() {
+        // 空の階層が 1 つ混じると `mkdir ""` を投げて、読みにくい失敗になる。
+        assert_eq!(ancestors("/srv//app/"), vec!["/", "/srv", "/srv/app"]);
+        assert_eq!(ancestors("/"), vec!["/"]);
+    }
 }
