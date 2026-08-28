@@ -4963,7 +4963,6 @@ dependencies = [
  "serde",
  "sshboard-band",
  "sshboard-connections",
- "sshboard-credentials",
  "sshboard-engine",
  "sshboard-mcp",
  "sshboard-stream",

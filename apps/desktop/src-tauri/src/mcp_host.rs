@@ -3,11 +3,11 @@
 //! **別バイナリにしない。別プロセスにしない。**
 //! GUI と MCP が同じ帯・同じ Operation Engine を共有することが製品の前提（PRD §4-1）。
 
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use sshboard_band::Band;
 use sshboard_connections::ConnectionsWatch;
-use sshboard_credentials::SecretStore;
 use sshboard_engine::Engine;
 use sshboard_mcp::DEFAULT_ACK_TIMEOUT;
 use sshboard_stream::OutputStream;
@@ -18,38 +18,79 @@ use crate::commands::{McpAccess, McpUrl};
 /// 画面が待ち受けるイベント名。
 pub const MCP_READY_EVENT: &str = "mcp://ready";
 
-/// 合言葉を置く OS ストアの区分と名前（D11 / D23）。**ファイルには書かない。**
-const KEYRING_SERVICE: &str = "sshboard";
-const TOKEN_REF: &str = "mcp-token";
+/// 合言葉を人が固定したいときの環境変数。**設定ファイルより優先する。**
+const TOKEN_ENV: &str = "SSHBOARD_MCP_TOKEN";
 
-/// MCP の合言葉を決める。
+/// 合言葉を置くファイル名。接続一覧の隣。
+const TOKEN_FILE: &str = "mcp-token";
+
+/// MCP の合言葉を決める（D23）。
 ///
 /// **起動ごとに変わると、人が毎回 `claude mcp add` をやり直すことになる。**
-/// 面倒を減らすために作っている道具が、新しい面倒を足しては本末転倒なので、
-/// OS の資格情報ストアへ置いて使い回す。
+/// 面倒を減らすための道具が新しい面倒を足しては本末転倒なので、使い回す。
 ///
-/// **読めない・書けない環境では、起動ごとの合言葉へ落とす。**
-/// 弱い合言葉で開けたことにはしない。落ちたことは端末へ出す。
+/// **OS の資格情報ストアには置かない。**あそこは「リモートを開ける秘密」の場所
+/// （鍵のパスフレーズ・D11）で、macOS ではバイナリごとに承認を求める。
+/// 開発中はビルドのたびに別のバイナリになるため、**承認が毎回出る**（実測）。
+/// MCP の合言葉は loopback の取っ手で、露出度は `connections.toml` と同じなので、
+/// **同じ置き場所・同じ権限（0600）**に置く。
+///
+/// 置けない環境では、起動ごとの合言葉へ落とす。**弱い合言葉で開けたことにはしない。**
 fn resolve_token() -> Option<String> {
-    let store = SecretStore::new(KEYRING_SERVICE);
+    // 人が固定したいならそれに従う。**製品が上書きしない。**
+    if let Some(pinned) = std::env::var(TOKEN_ENV)
+        .ok()
+        .filter(|v| !v.trim().is_empty())
+    {
+        return Some(pinned);
+    }
 
-    if let Ok(held) = store.get(TOKEN_REF) {
-        if !held.trim().is_empty() {
+    let Some(path) = token_path() else {
+        eprintln!(
+            "[sshboard] 合言葉の置き場所が分かりません。この起動限りの合言葉を使います。\
+             **起動するたびに貼り直しが要ります。**"
+        );
+        return None;
+    };
+
+    if let Ok(held) = std::fs::read_to_string(&path) {
+        let held = held.trim().to_string();
+        if !held.is_empty() {
             return Some(held);
         }
     }
 
     let fresh = sshboard_mcp::new_token();
-    match store.put(TOKEN_REF, &fresh) {
+    match write_private(&path, &fresh) {
         Ok(()) => Some(fresh),
         Err(error) => {
             eprintln!(
-                "[sshboard] 合言葉を OS のストアへ置けません（{error}）。\
-                 この起動限りの合言葉を使います。**起動するたびに貼り直しが要ります。**"
+                "[sshboard] 合言葉を保存できません（{error}）。この起動限りの合言葉を使います。\
+                 **起動するたびに貼り直しが要ります。**"
             );
             None
         }
     }
+}
+
+fn token_path() -> Option<PathBuf> {
+    let connections = sshboard_connections::default_path().ok()?;
+    Some(connections.parent()?.join(TOKEN_FILE))
+}
+
+/// 本人だけが読める形で書く。**接続一覧と同じ扱い。**
+fn write_private(path: &Path, value: &str) -> std::io::Result<()> {
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    std::fs::write(path, value)?;
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600))?;
+    }
+    Ok(())
 }
 
 /// 0 = OS に空きポートを選ばせる。
@@ -93,7 +134,7 @@ pub fn spawn(
         // **合言葉はここに出さない。**端末の記録に残る（product-baseline §14）。
         // 画面で見せて、人が手元で貼る。
         eprintln!("[sshboard] MCP listening on {url}");
-        eprintln!("[sshboard] トークンは画面の「MCP」から取ってください（起動ごとに変わります）");
+        eprintln!("[sshboard] トークンは画面の「MCP」ボタンから写せます");
 
         app.state::<McpUrl>().set(url.clone(), token.clone());
 
