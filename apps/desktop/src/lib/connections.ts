@@ -53,16 +53,34 @@ export function emptyConnection(): Connection {
 }
 
 /** 保存してよいか。**理由を返す。**空文字なら問題なし。 */
-export function whyNotSavable(entry: Connection, existingIds: readonly string[]): string {
-	if (!entry.id.trim()) return '識別子を入れてください';
-	if (!/^[A-Za-z0-9._-]+$/.test(entry.id)) return '識別子は英数字と . _ - だけにしてください';
-	if (!entry.host.trim()) return 'ホストを入れてください';
-	if (!entry.user.trim()) return 'ログイン名を入れてください';
-	if (entry.port < 1 || entry.port > 65535) return 'ポートが範囲外です';
-	if (existingIds.includes(entry.id)) return `識別子 ${entry.id} は既に使われています`;
-	if (!isConnectionTag(entry.tag))
-		return `タグは ${CONNECTION_TAG_MAX_CHARS} 文字までです`;
-	return '';
+/**
+ * 保存してよいか。**返すのは理由ではなく鍵。**
+ *
+ * 文言をここに書くと、言語を切り替えても変わらない場所ができます。
+ * **訳は画面側で当てます。**
+ */
+export type SaveBlocker =
+	| { key: 'conn.err.id.empty' }
+	| { key: 'conn.err.id.chars' }
+	| { key: 'conn.err.host' }
+	| { key: 'conn.err.user' }
+	| { key: 'conn.err.port' }
+	| { key: 'conn.err.dup'; id: string }
+	| { key: 'conn.err.tag'; max: number }
+	| null;
+
+export function whyNotSavable(
+	entry: Connection,
+	existingIds: readonly string[]
+): SaveBlocker {
+	if (!entry.id.trim()) return { key: 'conn.err.id.empty' };
+	if (!/^[A-Za-z0-9._-]+$/.test(entry.id)) return { key: 'conn.err.id.chars' };
+	if (!entry.host.trim()) return { key: 'conn.err.host' };
+	if (!entry.user.trim()) return { key: 'conn.err.user' };
+	if (entry.port < 1 || entry.port > 65535) return { key: 'conn.err.port' };
+	if (existingIds.includes(entry.id)) return { key: 'conn.err.dup', id: entry.id };
+	if (!isConnectionTag(entry.tag)) return { key: 'conn.err.tag', max: CONNECTION_TAG_MAX_CHARS };
+	return null;
 }
 
 /** `.ppk` は OpenSSH 系が読めない（D19）。**登録時に気づかせる。** */

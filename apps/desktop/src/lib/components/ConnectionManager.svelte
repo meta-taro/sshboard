@@ -3,6 +3,8 @@
 	import { listen } from '@tauri-apps/api/event';
 	import { onMount } from 'svelte';
 
+	import { i18n } from '$lib/i18n/i18n.svelte';
+
 	import {
 		clampListWidth,
 		DEFAULT_LIST_WIDTH,
@@ -75,13 +77,16 @@
 	/** 編集中なら、自分自身の識別子は重複扱いにしない。 */
 	const takenIds = $derived(items.map((item) => item.id).filter((id) => id !== selectedId));
 	const blocker = $derived(whyNotSavable(draft, takenIds));
+	const blockerText = $derived(
+		blocker ? i18n.t(blocker.key, { ...blocker }) : ''
+	);
 	const puttyWarning = $derived(isPuttyKey(draft.key_path));
 
 	async function reload() {
 		try {
 			items = await invoke<Connection[]>('connections_list');
 		} catch (error: unknown) {
-			failure = `一覧を読めません: ${String(error)}`;
+			failure = i18n.t('err.list', { detail: String(error) });
 		}
 	}
 
@@ -103,11 +108,11 @@
 		failure = null;
 		try {
 			await invoke('connection_save', { entry: draft });
-			notice = `${draft.id} を保存しました`;
+			notice = i18n.t('conn.saved', { id: draft.id });
 			selectedId = draft.id;
 			await reload();
 		} catch (error: unknown) {
-			failure = `保存できません: ${String(error)}`;
+			failure = i18n.t('err.save', { detail: String(error) });
 		}
 	}
 
@@ -116,11 +121,11 @@
 		confirmingDelete = false;
 		try {
 			await invoke('connection_delete', { id });
-			notice = `${id} を消しました`;
+			notice = i18n.t('conn.removed', { id });
 			if (selectedId === id) startNew();
 			await reload();
 		} catch (error: unknown) {
-			failure = `消せません: ${String(error)}`;
+			failure = i18n.t('err.delete', { detail: String(error) });
 		}
 	}
 
@@ -144,7 +149,7 @@
 		})
 			.then((stop) => stops.push(stop))
 			.catch((error: unknown) => {
-				failure = `一覧の更新を購読できません: ${String(error)}`;
+				failure = i18n.t('err.subscribe.list', { detail: String(error) });
 			});
 
 		return () => stops.forEach((stop) => stop());
@@ -160,12 +165,12 @@
 >
 	<aside class="list">
 		<div class="list-head">
-			<span>接続</span>
-			<button type="button" onclick={startNew}>＋ 新規</button>
+			<span>{i18n.t('conn.heading')}</span>
+			<button type="button" onclick={startNew}>{i18n.t('conn.new')}</button>
 		</div>
 
 		{#if items.length === 0}
-			<p class="empty">まだ 1 件も登録されていません。</p>
+			<p class="empty">{i18n.t('conn.empty')}</p>
 		{:else}
 			<ul>
 				{#each items as item (item.id)}
@@ -214,7 +219,7 @@
 		class="splitter"
 		role="separator"
 		aria-orientation="vertical"
-		aria-label="一覧の幅（ダブルクリックで定位置へ戻ります）"
+		aria-label={i18n.t('conn.splitter')}
 		aria-valuenow={listWidth}
 		aria-valuemin={MIN_LIST_WIDTH}
 		tabindex="0"
@@ -234,53 +239,54 @@
 		{/if}
 
 		<label>
-			<span>識別子</span>
+			<span>{i18n.t('conn.id')}</span>
 			<input bind:value={draft.id} placeholder="web-prod" disabled={selectedId !== null} />
-			<small>AI に見えるのは、これと名前だけです。ホスト名は渡りません。</small>
+			<small>{i18n.t('conn.id.help')}</small>
 		</label>
 
 		<label>
-			<span>名前</span>
+			<span>{i18n.t('conn.name')}</span>
 			<input bind:value={draft.name} placeholder="Web (prod)" />
 		</label>
 
 		<div class="pair">
 			<label>
-				<span>ホスト</span>
+				<span>{i18n.t('conn.host')}</span>
 				<input bind:value={draft.host} spellcheck="false" />
 			</label>
 			<label>
-				<span>ポート</span>
+				<span>{i18n.t('conn.port')}</span>
 				<input type="number" bind:value={draft.port} min="1" max="65535" />
 			</label>
 		</div>
 
 		<label>
-			<span>ログイン名</span>
+			<span>{i18n.t('conn.user')}</span>
 			<input bind:value={draft.user} spellcheck="false" />
 		</label>
 
 		<label>
-			<span>秘密鍵のパス（空なら ssh-agent）</span>
-			<input bind:value={draft.key_path} placeholder="空のまま = ssh-agent を使う" spellcheck="false" />
-			<small>
-				<strong>空のままを推奨します。</strong>ssh-agent なら、パスフレーズを sshboard
-				が一度も受け取りません。
-			</small>
+			<span>{i18n.t('conn.key')}</span>
+			<input
+				bind:value={draft.key_path}
+				placeholder={i18n.t('conn.key.placeholder')}
+				spellcheck="false"
+			/>
+			<small>{i18n.t('conn.key.help')}</small>
 		</label>
 
 		<div class="mark-row">
 			<label class="tag">
-				<span>タグ（{CONNECTION_TAG_MAX_CHARS} 文字まで）</span>
+				<span>{i18n.t('conn.tag', { max: CONNECTION_TAG_MAX_CHARS })}</span>
 				<input
 					bind:value={draft.tag}
 					maxlength={CONNECTION_TAG_MAX_CHARS}
-					placeholder="本番 / 開発2"
+					placeholder="prod / dev2"
 				/>
-				<small>色が見えなくても効く方の印です。白黒の画面写真でも読めます。</small>
+				<small>{i18n.t('conn.tag.help')}</small>
 			</label>
 			<label>
-				<span>色</span>
+				<span>{i18n.t('conn.color')}</span>
 				<div class="swatches">
 					{#each CONNECTION_COLORS as color (color)}
 						<button
@@ -295,41 +301,43 @@
 					{/each}
 				</div>
 				<button type="button" class="clear-mark" onclick={() => (draft.color = null)}>
-					印なし
+					{i18n.t('conn.color.none')}
 				</button>
 			</label>
 		</div>
 
 		{#if puttyWarning}
 			<p class="warning" role="alert">
-				<strong>これは PuTTY 形式（.ppk）です。</strong>OpenSSH 系は読めません。先に変換してください。
-				<code>puttygen &lt;鍵&gt;.ppk -O private-openssh -o &lt;鍵&gt;</code>
-				変換して <code>ssh-add</code> しておけば、このパスは空で構いません。
+				<strong>{i18n.t('conn.ppk.title')}</strong>
+				{i18n.t('conn.ppk.body')}
+				<code>puttygen KEY.ppk -O private-openssh -o KEY</code>
+				{i18n.t('conn.ppk.after')}
 			</p>
 		{/if}
 
 		<div class="actions">
-			<button type="button" onclick={save} disabled={blocker !== ''}>保存</button>
+			<button type="button" onclick={save} disabled={blocker !== null}>{i18n.t('conn.save')}</button>
 			{#if selectedId && !confirmingDelete}
 				<button type="button" class="danger" onclick={() => (confirmingDelete = true)}>
-					削除
+					{i18n.t('conn.delete')}
 				</button>
 			{/if}
-			{#if blocker}
-				<span class="blocker">{blocker}</span>
+			{#if blockerText}
+				<span class="blocker">{blockerText}</span>
 			{/if}
 		</div>
 
 		{#if selectedId && confirmingDelete}
 			<p class="confirm" role="alert">
-				<strong>{selectedId} を消します。</strong>
-				一覧から消えるだけで、<strong>サーバー側には何も起きません。</strong>
-				OS の資格情報ストアに入れた秘密も残ります。
+				<strong>{i18n.t('conn.delete.confirm', { id: selectedId })}</strong>
+				{i18n.t('conn.delete.scope')}
 				<span class="confirm-actions">
 					<button type="button" class="danger" onclick={() => remove(selectedId ?? '')}>
-						消す
+						{i18n.t('conn.delete.yes')}
 					</button>
-					<button type="button" onclick={() => (confirmingDelete = false)}>やめる</button>
+					<button type="button" onclick={() => (confirmingDelete = false)}>
+						{i18n.t('conn.delete.no')}
+					</button>
 				</span>
 			</p>
 		{/if}
@@ -526,10 +534,13 @@
 		width: 11rem;
 	}
 
+	/* **2 行 × 8。**flex の中で潰れないよう幅を固定する。 */
 	.swatches {
 		display: grid;
 		grid-template-columns: repeat(8, 18px);
 		gap: 0.25rem;
+		width: max-content;
+		flex: none;
 	}
 
 	.swatch {

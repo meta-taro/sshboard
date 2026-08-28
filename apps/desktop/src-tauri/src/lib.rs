@@ -7,6 +7,7 @@ mod bridge;
 mod commands;
 mod connections_cmd;
 mod mcp_host;
+mod menu;
 mod pending;
 mod stream_host;
 
@@ -35,7 +36,8 @@ pub fn run() {
             connections_cmd::connections_list,
             connections_cmd::connections_path,
             connections_cmd::connection_save,
-            connections_cmd::connection_delete
+            connections_cmd::connection_delete,
+            menu::set_menu_labels
         ])
         .setup(|app| {
             let band = Band::new();

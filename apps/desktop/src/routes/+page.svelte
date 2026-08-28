@@ -5,6 +5,8 @@
 
 	import { appendLine, type BandLine } from '$lib/band';
 	import ConnectionManager from '$lib/components/ConnectionManager.svelte';
+	import { i18n } from '$lib/i18n/i18n.svelte';
+	import { LOCALES } from '$lib/i18n/locales';
 	import { theme, type ThemeMode } from '$lib/theme/theme.svelte';
 	import { createTerminal, writeChunk } from '$lib/terminal.svelte';
 	import '@xterm/xterm/css/xterm.css';
@@ -24,7 +26,7 @@
 			await invoke('start_demo_stream');
 			streaming = true;
 		} catch (error: unknown) {
-			failure = `出力を流せませんでした: ${String(error)}`;
+			failure = i18n.t('err.stream.start', { detail: String(error) });
 		}
 	}
 
@@ -33,7 +35,7 @@
 			await invoke('stop_stream');
 			streaming = false;
 		} catch (error: unknown) {
-			failure = `出力を止められませんでした: ${String(error)}`;
+			failure = i18n.t('err.stream.stop', { detail: String(error) });
 		}
 	}
 
@@ -50,7 +52,7 @@
 	 */
 	function ackRendered(seq: number) {
 		invoke('band_ack', { seq }).catch((error: unknown) => {
-			failure = `帯の受け取りを返せませんでした: ${String(error)}`;
+			failure = i18n.t('err.ack', { detail: String(error) });
 		});
 	}
 
@@ -67,7 +69,7 @@
 		})
 			.then((stop) => stops.push(stop))
 			.catch((error: unknown) => {
-				failure = `出力を購読できませんでした: ${String(error)}`;
+				failure = i18n.t('err.subscribe.stream', { detail: String(error) });
 			});
 
 		listen<BandLine>('band://line', async (event) => {
@@ -77,7 +79,7 @@
 		})
 			.then((stop) => stops.push(stop))
 			.catch((error: unknown) => {
-				failure = `帯を購読できませんでした: ${String(error)}`;
+				failure = i18n.t('err.subscribe', { detail: String(error) });
 			});
 
 		listen<string>('mcp://ready', (event) => {
@@ -94,7 +96,7 @@
 				if (url) mcpUrl = url;
 			})
 			.catch((error: unknown) => {
-				failure = `MCP の状態を取得できませんでした: ${String(error)}`;
+				failure = i18n.t('err.mcp', { detail: String(error) });
 			});
 
 		return () => {
@@ -107,31 +109,37 @@
 <main>
 	<header>
 		<h1>sshboard</h1>
-		<p class="phase">
-			Phase 0 — 帯だけ。<strong>SSH には繋いでいません。</strong>
-		</p>
-		<p class="phase">
-			本来はここを人が操作しません。外の AI エージェントが MCP を呼び、その操作が帯に流れます。
-		</p>
+		<p class="phase">{i18n.t('app.phase0')}</p>
+		<p class="phase">{i18n.t('app.driven')}</p>
 		<div class="settings">
-			<span class="settings-label">テーマ</span>
-			{#each [['auto', '自動'], ['light', '明るい'], ['dark', '暗い']] as [mode, label] (mode)}
+			<span class="settings-label">{i18n.t('theme.label')}</span>
+			{#each ['auto', 'light', 'dark'] as const as mode (mode)}
 				<button
 					type="button"
 					class:active={theme.mode === mode}
 					onclick={() => theme.set(mode as ThemeMode)}
 				>
-					{label}
+					{i18n.t(`theme.${mode}`)}
 				</button>
 			{/each}
+
+			<span class="settings-label lang">{i18n.t('lang.label')}</span>
+			<select
+				value={i18n.locale}
+				onchange={(event) => i18n.set((event.currentTarget as HTMLSelectElement).value)}
+			>
+				{#each LOCALES as locale (locale.code)}
+					<option value={locale.code}>{locale.native}</option>
+				{/each}
+			</select>
 		</div>
 
 		<p class="mcp">
-			MCP:
+			{i18n.t('mcp.label')}:
 			{#if mcpUrl}
 				<code>{mcpUrl}</code>
 			{:else}
-				<span class="waiting">立ち上げ中…</span>
+				<span class="waiting">{i18n.t('mcp.starting')}</span>
 			{/if}
 		</p>
 	</header>
@@ -142,31 +150,31 @@
 
 	<nav class="tabs">
 		<button type="button" class:active={view === 'connections'} onclick={() => (view = 'connections')}>
-			接続
+			{i18n.t('tab.connections')}
 		</button>
 		<button type="button" class:active={view === 'band'} onclick={() => (view = 'band')}>
-			帯と出力
+			{i18n.t('tab.band')}
 		</button>
 	</nav>
 
 	{#if view === 'connections'}
 		<ConnectionManager />
 	{:else}
-	<section class="stream" aria-label="追尾している出力">
+	<section class="stream" aria-label={i18n.t('stream.label')}>
 		<div class="stream-head">
-			<span class="label">出力（GUI は色付き / MCP はプレーン）</span>
-			<span class="scaffold">足場 — 002 が通ったら消えます</span>
+			<span class="label">{i18n.t('stream.label')}</span>
+			<span class="scaffold">{i18n.t('stream.scaffold')}</span>
 			<button type="button" onclick={startDemoStream} disabled={streaming}>
-				合成の出力を流す
+				{i18n.t('stream.start')}
 			</button>
-			<button type="button" onclick={stopStream}>止める</button>
+			<button type="button" onclick={stopStream}>{i18n.t('stream.stop')}</button>
 		</div>
 		<div class="terminal" bind:this={terminalHost}></div>
 	</section>
 
-	<section class="band" aria-label="操作の帯">
+	<section class="band" aria-label={i18n.t('band.label')}>
 		{#if lines.length === 0}
-			<p class="empty">まだ何も流れていません。MCP から <code>ping</code> を呼ぶと 1 行増えます。</p>
+			<p class="empty">{i18n.t('band.empty')}</p>
 		{:else}
 			<ol>
 				{#each lines as line (line.seq)}
@@ -225,6 +233,20 @@
 
 	.settings-label {
 		margin-right: 0.2rem;
+	}
+
+	.settings-label.lang {
+		margin-left: 0.6rem;
+	}
+
+	.settings select {
+		font: inherit;
+		font-size: 0.75rem;
+		color: var(--fg);
+		background: var(--bg-raised);
+		border: 1px solid var(--border-strong);
+		border-radius: 3px;
+		padding: 0.1rem 0.3rem;
 	}
 
 	.settings button,

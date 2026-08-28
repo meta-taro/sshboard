@@ -25,23 +25,25 @@
 	--warning-fg: #7a5a12;
 	--ok-fg: #1f6f57;
 
-	/* 接続の印。**16 進数を設定ファイルに書かず、名前で持つ**（Rust 側の CONNECTION_COLORS）。 */
---mark-red: #c8443f;
-	--mark-orange: #b8702c;
-	--mark-amber: #a9821f;
-	--mark-yellow: #8f8419;
-	--mark-lime: #6f8c22;
-	--mark-green: #3f8b4d;
-	--mark-emerald: #2f8f65;
-	--mark-teal: #2f7d78;
-	--mark-cyan: #2f7f8f;
-	--mark-sky: #2f74ab;
-	--mark-blue: #3a66b0;
-	--mark-indigo: #5a5cb0;
-	--mark-violet: #7452ab;
-	--mark-purple: #8c4fa8;
-	--mark-magenta: #a44b93;
-	--mark-pink: #b04f77;
+	/* 接続の印。**16 進数を設定ファイルに書かず、名前で持つ**（Rust 側の CONNECTION_COLORS）。
+	   **彩度は落とさない。**16 色を見分けるには彩度が要る。
+	   色覚特性への配慮は**タグ**の側で担保している（白黒でも読める・DESIGN.md）。 */
+--mark-red: #e02b26;
+	--mark-orange: #e2761a;
+	--mark-amber: #d99500;
+	--mark-yellow: #c9a800;
+	--mark-lime: #74b800;
+	--mark-green: #17a83a;
+	--mark-emerald: #00a878;
+	--mark-teal: #00a29b;
+	--mark-cyan: #00a3c4;
+	--mark-sky: #0d8fe0;
+	--mark-blue: #2f6ff0;
+	--mark-indigo: #6a5cf0;
+	--mark-violet: #9b4ff0;
+	--mark-purple: #bf3fe8;
+	--mark-magenta: #e0399f;
+	--mark-pink: #e83a6d;
 
 	/* 端末は暗いままにする。ログは暗い背景で読むのが普通で、
 	   明るくすると ANSI の既定色（黒に載る前提の色）が読めなくなる。 */
@@ -67,22 +69,22 @@
 		--warning-fg: #ffe0a0;
 		--ok-fg: #7fd1b9;
 
---mark-red: #e05252;
-		--mark-orange: #e08a3c;
-		--mark-amber: #d9a13c;
-		--mark-yellow: #d9c53c;
-		--mark-lime: #a8c93f;
-		--mark-green: #4fa85f;
-		--mark-emerald: #3fb07d;
-		--mark-teal: #3a9f95;
-		--mark-cyan: #3fa8b8;
-		--mark-sky: #4a9ad4;
-		--mark-blue: #5a86d6;
-		--mark-indigo: #7a7ad6;
-		--mark-violet: #9a70d0;
-		--mark-purple: #b06fd0;
-		--mark-magenta: #cc6bb8;
-		--mark-pink: #d96f96;
+--mark-red: #ff5a52;
+		--mark-orange: #ff9640;
+		--mark-amber: #ffb327;
+		--mark-yellow: #ffe14d;
+		--mark-lime: #b8e02f;
+		--mark-green: #48d15f;
+		--mark-emerald: #2fd39a;
+		--mark-teal: #21ccc0;
+		--mark-cyan: #2fc9e8;
+		--mark-sky: #3aaefb;
+		--mark-blue: #5b8cff;
+		--mark-indigo: #8b7cff;
+		--mark-violet: #b06cff;
+		--mark-purple: #d264ff;
+		--mark-magenta: #ff5fd0;
+		--mark-pink: #ff5f96;
 	}
 }
 
@@ -103,20 +105,20 @@
 	--warning-fg: #ffe0a0;
 	--ok-fg: #7fd1b9;
 
---mark-red: #e05252;
-	--mark-orange: #e08a3c;
-	--mark-amber: #d9a13c;
-	--mark-yellow: #d9c53c;
-	--mark-lime: #a8c93f;
-	--mark-green: #4fa85f;
-	--mark-emerald: #3fb07d;
-	--mark-teal: #3a9f95;
-	--mark-cyan: #3fa8b8;
-	--mark-sky: #4a9ad4;
-	--mark-blue: #5a86d6;
-	--mark-indigo: #7a7ad6;
-	--mark-violet: #9a70d0;
-	--mark-purple: #b06fd0;
-	--mark-magenta: #cc6bb8;
-	--mark-pink: #d96f96;
+--mark-red: #ff5a52;
+	--mark-orange: #ff9640;
+	--mark-amber: #ffb327;
+	--mark-yellow: #ffe14d;
+	--mark-lime: #b8e02f;
+	--mark-green: #48d15f;
+	--mark-emerald: #2fd39a;
+	--mark-teal: #21ccc0;
+	--mark-cyan: #2fc9e8;
+	--mark-sky: #3aaefb;
+	--mark-blue: #5b8cff;
+	--mark-indigo: #8b7cff;
+	--mark-violet: #b06cff;
+	--mark-purple: #d264ff;
+	--mark-magenta: #ff5fd0;
+	--mark-pink: #ff5f96;
 }

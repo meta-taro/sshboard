@@ -1,0 +1,169 @@
+/**
+ * 画面に出す文字列。**鍵は英語、値は各言語。**
+ *
+ * `en` が正本です。**`en` に無い鍵を他の言語に足さないこと**（型で縛っています）。
+ * 訳が無い鍵は `en` へ落ちます。**画面に鍵がそのまま出るよりはましだからです。**
+ */
+
+const en = {
+	'app.phase0': 'Phase 0 — band only. Not connected to SSH.',
+	'app.driven': 'Normally you do not operate this. An external AI agent calls MCP, and its actions flow into the band.',
+	'theme.label': 'Theme',
+	'theme.auto': 'Auto',
+	'theme.light': 'Light',
+	'theme.dark': 'Dark',
+	'lang.label': 'Language',
+	'mcp.label': 'MCP',
+	'mcp.starting': 'starting…',
+	'tab.connections': 'Connections',
+	'tab.band': 'Band & output',
+
+	'conn.heading': 'Connections',
+	'conn.new': '+ New',
+	'conn.empty': 'Nothing registered yet.',
+	'conn.id': 'Identifier',
+	'conn.id.help': 'The AI sees only this and the name. The host is never passed.',
+	'conn.name': 'Name',
+	'conn.host': 'Host',
+	'conn.port': 'Port',
+	'conn.user': 'Login name',
+	'conn.key': 'Private key path (empty = ssh-agent)',
+	'conn.key.placeholder': 'leave empty to use ssh-agent',
+	'conn.key.help': 'Leaving this empty is recommended. With ssh-agent, sshboard never receives your passphrase.',
+	'conn.tag': 'Tag (up to {max} characters)',
+	'conn.tag.help': 'The half of the mark that works when colour cannot be seen — greyscale screenshots included.',
+	'conn.color': 'Colour',
+	'conn.color.none': 'No mark',
+	'conn.save': 'Save',
+	'conn.delete': 'Delete',
+	'conn.delete.confirm': '{id} will be removed.',
+	'conn.delete.scope': 'It only leaves this list — nothing happens on the server, and secrets in the OS credential store stay.',
+	'conn.delete.yes': 'Delete',
+	'conn.delete.no': 'Cancel',
+	'conn.saved': 'Saved {id}',
+	'conn.removed': 'Removed {id}',
+	'conn.splitter': 'List width (double-click to reset)',
+
+	'conn.err.id.empty': 'Enter an identifier',
+	'conn.err.id.chars': 'Identifier may use only letters, digits, . _ -',
+	'conn.err.host': 'Enter a host',
+	'conn.err.user': 'Enter a login name',
+	'conn.err.port': 'Port is out of range',
+	'conn.err.dup': 'Identifier {id} is already taken',
+	'conn.err.tag': 'Tag may be at most {max} characters',
+
+	'conn.ppk.title': 'This is a PuTTY key (.ppk).',
+	'conn.ppk.body': 'OpenSSH cannot read it. Convert it first.',
+	'conn.ppk.after': 'Once converted and added with ssh-add, you can leave this path empty.',
+
+	'stream.label': 'Output (colour for you, plain for the AI)',
+	'stream.scaffold': 'scaffolding — removed once 002 passes',
+	'stream.start': 'Send synthetic output',
+	'stream.stop': 'Stop',
+	'band.label': 'Band',
+	'band.empty': 'Nothing yet. Call ping over MCP and a line appears.',
+
+	'err.list': 'Cannot read the list: {detail}',
+	'err.save': 'Cannot save: {detail}',
+	'err.delete': 'Cannot delete: {detail}',
+	'err.ack': 'Could not acknowledge the band: {detail}',
+	'err.subscribe': 'Could not subscribe to the band: {detail}',
+	'err.subscribe.list': 'Could not subscribe to list updates: {detail}',
+	'err.subscribe.stream': 'Could not subscribe to the output: {detail}',
+	'err.mcp': 'Could not read the MCP state: {detail}',
+	'err.stream.start': 'Could not send output: {detail}',
+	'err.stream.stop': 'Could not stop the output: {detail}'
+} as const;
+
+export type MessageKey = keyof typeof en;
+type Catalog = Partial<Record<MessageKey, string>>;
+
+const ja: Catalog = {
+	'app.phase0': 'Phase 0 — 帯だけ。SSH には繋いでいません。',
+	'app.driven': '本来はここを人が操作しません。外の AI エージェントが MCP を呼び、その操作が帯に流れます。',
+	'theme.label': 'テーマ',
+	'theme.auto': '自動',
+	'theme.light': '明るい',
+	'theme.dark': '暗い',
+	'lang.label': '言語',
+	'mcp.label': 'MCP',
+	'mcp.starting': '立ち上げ中…',
+	'tab.connections': '接続',
+	'tab.band': '帯と出力',
+
+	'conn.heading': '接続',
+	'conn.new': '＋ 新規',
+	'conn.empty': 'まだ 1 件も登録されていません。',
+	'conn.id': '識別子',
+	'conn.id.help': 'AI に見えるのは、これと名前だけです。ホスト名は渡りません。',
+	'conn.name': '名前',
+	'conn.host': 'ホスト',
+	'conn.port': 'ポート',
+	'conn.user': 'ログイン名',
+	'conn.key': '秘密鍵のパス（空なら ssh-agent）',
+	'conn.key.placeholder': '空のまま = ssh-agent を使う',
+	'conn.key.help': '空のままを推奨します。ssh-agent なら、パスフレーズを sshboard が一度も受け取りません。',
+	'conn.tag': 'タグ（{max} 文字まで）',
+	'conn.tag.help': '色が見えなくても効く方の印です。白黒の画面写真でも読めます。',
+	'conn.color': '色',
+	'conn.color.none': '印なし',
+	'conn.save': '保存',
+	'conn.delete': '削除',
+	'conn.delete.confirm': '{id} を消します。',
+	'conn.delete.scope': '一覧から消えるだけで、サーバー側には何も起きません。OS の資格情報ストアに入れた秘密も残ります。',
+	'conn.delete.yes': '消す',
+	'conn.delete.no': 'やめる',
+	'conn.saved': '{id} を保存しました',
+	'conn.removed': '{id} を消しました',
+	'conn.splitter': '一覧の幅（ダブルクリックで定位置へ戻ります）',
+
+	'conn.err.id.empty': '識別子を入れてください',
+	'conn.err.id.chars': '識別子は英数字と . _ - だけにしてください',
+	'conn.err.host': 'ホストを入れてください',
+	'conn.err.user': 'ログイン名を入れてください',
+	'conn.err.port': 'ポートが範囲外です',
+	'conn.err.dup': '識別子 {id} は既に使われています',
+	'conn.err.tag': 'タグは {max} 文字までです',
+
+	'conn.ppk.title': 'これは PuTTY 形式（.ppk）です。',
+	'conn.ppk.body': 'OpenSSH 系は読めません。先に変換してください。',
+	'conn.ppk.after': '変換して ssh-add しておけば、このパスは空で構いません。',
+
+	'stream.label': '出力（GUI は色付き / MCP はプレーン）',
+	'stream.scaffold': '足場 — 002 が通ったら消えます',
+	'stream.start': '合成の出力を流す',
+	'stream.stop': '止める',
+	'band.label': '帯',
+	'band.empty': 'まだ何も流れていません。MCP から ping を呼ぶと 1 行増えます。',
+
+	'err.list': '一覧を読めません: {detail}',
+	'err.save': '保存できません: {detail}',
+	'err.delete': '消せません: {detail}',
+	'err.ack': '帯の受け取りを返せませんでした: {detail}',
+	'err.subscribe': '帯を購読できませんでした: {detail}',
+	'err.subscribe.list': '一覧の更新を購読できません: {detail}',
+	'err.subscribe.stream': '出力を購読できませんでした: {detail}',
+	'err.mcp': 'MCP の状態を取得できませんでした: {detail}',
+	'err.stream.start': '出力を流せませんでした: {detail}',
+	'err.stream.stop': '出力を止められませんでした: {detail}'
+};
+
+import { ko, zhCN, zhTW } from './messages-cjk';
+import { de, es, fr } from './messages-eu';
+import { it, ptBR, ru } from './messages-eu2';
+
+export const CATALOGS: Record<string, Catalog> = {
+	en,
+	ja,
+	ko,
+	'zh-CN': zhCN,
+	'zh-TW': zhTW,
+	de,
+	fr,
+	es,
+	'pt-BR': ptBR,
+	ru,
+	it
+};
+
+export const FALLBACK = en;
