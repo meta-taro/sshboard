@@ -120,6 +120,8 @@ pnpm --filter desktop check                            →  198 files, 0 errors,
   分割送信は、実測でそこに当たってから入れます
 - **ダウンロードがありません。**上げる側だけです
 - **`PerSourcePenalties` に当たる可能性**（D24）。製品側の連打防止はまだ入っていません
+- **Windows の ssh-agent は実機で未確認。**コンパイルは CI で通しますが、
+  名前付きパイプ / Pageant に実際に繋がるかは**人が実機で見るまで分かりません**
 - **アイコン・帯・端末の見た目は仮置き**（DESIGN.md）。人が決め直す前提
 - **`SSHBOARD_PHASE0_DEMO` と `start_demo_stream` は Phase 0 限り。**
   002 が通って本物の `tail -f` に差し替えたら消すこと
@@ -128,6 +130,14 @@ pnpm --filter desktop check                            →  198 files, 0 errors,
   読み出しは U+FFFD へ置換したうえで「置換した」と伝えるだけで、変換はしていません
 
 ## Phase 1 で拾えた未知
+
+11. **`russh` の ssh-agent クライアントは、Unix と Windows で入口が違う。**
+    `connect_env`（`SSH_AUTH_SOCK`）は `#[cfg(unix)]` にしか無く、
+    **Windows では `sshboard-ssh` がコンパイルできなかった**（CI で判明）。
+    Windows は OpenSSH の名前付きパイプ（`\\.\pipe\openssh-ssh-agent`）か
+    **Pageant**。**Pageant が使えるのは実利**で、`.ppk` を持つ層（D19）が
+    そのまま繋がる。
+    **手元（macOS）では検証できない** — `ring` のビルドに MSVC が要る。CI が最終ゲート
 
 7. **OpenSSH 9.8+ の `PerSourcePenalties` は、ホスト鍵の検証そのものを罰する**（D24）。
    「繋いで、鍵を見て、信用できなければ認証せず切る」が罰の対象。**実際にテストが落ちた**

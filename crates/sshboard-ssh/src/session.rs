@@ -223,31 +223,8 @@ async fn authenticate(
     auth: &Auth,
 ) -> Result<(), SshError> {
     let result = match auth {
-        Auth::Agent => {
-            let mut agent = keys::agent::client::AgentClient::connect_env()
-                .await
-                .map_err(|error| SshError::Authenticate(format!("ssh-agent: {error}")))?;
-            let identities = agent
-                .request_identities()
-                .await
-                .map_err(|error| SshError::Authenticate(format!("ssh-agent: {error}")))?;
-
-            let mut last = None;
-            for identity in identities {
-                let keys::agent::AgentIdentity::PublicKey { key, .. } = identity else {
-                    continue;
-                };
-                let attempt = handle
-                    .authenticate_publickey_with(user, key, None, &mut agent)
-                    .await
-                    .map_err(|error| SshError::Authenticate(error.to_string()))?;
-                if attempt.success() {
-                    return Ok(());
-                }
-                last = Some(attempt);
-            }
-            last.ok_or_else(|| SshError::Authenticate("ssh-agent に鍵がありません".into()))?
-        }
+        // **agent へ委譲する道は OS ごとに違う**（D11）。分岐は下の関数に閉じている。
+        Auth::Agent => return authenticate_with_agent(handle, user).await,
         Auth::Key { path, passphrase } => {
             let key = load_secret_key(path, passphrase.as_deref())
                 .map_err(|error| SshError::Authenticate(format!("鍵を読めません: {error}")))?;
@@ -270,6 +247,80 @@ async fn authenticate(
             "鍵が受け付けられませんでした".into(),
         ))
     }
+}
+
+/// ssh-agent へ委譲して認証する。**製品は鍵にもパスフレーズにも触りません**（D11）。
+///
+/// **agent への繋ぎ方は OS で違います。**
+/// Unix は `SSH_AUTH_SOCK`。Windows は OpenSSH の名前付きパイプで、
+/// それが無ければ Pageant（PuTTY）を試します。
+/// **Pageant を見るのは実利です**（D19）。この層の利用者は鍵を `.ppk` で持っていて、
+/// Pageant に入っていればそのまま繋がります。
+#[cfg(unix)]
+async fn authenticate_with_agent(handle: &mut Handle<Watcher>, user: &str) -> Result<(), SshError> {
+    let mut agent = keys::agent::client::AgentClient::connect_env()
+        .await
+        .map_err(|error| SshError::Authenticate(format!("ssh-agent: {error}")))?;
+    try_agent_identities(handle, user, &mut agent).await
+}
+
+#[cfg(windows)]
+async fn authenticate_with_agent(handle: &mut Handle<Watcher>, user: &str) -> Result<(), SshError> {
+    /// Windows の OpenSSH agent が待っている場所。**固定の名前。**
+    const OPENSSH_PIPE: &str = r"\\.\pipe\openssh-ssh-agent";
+
+    // 1. Windows の OpenSSH agent
+    let openssh_error =
+        match keys::agent::client::AgentClient::connect_named_pipe(OPENSSH_PIPE).await {
+            Ok(mut agent) => return try_agent_identities(handle, user, &mut agent).await,
+            Err(error) => error,
+        };
+
+    // 2. Pageant（PuTTY）。**`.ppk` を持っている人がここに居る**（D19）。
+    match keys::agent::client::AgentClient::connect_pageant().await {
+        Ok(mut agent) => try_agent_identities(handle, user, &mut agent).await,
+        // **どちらが駄目だったかを両方出す。**片方だけだと人が探せない。
+        Err(pageant_error) => Err(SshError::Authenticate(format!(
+            "ssh-agent に繋げません（OpenSSH: {openssh_error} / Pageant: {pageant_error}）"
+        ))),
+    }
+}
+
+/// agent が持っている鍵を順に試す。**通ったら、そこで終わり。**
+async fn try_agent_identities<S>(
+    handle: &mut Handle<Watcher>,
+    user: &str,
+    agent: &mut keys::agent::client::AgentClient<S>,
+) -> Result<(), SshError>
+where
+    S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin + Send + 'static,
+{
+    let identities = agent
+        .request_identities()
+        .await
+        .map_err(|error| SshError::Authenticate(format!("ssh-agent: {error}")))?;
+
+    let mut tried = 0;
+    for identity in identities {
+        let keys::agent::AgentIdentity::PublicKey { key, .. } = identity else {
+            continue;
+        };
+        tried += 1;
+        let attempt = handle
+            .authenticate_publickey_with(user, key, None, agent)
+            .await
+            .map_err(|error| SshError::Authenticate(error.to_string()))?;
+        if attempt.success() {
+            return Ok(());
+        }
+    }
+
+    // **「鍵が無い」と「全部弾かれた」を混ぜない。**人が次にやることが違う。
+    Err(SshError::Authenticate(if tried == 0 {
+        "ssh-agent に鍵がありません（ssh-add してください）".into()
+    } else {
+        format!("ssh-agent の鍵 {tried} 本とも受け付けられませんでした")
+    }))
 }
 
 /// `sftp` で見えたもの 1 件。**中身は持ちません。**
