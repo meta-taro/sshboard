@@ -7,4 +7,4 @@ mod hostkey;
 mod session;
 
 pub use hostkey::{decide, fingerprint, fingerprints_for, SeenHostKey, Trust};
-pub use session::{Auth, SshError, SshSession, Target};
+pub use session::{Auth, DirEntry, SshError, SshSession, Target};

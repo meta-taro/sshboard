@@ -125,3 +125,123 @@ async fn every_command_reaches_the_band_before_it_answers() {
         .expect("パニック")
         .expect("コマンドが通らない");
 }
+
+/// 登録済みとして繋ぐ。**初見は必ず 1 回拒否される**ので、そこで指紋を知る。
+async fn trusted_session(band: Band) -> SshSession {
+    let Err(SshError::UntrustedHost { seen, .. }) =
+        SshSession::connect(&target(None), &Auth::Agent, Band::new()).await
+    else {
+        panic!("初見のホストを通している");
+    };
+    SshSession::connect(&target(Some(&seen.fingerprint)), &Auth::Agent, band)
+        .await
+        .expect("繋がらない")
+}
+
+#[tokio::test]
+async fn sftp_and_exec_run_on_the_same_session() {
+    // **2 本目の接続を張らない**（PRD §4-1）。
+    if !server_is_up().await {
+        println!("テスト用サーバーが建っていません（想定内・飛ばします）");
+        return;
+    }
+
+    let session = trusted_session(Band::new()).await;
+
+    let out = session
+        .exec(Actor::Human, "whoami")
+        .await
+        .expect("exec が通らない");
+    let entries = session
+        .list_dir(Actor::Human, "/home/probe/app/logs")
+        .await
+        .expect("ls が通らない");
+
+    assert_eq!(out.trim(), "probe");
+    assert!(
+        entries.iter().any(|e| e.name == "app.log"),
+        "実際: {entries:?}"
+    );
+}
+
+#[tokio::test]
+async fn a_euc_jp_log_comes_back_as_bytes_not_mangled_text() {
+    // **ここで文字コードを決めない**（Issue 002）。
+    if !server_is_up().await {
+        println!("テスト用サーバーが建っていません（想定内・飛ばします）");
+        return;
+    }
+
+    let session = trusted_session(Band::new()).await;
+    let bytes = session
+        .read_file(Actor::Human, "/var/log/japanese-euc.log")
+        .await
+        .expect("読めない");
+
+    assert!(!bytes.is_empty());
+    assert!(
+        std::str::from_utf8(&bytes).is_err(),
+        "EUC-JP のはずが UTF-8 として通っている（テスト用サーバーの前提が崩れている）"
+    );
+}
+
+#[tokio::test]
+async fn a_root_only_log_is_refused_rather_than_returning_nothing() {
+    // **黙って空を返さない。**読めないことが分かる形で返る（D20 の前提）。
+    if !server_is_up().await {
+        println!("テスト用サーバーが建っていません（想定内・飛ばします）");
+        return;
+    }
+
+    let session = trusted_session(Band::new()).await;
+    let result = session.read_file(Actor::Human, "/var/log/maillog").await;
+
+    assert!(result.is_err(), "root しか読めないログが読めてしまっている");
+}
+
+#[tokio::test]
+async fn following_a_log_feeds_both_faces_and_stops_when_the_human_stops_it() {
+    // Issue 005 を実機で。**GUI は色付き / MCP は素。**
+    if !server_is_up().await {
+        println!("テスト用サーバーが建っていません（想定内・飛ばします）");
+        return;
+    }
+
+    use sshboard_stream::OutputStream;
+    use std::sync::Arc;
+
+    let session = trusted_session(Band::new()).await;
+    let stream = Arc::new(OutputStream::new());
+    let mut raw = stream.subscribe_raw();
+    let mut plain = stream.subscribe_plain();
+
+    let following = {
+        let stream = Arc::clone(&stream);
+        tokio::spawn(async move {
+            session
+                .follow(Actor::Human, "/home/probe/app/logs/app.log", 5, stream)
+                .await
+        })
+    };
+
+    // 生の側には色が残り、素の側には残らない。
+    let raw_chunk = tokio::time::timeout(std::time::Duration::from_secs(10), raw.recv())
+        .await
+        .expect("生の側へ来ない")
+        .expect("閉じている");
+    let plain_chunk = tokio::time::timeout(std::time::Duration::from_secs(10), plain.recv())
+        .await
+        .expect("素の側へ来ない")
+        .expect("閉じている");
+
+    assert!(raw_chunk.contains(&0x1b), "GUI 側の色が落ちている");
+    assert!(
+        !plain_chunk.contains('\x1b'),
+        "MCP 側に ANSI が混ざっている: {plain_chunk:?}"
+    );
+
+    // 人が止めたら、その場で追うのをやめる（PRD §4-3）。
+    stream.stop();
+    let stopped = tokio::time::timeout(std::time::Duration::from_secs(15), following).await;
+    assert!(stopped.is_ok(), "止めたのに追い続けている");
+}

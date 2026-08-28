@@ -258,3 +258,118 @@ async fn authenticate(
         ))
     }
 }
+
+/// `sftp` で見えたもの 1 件。**中身は持ちません。**
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DirEntry {
+    pub name: String,
+    pub is_dir: bool,
+    pub size: u64,
+}
+
+impl SshSession {
+    /// 同じセッションの上に `sftp` を開く。**2 本目の接続を張りません。**
+    async fn sftp(&self) -> Result<russh_sftp::client::SftpSession, SshError> {
+        let channel = self
+            .handle
+            .channel_open_session()
+            .await
+            .map_err(|error| SshError::Command(error.to_string()))?;
+        channel
+            .request_subsystem(true, "sftp")
+            .await
+            .map_err(|error| SshError::Command(error.to_string()))?;
+        russh_sftp::client::SftpSession::new(channel.into_stream())
+            .await
+            .map_err(|error| SshError::Command(error.to_string()))
+    }
+
+    /// ディレクトリの一覧。**先に帯へ出す**（D16）。
+    pub async fn list_dir(&self, actor: Actor, path: &str) -> Result<Vec<DirEntry>, SshError> {
+        self.show(actor, &format!("ls {path}")).await?;
+
+        let sftp = self.sftp().await?;
+        let entries = sftp
+            .read_dir(path)
+            .await
+            .map_err(|error| SshError::Command(error.to_string()))?;
+
+        Ok(entries
+            .map(|entry| DirEntry {
+                name: entry.file_name(),
+                is_dir: entry.file_type().is_dir(),
+                size: entry.metadata().size.unwrap_or(0),
+            })
+            .collect())
+    }
+
+    /// ファイルを丸ごと読む。**バイト列のまま返します。**
+    ///
+    /// **ここで文字コードを決めません。**EUC-JP のログが実在するので
+    /// （Issue 002・手元のテスト用サーバーでも再現済み）、
+    /// **変換するかどうかは呼び出し側が決めます。**
+    pub async fn read_file(&self, actor: Actor, path: &str) -> Result<Vec<u8>, SshError> {
+        use tokio::io::AsyncReadExt;
+
+        self.show(actor, &format!("read {path}")).await?;
+
+        let sftp = self.sftp().await?;
+        let mut file = sftp
+            .open(path)
+            .await
+            .map_err(|e| SshError::Command(e.to_string()))?;
+        let mut bytes = Vec::new();
+        file.read_to_end(&mut bytes)
+            .await
+            .map_err(|error| SshError::Command(error.to_string()))?;
+        Ok(bytes)
+    }
+
+    /// ログを追う。**同じ 1 本の出力を、GUI へは生・MCP へは素で流します**（Issue 005）。
+    ///
+    /// 人が止めたら（`OutputStream::stop`）、**その場で追うのをやめます**（PRD §4-3）。
+    pub async fn follow(
+        &self,
+        actor: Actor,
+        path: &str,
+        lines: u32,
+        into: Arc<sshboard_stream::OutputStream>,
+    ) -> Result<(), SshError> {
+        // 引数を組み立てるのは**こちら**で、外から任意の文字列を渡させない（D3）。
+        let command = format!("tail -n {lines} -f {}", shell_quote(path));
+        self.show(actor, &format!("$ {command}")).await?;
+
+        let mut channel = self
+            .handle
+            .channel_open_session()
+            .await
+            .map_err(|error| SshError::Command(error.to_string()))?;
+        channel
+            .exec(true, command)
+            .await
+            .map_err(|error| SshError::Command(error.to_string()))?;
+
+        while let Some(message) = channel.wait().await {
+            match message {
+                ChannelMsg::Data { ref data } => {
+                    // 人が止めたら、そこで終わり（PRD §4-3）。
+                    if into.push(data).is_err() {
+                        break;
+                    }
+                }
+                ChannelMsg::Eof | ChannelMsg::Close => break,
+                _ => {}
+            }
+        }
+
+        let _ = channel.close().await;
+        Ok(())
+    }
+}
+
+/// パスを 1 語として渡す。**`run_command` を作らないための下ごしらえ**（D3）。
+///
+/// 単引用符で囲み、中の単引用符だけを閉じ直す。
+fn shell_quote(value: &str) -> String {
+    format!("'{}'", value.replace('\'', "'\\''"))
+}
