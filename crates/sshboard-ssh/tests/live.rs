@@ -52,19 +52,11 @@ async fn a_pinned_host_connects_and_runs_a_command() {
         return;
     }
 
-    // 1 回目で指紋を知る。**人が確かめて登録する流れと同じ。**
-    let Err(SshError::UntrustedHost { seen, .. }) =
-        SshSession::connect(&target(None), &Auth::Agent, Band::new()).await
-    else {
-        panic!("初見のホストを通している");
-    };
+    // 初見で 1 回拒否されたときの指紋を使う。**人が確かめて登録する流れと同じ。**
+    let expected = known_fingerprint().await.clone();
+    let session = trusted_session(Band::new()).await;
 
-    // 2 回目は登録済みとして繋ぐ。
-    let session = SshSession::connect(&target(Some(&seen.fingerprint)), &Auth::Agent, Band::new())
-        .await
-        .expect("登録済みの指紋で繋がらない");
-
-    assert_eq!(session.host_key().fingerprint, seen.fingerprint);
+    assert_eq!(session.host_key().fingerprint, expected);
 
     let out = session
         .exec(Actor::Human, "echo sshboard-ok")
@@ -101,17 +93,9 @@ async fn every_command_reaches_the_band_before_it_answers() {
         return;
     }
 
-    let Err(SshError::UntrustedHost { seen, .. }) =
-        SshSession::connect(&target(None), &Auth::Agent, Band::new()).await
-    else {
-        panic!("初見のホストを通している");
-    };
-
     let band = Band::new();
     let mut subscriber = band.subscribe();
-    let session = SshSession::connect(&target(Some(&seen.fingerprint)), &Auth::Agent, band)
-        .await
-        .expect("繋がらない");
+    let session = trusted_session(band).await;
 
     let running = tokio::spawn(async move { session.exec(Actor::Ai, "echo hi").await });
     let event = subscriber.recv().await.expect("帯へ出ていない");
@@ -126,16 +110,30 @@ async fn every_command_reaches_the_band_before_it_answers() {
         .expect("コマンドが通らない");
 }
 
-/// 登録済みとして繋ぐ。**初見は必ず 1 回拒否される**ので、そこで指紋を知る。
-async fn trusted_session(band: Band) -> SshSession {
-    let Err(SshError::UntrustedHost { seen, .. }) =
-        SshSession::connect(&target(None), &Auth::Agent, Band::new()).await
-    else {
-        panic!("初見のホストを通している");
-    };
-    SshSession::connect(&target(Some(&seen.fingerprint)), &Auth::Agent, band)
+/// テスト用サーバーの指紋。**1 回だけ調べて使い回す。**
+///
+/// 毎回調べると、テストの本数 × 2 本の接続が同時に飛び、
+/// sshd の `MaxStartups`（既定 10）に弾かれる。**実際に弾かれた。**
+static FINGERPRINT: tokio::sync::OnceCell<String> = tokio::sync::OnceCell::const_new();
+
+async fn known_fingerprint() -> &'static String {
+    FINGERPRINT
+        .get_or_init(|| async {
+            match SshSession::connect(&target(None), &Auth::Agent, Band::new()).await {
+                Err(SshError::UntrustedHost { seen, .. }) => seen.fingerprint,
+                Ok(_) => panic!("初見のホストを通している"),
+                // **接続失敗を「通した」と言わない。**エラー文は嘘をつかない
+                Err(other) => panic!("繋げません: {other}"),
+            }
+        })
         .await
-        .expect("繋がらない")
+}
+
+/// 登録済みとして繋ぐ。
+async fn trusted_session(band: Band) -> SshSession {
+    SshSession::connect(&target(Some(known_fingerprint().await)), &Auth::Agent, band)
+        .await
+        .expect("登録済みの指紋で繋がらない")
 }
 
 #[tokio::test]

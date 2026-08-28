@@ -17,7 +17,9 @@ RUN dnf -y install openssh-server acl glibc-langpack-ja glibc-gconv-extra \
 # 実機と同じく、鍵だけで入る
 RUN sed -i 's/^#\?PasswordAuthentication.*/PasswordAuthentication no/' /etc/ssh/sshd_config \
     && sed -i 's/^#\?PubkeyAuthentication.*/PubkeyAuthentication yes/' /etc/ssh/sshd_config \
-    && sed -i 's/^#\?PermitRootLogin.*/PermitRootLogin no/' /etc/ssh/sshd_config
+    && sed -i 's/^#\?PermitRootLogin.*/PermitRootLogin no/' /etc/ssh/sshd_config \
+    # テストが並列に走ると既定の 10 を超える。**実際に弾かれた。**
+    && printf 'MaxStartups 100:30:200\nMaxSessions 50\n' >> /etc/ssh/sshd_config
 
 # ログインする利用者。**root ではない。**
 RUN useradd -m -s /bin/bash probe
