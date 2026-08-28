@@ -58,6 +58,14 @@ impl Engine {
         &self.stream
     }
 
+    /// 接続一覧の置き場所。
+    ///
+    /// **MCP 側にも同じ場所を使わせるため。**別々に持つと、
+    /// 一覧に見えているものと繋ぎに行くものが食い違いうる。
+    pub fn connections_path(&self) -> &Path {
+        &self.connections_path
+    }
+
     /// 登録済みの接続へ繋ぐ。
     ///
     /// `passphrase` は **人がその場で入れたものだけ**が入ります。

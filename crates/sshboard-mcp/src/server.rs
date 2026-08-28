@@ -60,7 +60,12 @@ impl SshboardMcp {
     }
 
     /// サーバーへ触る経路を渡す。**これが無いと SSH 系のツールは動かない。**
+    ///
+    /// **接続一覧の置き場所も、ここで実行体に合わせる。**
+    /// 別々に持たせると、`list_connections` が見ている一覧と `connect` が引く一覧が
+    /// 食い違いうる。**実際にテストで食い違った。**
     pub fn with_engine(mut self, engine: Arc<Engine>) -> Self {
+        self.connections_path = Some(engine.connections_path().to_path_buf());
         self.engine = Some(engine);
         self
     }

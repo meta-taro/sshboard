@@ -76,11 +76,13 @@ pub async fn serve(
     stream: Arc<OutputStream>,
     connections_watch: Arc<ConnectionsWatch>,
     engine: Option<Arc<Engine>>,
+    token: Option<String>,
     port: u16,
     ack_timeout: Duration,
 ) -> std::io::Result<McpEndpoint> {
     let cancel = CancellationToken::new();
-    let token = new_token();
+    // 渡されなければ起動ごとに作る。**渡された合言葉が弱くないかは、渡す側の責任。**
+    let token = token.unwrap_or_else(new_token);
 
     // SSE ではなく JSON で返す。server → client の通知はまだ無く、
     // 保持しつづける必要のあるストリームを増やす理由が無い。
@@ -164,8 +166,8 @@ fn same_secret(presented: &str, expected: &str) -> bool {
     difference == 0
 }
 
-/// 起動ごとの合言葉。**OS の乱数から作る。**
-fn new_token() -> String {
+/// 新しい合言葉。**OS の乱数から作る。**
+pub fn new_token() -> String {
     let mut bytes = [0u8; TOKEN_BYTES];
     // 取れなければ立ち上がらない方がよい。**弱い合言葉で開けたことにしない。**
     getrandom::fill(&mut bytes).expect("OS の乱数を読めません");

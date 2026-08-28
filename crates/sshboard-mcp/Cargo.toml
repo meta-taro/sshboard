@@ -31,5 +31,6 @@ reqwest = { version = "0.12", default-features = false, features = ["json"] }
 tempfile = "3"
 sshboard-connections = { path = "../sshboard-connections" }
 sshboard-engine = { path = "../sshboard-engine" }
+sshboard-ssh = { path = "../sshboard-ssh" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
