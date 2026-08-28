@@ -24,6 +24,10 @@ SECRETS.local.md
 # ベースルール完全版（内部事例を含むため公開しない）— commit 禁止
 .claude/rules/product-baseline.full.md
 
+# 手元のテスト用サーバーの使い捨て鍵 — commit 禁止
+tools/test-server/.key
+tools/test-server/.key.pub
+
 # 探り棒へ渡す接続先 — commit 禁止
 probe.env
 **/probe.env
