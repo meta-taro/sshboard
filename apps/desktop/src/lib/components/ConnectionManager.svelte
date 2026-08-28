@@ -3,6 +3,7 @@
 	import { listen } from '@tauri-apps/api/event';
 	import { onMount } from 'svelte';
 
+	import Icon from '$lib/components/Icon.svelte';
 	import { i18n } from '$lib/i18n/i18n.svelte';
 
 	import {
@@ -167,7 +168,10 @@
 		<div class="core list-core">
 		<div class="list-head">
 			<span>{i18n.t('conn.heading')}</span>
-			<button type="button" onclick={startNew}>{i18n.t('conn.new')}</button>
+			<button type="button" class="new" onclick={startNew}>
+				<Icon name="plus" size={13} />
+				{i18n.t('conn.new')}
+			</button>
 		</div>
 
 		{#if items.length === 0}
@@ -254,7 +258,7 @@
 
 		<div class="pair">
 			<label>
-				<span>{i18n.t('conn.host')}</span>
+				<span><Icon name="server" size={12} />{i18n.t('conn.host')}</span>
 				<input bind:value={draft.host} spellcheck="false" />
 			</label>
 			<label>
@@ -264,12 +268,12 @@
 		</div>
 
 		<label>
-			<span>{i18n.t('conn.user')}</span>
+			<span><Icon name="user" size={12} />{i18n.t('conn.user')}</span>
 			<input bind:value={draft.user} spellcheck="false" />
 		</label>
 
 		<label>
-			<span>{i18n.t('conn.key')}</span>
+			<span><Icon name="key" size={12} />{i18n.t('conn.key')}</span>
 			<input
 				bind:value={draft.key_path}
 				placeholder={i18n.t('conn.key.placeholder')}
@@ -280,7 +284,7 @@
 
 		<div class="mark-row">
 			<label class="tag">
-				<span>{i18n.t('conn.tag', { max: CONNECTION_TAG_MAX_CHARS })}</span>
+				<span><Icon name="tag" size={12} />{i18n.t('conn.tag', { max: CONNECTION_TAG_MAX_CHARS })}</span>
 				<input
 					bind:value={draft.tag}
 					maxlength={CONNECTION_TAG_MAX_CHARS}
@@ -289,7 +293,7 @@
 				<small>{i18n.t('conn.tag.help')}</small>
 			</label>
 			<label>
-				<span>{i18n.t('conn.color')}</span>
+				<span><Icon name="palette" size={12} />{i18n.t('conn.color')}</span>
 				<div class="swatches">
 					{#each CONNECTION_COLORS as color (color)}
 						<button
@@ -311,7 +315,7 @@
 
 		{#if puttyWarning}
 			<p class="warning" role="alert">
-				<strong>{i18n.t('conn.ppk.title')}</strong>
+				<Icon name="warning" size={13} /><strong>{i18n.t('conn.ppk.title')}</strong>
 				{i18n.t('conn.ppk.body')}
 				<code>puttygen KEY.ppk -O private-openssh -o KEY</code>
 				{i18n.t('conn.ppk.after')}
@@ -321,10 +325,11 @@
 		<div class="actions">
 			<button type="button" class="cta" onclick={save} disabled={blocker !== null}>
 				<span>{i18n.t('conn.save')}</span>
-				<span class="cta-icon" aria-hidden="true">↵</span>
+				<span class="cta-icon"><Icon name="check" size={13} /></span>
 			</button>
 			{#if selectedId && !confirmingDelete}
 				<button type="button" class="danger" onclick={() => (confirmingDelete = true)}>
+					<Icon name="trash" size={13} />
 					{i18n.t('conn.delete')}
 				</button>
 			{/if}
@@ -409,10 +414,7 @@
 	}
 
 	.list-head span {
-		font-family: var(--font-mono);
-		font-size: 9.5px;
-		letter-spacing: 0.18em;
-		text-transform: uppercase;
+		font-size: 0.72rem;
 		color: var(--fg-faint);
 	}
 
@@ -544,11 +546,13 @@
 		gap: 0.22rem;
 	}
 
+	/* **大文字化しない。**日本語ラベルの中のラテン文字まで大文字になり、
+	   「空なら ssh-agent」が「空なら SSH-AGENT」になってしまう。 */
 	label > span {
-		font-family: var(--font-mono);
-		font-size: 9.5px;
-		letter-spacing: 0.14em;
-		text-transform: uppercase;
+		display: flex;
+		align-items: center;
+		gap: 0.3rem;
+		font-size: 0.72rem;
 		color: var(--fg-faint);
 	}
 
@@ -650,6 +654,9 @@
 	}
 
 	button {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.35rem;
 		font: inherit;
 		font-size: 0.78rem;
 		color: var(--fg);
@@ -767,6 +774,12 @@
 		background: var(--warning-soft);
 		color: var(--warning);
 		font-size: 0.75rem;
+	}
+
+	.warning :global(.icon) {
+		display: inline-block;
+		vertical-align: -2px;
+		margin-right: 0.3rem;
 	}
 
 	.warning code {

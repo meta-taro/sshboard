@@ -5,6 +5,7 @@
 
 	import { appendLine, type BandLine } from '$lib/band';
 	import ConnectionManager from '$lib/components/ConnectionManager.svelte';
+	import Icon from '$lib/components/Icon.svelte';
 	import { i18n } from '$lib/i18n/i18n.svelte';
 	import { LOCALES } from '$lib/i18n/locales';
 	import { theme, type ThemeMode } from '$lib/theme/theme.svelte';
@@ -107,25 +108,43 @@
 </script>
 
 <main>
+	<!-- **上の帯は 1 行に収める。**6 段積むと、道具として使う面積が消える。 -->
 	<header>
-		<h1>sshboard</h1>
-		<p class="phase">{i18n.t('app.phase0')}</p>
-		<p class="phase">{i18n.t('app.driven')}</p>
+		<span class="phase" title={i18n.t('app.driven')}>{i18n.t('app.phase0')}</span>
+
+		<nav class="tabs">
+			<button
+				type="button"
+				class:active={view === 'connections'}
+				onclick={() => (view = 'connections')}
+			>
+				<Icon name="server" />
+				{i18n.t('tab.connections')}
+			</button>
+			<button type="button" class:active={view === 'band'} onclick={() => (view = 'band')}>
+				<Icon name="activity" />
+				{i18n.t('tab.band')}
+			</button>
+		</nav>
+
+		<span class="gap"></span>
+
 		<div class="settings">
-			<span class="settings-label">{i18n.t('theme.label')}</span>
+			<span class="settings-icon"><Icon name="globe" size={13} /></span>
 			{#each ['auto', 'light', 'dark'] as const as mode (mode)}
 				<button
 					type="button"
 					class:active={theme.mode === mode}
+					title={i18n.t('theme.label')}
 					onclick={() => theme.set(mode as ThemeMode)}
 				>
+					<Icon name={mode === 'auto' ? 'contrast' : mode === 'light' ? 'sun' : 'moon'} />
 					{i18n.t(`theme.${mode}`)}
 				</button>
 			{/each}
-
-			<span class="settings-label lang">{i18n.t('lang.label')}</span>
 			<select
 				value={i18n.locale}
+				aria-label={i18n.t('lang.label')}
 				onchange={(event) => i18n.set((event.currentTarget as HTMLSelectElement).value)}
 			>
 				{#each LOCALES as locale (locale.code)}
@@ -134,28 +153,14 @@
 			</select>
 		</div>
 
-		<p class="mcp">
-			{i18n.t('mcp.label')}:
-			{#if mcpUrl}
-				<code>{mcpUrl}</code>
-			{:else}
-				<span class="waiting">{i18n.t('mcp.starting')}</span>
-			{/if}
-		</p>
+		<code class="mcp" title="MCP"><Icon name="link" size={12} />
+			{#if mcpUrl}{mcpUrl}{:else}{i18n.t('mcp.starting')}{/if}
+		</code>
 	</header>
 
 	{#if failure}
 		<p class="failure" role="alert">{failure}</p>
 	{/if}
-
-	<nav class="tabs">
-		<button type="button" class:active={view === 'connections'} onclick={() => (view = 'connections')}>
-			{i18n.t('tab.connections')}
-		</button>
-		<button type="button" class:active={view === 'band'} onclick={() => (view = 'band')}>
-			{i18n.t('tab.band')}
-		</button>
-	</nav>
 
 	{#if view === 'connections'}
 		<ConnectionManager />
@@ -207,114 +212,41 @@
 		gap: 0.7rem;
 	}
 
+	/* **上の帯は 1 行。**折り返しても 2 行までに収まる高さにする。 */
 	header {
 		display: flex;
-		flex-direction: column;
-		gap: 0.35rem;
+		align-items: center;
+		gap: 0.5rem;
+		flex-wrap: wrap;
+		row-gap: 0.35rem;
 	}
 
-	h1 {
-		margin: 0;
-		font-size: 0.95rem;
-		font-weight: 700;
-		letter-spacing: 0.01em;
-	}
-
+	/* 長い説明は常時出さない。**ここに置くと本文の面積が消える。**
+	   全文は title 属性と、帯が空のときの案内に出す。 */
 	.phase {
-		margin: 0;
-		font-size: 0.74rem;
-		line-height: 1.6;
+		font-size: 0.7rem;
 		color: var(--fg-muted);
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		max-width: 22rem;
+		flex: 0 1 auto;
+	}
+
+	.gap {
+		flex: 1 1 auto;
+		min-width: 0;
 	}
 
 	.mcp {
-		margin: 0;
-		font-family: var(--font-mono);
-		font-size: 0.66rem;
-		color: var(--fg-faint);
-	}
-
-	.waiting {
-		color: var(--fg-faint);
-	}
-
-	/* 設定と切替は、浮いた 1 本の帯にまとめる。 */
-	.settings,
-	.tabs {
-		display: flex;
+		display: inline-flex;
 		align-items: center;
-		gap: 0.25rem;
-		flex-wrap: wrap;
-		background: var(--shell);
-		border: 1px solid var(--hairline);
-		border-radius: 999px;
-		padding: 3px;
-		width: max-content;
-		max-width: 100%;
-	}
-
-	.settings {
-		margin-top: 0.15rem;
-	}
-
-	.settings-label {
+		gap: 0.28rem;
 		font-family: var(--font-mono);
-		font-size: 9px;
-		letter-spacing: 0.16em;
-		text-transform: uppercase;
+		font-size: 0.62rem;
 		color: var(--fg-faint);
-		padding: 0 0.4rem 0 0.6rem;
-	}
-
-	.settings-label.lang {
-		margin-left: 0.5rem;
-		border-left: 1px solid var(--hairline);
-	}
-
-	.settings button,
-	.tabs button {
-		font: inherit;
-		font-size: 0.74rem;
-		color: var(--fg-muted);
-		background: transparent;
-		border: 1px solid transparent;
-		border-radius: 999px;
-		padding: 0.2rem 0.75rem;
-		cursor: pointer;
-		transition:
-			background var(--fast) var(--ease),
-			color var(--fast) var(--ease),
-			transform var(--fast) var(--ease);
-	}
-
-	.settings button:active,
-	.tabs button:active {
-		transform: scale(0.97);
-	}
-
-	.settings button.active,
-	.tabs button.active {
-		color: var(--fg);
-		background: var(--surface);
-		box-shadow: var(--inner-highlight), var(--lift-1);
-	}
-
-	.settings button:focus-visible,
-	.tabs button:focus-visible,
-	.settings select:focus-visible {
-		outline: 2px solid var(--accent);
-		outline-offset: 1px;
-	}
-
-	.settings select {
-		font: inherit;
-		font-size: 0.74rem;
-		color: var(--fg);
-		background: var(--surface);
-		border: 1px solid var(--hairline);
-		border-radius: 999px;
-		padding: 0.15rem 0.5rem;
-		box-shadow: var(--inner-highlight);
+		white-space: nowrap;
+		flex: none;
 	}
 
 	.failure {
@@ -345,10 +277,7 @@
 
 	.stream-head .label {
 		flex: 1;
-		font-family: var(--font-mono);
-		font-size: 9.5px;
-		letter-spacing: 0.16em;
-		text-transform: uppercase;
+		font-size: 0.72rem;
 		color: var(--fg-faint);
 	}
 
