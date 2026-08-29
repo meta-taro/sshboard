@@ -37,3 +37,10 @@ probe.env
 # リポジトリへ入れない（PRD §8）。
 connections.local.json
 *.known_hosts
+
+# 画面のキャプチャ（D26）。**リポジトリへ置かない。**
+# commit history に焼き付くと、出す前しか対策できない（PRD §8）。
+*.png
+*.jpg
+*.gif
+!apps/desktop/src/lib/assets/*
