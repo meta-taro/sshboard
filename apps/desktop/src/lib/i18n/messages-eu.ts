@@ -81,6 +81,11 @@ export const de: Catalog = {
 	"files.trust.mismatch": "Der Hostschlüssel passt nicht zum hinterlegten",
 	"files.trust.mismatch.body": "Entweder wurde der Server neu aufgesetzt, oder etwas gibt sich als er aus. sshboard verbindet nicht.",
 	"files.trust.mismatch.how": "Wenn Sie wissen, dass der Server neu aufgesetzt wurde: Fingerabdruck im Tab Verbindungen löschen und erneut verbinden.",
+
+	// --- 文字サイズ（アクセシビリティ） ---
+	"text.label": "Schriftgröße",
+	"text.smaller": "Kleiner",
+	"text.larger": "Größer",
 };
 
 export const fr: Catalog = {
@@ -161,6 +166,11 @@ export const fr: Catalog = {
 	"files.trust.mismatch": "La clé d'hôte ne correspond pas à celle enregistrée",
 	"files.trust.mismatch.body": "Soit le serveur a été refait, soit quelque chose usurpe son identité. sshboard ne se connecte pas.",
 	"files.trust.mismatch.how": "Si vous savez que le serveur a été refait, effacez l'empreinte dans l'onglet Connexions puis reconnectez-vous.",
+
+	// --- 文字サイズ（アクセシビリティ） ---
+	"text.label": "Taille du texte",
+	"text.smaller": "Plus petit",
+	"text.larger": "Plus grand",
 };
 
 export const es: Catalog = {
@@ -241,4 +251,9 @@ export const es: Catalog = {
 	"files.trust.mismatch": "La clave del host no coincide con la registrada",
 	"files.trust.mismatch.body": "O el servidor se rehízo, o algo se está haciendo pasar por él. sshboard no conecta.",
 	"files.trust.mismatch.how": "Si sabe que el servidor se rehízo, borre la huella en la pestaña Conexiones y vuelva a conectar.",
+
+	// --- 文字サイズ（アクセシビリティ） ---
+	"text.label": "Tamaño del texto",
+	"text.smaller": "Más pequeño",
+	"text.larger": "Más grande",
 };

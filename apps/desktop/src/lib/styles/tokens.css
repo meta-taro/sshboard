@@ -11,6 +11,27 @@
  * 値そのものは Phase 1-A で見直します（DESIGN.md）。
  */
 
+/*
+ * 文字サイズ。**`html` の `font-size` だけを変えます。**
+ *
+ * 画面側の寸法はすべて `rem` なので、字と一緒に余白も行間も伸びます。
+ * **px で書いた寸法があると、そこだけ伸びずに崩れます。**足すときは `rem` で。
+ *
+ * 標準（100%）のときは属性を付けません。**付けないのが既定、が読みやすい。**
+ * `app.html` が最初の描画より前に当てています（一瞬だけ別の大きさが見えないように）。
+ */
+:root[data-text-size='small'] {
+	font-size: 88%;
+}
+
+:root[data-text-size='large'] {
+	font-size: 115%;
+}
+
+:root[data-text-size='xlarge'] {
+	font-size: 130%;
+}
+
 :root {
 	/* 面 — 奥から手前へ */
 	--ground: #eef0f3;

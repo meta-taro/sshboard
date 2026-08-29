@@ -119,6 +119,11 @@ const en = {
 	"files.trust.mismatch": "The host key does not match what is registered",
 	"files.trust.mismatch.body": "Either the server was rebuilt, or something is impersonating it. sshboard will not connect.",
 	"files.trust.mismatch.how": "If you know the server was rebuilt, clear the fingerprint on the Connections tab and connect again.",
+
+	// --- 文字サイズ（アクセシビリティ） ---
+	"text.label": "Text size",
+	"text.smaller": "Smaller",
+	"text.larger": "Larger",
 } as const;
 
 export type MessageKey = keyof typeof en;
@@ -238,6 +243,11 @@ const ja: Catalog = {
 	"files.trust.mismatch": "ホスト鍵が登録と違います",
 	"files.trust.mismatch.body": "サーバーを建て直したか、別の何かがなりすましています。繋ぎません。",
 	"files.trust.mismatch.how": "建て直したと分かっているなら、接続タブで指紋を消してから繋ぎ直してください。",
+
+	// --- 文字サイズ（アクセシビリティ） ---
+	"text.label": "文字サイズ",
+	"text.smaller": "小さく",
+	"text.larger": "大きく",
 };
 
 import { ko, zhCN, zhTW } from './messages-cjk';

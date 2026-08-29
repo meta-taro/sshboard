@@ -9,6 +9,7 @@
 	import Icon from '$lib/components/Icon.svelte';
 	import { i18n } from '$lib/i18n/i18n.svelte';
 	import { LOCALES } from '$lib/i18n/locales';
+	import { textSize } from '$lib/text-size/text-size.svelte';
 	import { theme, type ThemeMode } from '$lib/theme/theme.svelte';
 	import { createTerminal, writeChunk } from '$lib/terminal.svelte';
 	import '@xterm/xterm/css/xterm.css';
@@ -50,6 +51,34 @@
 	let terminalHost: HTMLDivElement | undefined = $state();
 	let terminal: Terminal | undefined;
 
+	// **端末の字も一緒に変える。**xterm.js は自前で描くので `rem` が効かない。
+	// 画面だけ大きくなって端末が小さいままだと、同じ 1 つの道具に見えない。
+	$effect(() => {
+		const px = textSize.terminalPx;
+		if (terminal) terminal.options.fontSize = px;
+	});
+
+	/**
+	 * `⌘ +` / `⌘ −` / `⌘ 0`。**この操作は覚えなくても手が知っている。**
+	 *
+	 * WebView 側の既定の拡大は効かない（アプリなので）。
+	 * 押しても何も起きないより、**期待どおりに動く方**へ寄せる。
+	 */
+	function onKeydown(event: KeyboardEvent) {
+		if (!(event.metaKey || event.ctrlKey)) return;
+		// `+` は Shift 付きだったり `=` だったりする。**両方受ける。**
+		if (event.key === '+' || event.key === '=' || event.key === ';') {
+			textSize.step(1);
+		} else if (event.key === '-' || event.key === '_') {
+			textSize.step(-1);
+		} else if (event.key === '0') {
+			textSize.set('normal');
+		} else {
+			return;
+		}
+		event.preventDefault();
+	}
+
 	async function startDemoStream() {
 		try {
 			await invoke('start_demo_stream');
@@ -89,7 +118,7 @@
 		const stops: Array<() => void> = [];
 
 		if (terminalHost) {
-			terminal = createTerminal(terminalHost);
+			terminal = createTerminal(terminalHost, textSize.terminalPx);
 		}
 
 		// **ANSI を落とさずに渡す。**色は人の側にだけ残す（Issue 005）。
@@ -135,6 +164,8 @@
 	});
 </script>
 
+<svelte:window onkeydown={onKeydown} />
+
 <main>
 	<!-- **上の帯は 1 行に収める。**6 段積むと、道具として使う面積が消える。 -->
 	<header>
@@ -161,6 +192,28 @@
 		</nav>
 
 		<div class="settings">
+			<!-- 文字サイズ。**この道具は小さい字が画面いっぱいに並ぶ。**読めなければ始まらない。 -->
+			<button
+				type="button"
+				class="icon-only text-step"
+				onclick={() => textSize.step(-1)}
+				disabled={textSize.atSmallest}
+				title={`${i18n.t('text.label')}: ${i18n.t('text.smaller')}`}
+				aria-label={`${i18n.t('text.label')}: ${i18n.t('text.smaller')}`}
+			>
+				A<span class="minus">−</span>
+			</button>
+			<button
+				type="button"
+				class="icon-only text-step"
+				onclick={() => textSize.step(1)}
+				disabled={textSize.atLargest}
+				title={`${i18n.t('text.label')}: ${i18n.t('text.larger')}`}
+				aria-label={`${i18n.t('text.label')}: ${i18n.t('text.larger')}`}
+			>
+				A<span class="plus">＋</span>
+			</button>
+
 			<span class="settings-icon"><Icon name="globe" size={13} /></span>
 			{#each ['auto', 'light', 'dark'] as const as mode (mode)}
 				<button
@@ -280,6 +333,20 @@
 	}
 
 	/* **合言葉ごと写せるボタン。**起動ごとに変わる値を人に書き写させない（D23）。 */
+	/* 文字サイズのボタン。**アイコンではなく字そのもの**で示す方が伝わる。 */
+	.text-step {
+		font-size: 0.72rem;
+		font-weight: 500;
+		line-height: 1;
+		letter-spacing: -0.02em;
+	}
+
+	.text-step .minus,
+	.text-step .plus {
+		font-size: 0.62rem;
+		margin-left: 0.05rem;
+	}
+
 	.mcp {
 		display: inline-flex;
 		align-items: center;

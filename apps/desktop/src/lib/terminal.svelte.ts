@@ -12,12 +12,17 @@ const PLACEHOLDER_THEME = {
 	foreground: '#d7dae0'
 };
 
-export function createTerminal(host: HTMLElement): Terminal {
+/**
+ * 端末を作る。`fontSize` は**画面側の文字サイズと揃えた px**（`text-size.svelte.ts`）。
+ *
+ * xterm.js は自前で描画するため `rem` が効かない。**px を渡すしかない。**
+ */
+export function createTerminal(host: HTMLElement, fontSize = 12): Terminal {
 	const terminal = new Terminal({
 		convertEol: false,
 		cursorBlink: false,
 		disableStdin: true,
-		fontSize: 12,
+		fontSize,
 		// 日本語のグリフを持つ等幅フォントを候補に入れる。
 		// **入れないと、xterm.js が 2 桁分を確保したところへ 1 桁幅の字が描かれ、
 		// 文字と文字の間が空く。**対象が国内サーバーなので、ここは実務で必ず踏む。

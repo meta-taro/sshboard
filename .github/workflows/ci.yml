@@ -87,6 +87,10 @@ jobs:
       - name: 型検査
         run: pnpm --filter desktop check
 
+      # 型検査は動きを見ない。**画面を開かずに確かめられる部分**はここで見る。
+      - name: フロントのテスト
+        run: pnpm --filter desktop test
+
       - name: フロントをビルド
         run: pnpm --filter desktop build
 

@@ -81,6 +81,11 @@ export const ptBR: Catalog = {
 	"files.trust.mismatch": "A chave do host não bate com a registrada",
 	"files.trust.mismatch.body": "Ou o servidor foi refeito, ou algo está se passando por ele. O sshboard não conecta.",
 	"files.trust.mismatch.how": "Se você sabe que o servidor foi refeito, limpe a impressão na aba Conexões e conecte de novo.",
+
+	// --- 文字サイズ（アクセシビリティ） ---
+	"text.label": "Tamanho do texto",
+	"text.smaller": "Menor",
+	"text.larger": "Maior",
 };
 
 export const ru: Catalog = {
@@ -161,6 +166,11 @@ export const ru: Catalog = {
 	"files.trust.mismatch": "Ключ хоста не совпадает с записанным",
 	"files.trust.mismatch.body": "Либо сервер пересоздали, либо кто-то выдаёт себя за него. sshboard не подключается.",
 	"files.trust.mismatch.how": "Если сервер точно пересоздан, удалите отпечаток на вкладке подключений и подключитесь снова.",
+
+	// --- 文字サイズ（アクセシビリティ） ---
+	"text.label": "Размер текста",
+	"text.smaller": "Меньше",
+	"text.larger": "Больше",
 };
 
 export const it: Catalog = {
@@ -241,4 +251,9 @@ export const it: Catalog = {
 	"files.trust.mismatch": "La chiave dell'host non corrisponde a quella registrata",
 	"files.trust.mismatch.body": "O il server è stato rifatto, oppure qualcosa si sta spacciando per lui. sshboard non si connette.",
 	"files.trust.mismatch.how": "Se sai che il server è stato rifatto, cancella l'impronta nella scheda Connessioni e riconnettiti.",
+
+	// --- 文字サイズ（アクセシビリティ） ---
+	"text.label": "Dimensione del testo",
+	"text.smaller": "Più piccolo",
+	"text.larger": "Più grande",
 };

@@ -5,12 +5,17 @@
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
 		<meta name="text-scale" content="scale" />
 		<script>
-			// **最初の描画より前に当てる。**あとから当てると、一瞬だけ違うテーマが見える。
-			// 鍵は theme.svelte.ts の THEME_STORAGE_KEY と同じにすること。
+			// **最初の描画より前に当てる。**あとから当てると、一瞬だけ違う見た目が見える。
+			// 鍵は theme.svelte.ts / text-size.svelte.ts の定数と揃えること。
 			try {
 				const mode = localStorage.getItem('sshboard-theme');
 				if (mode === 'light' || mode === 'dark') {
 					document.documentElement.setAttribute('data-theme', mode);
+				}
+				// 文字サイズも同じ理由でここ。鍵は text-size.svelte.ts と揃えること。
+				const size = localStorage.getItem('sshboard-text-size');
+				if (size === 'small' || size === 'large' || size === 'xlarge') {
+					document.documentElement.setAttribute('data-text-size', size);
 				}
 			} catch (_) {
 				/* localStorage が使えなくても、OS の設定に従えばよい */

@@ -81,6 +81,11 @@ export const ko: Catalog = {
 	"files.trust.mismatch": "호스트 키가 등록된 것과 다릅니다",
 	"files.trust.mismatch.body": "서버를 다시 만들었거나, 다른 무언가가 위장하고 있습니다. 연결하지 않습니다.",
 	"files.trust.mismatch.how": "다시 만든 것이 확실하다면 연결 탭에서 지문을 지우고 다시 연결하세요.",
+
+	// --- 文字サイズ（アクセシビリティ） ---
+	"text.label": "글자 크기",
+	"text.smaller": "작게",
+	"text.larger": "크게",
 };
 
 export const zhCN: Catalog = {
@@ -161,6 +166,11 @@ export const zhCN: Catalog = {
 	"files.trust.mismatch": "主机密钥与登记的不一致",
 	"files.trust.mismatch.body": "要么服务器被重建了，要么有东西在冒充它。不予连接。",
 	"files.trust.mismatch.how": "如果确知是重建，请在连接标签页清除指纹后再连。",
+
+	// --- 文字サイズ（アクセシビリティ） ---
+	"text.label": "文字大小",
+	"text.smaller": "缩小",
+	"text.larger": "放大",
 };
 
 export const zhTW: Catalog = {
@@ -241,4 +251,9 @@ export const zhTW: Catalog = {
 	"files.trust.mismatch": "主機金鑰與登記的不一致",
 	"files.trust.mismatch.body": "可能是伺服器重建了，也可能有東西在冒充它。不予連線。",
 	"files.trust.mismatch.how": "若確知是重建，請在連線分頁清除指紋後再連。",
+
+	// --- 文字サイズ（アクセシビリティ） ---
+	"text.label": "文字大小",
+	"text.smaller": "縮小",
+	"text.larger": "放大",
 };

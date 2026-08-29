@@ -11,12 +11,16 @@
 	import '@fontsource/jetbrains-mono/500.css';
 	import '$lib/styles/tokens.css';
 	import { i18n } from '$lib/i18n/i18n.svelte';
+	import { textSize } from '$lib/text-size/text-size.svelte';
 	import { theme } from '$lib/theme/theme.svelte';
 
 	let { children } = $props();
 
 	onMount(() => {
 		theme.init();
+		// **`app.html` が既に当てている。**ここは状態を読み戻すためで、
+		// 片方だけにすると「保存はされるが次の起動で標準に戻る」になる。
+		textSize.init();
 		i18n.init();
 	});
 </script>
