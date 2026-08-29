@@ -139,6 +139,10 @@ const en = {
 	"diag.help": "Same log the AI reads over MCP. No hostnames, usernames or secrets.",
 	"diag.refresh": "Reload",
 	"diag.empty": "Nothing yet. Try connecting, and the steps appear here.",
+	// 左ペインの選択
+	"files.clear": "Clear the selection",
+	// 複数の接続をタブで持つ（D25）
+	"files.another": "Open another connection",
 } as const;
 
 export type MessageKey = keyof typeof en;
@@ -278,6 +282,10 @@ const ja: Catalog = {
 	"diag.help": "AI が MCP から読むのと同じ記録です。ホスト名・利用者名・秘密は入りません。",
 	"diag.refresh": "読み直す",
 	"diag.empty": "まだ何もありません。接続を試すと、その経過がここに出ます。",
+	// 左ペインの選択
+	"files.clear": "選択を外す",
+	// 複数の接続をタブで持つ（D25）
+	"files.another": "別の接続を開く",
 };
 
 import { ko, zhCN, zhTW } from './messages-cjk';

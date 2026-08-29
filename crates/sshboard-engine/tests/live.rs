@@ -62,6 +62,29 @@ async fn registry(dir: &tempfile::TempDir, write_roots: &[&str]) -> PathBuf {
     path
 }
 
+/// 同じ相手を 2 つの識別子で登録する。**別々の接続として開けるか**を見るため。
+async fn registry_pair(dir: &tempfile::TempDir) -> PathBuf {
+    let path = dir.path().join("connections.toml");
+    let fingerprint = known_fingerprint().await;
+    let one = |id: &str, name: &str| {
+        format!(
+            "[[connections]]\nid = \"{id}\"\nname = \"{name}\"\n\
+             host = \"{HOST}\"\nport = {PORT}\nuser = \"{USER}\"\n\
+             fingerprint = \"{fingerprint}\"\n"
+        )
+    };
+    std::fs::write(
+        &path,
+        format!(
+            "version = 1\n\n{}\n{}",
+            one("first", "One"),
+            one("second", "Two")
+        ),
+    )
+    .expect("接続一覧を書けない");
+    path
+}
+
 fn engine_at(path: PathBuf) -> Engine {
     Engine::new(Band::new(), Arc::new(OutputStream::new()), path)
 }
@@ -72,7 +95,7 @@ async fn nothing_can_be_done_before_a_connection_is_open() {
     let dir = tempfile::tempdir().expect("一時ディレクトリ");
     let engine = engine_at(dir.path().join("connections.toml"));
 
-    assert!(engine.current().await.is_none());
+    assert!(engine.active().await.is_none());
     assert!(matches!(
         engine.list_dir(Actor::Ai, "/").await,
         Err(EngineError::NotConnected)
@@ -123,11 +146,14 @@ async fn opening_a_connection_publishes_it_and_carries_the_write_scope() {
     // **画面が知らないまま繋がっている、を作らない。**
     watching.changed().await.expect("配られていない");
     assert_eq!(
-        watching.borrow().as_ref().map(|o| o.id.clone()),
+        watching
+            .borrow()
+            .first()
+            .map(|o: &sshboard_engine::Opened| o.id.clone()),
         Some("local".to_string())
     );
 
-    assert_eq!(engine.current().await.map(|o| o.id), Some("local".into()));
+    assert_eq!(engine.active().await.map(|o| o.id), Some("local".into()));
 }
 
 #[tokio::test]
@@ -151,7 +177,7 @@ async fn what_the_engine_publishes_carries_no_host_and_no_user() {
 }
 
 #[tokio::test]
-async fn a_second_connect_is_refused_rather_than_opening_a_hidden_session() {
+async fn the_same_connection_is_not_opened_twice() {
     // **裏で見えない SSH を 1 本も増やさない**（PRD §4-1）。ここが崩れたら製品の意味が消える。
     if !server_is_up().await {
         println!("テスト用サーバーが建っていません（想定内・飛ばします）");
@@ -169,8 +195,9 @@ async fn a_second_connect_is_refused_rather_than_opening_a_hidden_session() {
 
     assert!(
         matches!(again, Err(EngineError::AlreadyConnected { .. })),
-        "2 本目を開いている"
+        "同じ相手を二重に開いている"
     );
+    assert_eq!(engine.open_connections().await.len(), 1);
 }
 
 #[tokio::test]
@@ -188,12 +215,12 @@ async fn disconnecting_clears_the_current_connection_and_is_safe_to_repeat() {
         .expect("繋がらない");
 
     assert_eq!(
-        engine.disconnect(Actor::Human).await.map(|o| o.id),
+        engine.disconnect(Actor::Human, None).await.map(|o| o.id),
         Some("local".to_string())
     );
-    assert!(engine.current().await.is_none());
+    assert!(engine.active().await.is_none());
     // 2 回目は「何も開いていなかった」。**失敗にしない。**
-    assert!(engine.disconnect(Actor::Human).await.is_none());
+    assert!(engine.disconnect(Actor::Human, None).await.is_none());
 }
 
 #[tokio::test]
@@ -299,4 +326,132 @@ async fn a_missing_local_file_is_reported_as_a_local_problem_not_an_ssh_one() {
         .await;
 
     assert!(matches!(result, Err(EngineError::Local(_))), "{result:?}");
+}
+
+// --- 複数の接続（D25） -------------------------------------------------------
+
+#[tokio::test]
+async fn several_connections_stay_open_at_once_and_all_of_them_are_listed() {
+    // **切らずに次へ移れること**が要（D25）。1 本ずつ切って繋ぎ直す道具は使われない。
+    if !server_is_up().await {
+        println!("テスト用サーバーが建っていません（想定内・飛ばします）");
+        return;
+    }
+
+    let dir = tempfile::tempdir().expect("一時ディレクトリ");
+    let engine = engine_at(registry_pair(&dir).await);
+
+    engine
+        .connect(Actor::Human, "first", None)
+        .await
+        .expect("1 本目");
+    engine
+        .connect(Actor::Human, "second", None)
+        .await
+        .expect("2 本目");
+
+    let open = engine.open_connections().await;
+    assert_eq!(
+        open.len(),
+        2,
+        "**開いたものが一覧に出ていない**（裏に持っている）"
+    );
+    let ids: Vec<_> = open.iter().map(|o| o.id.as_str()).collect();
+    assert!(ids.contains(&"first") && ids.contains(&"second"));
+}
+
+#[tokio::test]
+async fn opening_a_second_connection_points_operations_at_it() {
+    // **開いたのに何も向いていない、を作らない。**
+    if !server_is_up().await {
+        println!("テスト用サーバーが建っていません（想定内・飛ばします）");
+        return;
+    }
+
+    let dir = tempfile::tempdir().expect("一時ディレクトリ");
+    let engine = engine_at(registry_pair(&dir).await);
+
+    engine
+        .connect(Actor::Human, "first", None)
+        .await
+        .expect("1 本目");
+    engine
+        .connect(Actor::Human, "second", None)
+        .await
+        .expect("2 本目");
+
+    assert_eq!(engine.active().await.map(|o| o.id), Some("second".into()));
+
+    // 戻れること。**タブを押す操作。**
+    engine.focus("first").await.expect("戻れない");
+    assert_eq!(engine.active().await.map(|o| o.id), Some("first".into()));
+}
+
+#[tokio::test]
+async fn closing_the_focused_connection_moves_the_focus_to_one_that_is_still_open() {
+    // 宛先が空のまま接続だけ開いている、という読めない状態を作らない。
+    if !server_is_up().await {
+        println!("テスト用サーバーが建っていません（想定内・飛ばします）");
+        return;
+    }
+
+    let dir = tempfile::tempdir().expect("一時ディレクトリ");
+    let engine = engine_at(registry_pair(&dir).await);
+    engine
+        .connect(Actor::Human, "first", None)
+        .await
+        .expect("1 本目");
+    engine
+        .connect(Actor::Human, "second", None)
+        .await
+        .expect("2 本目");
+
+    engine.disconnect(Actor::Human, Some("second")).await;
+
+    assert_eq!(engine.open_connections().await.len(), 1);
+    assert_eq!(
+        engine.active().await.map(|o| o.id),
+        Some("first".into()),
+        "宛先が空のまま接続が残っている"
+    );
+}
+
+#[tokio::test]
+async fn focusing_something_that_is_not_open_is_refused() {
+    let dir = tempfile::tempdir().expect("一時ディレクトリ");
+    let engine = engine_at(dir.path().join("connections.toml"));
+
+    assert!(matches!(
+        engine.focus("nothing-here").await,
+        Err(EngineError::NotConnected)
+    ));
+}
+
+#[tokio::test]
+async fn operations_follow_the_focus_rather_than_the_most_recent_connection() {
+    // **タブを押したら、その相手に効く。**ここがずれると、
+    // 本番へ送るつもりで開発へ送る事故になる。
+    if !server_is_up().await {
+        println!("テスト用サーバーが建っていません（想定内・飛ばします）");
+        return;
+    }
+
+    let dir = tempfile::tempdir().expect("一時ディレクトリ");
+    let engine = engine_at(registry_pair(&dir).await);
+    engine
+        .connect(Actor::Human, "first", None)
+        .await
+        .expect("1 本目");
+    engine
+        .connect(Actor::Human, "second", None)
+        .await
+        .expect("2 本目");
+
+    engine.focus("first").await.expect("戻れない");
+    // 宛先が生きていれば、そこへ操作が通る。
+    let listed = engine
+        .list_dir(Actor::Human, "/home/probe")
+        .await
+        .expect("宛先へ操作が通らない");
+    assert!(!listed.is_empty());
 }

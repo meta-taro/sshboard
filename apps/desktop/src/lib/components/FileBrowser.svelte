@@ -45,6 +45,11 @@
 	let entries = $state<Listed[]>([]);
 	let loading = $state(false);
 
+	/** 手元の現在地と中身。**右と同じ形で持つ**（並べたときに揃うように）。 */
+	let localPath = $state('');
+	let localParent = $state<string | null>(null);
+	let localEntries = $state<Listed[]>([]);
+
 	/** 上げる待ちの手元のファイル。**パスだけを持つ**（中身は Rust 側で読む）。 */
 	let staged = $state<string[]>([]);
 	let dropping = $state(false);
@@ -53,6 +58,48 @@
 	let failure = $state<string | null>(null);
 
 	const connected = $derived(session.open !== null);
+
+	/** 接続を足す一覧を出すか。**開いていないときは常に出す。** */
+	let addingAnother = $state(false);
+	const showPicker = $derived(session.all.length === 0 || addingAnother);
+
+	/** その接続の印の色。**タブにも出す**（どれが本番かをタブで見分けるため）。 */
+	function markOf(id: string): string {
+		const entry = registered.find((held) => held.id === id);
+		return entry?.color ? `var(--mark-${entry.color})` : 'transparent';
+	}
+
+	/** 手元を読む。**繋がっていなくても使える**（左は手元だけの話）。 */
+	async function loadLocal(path?: string) {
+		try {
+			const listing = await invoke<{
+				path: string;
+				parent: string | null;
+				entries: Listed[];
+			}>('local_list_dir', { path: path ?? null });
+			localPath = listing.path;
+			localParent = listing.parent;
+			localEntries = listing.entries;
+		} catch (error: unknown) {
+			failure = String(error);
+		}
+	}
+
+	/** 手元のパスを繋ぐ。**Windows も相手にする**（PRD §7）。 */
+	function localJoin(dir: string, name: string): string {
+		const sep = dir.includes('\\') && !dir.includes('/') ? '\\' : '/';
+		return dir.endsWith(sep) ? `${dir}${name}` : `${dir}${sep}${name}`;
+	}
+
+	/** 選んでいるか。**選択は絶対パスで持つ**（別の階層へ移っても消えない）。 */
+	function isStaged(name: string): boolean {
+		return staged.includes(localJoin(localPath, name));
+	}
+
+	function toggle(name: string) {
+		const full = localJoin(localPath, name);
+		staged = staged.includes(full) ? staged.filter((h) => h !== full) : [...staged, full];
+	}
 
 	async function loadRegistered() {
 		try {
@@ -78,6 +125,8 @@
 			passphrase = '';
 			needsPassphrase = false;
 			remotePath = '.';
+			await session.refresh();
+			addingAnother = false;
 			await refresh();
 		} catch (error: unknown) {
 			const why = error as ConnectFailure;
@@ -117,12 +166,26 @@
 		}
 	}
 
-	async function disconnect() {
+	async function disconnect(id?: string) {
 		try {
-			await invoke('session_disconnect');
+			await invoke('session_disconnect', { id: id ?? null });
+			await session.refresh();
 			entries = [];
-			staged = [];
 			notice = null;
+			// **残っている接続があれば、そちらを読み直す。**画面が空のままにしない。
+			if (session.open) await refresh();
+		} catch (error: unknown) {
+			failure = String(error);
+		}
+	}
+
+	/** タブを押した。**宛先を変えて、その場所を読み直す。** */
+	async function switchTo(id: string) {
+		if (id === session.activeId) return;
+		try {
+			await session.focus(id);
+			remotePath = '.';
+			await refresh();
 		} catch (error: unknown) {
 			failure = String(error);
 		}
@@ -212,6 +275,7 @@
 	onMount(() => {
 		const stops: Array<() => void> = [];
 		loadRegistered();
+		loadLocal();
 		session
 			.watch()
 			.then((stop) => stops.push(stop))
@@ -239,48 +303,79 @@
 </script>
 
 <section class="files" class:dropping>
-	<!-- どこへ繋がっているかを、**常に一番上に**出す。 -->
+	<!-- 開いている接続。**1 本残らずここに出る**（D25）。裏に持つ場所は無い。 -->
 	<div class="bar shell">
 		<div class="core">
-			{#if session.open}
-				<span class="live" title={session.open.fingerprint}>
-					<Icon name="plug" />
-					<strong>{session.open.name}</strong>
-					{#if session.open.tag}<span class="tag">{session.open.tag}</span>{/if}
-				</span>
-				<code class="fp">{session.open.fingerprint}</code>
-				<span class="scope" title={i18n.t('files.scope.help')}>
-					{#if session.open.write.aiRoots.length > 0}
-						{i18n.t('files.scope.some', { roots: session.open.write.aiRoots.join(' , ') })}
-					{:else}
-						{i18n.t('files.scope.none')}
-					{/if}
-				</span>
-				<button type="button" onclick={disconnect}>
-					<Icon name="unplug" />
-					{i18n.t('files.disconnect')}
-				</button>
-			{:else}
-				<!-- **プルダウンにしない。**印（色とタグ）が畳まれて見えなくなる。
-				     どのサーバーかを間違えないための印が、選ぶ瞬間に消えては意味がない。 -->
-				<span class="title">{i18n.t('files.choose')}</span>
-				{#if needsPassphrase}
-					<input
-						type="password"
-						bind:value={passphrase}
-						placeholder={i18n.t('files.passphrase')}
-						aria-label={i18n.t('files.passphrase')}
-					/>
+			{#if session.all.length > 0}
+				<div class="conn-tabs" role="tablist">
+					{#each session.all as held (held.id)}
+						<div
+							class="conn-tab"
+							class:active={held.id === session.activeId}
+							style:--mark={markOf(held.id)}
+						>
+							<button
+								type="button"
+								role="tab"
+								aria-selected={held.id === session.activeId}
+								onclick={() => switchTo(held.id)}
+								title={held.fingerprint}
+							>
+								<span class="mark-bar" aria-hidden="true"></span>
+								{held.name}
+								{#if held.tag}<span class="tag">{held.tag}</span>{/if}
+							</button>
+							<button
+								type="button"
+								class="ghost close"
+								onclick={() => disconnect(held.id)}
+								aria-label={i18n.t('files.disconnect')}
+								title={i18n.t('files.disconnect')}
+							>
+								<Icon name="unplug" size={11} />
+							</button>
+						</div>
+					{/each}
+				</div>
+				{#if session.open}
+					<span class="scope" title={i18n.t('files.scope.help')}>
+						{#if session.open.write.aiRoots.length > 0}
+							{i18n.t('files.scope.some', { roots: session.open.write.aiRoots.join(' , ') })}
+						{:else}
+							{i18n.t('files.scope.none')}
+						{/if}
+					</span>
 				{/if}
+			{:else}
+				<span class="title">{i18n.t('files.choose')}</span>
 				{#if registered.length === 0}
 					<span class="hint">{i18n.t('files.none')}</span>
 				{/if}
+			{/if}
+			{#if needsPassphrase}
+				<input
+					type="password"
+					bind:value={passphrase}
+					placeholder={i18n.t('files.passphrase')}
+					aria-label={i18n.t('files.passphrase')}
+				/>
+			{/if}
+			{#if session.all.length > 0}
+				<button
+					type="button"
+					class="ghost add"
+					onclick={() => (addingAnother = !addingAnother)}
+					title={i18n.t('files.another')}
+					aria-label={i18n.t('files.another')}
+				>
+					<Icon name="plus" size={13} />
+				</button>
 			{/if}
 		</div>
 	</div>
 
 	<!-- 繋いでいないときは、印つきの一覧から選ぶ。**色とタグが見えたまま選べる。** -->
-	{#if !session.open && registered.length > 0}
+	{#if showPicker && registered.length > 0}
 		<div class="picker shell">
 			<ul class="core">
 				{#each registered as entry (entry.id)}
@@ -380,49 +475,88 @@
 	{/if}
 
 	<div class="panes">
-		<!-- 手元 -->
+		<!-- 手元。**右と同じ形にする。**どの階層から上げるのかが見えないと、
+		     「どこからどこへ」が分からない（実際に分からなかった）。 -->
 		<div class="pane shell">
 			<div class="core">
 				<header>
 					<Icon name="file" />
-					<span class="title">{i18n.t('files.local')}</span>
-					<button type="button" onclick={pickFiles}>
-						<Icon name="plus" />
-						{i18n.t('files.pick')}
+					<button
+						type="button"
+						class="ghost"
+						onclick={() => localParent && loadLocal(localParent)}
+						disabled={!localParent}
+						aria-label={i18n.t('files.up')}
+						title={i18n.t('files.up')}
+					>
+						<Icon name="arrow-up" size={13} />
+					</button>
+					<input
+						class="path"
+						bind:value={localPath}
+						onkeydown={(event) => event.key === 'Enter' && loadLocal(localPath)}
+						aria-label={i18n.t('files.local')}
+						spellcheck="false"
+					/>
+					<button type="button" onclick={pickFiles} title={i18n.t('files.pick')}>
+						<Icon name="plus" size={13} />
 					</button>
 				</header>
 
-				{#if staged.length === 0}
-					<p class="empty">{i18n.t('files.drop')}</p>
+				{#if localEntries.length === 0}
+					<p class="empty">{i18n.t('files.emptydir')}</p>
 				{:else}
 					<ul class="list">
-						{#each staged as path (path)}
-							<li>
-								<Icon name="file" size={12} />
-								<span class="name" title={path}>{baseName(path)}</span>
-								<button
-									type="button"
-									class="ghost"
-									onclick={() => unstage(path)}
-									aria-label={i18n.t('files.remove')}
-								>
-									<Icon name="trash" size={12} />
-								</button>
+						{#each localEntries as entry (entry.name)}
+							<li class:picked={!entry.isDir && isStaged(entry.name)}>
+								<Icon name={entry.isDir ? 'folder' : 'file'} size={12} />
+								{#if entry.isDir}
+									<button
+										type="button"
+										class="link"
+										onclick={() => loadLocal(localJoin(localPath, entry.name))}
+									>
+										{entry.name}
+									</button>
+								{:else}
+									<!-- **ファイルは押すと選ぶ。**選んだものが右へ上がる。 -->
+									<button type="button" class="link plain" onclick={() => toggle(entry.name)}>
+										{entry.name}
+									</button>
+								{/if}
+								<span class="size">{entry.isDir ? '' : humanSize(entry.size)}</span>
+								{#if !entry.isDir && isStaged(entry.name)}
+									<span class="chosen-mark"><Icon name="check" size={11} /></span>
+								{/if}
 							</li>
 						{/each}
 					</ul>
 				{/if}
 
-				<footer>
-					<button
-						type="button"
-						class="primary"
-						onclick={upload}
-						disabled={!connected || staged.length === 0 || loading}
-					>
-						<Icon name="upload" />
-						{i18n.t('files.upload', { count: String(staged.length) })}
-					</button>
+				<footer class="stack">
+					<!-- **どこへ送るかを、送るボタンの隣に出す。** -->
+					<div class="sending">
+						<button
+							type="button"
+							class="primary"
+							onclick={upload}
+							disabled={!connected || staged.length === 0 || loading}
+						>
+							<Icon name="upload" />
+							{i18n.t('files.upload', { count: String(staged.length) })}
+						</button>
+						{#if connected}
+							<span class="to" title={remotePath}>
+								<Icon name="arrow-up" size={11} />
+								{remotePath}
+							</span>
+						{/if}
+					</div>
+					{#if staged.length > 0}
+						<button type="button" class="ghost tiny" onclick={() => (staged = [])}>
+							{i18n.t('files.clear')}
+						</button>
+					{/if}
 				</footer>
 			</div>
 		</div>
@@ -545,12 +679,51 @@
 		overflow: hidden;
 	}
 
-	.live {
+	/* 開いている接続のタブ。**1 本残らずここに出る**（D25）。 */
+	.conn-tabs {
+		display: flex;
+		align-items: center;
+		gap: 0.25rem;
+		flex: 1 1 auto;
+		min-width: 0;
+		overflow-x: auto;
+	}
+
+	.conn-tab {
 		display: inline-flex;
 		align-items: center;
-		gap: 0.3rem;
-		white-space: nowrap;
+		flex: none;
+		border-radius: 999px;
+		border: 1px solid var(--hairline);
+		background: var(--shell);
 	}
+
+	.conn-tab.active {
+		background: var(--surface-2);
+		/* **印の色で示す。**どれが本番かをタブで見分けられるように。 */
+		box-shadow: inset 0 0 0 1.5px var(--mark, var(--accent));
+	}
+
+	.conn-tab button {
+		border: none;
+		background: none;
+		border-radius: 999px;
+	}
+
+	.conn-tab .close {
+		padding: 0.18rem 0.3rem 0.18rem 0.1rem;
+		color: var(--fg-faint);
+	}
+
+	.conn-tab .close:hover {
+		color: var(--danger);
+	}
+
+	.add {
+		flex: none;
+		color: var(--fg-muted);
+	}
+
 
 	.tag {
 		font-size: 0.62rem;
@@ -560,16 +733,6 @@
 		color: var(--fg-muted);
 	}
 
-	.fp {
-		font-family: var(--font-mono);
-		font-size: 0.6rem;
-		color: var(--fg-faint);
-		white-space: nowrap;
-		overflow: hidden;
-		text-overflow: ellipsis;
-		min-width: 0;
-		flex: 0 1 auto;
-	}
 
 	.scope,
 	.hint {
@@ -815,6 +978,55 @@
 		color: var(--fg-faint);
 		font-variant-numeric: tabular-nums;
 		flex: none;
+	}
+
+	/* 選んだファイル。**色だけに頼らない。**右端に印も出す。 */
+	.list li.picked {
+		background: var(--accent-soft);
+	}
+
+	.chosen-mark {
+		flex: none;
+		color: var(--accent);
+		display: inline-flex;
+	}
+
+	/* 送り先。**送るボタンの隣に出す。**「どこからどこへ」が見えないと動けない。 */
+	footer.stack {
+		flex-direction: column;
+		align-items: stretch;
+		gap: 0.25rem;
+	}
+
+	.sending {
+		display: flex;
+		align-items: center;
+		gap: 0.4rem;
+		min-width: 0;
+	}
+
+	.to {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.2rem;
+		font-family: var(--font-mono);
+		font-size: 0.62rem;
+		color: var(--fg-muted);
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		min-width: 0;
+	}
+
+	button.tiny {
+		font-size: 0.62rem;
+		align-self: flex-start;
+		color: var(--fg-muted);
+	}
+
+	/* ディレクトリは移動、ファイルは選択。**見た目で区別する。** */
+	.link.plain {
+		color: inherit;
 	}
 
 	.link {

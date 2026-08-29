@@ -101,6 +101,10 @@ export const ko: Catalog = {
 	"diag.help": "AI가 MCP로 읽는 것과 같은 기록입니다. 호스트명·사용자명·비밀은 들어가지 않습니다.",
 	"diag.refresh": "다시 읽기",
 	"diag.empty": "아직 없습니다. 연결을 시도하면 그 경과가 여기 나옵니다.",
+	// 左ペインの選択
+	"files.clear": "선택 해제",
+	// 複数の接続をタブで持つ（D25）
+	"files.another": "다른 연결 열기",
 };
 
 export const zhCN: Catalog = {
@@ -201,6 +205,10 @@ export const zhCN: Catalog = {
 	"diag.help": "与 AI 通过 MCP 读取的是同一份记录。不含主机名、用户名和机密。",
 	"diag.refresh": "重新读取",
 	"diag.empty": "还没有内容。试着连接，过程会显示在这里。",
+	// 左ペインの選択
+	"files.clear": "取消选择",
+	// 複数の接続をタブで持つ（D25）
+	"files.another": "再开一个连接",
 };
 
 export const zhTW: Catalog = {
@@ -301,4 +309,8 @@ export const zhTW: Catalog = {
 	"diag.help": "與 AI 透過 MCP 讀取的是同一份記錄。不含主機名稱、使用者名稱和機密。",
 	"diag.refresh": "重新讀取",
 	"diag.empty": "還沒有內容。試著連線，過程會顯示在這裡。",
+	// 左ペインの選択
+	"files.clear": "取消選擇",
+	// 複数の接続をタブで持つ（D25）
+	"files.another": "再開一個連線",
 };

@@ -1,5 +1,6 @@
 //! 開いている 1 本を持ち、すべての操作をここへ集める。
 
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -22,6 +23,17 @@ struct Live {
     opened: Opened,
 }
 
+/// 開いているもの全部と、いま操作の宛先になっているもの。
+///
+/// **1 本残らずここに入ります**（D25）。裏に持つ場所はありません。
+#[derive(Default)]
+struct Held {
+    /// 識別子で引く。**並びが毎回変わるとタブが踊る**ので BTreeMap。
+    live: BTreeMap<String, Live>,
+    /// いまの宛先。**閉じたら次の 1 本へ移る**（宛先が無いまま開いている、を作らない）。
+    active: Option<String>,
+}
+
 /// **すべての操作が通る 1 か所**（PRD §4-1）。
 pub struct Engine {
     band: Band,
@@ -30,9 +42,9 @@ pub struct Engine {
     diag: Diagnostics,
     stream: Arc<OutputStream>,
     connections_path: PathBuf,
-    live: Mutex<Option<Live>>,
+    held: Mutex<Held>,
     /// 開いているものが変わったことを配る。**画面が知らないまま繋がっている、を作らない。**
-    changed: watch::Sender<Option<Opened>>,
+    changed: watch::Sender<Vec<Opened>>,
 }
 
 impl Engine {
@@ -46,25 +58,49 @@ impl Engine {
         connections_path: PathBuf,
         diag: Diagnostics,
     ) -> Self {
-        let (changed, _) = watch::channel(None);
+        let (changed, _) = watch::channel(Vec::new());
         Self {
             band,
             diag,
             stream,
             connections_path,
-            live: Mutex::new(None),
+            held: Mutex::new(Held::default()),
             changed,
         }
     }
 
-    /// 開いているものの変化を受け取る口。
-    pub fn subscribe(&self) -> watch::Receiver<Option<Opened>> {
+    /// 開いているものの変化を受け取る口。**全部の一覧が流れます。**
+    pub fn subscribe(&self) -> watch::Receiver<Vec<Opened>> {
         self.changed.subscribe()
     }
 
-    /// いま開いているもの。
-    pub async fn current(&self) -> Option<Opened> {
-        self.live.lock().await.as_ref().map(|l| l.opened.clone())
+    /// 開いているもの全部。**タブに出すのはこれ**（D25）。
+    pub async fn open_connections(&self) -> Vec<Opened> {
+        let held = self.held.lock().await;
+        held.live.values().map(|l| l.opened.clone()).collect()
+    }
+
+    /// いま操作の宛先になっているもの。
+    pub async fn active(&self) -> Option<Opened> {
+        let held = self.held.lock().await;
+        held.active
+            .as_ref()
+            .and_then(|id| held.live.get(id))
+            .map(|l| l.opened.clone())
+    }
+
+    /// 宛先を変える。**開いていないものは指定できない。**
+    pub async fn focus(&self, id: &str) -> Result<Opened, EngineError> {
+        let mut held = self.held.lock().await;
+        let Some(live) = held.live.get(id) else {
+            return Err(EngineError::NotConnected);
+        };
+        let opened = live.opened.clone();
+        held.active = Some(id.to_owned());
+        let all = held.live.values().map(|l| l.opened.clone()).collect();
+        drop(held);
+        let _ = self.changed.send(all);
+        Ok(opened)
     }
 
     /// 共有している出力（`tail -f` の行き先）。
@@ -96,12 +132,15 @@ impl Engine {
         id: &str,
         passphrase: Option<String>,
     ) -> Result<Opened, EngineError> {
-        let mut live = self.live.lock().await;
-        if let Some(open) = live.as_ref() {
-            return Err(EngineError::AlreadyConnected {
-                id: open.opened.id.clone(),
-                name: open.opened.name.clone(),
-            });
+        // **同じ相手を二重に開かない。**別の相手は開ける（D25）。
+        {
+            let held = self.held.lock().await;
+            if let Some(open) = held.live.get(id) {
+                return Err(EngineError::AlreadyConnected {
+                    id: open.opened.id.clone(),
+                    name: open.opened.name.clone(),
+                });
+            }
         }
 
         let entry = self.entry(id).inspect_err(|error| {
@@ -162,24 +201,48 @@ impl Engine {
             },
         };
 
-        *live = Some(Live {
-            session: Arc::new(session),
-            opened: opened.clone(),
-        });
-        let _ = self.changed.send(Some(opened.clone()));
+        let mut held = self.held.lock().await;
+        held.live.insert(
+            entry.id.clone(),
+            Live {
+                session: Arc::new(session),
+                opened: opened.clone(),
+            },
+        );
+        // **開いたものを宛先にする。**開いたのに何も向いていない、を作らない。
+        held.active = Some(entry.id.clone());
+        let all = held.live.values().map(|l| l.opened.clone()).collect();
+        drop(held);
+
+        let _ = self.changed.send(all);
         Ok(opened)
     }
 
     /// 切る。**繋がっていなくても失敗にしない**（同じ状態へ向かう操作なので）。
-    pub async fn disconnect(&self, actor: Actor) -> Option<Opened> {
-        let mut live = self.live.lock().await;
-        let closed = live.take().map(|l| l.opened);
+    ///
+    /// `id` を省略すると、いまの宛先を切ります。
+    pub async fn disconnect(&self, actor: Actor, id: Option<&str>) -> Option<Opened> {
+        let mut held = self.held.lock().await;
+        let target = match id {
+            Some(id) => id.to_owned(),
+            None => held.active.clone()?,
+        };
+        let closed = held.live.remove(&target).map(|l| l.opened);
+
+        // **宛先が無いまま開いている、を作らない。**残っている 1 本へ移す。
+        if held.active.as_deref() == Some(target.as_str()) {
+            held.active = held.live.keys().next().cloned();
+        }
+        let all: Vec<Opened> = held.live.values().map(|l| l.opened.clone()).collect();
+        drop(held);
+
         if let Some(open) = closed.as_ref() {
             // 切断は取り消せないので、**受け取りが返らなくても切る**。
             // ここで失敗にすると「切れないまま繋がっている」という悪い方へ倒れる。
             let _ = self.show(actor, &format!("disconnect {}", open.id)).await;
+            self.diag.info(Stage::Reach, Some(&open.id), "切りました");
         }
-        let _ = self.changed.send(None);
+        let _ = self.changed.send(all);
         closed
     }
 
@@ -196,11 +259,12 @@ impl Engine {
         }
     }
 
+    /// 操作の宛先。**開いていなければ、そう言う。**
     async fn session(&self) -> Result<Arc<SshSession>, EngineError> {
-        self.live
-            .lock()
-            .await
+        let held = self.held.lock().await;
+        held.active
             .as_ref()
+            .and_then(|id| held.live.get(id))
             .map(|l| Arc::clone(&l.session))
             .ok_or(EngineError::NotConnected)
     }

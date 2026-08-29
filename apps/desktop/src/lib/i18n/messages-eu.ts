@@ -101,6 +101,10 @@ export const de: Catalog = {
 	"diag.help": "Dasselbe Protokoll, das die KI über MCP liest. Ohne Hostnamen, Benutzernamen oder Geheimnisse.",
 	"diag.refresh": "Neu laden",
 	"diag.empty": "Noch nichts. Versuchen Sie zu verbinden, dann erscheinen die Schritte hier.",
+	// 左ペインの選択
+	"files.clear": "Auswahl aufheben",
+	// 複数の接続をタブで持つ（D25）
+	"files.another": "Weitere Verbindung öffnen",
 };
 
 export const fr: Catalog = {
@@ -201,6 +205,10 @@ export const fr: Catalog = {
 	"diag.help": "Le même journal que l'IA lit via MCP. Sans noms d'hôte, identifiants ni secrets.",
 	"diag.refresh": "Recharger",
 	"diag.empty": "Rien pour l'instant. Essayez de vous connecter, les étapes apparaîtront ici.",
+	// 左ペインの選択
+	"files.clear": "Annuler la sélection",
+	// 複数の接続をタブで持つ（D25）
+	"files.another": "Ouvrir une autre connexion",
 };
 
 export const es: Catalog = {
@@ -301,4 +309,8 @@ export const es: Catalog = {
 	"diag.help": "El mismo registro que la IA lee por MCP. Sin nombres de host, usuarios ni secretos.",
 	"diag.refresh": "Recargar",
 	"diag.empty": "Nada aún. Pruebe a conectar y los pasos aparecerán aquí.",
+	// 左ペインの選択
+	"files.clear": "Quitar la selección",
+	// 複数の接続をタブで持つ（D25）
+	"files.another": "Abrir otra conexión",
 };

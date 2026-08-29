@@ -58,25 +58,58 @@ impl SshboardMcp {
         render(&opened)
     }
 
-    /// 開いている接続を閉じる。
-    #[tool(description = "Close the SSH connection sshboard currently holds.")]
-    pub async fn disconnect(&self) -> Result<String, ErrorData> {
-        match self.engine()?.disconnect(Actor::Ai).await {
+    /// 開いている接続を閉じる。**省略するといまの宛先。**
+    #[tool(
+        description = "Close one open SSH connection. Omit connectionId to close the one operations currently go to."
+    )]
+    pub async fn disconnect(
+        &self,
+        Parameters(request): Parameters<MaybeConnectionId>,
+    ) -> Result<String, ErrorData> {
+        match self
+            .engine()?
+            .disconnect(Actor::Ai, request.connection_id.as_deref())
+            .await
+        {
             Some(open) => Ok(format!("closed `{}`", open.id)),
             None => Ok("nothing was open".to_string()),
         }
     }
 
+    /// 操作の宛先を変える。**開いているものの中からしか選べません。**
+    #[tool(
+        description = "Point subsequent file and command operations at one of the already-open connections. sshboard can hold several at once; this chooses which one they go to."
+    )]
+    pub async fn focus_connection(
+        &self,
+        Parameters(request): Parameters<ConnectionId>,
+    ) -> Result<String, ErrorData> {
+        let opened = self
+            .engine()?
+            .focus(&request.connection_id)
+            .await
+            .map_err(refuse)?;
+        render(&opened)
+    }
+
     /// いま何が開いているか。**サーバーへは触りません。**
     #[tool(
-        description = "Report which connection sshboard currently holds open, and where the AI is allowed to write on it. Touches no remote server."
+        description = "List every connection sshboard currently holds open, where the AI may write on each, and which one file and command operations currently go to. Touches no remote server."
     )]
     pub async fn session_status(&self) -> Result<String, ErrorData> {
         self.show("session_status").await?;
-        match self.engine()?.current().await {
-            Some(open) => render(&open),
-            None => Ok("{\"open\":false}".to_string()),
-        }
+
+        let engine = self.engine()?;
+        let open = engine.open_connections().await;
+        let active = engine.active().await;
+
+        serde_json::to_string(&serde_json::json!({
+            // **開いているものは 1 本残らずここに出ます**（D25）。
+            "open": open,
+            // 操作がどれへ行くか。`focus_connection` で変えられる。
+            "operationsGoTo": active.map(|open| open.id),
+        }))
+        .map_err(|error| ErrorData::internal_error(error.to_string(), None))
     }
 
     /// 何が起きたかの記録。**サーバーへは触りません。**
@@ -250,6 +283,14 @@ pub struct HowMany {
     /// 何件まで返すか。省略すると 40 件、上限は 200 件。
     #[serde(default)]
     pub limit: Option<usize>,
+}
+
+#[derive(Debug, Deserialize, rmcp::schemars::JsonSchema)]
+#[schemars(crate = "rmcp::schemars")]
+pub struct MaybeConnectionId {
+    /// 省略すると、いま操作の宛先になっているもの。
+    #[serde(default)]
+    pub connection_id: Option<String>,
 }
 
 #[derive(Debug, Deserialize, rmcp::schemars::JsonSchema)]

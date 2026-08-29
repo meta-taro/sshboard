@@ -164,6 +164,8 @@ async fn the_server_advertises_only_the_phase_zero_tools() {
         "upload_file",
         // **詰まったときに AI が自分で状況を掴む口。**
         "diagnostics",
+        // **複数の接続をタブで持つ**（D25）。宛先を変える口。
+        "focus_connection",
     ] {
         assert!(
             listed.contains(expected),

@@ -30,18 +30,42 @@ export type Listed = {
 };
 
 class SessionState {
-	open = $state<Opened | null>(null);
+	/** 開いているもの**全部**（D25）。**タブに 1 本残らず出す。** */
+	all = $state<Opened[]>([]);
+	/** 操作の宛先。 */
+	activeId = $state<string | null>(null);
 	/** 繋ぎに行っている最中か。**押しっぱなしで二重に繋ぎに行かないため。** */
 	busy = $state(false);
 
+	/** いま操作の宛先になっているもの。 */
+	get open(): Opened | null {
+		return this.all.find((held) => held.id === this.activeId) ?? null;
+	}
+
 	/** 変化を受け取り始める。返り値を呼ぶと購読を止める。 */
 	async watch(): Promise<() => void> {
-		const stop = await listen<Opened | null>('session://changed', (event) => {
-			this.open = event.payload;
+		const stop = await listen<Opened[]>('session://changed', (event) => {
+			this.all = event.payload;
+			// 宛先が閉じられていたら、残っている 1 本へ移す。
+			if (!this.all.some((held) => held.id === this.activeId)) {
+				this.activeId = this.all[0]?.id ?? null;
+			}
 		});
-		// 起動が速いと、購読より先に流れた分を取りこぼす。**取り直す。**
-		this.open = await invoke<Opened | null>('session_status');
+		await this.refresh();
 		return stop;
+	}
+
+	/** 取り直す。**起動が速いと、購読より先に流れた分を取りこぼす。** */
+	async refresh(): Promise<void> {
+		const status = await invoke<{ open: Opened[]; active: string | null }>('session_status');
+		this.all = status.open;
+		this.activeId = status.active;
+	}
+
+	/** 宛先を変える。**タブを押したとき。** */
+	async focus(id: string): Promise<void> {
+		await invoke('session_focus', { id });
+		this.activeId = id;
 	}
 }
 

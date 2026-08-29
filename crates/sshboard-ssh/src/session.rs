@@ -15,7 +15,20 @@ use sshboard_diag::{Diagnostics, Stage};
 use crate::hostkey::{decide, fingerprint, fingerprints_for, SeenHostKey, Trust};
 use crate::write_scope::{Refusal, WriteScope};
 
-const TIMEOUT: Duration = Duration::from_secs(15);
+/// 何も流れない時間がこれを超えたら、**プロトコルの keepalive を送る**。
+///
+/// **ダミーのコマンドを打つ形にはしません。**それは帯に出る操作になり、
+/// 「誰も打っていないコマンド」が並びます（PRD §4-2 / D25）。
+/// SSH 自身の仕組みなら帯に出ず、**切れたときだけ**出ます。
+///
+/// 30 秒は、経路上の NAT / ロードバランサが黙った接続を切る値
+/// （多くが 60〜120 秒）より十分短くとってあります。
+const KEEPALIVE_EVERY: Duration = Duration::from_secs(30);
+
+/// 返事が来ないまま何回まで送るか。**ここを超えたら切れたと判断する。**
+///
+/// 30 秒 × 4 = 2 分。**切れているのに繋がっているように見える時間**の上限です。
+const KEEPALIVE_GIVE_UP_AFTER: usize = 4;
 
 /// 繋げなかった理由。**握り潰さない。**
 #[derive(Debug)]
@@ -140,7 +153,11 @@ impl SshSession {
 
         let seen = Arc::new(Mutex::new(None));
         let config = Arc::new(client::Config {
-            inactivity_timeout: Some(TIMEOUT),
+            // **黙っていても切らせない**（D25）。タブに開いたまま置く道具なので、
+            // 席を外している間に切れていると、戻ったときに全部やり直しになる。
+            inactivity_timeout: None,
+            keepalive_interval: Some(KEEPALIVE_EVERY),
+            keepalive_max: KEEPALIVE_GIVE_UP_AFTER,
             ..Default::default()
         });
 
