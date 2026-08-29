@@ -6,8 +6,8 @@
  */
 
 const en = {
-	'app.phase0': 'Phase 0 — band only. Not connected to SSH.',
-	'app.driven': 'Normally you do not operate this. An external AI agent calls MCP, and its actions flow into the band.',
+	'app.phase0': "one SSH, shared by you and the AI.",
+	'app.driven': "You can use this on its own as an SFTP client. An external AI agent calls MCP over the same session, and everything both of you do shows in the band.",
 	'theme.label': 'Theme',
 	'theme.auto': 'Auto',
 	'theme.light': 'Light',
@@ -105,14 +105,28 @@ const en = {
 	"mcp.copy": "Copy the MCP command",
 	"mcp.copied": "Copied.",
 	"mcp.token.help": "The token changes every time sshboard starts. Paste this command into your agent.",
+
+	// --- 接続の選択と、初見のホスト鍵を確かめる道 ---
+	"files.pick.help": "Double-click to connect.",
+	"files.known": "Fingerprint registered",
+	"files.passphrase.needed": "This key needs a passphrase. Enter it and connect again.",
+	"files.trust.first": "First time seeing this host",
+	"files.trust.seen": "Seen",
+	"files.trust.expected": "Registered",
+	"files.trust.first.body": "Compare this fingerprint with the one your server operator gave you, or with `ssh-keygen -lf` on the server. Once registered, sshboard will refuse anything else.",
+	"files.trust.accept": "I checked it — register and connect",
+	"files.trust.cancel": "Not now",
+	"files.trust.mismatch": "The host key does not match what is registered",
+	"files.trust.mismatch.body": "Either the server was rebuilt, or something is impersonating it. sshboard will not connect.",
+	"files.trust.mismatch.how": "If you know the server was rebuilt, clear the fingerprint on the Connections tab and connect again.",
 } as const;
 
 export type MessageKey = keyof typeof en;
 type Catalog = Partial<Record<MessageKey, string>>;
 
 const ja: Catalog = {
-	'app.phase0': 'Phase 0 — 帯だけ。SSH には繋いでいません。',
-	'app.driven': '本来はここを人が操作しません。外の AI エージェントが MCP を呼び、その操作が帯に流れます。',
+	'app.phase0': "1 本の SSH を、人と AI で共有します。",
+	'app.driven': "これ単体で SFTP クライアントとして使えます。外の AI エージェントは MCP から同じセッションを使い、どちらの操作も帯に出ます。",
 	'theme.label': 'テーマ',
 	'theme.auto': '自動',
 	'theme.light': '明るい',
@@ -210,6 +224,20 @@ const ja: Catalog = {
 	"mcp.copy": "MCP の登録コマンドを写す",
 	"mcp.copied": "写しました。",
 	"mcp.token.help": "トークンは sshboard を起動するたびに変わります。このコマンドをエージェントへ貼ってください。",
+
+	// --- 接続の選択と、初見のホスト鍵を確かめる道 ---
+	"files.pick.help": "ダブルクリックで繋がります。",
+	"files.known": "指紋を登録済み",
+	"files.passphrase.needed": "この鍵にはパスフレーズが要ります。入れてもう一度繋いでください。",
+	"files.trust.first": "初めて見るホストです",
+	"files.trust.seen": "見えたもの",
+	"files.trust.expected": "登録",
+	"files.trust.first.body": "サーバーの管理者から渡された指紋か、サーバー上の `ssh-keygen -lf` の出力と見比べてください。登録すると、以後それ以外は繋がりません。",
+	"files.trust.accept": "確かめた — 登録して繋ぐ",
+	"files.trust.cancel": "やめる",
+	"files.trust.mismatch": "ホスト鍵が登録と違います",
+	"files.trust.mismatch.body": "サーバーを建て直したか、別の何かがなりすましています。繋ぎません。",
+	"files.trust.mismatch.how": "建て直したと分かっているなら、接続タブで指紋を消してから繋ぎ直してください。",
 };
 
 import { ko, zhCN, zhTW } from './messages-cjk';

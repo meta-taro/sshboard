@@ -22,10 +22,24 @@
 		type Listed
 	} from '$lib/session.svelte';
 
+	/** 初見のホスト鍵。**人が確かめて登録するまで、ここで止める。** */
+	type Untrusted = {
+		algorithm: string;
+		fingerprint: string;
+		/** 登録済みの指紋。**あるのに食い違うなら、すり替えの疑い。** */
+		expected: string | null;
+	};
+
+	type ConnectFailure =
+		| ({ kind: 'untrusted' } & Untrusted)
+		| { kind: 'passphraseNeeded' }
+		| { kind: 'other'; message: string };
+
 	let registered = $state<Connection[]>([]);
 	let chosenId = $state('');
 	let passphrase = $state('');
 	let needsPassphrase = $state(false);
+	let untrusted = $state<Untrusted | null>(null);
 
 	let remotePath = $state('.');
 	let entries = $state<Listed[]>([]);
@@ -53,6 +67,7 @@
 		if (!chosenId || session.busy) return;
 		failure = null;
 		notice = null;
+		untrusted = null;
 		session.busy = true;
 		try {
 			await invoke('session_connect', {
@@ -65,12 +80,40 @@
 			remotePath = '.';
 			await refresh();
 		} catch (error: unknown) {
-			const detail = String(error);
-			failure = detail;
-			// 鍵にパスフレーズが要るなら、入力欄を出す。**AI には出せない道**（D14）。
-			needsPassphrase = detail.includes('パスフレーズ') || detail.includes('passphrase');
+			const why = error as ConnectFailure;
+			if (why?.kind === 'untrusted') {
+				// **行き止まりにしない。**指紋を見せて、人が確かめて登録できるようにする。
+				untrusted = why;
+			} else if (why?.kind === 'passphraseNeeded') {
+				needsPassphrase = true;
+				failure = i18n.t('files.passphrase.needed');
+			} else {
+				failure = why?.kind === 'other' ? why.message : String(error);
+			}
 		} finally {
 			session.busy = false;
+		}
+	}
+
+	/**
+	 * 見えた指紋を、この接続の正解として登録する。**人が確かめたという記録。**
+	 *
+	 * 以後この接続は、**同じ指紋の相手としか繋がらない**（すり替えを検出できる）。
+	 */
+	async function trustFingerprint() {
+		if (!untrusted) return;
+		const entry = registered.find((held) => held.id === chosenId);
+		if (!entry) return;
+
+		try {
+			await invoke('connection_save', {
+				entry: { ...entry, fingerprint: untrusted.fingerprint }
+			});
+			untrusted = null;
+			await loadRegistered();
+			await connect();
+		} catch (error: unknown) {
+			failure = String(error);
 		}
 	}
 
@@ -218,11 +261,9 @@
 					{i18n.t('files.disconnect')}
 				</button>
 			{:else}
-				<select bind:value={chosenId} aria-label={i18n.t('files.choose')}>
-					{#each registered as entry (entry.id)}
-						<option value={entry.id}>{entry.name || entry.id}</option>
-					{/each}
-				</select>
+				<!-- **プルダウンにしない。**印（色とタグ）が畳まれて見えなくなる。
+				     どのサーバーかを間違えないための印が、選ぶ瞬間に消えては意味がない。 -->
+				<span class="title">{i18n.t('files.choose')}</span>
 				{#if needsPassphrase}
 					<input
 						type="password"
@@ -231,6 +272,43 @@
 						aria-label={i18n.t('files.passphrase')}
 					/>
 				{/if}
+				{#if registered.length === 0}
+					<span class="hint">{i18n.t('files.none')}</span>
+				{/if}
+			{/if}
+		</div>
+	</div>
+
+	<!-- 繋いでいないときは、印つきの一覧から選ぶ。**色とタグが見えたまま選べる。** -->
+	{#if !session.open && registered.length > 0}
+		<div class="picker shell">
+			<ul class="core">
+				{#each registered as entry (entry.id)}
+					<li>
+						<button
+							type="button"
+							class="pick"
+							class:chosen={chosenId === entry.id}
+							style:--mark={entry.color ? `var(--mark-${entry.color})` : 'transparent'}
+							onclick={() => (chosenId = entry.id)}
+							ondblclick={() => {
+								chosenId = entry.id;
+								connect();
+							}}
+						>
+							<span class="bar" aria-hidden="true"></span>
+							<span class="who">{entry.name || entry.id}</span>
+							{#if entry.tag}<span class="tag">{entry.tag}</span>{/if}
+							{#if entry.fingerprint}
+								<span class="known" title={i18n.t('files.known')}>
+									<Icon name="check" size={11} />
+								</span>
+							{/if}
+						</button>
+					</li>
+				{/each}
+			</ul>
+			<div class="picker-foot">
 				<button
 					type="button"
 					class="primary"
@@ -240,12 +318,52 @@
 					<Icon name="plug" />
 					{session.busy ? i18n.t('files.connecting') : i18n.t('files.connect')}
 				</button>
-				{#if registered.length === 0}
-					<span class="hint">{i18n.t('files.none')}</span>
-				{/if}
-			{/if}
+				<span class="hint">{i18n.t('files.pick.help')}</span>
+			</div>
 		</div>
-	</div>
+	{/if}
+
+	<!-- **初見の指紋は、行き止まりにしない。**確かめて登録する道をここに置く。 -->
+	{#if untrusted}
+		<div class="trust shell" class:danger={untrusted.expected}>
+			<div class="core">
+				{#if untrusted.expected}
+					<p class="head">
+						<Icon name="warning" size={14} />
+						<strong>{i18n.t('files.trust.mismatch')}</strong>
+					</p>
+					<p class="body">{i18n.t('files.trust.mismatch.body')}</p>
+					<dl>
+						<dt>{i18n.t('files.trust.seen')}</dt>
+						<dd><code>{untrusted.fingerprint}</code></dd>
+						<dt>{i18n.t('files.trust.expected')}</dt>
+						<dd><code>{untrusted.expected}</code></dd>
+					</dl>
+					<!-- **一押しで受け入れる道を置かない。**すり替えかもしれないため。 -->
+					<p class="body">{i18n.t('files.trust.mismatch.how')}</p>
+				{:else}
+					<p class="head">
+						<Icon name="key" size={14} />
+						<strong>{i18n.t('files.trust.first')}</strong>
+					</p>
+					<p class="body">{i18n.t('files.trust.first.body')}</p>
+					<dl>
+						<dt>{untrusted.algorithm}</dt>
+						<dd><code>{untrusted.fingerprint}</code></dd>
+					</dl>
+					<div class="trust-actions">
+						<button type="button" class="primary" onclick={trustFingerprint}>
+							<Icon name="check" />
+							{i18n.t('files.trust.accept')}
+						</button>
+						<button type="button" onclick={() => (untrusted = null)}>
+							{i18n.t('files.trust.cancel')}
+						</button>
+					</div>
+				{/if}
+			</div>
+		</div>
+	{/if}
 
 	{#if failure}
 		<p class="failure" role="alert">{failure}</p>
@@ -457,6 +575,130 @@
 		flex: 1 1 auto;
 	}
 
+	/* 接続を選ぶところ。**印（色とタグ）が見えたまま選べる。** */
+	.picker .core {
+		list-style: none;
+		margin: 0;
+		padding: 0.2rem;
+		max-height: 8.5rem;
+		overflow: auto;
+	}
+
+	.picker li {
+		list-style: none;
+	}
+
+	.pick {
+		display: flex;
+		align-items: center;
+		gap: 0.4rem;
+		width: 100%;
+		/* **左寄せ。**一覧として読むもの。 */
+		text-align: left;
+		border: none;
+		background: none;
+		border-radius: var(--r-control);
+		padding: 0.2rem 0.4rem;
+	}
+
+	.pick:hover {
+		background: var(--surface-2);
+	}
+
+	.pick.chosen {
+		/* **選択の枠も印の色に合わせる。**緑の固定色だと印が意味を失う。 */
+		background: var(--surface-2);
+		box-shadow: inset 0 0 0 1.5px var(--mark, var(--accent));
+	}
+
+	/* 印の色。**タグと二重に出す**（色が見えない人にも効くように）。 */
+	.bar {
+		flex: none;
+		width: 3px;
+		height: 0.95rem;
+		border-radius: 2px;
+		background: var(--mark);
+	}
+
+	.who {
+		flex: 1 1 auto;
+		min-width: 0;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	.known {
+		flex: none;
+		color: var(--ok);
+		display: inline-flex;
+	}
+
+	.picker-foot {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		padding: 0.35rem 0.2rem 0.05rem;
+	}
+
+	/* 初見の指紋。**行き止まりにしない。** */
+	.trust .core {
+		padding: 0.6rem 0.7rem;
+	}
+
+	.trust.danger .core {
+		background: var(--danger-soft);
+	}
+
+	.trust .head {
+		display: flex;
+		align-items: center;
+		gap: 0.35rem;
+		margin: 0 0 0.3rem;
+		font-size: 0.78rem;
+	}
+
+	.trust.danger .head {
+		color: var(--danger);
+	}
+
+	.trust .body {
+		margin: 0 0 0.4rem;
+		font-size: 0.72rem;
+		color: var(--fg-muted);
+		line-height: 1.6;
+	}
+
+	.trust dl {
+		margin: 0 0 0.5rem;
+		display: grid;
+		grid-template-columns: auto 1fr;
+		gap: 0.15rem 0.5rem;
+		align-items: baseline;
+	}
+
+	.trust dt {
+		font-size: 0.66rem;
+		color: var(--fg-faint);
+		white-space: nowrap;
+	}
+
+	.trust dd {
+		margin: 0;
+		min-width: 0;
+	}
+
+	.trust code {
+		font-family: var(--font-mono);
+		font-size: 0.68rem;
+		word-break: break-all;
+	}
+
+	.trust-actions {
+		display: flex;
+		gap: 0.4rem;
+	}
+
 	.panes {
 		display: grid;
 		grid-template-columns: 1fr 1fr;
@@ -632,8 +874,7 @@
 		padding: 0.18rem;
 	}
 
-	input,
-	select {
+	input {
 		font: inherit;
 		font-size: 0.7rem;
 		padding: 0.2rem 0.4rem;

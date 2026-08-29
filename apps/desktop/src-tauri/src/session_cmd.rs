@@ -38,19 +38,61 @@ pub fn spawn_bridge(app: AppHandle, engine: Arc<Engine>) {
     });
 }
 
+/// 繋げなかった理由。**文字列に潰さない。**
+///
+/// 画面が「この指紋で登録しますか」「パスフレーズを入れてください」を出せないと、
+/// 人はそこで行き止まりになる（**実際になった**）。
+#[derive(Serialize)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+pub enum ConnectFailure {
+    /// 初見のホスト。**人が確かめて登録すれば繋がる。**
+    Untrusted {
+        algorithm: String,
+        fingerprint: String,
+        /// 登録済みの指紋。**あるのに食い違うなら、すり替えの疑い。**
+        expected: Option<String>,
+    },
+    /// 鍵にパスフレーズが要る。
+    PassphraseNeeded,
+    /// それ以外。**そのまま人へ見せる。**
+    Other { message: String },
+}
+
+impl From<sshboard_engine::EngineError> for ConnectFailure {
+    fn from(error: sshboard_engine::EngineError) -> Self {
+        use sshboard_engine::EngineError;
+        match error {
+            EngineError::UntrustedHost {
+                algorithm,
+                fingerprint,
+                expected,
+                ..
+            } => ConnectFailure::Untrusted {
+                algorithm,
+                fingerprint,
+                expected,
+            },
+            EngineError::PassphraseNeeded { .. } => ConnectFailure::PassphraseNeeded,
+            other => ConnectFailure::Other {
+                message: other.to_string(),
+            },
+        }
+    }
+}
+
 /// 繋ぐ。`passphrase` は**人がその場で入れたもの**だけ（D14）。
 #[tauri::command]
 pub async fn session_connect(
     id: String,
     passphrase: Option<String>,
     engine: State<'_, Arc<Engine>>,
-) -> Result<Opened, String> {
+) -> Result<Opened, ConnectFailure> {
     // 空文字は「入れていない」。空のまま鍵へ渡すと、読めない理由が分かりにくくなる。
     let passphrase = passphrase.filter(|value| !value.is_empty());
     engine
         .connect(Actor::Human, &id, passphrase)
         .await
-        .map_err(|error| error.to_string())
+        .map_err(ConnectFailure::from)
 }
 
 #[tauri::command]

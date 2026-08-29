@@ -16,6 +16,9 @@ russh-sftp = "2"
 tokio = { workspace = true, features = ["net", "io-util"] }
 base64 = "0.22"
 sha2 = "0.10"
+# known_hosts のハッシュ化された行を照合するためだけに使う（HMAC-SHA1・RFC 2104）。
+# **鍵の強度が要る用途では使わない。**
+sha1 = "0.10"
 
 [dev-dependencies]
 tokio = { version = "1", features = ["sync", "time", "macros", "rt", "rt-multi-thread", "net"] }

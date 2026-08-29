@@ -14,6 +14,17 @@ pub enum EngineError {
     Connections(String),
     /// 鍵にパスフレーズが要る。**AI は受け取れない**（D14）。
     PassphraseNeeded { id: String },
+    /// **ホスト鍵を信用できない。**初見か、登録と食い違う。
+    ///
+    /// 文字列にせず**構造のまま**返す。画面が「この指紋で登録しますか」を
+    /// 出せなければ、人はここで行き止まりになる（**実際になった**）。
+    UntrustedHost {
+        id: String,
+        algorithm: String,
+        fingerprint: String,
+        /// 登録済みの指紋。**あるのに食い違っているなら、すり替えの疑い。**
+        expected: Option<String>,
+    },
     /// SSH 側の失敗。ホスト鍵の不一致もここに入る。
     Ssh(sshboard_ssh::SshError),
     /// ローカルのファイルが読めない・書けない。
@@ -42,6 +53,24 @@ impl fmt::Display for EngineError {
                 f,
                 "{id} の鍵にはパスフレーズが要ります。\
                  sshboard の画面で人が入れてください（AI はパスフレーズを扱いません）"
+            ),
+            EngineError::UntrustedHost {
+                algorithm,
+                fingerprint,
+                expected: Some(expected),
+                ..
+            } => write!(
+                f,
+                "ホスト鍵が登録と違います（{algorithm} / 見えたもの {fingerprint}・登録 {expected}）"
+            ),
+            EngineError::UntrustedHost {
+                algorithm,
+                fingerprint,
+                expected: None,
+                ..
+            } => write!(
+                f,
+                "初めて見るホストです（{algorithm} / {fingerprint}）。確かめて登録してください"
             ),
             EngineError::Ssh(error) => write!(f, "{error}"),
             EngineError::Local(detail) => write!(f, "手元のファイルを扱えません: {detail}"),

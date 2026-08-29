@@ -4,8 +4,8 @@ import type { MessageKey } from './messages';
 type Catalog = Partial<Record<MessageKey, string>>;
 
 export const ko: Catalog = {
-	'app.phase0': 'Phase 0 — 밴드만. SSH에 연결하지 않았습니다.',
-	'app.driven': '원래는 사람이 조작하지 않습니다. 외부 AI 에이전트가 MCP를 호출하고, 그 동작이 밴드에 흐릅니다.',
+	'app.phase0': "하나의 SSH를 사람과 AI가 함께 씁니다.",
+	'app.driven': "이것만으로 SFTP 클라이언트로 쓸 수 있습니다. 외부 AI 에이전트는 MCP로 같은 세션을 쓰고, 양쪽의 조작이 모두 밴드에 나옵니다.",
 	'theme.label': '테마', 'theme.auto': '자동', 'theme.light': '밝게', 'theme.dark': '어둡게',
 	'lang.label': '언어', 'mcp.label': 'MCP', 'mcp.starting': '시작 중…',
 	'tab.connections': '연결', 'tab.band': '밴드와 출력',
@@ -67,11 +67,25 @@ export const ko: Catalog = {
 	"mcp.copy": "MCP 등록 명령 복사",
 	"mcp.copied": "복사했습니다.",
 	"mcp.token.help": "토큰은 sshboard를 켤 때마다 바뀝니다. 이 명령을 에이전트에 붙여 넣으세요.",
+
+	// --- 接続の選択と、初見のホスト鍵を確かめる道 ---
+	"files.pick.help": "더블클릭하면 연결됩니다.",
+	"files.known": "지문 등록됨",
+	"files.passphrase.needed": "이 키에는 암호가 필요합니다. 입력하고 다시 연결하세요.",
+	"files.trust.first": "처음 보는 호스트입니다",
+	"files.trust.seen": "보인 것",
+	"files.trust.expected": "등록",
+	"files.trust.first.body": "서버 관리자에게 받은 지문이나 서버의 `ssh-keygen -lf` 출력과 대조하세요. 등록하면 이후 다른 것은 연결되지 않습니다.",
+	"files.trust.accept": "확인했습니다 — 등록하고 연결",
+	"files.trust.cancel": "취소",
+	"files.trust.mismatch": "호스트 키가 등록된 것과 다릅니다",
+	"files.trust.mismatch.body": "서버를 다시 만들었거나, 다른 무언가가 위장하고 있습니다. 연결하지 않습니다.",
+	"files.trust.mismatch.how": "다시 만든 것이 확실하다면 연결 탭에서 지문을 지우고 다시 연결하세요.",
 };
 
 export const zhCN: Catalog = {
-	'app.phase0': 'Phase 0 — 仅带状记录。尚未连接 SSH。',
-	'app.driven': '这里本不由人操作。外部 AI 代理调用 MCP，其操作会流入带状记录。',
+	'app.phase0': "一条 SSH，人和 AI 共用。",
+	'app.driven': "单独用作 SFTP 客户端也可以。外部 AI 代理通过 MCP 使用同一个会话，双方的操作都会显示在带上。",
 	'theme.label': '主题', 'theme.auto': '自动', 'theme.light': '浅色', 'theme.dark': '深色',
 	'lang.label': '语言', 'mcp.label': 'MCP', 'mcp.starting': '启动中…',
 	'tab.connections': '连接', 'tab.band': '带状记录与输出',
@@ -133,11 +147,25 @@ export const zhCN: Catalog = {
 	"mcp.copy": "复制 MCP 注册命令",
 	"mcp.copied": "已复制。",
 	"mcp.token.help": "每次启动 sshboard 令牌都会变。把这条命令贴给你的代理。",
+
+	// --- 接続の選択と、初見のホスト鍵を確かめる道 ---
+	"files.pick.help": "双击即可连接。",
+	"files.known": "已登记指纹",
+	"files.passphrase.needed": "此密钥需要口令。输入后再连接一次。",
+	"files.trust.first": "第一次见到这台主机",
+	"files.trust.seen": "看到的",
+	"files.trust.expected": "已登记",
+	"files.trust.first.body": "请与服务器管理员给你的指纹，或服务器上 `ssh-keygen -lf` 的输出比对。登记之后，其它的一律不连。",
+	"files.trust.accept": "已核对 — 登记并连接",
+	"files.trust.cancel": "暂不",
+	"files.trust.mismatch": "主机密钥与登记的不一致",
+	"files.trust.mismatch.body": "要么服务器被重建了，要么有东西在冒充它。不予连接。",
+	"files.trust.mismatch.how": "如果确知是重建，请在连接标签页清除指纹后再连。",
 };
 
 export const zhTW: Catalog = {
-	'app.phase0': 'Phase 0 — 僅帶狀紀錄。尚未連線 SSH。',
-	'app.driven': '這裡本不由人操作。外部 AI 代理呼叫 MCP，其操作會流入帶狀紀錄。',
+	'app.phase0': "一條 SSH，人與 AI 共用。",
+	'app.driven': "單獨當作 SFTP 用戶端也可以。外部 AI 代理透過 MCP 使用同一個工作階段，雙方的操作都會顯示在帶上。",
 	'theme.label': '主題', 'theme.auto': '自動', 'theme.light': '淺色', 'theme.dark': '深色',
 	'lang.label': '語言', 'mcp.label': 'MCP', 'mcp.starting': '啟動中…',
 	'tab.connections': '連線', 'tab.band': '帶狀紀錄與輸出',
@@ -199,4 +227,18 @@ export const zhTW: Catalog = {
 	"mcp.copy": "複製 MCP 註冊指令",
 	"mcp.copied": "已複製。",
 	"mcp.token.help": "每次啟動 sshboard 權杖都會改變。把這條指令貼給你的代理程式。",
+
+	// --- 接続の選択と、初見のホスト鍵を確かめる道 ---
+	"files.pick.help": "連按兩下即可連線。",
+	"files.known": "已登記指紋",
+	"files.passphrase.needed": "此金鑰需要通行碼。輸入後再連線一次。",
+	"files.trust.first": "第一次見到這台主機",
+	"files.trust.seen": "看到的",
+	"files.trust.expected": "已登記",
+	"files.trust.first.body": "請與伺服器管理者給你的指紋，或伺服器上 `ssh-keygen -lf` 的輸出比對。登記之後，其它的一律不連。",
+	"files.trust.accept": "已核對 — 登記並連線",
+	"files.trust.cancel": "暫不",
+	"files.trust.mismatch": "主機金鑰與登記的不一致",
+	"files.trust.mismatch.body": "可能是伺服器重建了，也可能有東西在冒充它。不予連線。",
+	"files.trust.mismatch.how": "若確知是重建，請在連線分頁清除指紋後再連。",
 };

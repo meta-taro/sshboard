@@ -4,8 +4,8 @@ import type { MessageKey } from './messages';
 type Catalog = Partial<Record<MessageKey, string>>;
 
 export const ptBR: Catalog = {
-	'app.phase0': 'Phase 0 — apenas a faixa. Sem conexão SSH.',
-	'app.driven': 'Normalmente você não opera aqui. Um agente de IA externo chama o MCP, e suas ações fluem para a faixa.',
+	'app.phase0': "uma única conexão SSH, compartilhada por você e pela IA.",
+	'app.driven': "Dá para usar sozinho como cliente SFTP. Um agente de IA externo chama o MCP na mesma sessão, e tudo o que vocês dois fazem aparece na faixa.",
 	'theme.label': 'Tema', 'theme.auto': 'Automático', 'theme.light': 'Claro', 'theme.dark': 'Escuro',
 	'lang.label': 'Idioma', 'mcp.label': 'MCP', 'mcp.starting': 'iniciando…',
 	'tab.connections': 'Conexões', 'tab.band': 'Faixa e saída',
@@ -67,11 +67,25 @@ export const ptBR: Catalog = {
 	"mcp.copy": "Copiar o comando MCP",
 	"mcp.copied": "Copiado.",
 	"mcp.token.help": "O token muda a cada início do sshboard. Cole este comando no seu agente.",
+
+	// --- 接続の選択と、初見のホスト鍵を確かめる道 ---
+	"files.pick.help": "Clique duas vezes para conectar.",
+	"files.known": "Impressão registrada",
+	"files.passphrase.needed": "Esta chave precisa de senha. Digite e conecte de novo.",
+	"files.trust.first": "Primeira vez que vemos este host",
+	"files.trust.seen": "Visto",
+	"files.trust.expected": "Registrado",
+	"files.trust.first.body": "Compare esta impressão com a que o operador do servidor lhe passou, ou com `ssh-keygen -lf` no servidor. Depois de registrada, o sshboard recusa qualquer outra.",
+	"files.trust.accept": "Conferi — registrar e conectar",
+	"files.trust.cancel": "Agora não",
+	"files.trust.mismatch": "A chave do host não bate com a registrada",
+	"files.trust.mismatch.body": "Ou o servidor foi refeito, ou algo está se passando por ele. O sshboard não conecta.",
+	"files.trust.mismatch.how": "Se você sabe que o servidor foi refeito, limpe a impressão na aba Conexões e conecte de novo.",
 };
 
 export const ru: Catalog = {
-	'app.phase0': 'Phase 0 — только лента. Соединение SSH не установлено.',
-	'app.driven': 'Обычно вы здесь ничего не нажимаете. Внешний ИИ-агент вызывает MCP, и его действия попадают в ленту.',
+	'app.phase0': "одно SSH-соединение на вас и ИИ.",
+	'app.driven': "Можно пользоваться и просто как SFTP-клиентом. Внешний ИИ-агент обращается через MCP к той же сессии, и всё, что делаете вы оба, видно в ленте.",
 	'theme.label': 'Тема', 'theme.auto': 'Авто', 'theme.light': 'Светлая', 'theme.dark': 'Тёмная',
 	'lang.label': 'Язык', 'mcp.label': 'MCP', 'mcp.starting': 'запуск…',
 	'tab.connections': 'Подключения', 'tab.band': 'Лента и вывод',
@@ -133,11 +147,25 @@ export const ru: Catalog = {
 	"mcp.copy": "Скопировать команду MCP",
 	"mcp.copied": "Скопировано.",
 	"mcp.token.help": "Токен меняется при каждом запуске sshboard. Вставьте эту команду в своего агента.",
+
+	// --- 接続の選択と、初見のホスト鍵を確かめる道 ---
+	"files.pick.help": "Двойной щелчок — подключиться.",
+	"files.known": "Отпечаток записан",
+	"files.passphrase.needed": "Этому ключу нужен пароль. Введите его и подключитесь снова.",
+	"files.trust.first": "Этот хост виден впервые",
+	"files.trust.seen": "Увидели",
+	"files.trust.expected": "Записано",
+	"files.trust.first.body": "Сверьте отпечаток с тем, что дал администратор сервера, или с выводом `ssh-keygen -lf` на сервере. После записи sshboard не примет никакой другой.",
+	"files.trust.accept": "Сверил — записать и подключиться",
+	"files.trust.cancel": "Не сейчас",
+	"files.trust.mismatch": "Ключ хоста не совпадает с записанным",
+	"files.trust.mismatch.body": "Либо сервер пересоздали, либо кто-то выдаёт себя за него. sshboard не подключается.",
+	"files.trust.mismatch.how": "Если сервер точно пересоздан, удалите отпечаток на вкладке подключений и подключитесь снова.",
 };
 
 export const it: Catalog = {
-	'app.phase0': 'Phase 0 — solo la fascia. Nessuna connessione SSH.',
-	'app.driven': "Di norma non si opera qui. Un agente IA esterno chiama MCP e le sue azioni scorrono nella fascia.",
+	'app.phase0': "una sola connessione SSH, condivisa fra te e l'IA.",
+	'app.driven': "Puoi usarlo da solo come client SFTP. Un agente IA esterno chiama MCP sulla stessa sessione, e tutto quello che fate entrambi compare nella banda.",
 	'theme.label': 'Tema', 'theme.auto': 'Automatico', 'theme.light': 'Chiaro', 'theme.dark': 'Scuro',
 	'lang.label': 'Lingua', 'mcp.label': 'MCP', 'mcp.starting': 'avvio…',
 	'tab.connections': 'Connessioni', 'tab.band': 'Fascia e output',
@@ -199,4 +227,18 @@ export const it: Catalog = {
 	"mcp.copy": "Copia il comando MCP",
 	"mcp.copied": "Copiato.",
 	"mcp.token.help": "Il token cambia a ogni avvio di sshboard. Incolla questo comando nel tuo agente.",
+
+	// --- 接続の選択と、初見のホスト鍵を確かめる道 ---
+	"files.pick.help": "Doppio clic per connettersi.",
+	"files.known": "Impronta registrata",
+	"files.passphrase.needed": "Questa chiave richiede una passphrase. Inseriscila e riconnettiti.",
+	"files.trust.first": "È la prima volta che vediamo questo host",
+	"files.trust.seen": "Visto",
+	"files.trust.expected": "Registrato",
+	"files.trust.first.body": "Confronta questa impronta con quella data dall'operatore del server, o con `ssh-keygen -lf` sul server. Una volta registrata, sshboard rifiuterà qualsiasi altra.",
+	"files.trust.accept": "Verificato — registra e connetti",
+	"files.trust.cancel": "Non ora",
+	"files.trust.mismatch": "La chiave dell'host non corrisponde a quella registrata",
+	"files.trust.mismatch.body": "O il server è stato rifatto, oppure qualcosa si sta spacciando per lui. sshboard non si connette.",
+	"files.trust.mismatch.how": "Se sai che il server è stato rifatto, cancella l'impronta nella scheda Connessioni e riconnettiti.",
 };

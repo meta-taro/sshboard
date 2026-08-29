@@ -104,7 +104,25 @@ impl Engine {
         // 誰がいつ開いたかが残らないなら、同じ 1 本を共有している意味がない。
         self.show(actor, &format!("connect {}", entry.id)).await?;
 
-        let session = SshSession::connect(&target, &auth, self.band.clone()).await?;
+        let session = SshSession::connect(&target, &auth, self.band.clone())
+            .await
+            // **ホスト鍵の不一致だけは、構造のまま上へ返す。**
+            // 文字列に潰すと、画面が「この指紋で登録しますか」を出せず、
+            // 人がそこで行き止まりになる（**実際になった**）。
+            .map_err(|error| match error {
+                sshboard_ssh::SshError::UntrustedHost { seen, trust } => {
+                    EngineError::UntrustedHost {
+                        id: entry.id.clone(),
+                        algorithm: seen.algorithm,
+                        fingerprint: seen.fingerprint,
+                        expected: match trust {
+                            sshboard_ssh::Trust::Mismatch { expected } => Some(expected),
+                            _ => None,
+                        },
+                    }
+                }
+                other => EngineError::Ssh(other),
+            })?;
         let opened = Opened {
             id: entry.id.clone(),
             name: entry.name.clone(),

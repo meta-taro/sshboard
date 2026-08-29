@@ -26,7 +26,9 @@ fn refuse(error: EngineError) -> ErrorData {
         EngineError::NotConnected
         | EngineError::AlreadyConnected { .. }
         | EngineError::UnknownConnection(_)
-        | EngineError::PassphraseNeeded { .. } => {
+        | EngineError::PassphraseNeeded { .. }
+        // **指紋を確かめて登録できるのは人だけ。**AI へは「人に頼め」と返す。
+        | EngineError::UntrustedHost { .. } => {
             ErrorData::invalid_params(error.to_string(), None)
         }
         other => ErrorData::internal_error(other.to_string(), None),
