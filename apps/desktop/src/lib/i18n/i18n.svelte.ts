@@ -7,7 +7,7 @@ import { invoke } from '@tauri-apps/api/core';
 
 import { CATALOGS, FALLBACK, type MessageKey } from './messages';
 import { DEFAULT_LOCALE, preferredLocale, SUPPORTED_CODES } from './locales';
-import { menuLabels } from './messages-menu';
+import { MENU_KEYS, menuLabels } from './messages-menu';
 
 const STORAGE_KEY = 'sshboard-locale';
 
@@ -51,27 +51,22 @@ class I18n {
 	/**
 	 * OS のメニューバーを組み直す。**訳はここから渡す。**
 	 * Rust 側にも訳を置くと、片方だけ直す事故が起きます。
+	 *
+	 * **項目を手で並べないこと。**以前ここを手書きしていて、
+	 * 「表示」メニューを足したときに渡し忘れ、**メニュー全体が既定の英語へ戻った。**
+	 * `MENU_KEYS` から機械的に作れば、鍵を足した時点で必ず渡ります。
 	 */
 	#applyMenu(): void {
 		const labels = menuLabels(this.locale);
-		invoke('set_menu_labels', {
-			labels: {
-				about: labels['menu.about'],
-				quit: labels['menu.quit'],
-				edit: labels['menu.edit'],
-				undo: labels['menu.undo'],
-				redo: labels['menu.redo'],
-				cut: labels['menu.cut'],
-				copy: labels['menu.copy'],
-				paste: labels['menu.paste'],
-				selectAll: labels['menu.selectAll'],
-				window: labels['menu.window'],
-				minimize: labels['menu.minimize'],
-				zoom: labels['menu.zoom'],
-				close: labels['menu.close']
-			}
-		}).catch(() => {
-			/* メニューが組めなくても画面は使える。**アプリを止めない。** */
+		// `menu.textLarger` → `textLarger`。Rust 側の MenuLabels は camelCase。
+		const forRust = Object.fromEntries(
+			MENU_KEYS.map((key) => [key.slice('menu.'.length), labels[key]])
+		);
+
+		invoke('set_menu_labels', { labels: forRust }).catch((error: unknown) => {
+			// **黙らない。**組めなかったことに気づけないと、既定の英語メニューのまま
+			// 使い続けることになる（実際になった）。画面は使えるのでアプリは止めない。
+			console.error('[sshboard] メニューを組めません', error);
 		});
 	}
 

@@ -58,7 +58,6 @@ export const ko: Catalog = {
 	"files.refresh": "다시 읽기",
 	"files.loading": "읽는 중…",
 	"files.emptydir": "비어 있습니다.",
-	"files.notconnected": "연결되지 않았습니다.",
 	"files.newdir": "새 디렉터리 이름",
 	"files.mkdir": "만들기",
 	"conn.write": "AI가 써도 되는 디렉터리",
@@ -91,6 +90,11 @@ export const ko: Catalog = {
 	"text.normal": "보통",
 	"text.large": "크게",
 	"text.xlarge": "아주 크게",
+	// 初動で迷わせない。**繋がるまでの 3 手順。**
+	"files.step1": "아래 목록에서 서버를 고르고 [연결]을 누릅니다.",
+	"files.step2": "처음이라면 표시된 지문을 확인하고 등록합니다.",
+	"files.step3": "왼쪽에 파일을 끌어다 놓고 [올리기]를 누릅니다.",
+	"files.notconnected": "연결되지 않았습니다. 위에서 서버를 고르고 [연결]을 누르세요.",
 };
 
 export const zhCN: Catalog = {
@@ -148,7 +152,6 @@ export const zhCN: Catalog = {
 	"files.refresh": "刷新",
 	"files.loading": "读取中…",
 	"files.emptydir": "空的。",
-	"files.notconnected": "尚未连接。",
 	"files.newdir": "新目录名",
 	"files.mkdir": "创建",
 	"conn.write": "允许 AI 写入的目录",
@@ -181,6 +184,11 @@ export const zhCN: Catalog = {
 	"text.normal": "标准",
 	"text.large": "大",
 	"text.xlarge": "特大",
+	// 初動で迷わせない。**繋がるまでの 3 手順。**
+	"files.step1": "在下面选一台服务器，按［连接］。",
+	"files.step2": "第一次连接时，核对显示的指纹并登记。",
+	"files.step3": "把文件拖到左边，按［上传］。",
+	"files.notconnected": "尚未连接。请在上面选一台服务器并按［连接］。",
 };
 
 export const zhTW: Catalog = {
@@ -238,7 +246,6 @@ export const zhTW: Catalog = {
 	"files.refresh": "重新讀取",
 	"files.loading": "讀取中…",
 	"files.emptydir": "空的。",
-	"files.notconnected": "尚未連線。",
 	"files.newdir": "新目錄名稱",
 	"files.mkdir": "建立",
 	"conn.write": "允許 AI 寫入的目錄",
@@ -271,4 +278,9 @@ export const zhTW: Catalog = {
 	"text.normal": "標準",
 	"text.large": "大",
 	"text.xlarge": "特大",
+	// 初動で迷わせない。**繋がるまでの 3 手順。**
+	"files.step1": "在下面選一台伺服器，按［連線］。",
+	"files.step2": "第一次連線時，核對顯示的指紋並登記。",
+	"files.step3": "把檔案拖到左邊，按［上傳］。",
+	"files.notconnected": "尚未連線。請在上面選一台伺服器並按［連線］。",
 };

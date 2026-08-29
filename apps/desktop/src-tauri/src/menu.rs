@@ -13,6 +13,15 @@ use tauri::{AppHandle, Emitter, Wry};
 /// ここでは「どちらへ動かすか」だけを渡す。
 pub const TEXT_SIZE_EVENT: &str = "menu://text-size";
 
+/// 割り当て。**キー名は `keyboard-types` の Code**（`Plus` や `0` は無い）。
+///
+/// `CmdOrCtrl+Plus` と書いたらパースに失敗し、`apply` がエラーを返して
+/// **メニューが 1 つも適用されず既定の英語メニューへ戻った。**実際に戻った。
+/// 下の `accelerators_parse` がそれを見張っている。
+pub const TEXT_LARGER_KEY: &str = "CmdOrCtrl+Equal";
+pub const TEXT_SMALLER_KEY: &str = "CmdOrCtrl+Minus";
+pub const TEXT_RESET_KEY: &str = "CmdOrCtrl+Digit0";
+
 /// 画面から渡されるメニューの文言。
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -76,14 +85,14 @@ pub fn apply(app: &AppHandle, labels: &MenuLabels) -> tauri::Result<()> {
                 "text-larger",
                 &labels.text_larger,
                 true,
-                Some("CmdOrCtrl+Plus"),
+                Some(TEXT_LARGER_KEY),
             )?,
             &MenuItem::with_id(
                 app,
                 "text-smaller",
                 &labels.text_smaller,
                 true,
-                Some("CmdOrCtrl+-"),
+                Some(TEXT_SMALLER_KEY),
             )?,
             &PredefinedMenuItem::separator(app)?,
             &MenuItem::with_id(
@@ -91,7 +100,7 @@ pub fn apply(app: &AppHandle, labels: &MenuLabels) -> tauri::Result<()> {
                 "text-reset",
                 &labels.text_reset,
                 true,
-                Some("CmdOrCtrl+0"),
+                Some(TEXT_RESET_KEY),
             )?,
         ],
     )?;
@@ -151,4 +160,52 @@ pub fn handle_event(app: &AppHandle, event: MenuEvent) {
 #[tauri::command]
 pub fn set_menu_labels(app: AppHandle<Wry>, labels: MenuLabels) -> Result<(), String> {
     apply(&app, &labels).map_err(|error| error.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{TEXT_LARGER_KEY, TEXT_RESET_KEY, TEXT_SMALLER_KEY};
+    use muda::accelerator::Accelerator;
+    use std::str::FromStr;
+    use tauri::menu::AboutMetadata;
+
+    /// **割り当てが読めないと、メニューが 1 つも出ない。**
+    ///
+    /// `MenuItem::with_id` はここで失敗し、`apply` 全体が Err になる。
+    /// 画面はそれを握り潰していたので、**既定の英語メニューのまま**気づけなかった。
+    #[test]
+    fn every_accelerator_parses() {
+        for key in [TEXT_LARGER_KEY, TEXT_SMALLER_KEY, TEXT_RESET_KEY] {
+            Accelerator::from_str(key).unwrap_or_else(|error| panic!("{key} が読めない: {error}"));
+        }
+    }
+
+    /// **これが弾かれることを確かめておく。**弾かれないなら上のテストは無意味。
+    #[test]
+    fn the_name_that_broke_the_menu_is_rejected() {
+        // `Plus` は keyboard-types の Code に無い。**これ 1 つでメニューが全部消えた。**
+        assert!(
+            Accelerator::from_str("CmdOrCtrl+Plus").is_err(),
+            "壊れた名前が通ってしまう。上のテストが無意味になる"
+        );
+
+        // 一方 `0` と `-` は通る。**通ると思い込んでいた方が間違っていた**ので、
+        // ここに実測を残す（`Digit0` / `Minus` と書いても同じく通る）。
+        assert!(Accelerator::from_str("CmdOrCtrl+0").is_ok());
+        assert!(Accelerator::from_str("CmdOrCtrl+-").is_ok());
+    }
+
+    /// **「〜について」に個人を載せない**（product-baseline §25）。
+    #[test]
+    fn the_about_panel_carries_no_person() {
+        let about = AboutMetadata {
+            name: Some("sshboard".into()),
+            version: Some(env!("CARGO_PKG_VERSION").into()),
+            website: Some("https://github.com/meta-taro/sshboard".into()),
+            ..Default::default()
+        };
+
+        assert!(about.authors.is_none(), "作者名を載せている");
+        assert!(about.credits.is_none(), "謝辞に個人が入りうる");
+    }
 }

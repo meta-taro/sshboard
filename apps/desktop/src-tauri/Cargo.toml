@@ -26,4 +26,7 @@ tokio = { workspace = true, features = ["rt-multi-thread"] }
 serde = { version = "1", features = ["derive"] }
 
 [dev-dependencies]
+# メニューの割り当てを**本物のパーサ**で検査するため（tauri 経由で既に依存木にある）。
+# `CmdOrCtrl+Plus` のような読めない名前を書くと、メニューが 1 つも出ない。
+muda = "0.19"
 tokio = { version = "1", features = ["sync", "time", "macros", "rt", "rt-multi-thread"] }

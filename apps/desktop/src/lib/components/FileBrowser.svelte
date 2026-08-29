@@ -296,7 +296,7 @@
 								connect();
 							}}
 						>
-							<span class="bar" aria-hidden="true"></span>
+							<span class="mark-bar" aria-hidden="true"></span>
 							<span class="who">{entry.name || entry.id}</span>
 							{#if entry.tag}<span class="tag">{entry.tag}</span>{/if}
 							{#if entry.fingerprint}
@@ -320,6 +320,13 @@
 				</button>
 				<span class="hint">{i18n.t('files.pick.help')}</span>
 			</div>
+
+			<!-- **初動で迷わせない。**繋がるまでの 3 手順をその場に置く。 -->
+			<ol class="steps">
+				<li>{i18n.t('files.step1')}</li>
+				<li>{i18n.t('files.step2')}</li>
+				<li>{i18n.t('files.step3')}</li>
+			</ol>
 		</div>
 	{/if}
 
@@ -611,8 +618,10 @@
 		box-shadow: inset 0 0 0 1.5px var(--mark, var(--accent));
 	}
 
-	/* 印の色。**タグと二重に出す**（色が見えない人にも効くように）。 */
-	.bar {
+	/* 印の色。**タグと二重に出す**（色が見えない人にも効くように）。
+	   **`.bar` と名付けない。**上の接続バーと衝突して、そちらが幅 3px に潰れた
+	   （実際に潰れた）。 */
+	.mark-bar {
 		flex: none;
 		width: 3px;
 		height: 0.95rem;
@@ -632,6 +641,18 @@
 		flex: none;
 		color: var(--ok);
 		display: inline-flex;
+	}
+
+	/* 3 手順。**繋がるまでのあいだだけ出す。**繋がったら消える。 */
+	.steps {
+		margin: 0.15rem 0 0;
+		padding: 0 0 0 1.1rem;
+		display: flex;
+		flex-direction: column;
+		gap: 0.1rem;
+		font-size: 0.66rem;
+		color: var(--fg-faint);
+		line-height: 1.5;
 	}
 
 	.picker-foot {
