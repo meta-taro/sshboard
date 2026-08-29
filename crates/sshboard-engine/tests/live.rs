@@ -7,7 +7,7 @@ use std::sync::Arc;
 
 use sshboard_band::{Actor, Band};
 use sshboard_diag::Diagnostics;
-use sshboard_engine::{Engine, EngineError};
+use sshboard_engine::{Engine, EngineError, OnConflict};
 use sshboard_ssh::{Auth, SshError, SshSession, Target, WriteScope};
 use sshboard_stream::OutputStream;
 
@@ -326,6 +326,115 @@ async fn a_missing_local_file_is_reported_as_a_local_problem_not_an_ssh_one() {
         .await;
 
     assert!(matches!(result, Err(EngineError::Local(_))), "{result:?}");
+}
+
+// --- ダウンロード（サーバー → 手元） -----------------------------------------
+
+#[tokio::test]
+async fn a_remote_file_is_downloaded_byte_for_byte() {
+    if !server_is_up().await {
+        println!("テスト用サーバーが建っていません（想定内・飛ばします）");
+        return;
+    }
+
+    let dir = tempfile::tempdir().expect("一時ディレクトリ");
+    let engine = engine_at(registry(&dir, &["/home/probe/upload"]).await);
+    engine
+        .connect(Actor::Human, "local", None)
+        .await
+        .expect("繋がらない");
+
+    // **文字コードを決めない**（`read_file` と同じ立場）。
+    // EUC-JP のログは実在するので、落とした先で化けていては使えない。
+    let payload: Vec<u8> = b"\x00\xff\r\n\xa4\xa2\xa4\xa4".to_vec();
+    let remote = "/home/probe/upload/download-me.bin";
+    engine
+        .upload_bytes(Actor::Human, remote, &payload)
+        .await
+        .expect("置けない");
+
+    let local = dir.path().join("came-back.bin");
+    let bytes = engine
+        .download_file(Actor::Human, remote, &local, OnConflict::Refuse)
+        .await
+        .expect("落とせない");
+
+    assert_eq!(bytes, payload.len() as u64);
+    assert_eq!(
+        std::fs::read(&local).expect("手元に無い"),
+        payload,
+        "落としたものが元と違う"
+    );
+}
+
+#[tokio::test]
+async fn a_second_download_is_refused_unless_overwriting_was_chosen() {
+    // **人の手元を黙って壊さない。**繋がっていても、そこは変わらない。
+    if !server_is_up().await {
+        println!("テスト用サーバーが建っていません（想定内・飛ばします）");
+        return;
+    }
+
+    let dir = tempfile::tempdir().expect("一時ディレクトリ");
+    let engine = engine_at(registry(&dir, &["/home/probe/upload"]).await);
+    engine
+        .connect(Actor::Human, "local", None)
+        .await
+        .expect("繋がらない");
+
+    let remote = "/home/probe/upload/twice.txt";
+    engine
+        .upload_bytes(Actor::Human, remote, b"server")
+        .await
+        .expect("置けない");
+
+    let local = dir.path().join("twice.txt");
+    std::fs::write(&local, b"local").expect("手元に書けない");
+
+    let refused = engine
+        .download_file(Actor::Human, remote, &local, OnConflict::Refuse)
+        .await;
+    assert!(matches!(refused, Err(EngineError::Local(_))), "{refused:?}");
+    assert_eq!(std::fs::read(&local).expect("読めない"), b"local");
+
+    engine
+        .download_file(Actor::Human, remote, &local, OnConflict::Overwrite)
+        .await
+        .expect("上書きを頼んだのに落とせない");
+    assert_eq!(std::fs::read(&local).expect("読めない"), b"server");
+}
+
+#[tokio::test]
+async fn downloading_something_that_is_not_there_leaves_nothing_behind() {
+    // **失敗したのに 0 バイトのファイルが残る**のが一番たちが悪い。
+    // 落ちてきたと思って、そのまま次の作業へ進んでしまう。
+    if !server_is_up().await {
+        println!("テスト用サーバーが建っていません（想定内・飛ばします）");
+        return;
+    }
+
+    let dir = tempfile::tempdir().expect("一時ディレクトリ");
+    let engine = engine_at(registry(&dir, &["/home/probe/upload"]).await);
+    engine
+        .connect(Actor::Human, "local", None)
+        .await
+        .expect("繋がらない");
+
+    let local = dir.path().join("never-arrives.bin");
+    let result = engine
+        .download_file(
+            Actor::Human,
+            "/home/probe/upload/no-such-file-at-all",
+            &local,
+            OnConflict::Refuse,
+        )
+        .await;
+
+    assert!(result.is_err(), "無いものが落ちてきた");
+    assert!(
+        !local.exists(),
+        "落ちなかったのに手元にファイルが残っている"
+    );
 }
 
 // --- 複数の接続（D25） -------------------------------------------------------

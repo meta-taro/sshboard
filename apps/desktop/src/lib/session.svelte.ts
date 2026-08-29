@@ -85,6 +85,17 @@ export function joinPath(dir: string, name: string): string {
 	return `${dir.replace(/\/+$/, '')}/${name}`;
 }
 
+/**
+ * 手元のディレクトリと名前を繋ぐ。**Windows も相手にする**（PRD §7）。
+ *
+ * リモートは常に `/` ですが、手元は `\` で来ます。混ぜると
+ * **落とし先が人の見ている場所と違って見える**ので、どちらか一方に決めます。
+ */
+export function localJoin(dir: string, name: string): string {
+	const sep = dir.includes('\\') && !dir.includes('/') ? '\\' : '/';
+	return dir.endsWith(sep) ? `${dir}${name}` : `${dir}${sep}${name}`;
+}
+
 /** 人が読める大きさ。**1024 で割る**（ファイルの大きさなので）。 */
 export function humanSize(bytes: number): string {
 	const units = ['B', 'KB', 'MB', 'GB', 'TB'];

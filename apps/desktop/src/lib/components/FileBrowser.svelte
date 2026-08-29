@@ -17,6 +17,7 @@
 		baseName,
 		humanSize,
 		joinPath,
+		localJoin,
 		parentOf,
 		session,
 		type Listed
@@ -52,6 +53,21 @@
 
 	/** 上げる待ちの手元のファイル。**パスだけを持つ**（中身は Rust 側で読む）。 */
 	let staged = $state<string[]>([]);
+
+	/**
+	 * 落とす待ちのサーバー側のファイル。**名前だけ**を持ちます。
+	 *
+	 * 絶対パスにせず名前で持つのは、**いま見えている階層のものしか落とさない**ため。
+	 * 階層を移ったら捨てます（別の場所の同じ名前を落としてしまわないように）。
+	 */
+	let pickedRemote = $state<string[]>([]);
+
+	/**
+	 * 手元にある同じ名前を上書きしてよいか。**既定は否**（product-baseline §13）。
+	 *
+	 * **1 回ごとに戻します。**一度承認された操作が、次も承認されているとは限らない。
+	 */
+	let overwrite = $state(false);
 	let dropping = $state(false);
 	let newDirName = $state('');
 	let notice = $state<string | null>(null);
@@ -83,12 +99,6 @@
 		} catch (error: unknown) {
 			failure = String(error);
 		}
-	}
-
-	/** 手元のパスを繋ぐ。**Windows も相手にする**（PRD §7）。 */
-	function localJoin(dir: string, name: string): string {
-		const sep = dir.includes('\\') && !dir.includes('/') ? '\\' : '/';
-		return dir.endsWith(sep) ? `${dir}${name}` : `${dir}${sep}${name}`;
 	}
 
 	/** 選んでいるか。**選択は絶対パスで持つ**（別の階層へ移っても消えない）。 */
@@ -195,11 +205,54 @@
 		if (!connected) return;
 		loading = true;
 		failure = null;
+		// **一覧を読み直したら選択は捨てる。**名前で持っているので、
+		// 階層が変われば同じ名前が別のファイルを指す。
+		pickedRemote = [];
 		try {
 			entries = await invoke<Listed[]>('remote_list_dir', { path: remotePath });
 		} catch (error: unknown) {
 			failure = String(error);
 		} finally {
+			loading = false;
+		}
+	}
+
+	/** サーバー側のファイルを選ぶ／外す。**押した階層のものだけ。** */
+	function toggleRemote(name: string) {
+		pickedRemote = pickedRemote.includes(name)
+			? pickedRemote.filter((held) => held !== name)
+			: [...pickedRemote, name];
+	}
+
+	/**
+	 * 選んだものを手元へ落とす。**いま左に見えているディレクトリへ入ります。**
+	 *
+	 * 同じ名前が手元にあるときは、上書きを選んでいない限り Rust 側が断ります。
+	 */
+	async function download() {
+		if (pickedRemote.length === 0 || !connected) return;
+		failure = null;
+		notice = null;
+		loading = true;
+		try {
+			const done = await invoke<Array<{ name: string; bytes: number }>>('remote_download', {
+				names: pickedRemote,
+				remoteDir: remotePath,
+				localDir: localPath,
+				overwrite
+			});
+			const total = done.reduce((sum, one) => sum + one.bytes, 0);
+			notice = i18n.t('files.downloaded', {
+				count: String(done.length),
+				size: humanSize(total)
+			});
+			pickedRemote = [];
+			await loadLocal(localPath);
+		} catch (error: unknown) {
+			failure = String(error);
+		} finally {
+			// **上書きの許しは 1 回きり。**押しっぱなしにさせない（§13）。
+			overwrite = false;
 			loading = false;
 		}
 	}
@@ -603,34 +656,65 @@
 				{:else}
 					<ul class="list">
 						{#each entries as entry (entry.name)}
-							<li>
+							<li class:picked={!entry.isDir && pickedRemote.includes(entry.name)}>
 								<Icon name={entry.isDir ? 'folder' : 'file'} size={12} />
 								{#if entry.isDir}
 									<button type="button" class="link" onclick={() => enter(entry.name)}>
 										{entry.name}
 									</button>
 								{:else}
-									<span class="name">{entry.name}</span>
+									<!-- **左と同じ操作にする。**押すと選び、選んだものが手元へ落ちる。 -->
+									<button type="button" class="link plain" onclick={() => toggleRemote(entry.name)}>
+										{entry.name}
+									</button>
 								{/if}
 								<span class="size">{entry.isDir ? '' : humanSize(entry.size)}</span>
+								{#if !entry.isDir && pickedRemote.includes(entry.name)}
+									<span class="chosen-mark"><Icon name="check" size={11} /></span>
+								{/if}
 							</li>
 						{/each}
 					</ul>
 				{/if}
 
-				<footer>
-					<input
-						bind:value={newDirName}
-						onkeydown={(event) => event.key === 'Enter' && makeDir()}
-						placeholder={i18n.t('files.newdir')}
-						aria-label={i18n.t('files.newdir')}
-						disabled={!connected}
-						spellcheck="false"
-					/>
-					<button type="button" onclick={makeDir} disabled={!connected || !newDirName.trim()}>
-						<Icon name="folder" />
-						{i18n.t('files.mkdir')}
-					</button>
+				<footer class="stack">
+					<!-- **どこへ落ちるかを、落とすボタンの隣に出す**（上げる側と同じ）。 -->
+					<div class="sending">
+						<button
+							type="button"
+							class="primary"
+							onclick={download}
+							disabled={!connected || pickedRemote.length === 0 || loading}
+						>
+							<Icon name="download" />
+							{i18n.t('files.download', { count: String(pickedRemote.length) })}
+						</button>
+						<span class="to" title={localPath}>
+							<Icon name="arrow-down" size={11} />
+							{localPath}
+						</span>
+					</div>
+					{#if pickedRemote.length > 0}
+						<!-- **既定は上書きしない。**落とす側が壊すのは人の手元のファイル。 -->
+						<label class="overwrite">
+							<input type="checkbox" bind:checked={overwrite} />
+							{i18n.t('files.overwrite')}
+						</label>
+					{/if}
+					<div class="sending">
+						<input
+							bind:value={newDirName}
+							onkeydown={(event) => event.key === 'Enter' && makeDir()}
+							placeholder={i18n.t('files.newdir')}
+							aria-label={i18n.t('files.newdir')}
+							disabled={!connected}
+							spellcheck="false"
+						/>
+						<button type="button" onclick={makeDir} disabled={!connected || !newDirName.trim()}>
+							<Icon name="folder" />
+							{i18n.t('files.mkdir')}
+						</button>
+					</div>
 				</footer>
 			</div>
 		</div>
@@ -964,14 +1048,6 @@
 		background: var(--surface-2);
 	}
 
-	.name {
-		flex: 1 1 auto;
-		min-width: 0;
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
-	}
-
 	.size {
 		font-family: var(--font-mono);
 		font-size: 0.64rem;
@@ -1016,6 +1092,22 @@
 		overflow: hidden;
 		text-overflow: ellipsis;
 		min-width: 0;
+	}
+
+	/* 上書きの許し。**押すたびに戻る**ので、見えていないと気づけない。 */
+	.overwrite {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.3rem;
+		font-size: 0.66rem;
+		color: var(--fg-muted);
+		cursor: pointer;
+	}
+
+	.overwrite input {
+		width: auto;
+		margin: 0;
+		accent-color: var(--accent);
 	}
 
 	button.tiny {

@@ -1,4 +1,4 @@
-//! 開いている 1 本を持ち、すべての操作をここへ集める。
+//! 開いているものを**全部**持ち、すべての操作をここへ集める（D25）。
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -321,6 +321,35 @@ impl Engine {
         self.upload_bytes(actor, remote, &bytes).await
     }
 
+    // --- ダウンロード（サーバー → 手元） ------------------------------------
+
+    /// サーバーのファイルを 1 つ手元へ落とす。
+    ///
+    /// **囲い（D22）はかかりません。**囲いが守るのは*サーバー*で、
+    /// ここで書き換わるのは*手元*だからです。代わりに
+    /// [`OnConflict`] が、**人の手元を黙って上書きしないこと**を守ります。
+    ///
+    /// **中身をここで全部メモリに載せます。**上げる側と同じ制限で、
+    /// 分割して落とす必要のある大きさに当たったら、そのとき実測して直します（YAGNI）。
+    pub async fn download_file(
+        &self,
+        actor: Actor,
+        remote: &str,
+        local: &Path,
+        on_conflict: OnConflict,
+    ) -> Result<u64, EngineError> {
+        // **サーバーへ行く前に落とし先を確かめる。**
+        // 断ったのに帯へ 1 行出た、が起きない（上げる側の `allow_write` と同じ順番）。
+        check_destination(local, on_conflict)?;
+
+        let bytes = self.read_file(actor, remote).await?;
+        // ここまで来て初めて手元へ書く。**落ちてこなかったのに 0 バイトが残る、を作らない。**
+        tokio::fs::write(local, &bytes)
+            .await
+            .map_err(|error| EngineError::Local(format!("{}: {error}", local.display())))?;
+        Ok(bytes.len() as u64)
+    }
+
     // --- 接続一覧 -----------------------------------------------------------
 
     fn entry(&self, id: &str) -> Result<ConnectionEntry, EngineError> {
@@ -360,6 +389,42 @@ impl Engine {
             path,
             passphrase: secret,
         })
+    }
+}
+
+/// 落とし先に同じ名前があったとき、どうするか。
+///
+/// **既定は断る側**（`Refuse`）です。上げる側と違い、落とす側が壊すのは
+/// **人の手元のファイル**で、sshboard からは元へ戻せません（product-baseline §13）。
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum OnConflict {
+    /// 既に在ったら断る。**人が「上書きする」と言うまで触らない。**
+    #[default]
+    Refuse,
+    /// 人がその場で上書きを選んだときだけ。
+    Overwrite,
+}
+
+/// 落とし先を確かめる。**サーバーへ触る前に呼びます。**
+fn check_destination(local: &Path, on_conflict: OnConflict) -> Result<(), EngineError> {
+    if on_conflict == OnConflict::Refuse && local.exists() {
+        return Err(EngineError::Local(format!(
+            "{} は既に在ります。上書きしてよいかは人が決めてください",
+            local.display()
+        )));
+    }
+
+    // 落とし先の階層は**勝手に作りません。**作ってしまうと、
+    // 打ち間違えたパスがそのまま新しいディレクトリになり、
+    // **どこへ落ちたのか分からなくなる**（上げる側の `ensure_dir` は人が明示的に押す）。
+    match local.parent() {
+        Some(parent) if !parent.as_os_str().is_empty() && !parent.is_dir() => {
+            Err(EngineError::Local(format!(
+                "{} というディレクトリがありません",
+                parent.display()
+            )))
+        }
+        _ => Ok(()),
     }
 }
 

@@ -1,11 +1,12 @@
 # プロジェクトステータス — sshboard
 
 - **現在フェーズ**: Phase 0 は技術項目を抜けた。**Phase 1 に入っています**
-- **最終更新**: 2026-08-29
+- **最終更新**: 2026-08-30
 
 ## いまの状態を一言で
 
 **人も AI も、同じ SSH でファイルを上げられます。**接続はタブで複数持てます（D25）。
+**人は落とせます（サーバー → 手元）。AI には落とす口を渡していません**（D27）。
 
 Phase 0 の 5 本は、実機と Windows 目視を除いてすべて通りました。
 そのうえで **D2（読み取り専用）を D22 で覆し、囲いつきの書き込みを入れています。**
@@ -22,10 +23,10 @@ Phase 0 の 5 本は、実機と Windows 目視を除いてすべて通りまし
 | `crates/sshboard-credentials` | OS 資格情報ストア ＋ ssh-agent。**自前の鍵ストアを持たない**（D11） |
 | `crates/sshboard-connections` | 接続の一覧。秘密はファイルに置かず参照名だけ。印（色・タグ）付き |
 | `crates/sshboard-ssh` | SSH 1 本の上の `exec` / `sftp` / `tail -f`。ホスト鍵の検証。**書き込みの囲い**（D22） |
-| `crates/sshboard-engine` | **GUI と MCP が共有する実行体**（PRD §4-1）。接続を複数持ち、**1 本残らずタブに出す**（D25） |
+| `crates/sshboard-engine` | **GUI と MCP が共有する実行体**（PRD §4-1）。接続を複数持ち、**1 本残らずタブに出す**（D25）。手元へ落とす側は**黙って上書きしない**（D27） |
 | `crates/sshboard-diag` | 何が起きたかの記録。**人にも AI にも同じものを見せる**。接続先を入れない |
 | `crates/sshboard-mcp` | 同居 MCP・**合言葉必須**（D23）。16 本のツール（下記） |
-| `apps/desktop` | SvelteKit + Tauri 2。**ファイル 2 ペイン（左右とも本物の一覧）**・接続タブ・接続管理・帯・診断・端末・11 言語・テーマ・**文字サイズ 4 段** |
+| `apps/desktop` | SvelteKit + Tauri 2。**ファイル 2 ペイン（左右とも本物の一覧・上げ下ろし両方）**・接続タブ・接続管理・帯・診断・端末・11 言語・テーマ・**文字サイズ 4 段** |
 | `tools/test-server` | 手元の AlmaLinux 9 sshd。`/var/log` の権限・EUC-JP のログ・色付きの成長ログを再現 |
 | `tools/ssh-probe` | 002 / 003 の確認コマンド（**製品ではない**。D6 が決まったので役目は終わり） |
 | `tools/check-005.sh` | 005 の確認スクリプト |
@@ -48,14 +49,14 @@ Phase 0 の 5 本は、実機と Windows 目視を除いてすべて通りまし
 
 ## テスト状況
 
-**Rust 167 ＋ フロント 40 ＝ 207 本。全部通っています。**（手元のテスト用サーバーを建てた状態）
+**Rust 175 ＋ フロント 43 ＝ 218 本。全部通っています。**（手元のテスト用サーバーを建てた状態）
 
 ```
-cargo test --workspace                                 →  167 passed; 0 failed
+cargo test --workspace                                 →  175 passed; 0 failed
 cargo fmt --all -- --check                             →  差分なし
 cargo clippy --workspace --all-targets -- -D warnings  →  警告なし
-pnpm --filter desktop check                            →  247 files, 0 errors, 0 warnings
-pnpm --filter desktop test                             →   40 passed
+pnpm --filter desktop check                            →  248 files, 0 errors, 0 warnings
+pnpm --filter desktop test                             →   43 passed
 （別ワークスペース）tools/ssh-probe: cargo test        →   10 passed
 ```
 
@@ -67,10 +68,10 @@ pnpm --filter desktop test                             →   40 passed
 | `sshboard-connections` | 20 | |
 | `sshboard-diag` | 8 | |
 | `sshboard-ssh` | 42 | 16 |
-| `sshboard-engine` | 14 | 12 |
+| `sshboard-engine` | 20 | 15 |
 | `sshboard-mcp` | 27 | 4 |
-| `sshboard-desktop` | 7 | |
-| **フロント（vitest）** | **40** | |
+| `sshboard-desktop` | 9 | |
+| **フロント（vitest）** | **43** | |
 
 **実機の通し 4 本が要です。**MCP（HTTP・合言葉つき）→ Engine → SSH → sftp を、
 **外部クライアントと同じ生の JSON-RPC** で叩き、囲いの外を断ったあと
@@ -95,18 +96,17 @@ pnpm --filter desktop test                             →   40 passed
 1. **本番へ 1 台繋ぐ**（人）。**ここが本当の合否です。**
    いま止まっているのは **ssh-agent に本番の鍵が入っていない**ことだけ。
    `ssh-add` するか、接続タブでその接続に**鍵のパス**を書く
-2. **ダウンロード**（サーバー → 手元）。いまは上げる側しかない
-3. **端末タブ**。ファイルの面はできたが、Tera Term 側の面がまだ
-4. **`run_readonly`**（許可リスト方式）。`df` / `ps` / `systemctl status` 相当
-5. **Windows 実機**（001 / 004）。CI はビルドとテストを回すが、画面は見られない
-6. **画面のキャプチャを MCP へ（D26）— 着手したところで止まっています。**
+2. **端末タブ**。ファイルの面はできたが、Tera Term 側の面がまだ
+3. **`run_readonly`**（許可リスト方式）。`df` / `ps` / `systemctl status` 相当
+4. **Windows 実機**（001 / 004）。CI はビルドとテストを回すが、画面は見られない
+5. **画面のキャプチャを MCP へ（D26）— 着手したところで止まっています。**
    AI が自分で画面を見て崩れを見つけるため。**残りは下の「途中で止まっているもの」参照**
-7. **画面そのもののテスト**。いまフロントのテストは純粋な関数だけで、
+6. **画面そのもののテスト**。いまフロントのテストは純粋な関数だけで、
    **コンポーネントを描画して確かめるものが 1 本も無い**
 
 ## 技術的決定
 
-`.claude/decisions.md`（D1〜D26）＋ `DESIGN.md`。**未決は D10（実装体制）のみ。**
+`.claude/decisions.md`（D1〜D27）＋ `DESIGN.md`。**未決は D10（実装体制）のみ。**
 
 ## 途中で止まっているもの
 
@@ -154,7 +154,8 @@ pnpm --filter desktop test                             →   40 passed
   合言葉は固定しましたが、URL はまだ固定していません
 - **大きいファイルは丸ごとメモリに載ります**（上限 8 MB / MCP）。
   分割送信は、実測でそこに当たってから入れます
-- **ダウンロードがありません。**上げる側だけです
+- **ダウンロードを人が実際に押していません。**テストは通っていますが、
+  **画面での操作は人が見るまで分かりません**（D27・下の「人にしかできない工程」）
 - **画面のコンポーネントにテストがありません。**型検査と純粋な関数だけで、
   「押したら動くか」は**人が見るまで分かりません**（実際に 3 件の崩れを見逃しました）
 - **`PerSourcePenalties` に当たる可能性**（D24）。製品側の連打防止はまだ入っていません
@@ -196,6 +197,9 @@ pnpm --filter desktop test                             →   40 passed
 
 ## 人にしかできない工程で、止まっているもの
 
-- **実運用で 1 回上げること。**ここが通らなければ、上の 145 本は意味を持ちません
+- **実運用で 1 回上げること。**ここが通らなければ、上の 218 本は意味を持ちません
 - **macOS の目視**（001 / 005）と **Windows 実機**（001 / 004）
+- **ダウンロードを 1 回押すこと**（D27・2026-08-30 に実装）。
+  右のペインでファイルを選び、左の現在地へ落ちるか。同じ名前があるとき断るか。
+  **上書きの印が 1 回ごとに戻るか。**ここは人が押さないと分かりません
 - **push の最終確認**

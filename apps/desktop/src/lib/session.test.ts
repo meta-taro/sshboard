@@ -6,7 +6,30 @@
  */
 import { describe, expect, test } from 'vitest';
 
-import { baseName, humanSize, joinPath, parentOf } from './session.svelte';
+import { baseName, humanSize, joinPath, localJoin, parentOf } from './session.svelte';
+
+describe('localJoin', () => {
+	test('joins a unix path with a single separator', () => {
+		expect(localJoin('/Users/someone/build', 'app.tar.gz')).toBe('/Users/someone/build/app.tar.gz');
+		expect(localJoin('/Users/someone/build/', 'app.tar.gz')).toBe(
+			'/Users/someone/build/app.tar.gz'
+		);
+	});
+
+	test('keeps the Windows separator instead of mixing the two', () => {
+		// **Windows は配布対象**（PRD §7）。`C:\build/app` のような混ざり方をすると、
+		// 落とし先が人の見ている場所と違って見える。
+		expect(localJoin('C:\\build', 'app.tar.gz')).toBe('C:\\build\\app.tar.gz');
+		expect(localJoin('C:\\build\\', 'app.tar.gz')).toBe('C:\\build\\app.tar.gz');
+	});
+
+	test('picks one separator when the path already holds both', () => {
+		// WSL やツールの都合で `/` 混じりの Windows パスが来ることがある。
+		// **どちらか一方に決める**（決めないと `\/` のような繋ぎ目を作る）。
+		expect(localJoin('C:\\build/out', 'app.tar.gz')).toBe('C:\\build/out/app.tar.gz');
+		expect(localJoin('C:/build', 'app.tar.gz')).toBe('C:/build/app.tar.gz');
+	});
+});
 
 describe('parentOf', () => {
 	test('goes up exactly one level', () => {

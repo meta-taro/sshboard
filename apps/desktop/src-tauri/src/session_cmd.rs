@@ -9,7 +9,7 @@ use std::sync::Arc;
 use serde::Serialize;
 use sshboard_band::Actor;
 use sshboard_diag::Event;
-use sshboard_engine::{Engine, Opened};
+use sshboard_engine::{Engine, OnConflict, Opened};
 use tauri::{AppHandle, Emitter, State};
 
 /// 開いている接続が変わったことを画面へ配るイベント。
@@ -236,6 +236,91 @@ pub async fn remote_upload(
     Ok(done)
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Downloaded {
+    pub name: String,
+    pub local: String,
+    pub bytes: u64,
+}
+
+/// サーバーのファイルを手元へ落とす。**1 件ずつ帯に出ます。**
+///
+/// `overwrite` が真になるのは、**人が画面で「上書きする」を選んだとき**だけです。
+/// 既定では、同じ名前が手元にあれば断ります（product-baseline §13）。
+#[tauri::command]
+pub async fn remote_download(
+    names: Vec<String>,
+    remote_dir: String,
+    local_dir: String,
+    overwrite: bool,
+    engine: State<'_, Arc<Engine>>,
+) -> Result<Vec<Downloaded>, String> {
+    let local_dir = PathBuf::from(&local_dir);
+    if !local_dir.is_dir() {
+        return Err(format!(
+            "{} というディレクトリがありません",
+            local_dir.display()
+        ));
+    }
+    let on_conflict = if overwrite {
+        OnConflict::Overwrite
+    } else {
+        OnConflict::Refuse
+    };
+
+    let mut done = Vec::with_capacity(names.len());
+    for requested in &names {
+        let name = safe_local_name(requested)?;
+        let local = local_dir.join(name);
+
+        // **名前の検査だけに頼らない。**Windows の `C:x`（ドライブ相対）のように、
+        // 区切り文字が無いのに階層が変わる書き方がある。
+        // 実際に繋いだ結果が、人が選んだディレクトリの直下かどうかで見る。
+        if local.parent() != Some(local_dir.as_path()) {
+            return Err(format!("手元へ落とせない名前です: {name}"));
+        }
+
+        // **1 件失敗したら、そこで止める**（上げる側と同じ）。
+        // 残りを黙って続けると、どこまで落ちたのかが分からなくなる。
+        let bytes = engine
+            .download_file(
+                Actor::Human,
+                &join_remote(&remote_dir, name),
+                &local,
+                on_conflict,
+            )
+            .await
+            .map_err(|error| format!("{name}: {error}"))?;
+        done.push(Downloaded {
+            name: name.to_owned(),
+            local: local.to_string_lossy().into_owned(),
+            bytes,
+        });
+    }
+    Ok(done)
+}
+
+/// サーバーから来た名前を、**落とし先の 1 階層分の名前として**受け取る。
+///
+/// **一覧を返すのはサーバー**です。`../` を含む名前を返されたまま繋ぐと、
+/// **繋いだ相手が手元の好きな場所へ書ける**ことになります。
+/// ここは「1 語であること」だけを通します（許可リストの考え方・D3 と同じ）。
+fn safe_local_name(name: &str) -> Result<&str, String> {
+    let ok = !name.trim().is_empty()
+        && name != "."
+        && name != ".."
+        && !name.contains('/')
+        && !name.contains('\\')
+        && !name.contains('\0');
+
+    if ok {
+        Ok(name)
+    } else {
+        Err(format!("手元へ落とせない名前です: {name}"))
+    }
+}
+
 /// 手元のディレクトリ 1 つ分。
 ///
 /// **左右で同じ形にする。**片方だけ違う形だと、画面で並べたときに揃わない。
@@ -305,13 +390,45 @@ fn join_remote(dir: &str, name: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::join_remote;
+    use super::{join_remote, safe_local_name};
 
     #[test]
     fn joining_a_directory_and_a_name_never_doubles_the_separator() {
         assert_eq!(join_remote("/srv/app", "a.tar.gz"), "/srv/app/a.tar.gz");
         assert_eq!(join_remote("/srv/app/", "a.tar.gz"), "/srv/app/a.tar.gz");
         assert_eq!(join_remote("/", "a.tar.gz"), "/a.tar.gz");
+    }
+
+    #[test]
+    fn an_ordinary_file_name_is_accepted() {
+        assert_eq!(safe_local_name("app.tar.gz"), Ok("app.tar.gz"));
+        assert_eq!(
+            safe_local_name("日本語 の 名前.txt"),
+            Ok("日本語 の 名前.txt")
+        );
+    }
+
+    #[test]
+    fn a_name_that_climbs_out_of_the_chosen_directory_is_refused() {
+        // **落とすファイル名を決めるのはサーバー**です（一覧はサーバーが返す）。
+        // ここを通すと、繋いだ相手が手元の任意の場所へ書けることになります。
+        for hostile in [
+            "../secret",
+            "../../.ssh/authorized_keys",
+            "sub/dir.txt",
+            "sub\\dir.txt",
+            "/etc/passwd",
+            "C:\\Windows\\x.dll",
+            "..",
+            ".",
+            "",
+            "   ",
+        ] {
+            assert!(
+                safe_local_name(hostile).is_err(),
+                "{hostile} を落とし先の名前として通している"
+            );
+        }
     }
 }
 

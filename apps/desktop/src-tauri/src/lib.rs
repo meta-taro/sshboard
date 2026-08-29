@@ -50,6 +50,7 @@ pub fn run() {
             session_cmd::remote_read_file,
             session_cmd::remote_ensure_dir,
             session_cmd::remote_upload,
+            session_cmd::remote_download,
             session_cmd::local_list_dir,
             session_cmd::diagnostics_recent,
             menu::set_menu_labels
