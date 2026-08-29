@@ -101,6 +101,13 @@ export type KeyReport = {
 	/** 認証に使えるか。公開鍵と、鍵でないものは使えない。 */
 	usable: boolean;
 	needsPassphrase: boolean;
+	/**
+	 * **鍵ではあるが、この暗号方式を読めない。**
+	 *
+	 * 「秘密鍵を指してください」は的外れです（指しているので）。
+	 * 実測で 2 つ在りました — 暗号化された PKCS#8 と、PKCS#1 の AES-256-CBC。
+	 */
+	unsupportedEncryption: boolean;
 	/** 人に見せる形式の名前（`OpenSSH` / `PuTTY (PPK v3)` など）。 */
 	format: string;
 };
@@ -115,7 +122,12 @@ export type KeyNotice =
 	| { tone: 'none' }
 	| {
 			tone: 'info' | 'error';
-			key: 'conn.key.missing' | 'conn.key.unusable' | 'conn.key.ok' | 'conn.key.passphrase';
+			key:
+				| 'conn.key.missing'
+				| 'conn.key.unusable'
+				| 'conn.key.unsupported'
+				| 'conn.key.ok'
+				| 'conn.key.passphrase';
 			format: string;
 	  };
 
@@ -132,6 +144,11 @@ export function keyNotice(
 	if (!keyPath || !keyPath.trim() || !report) return { tone: 'none' };
 
 	if (!report.readable) return { tone: 'error', key: 'conn.key.missing', format: '' };
+	// **理由で文言を変える。**「秘密鍵を指してください」と言われても、
+	// 指しているのだから人は動けない。
+	if (report.unsupportedEncryption) {
+		return { tone: 'error', key: 'conn.key.unsupported', format: report.format };
+	}
 	if (!report.usable) {
 		return { tone: 'error', key: 'conn.key.unusable', format: report.format };
 	}

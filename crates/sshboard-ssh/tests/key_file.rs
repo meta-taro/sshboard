@@ -6,7 +6,7 @@
 //!
 //! ここに本物の鍵は 1 つも置きません。**見出しだけで判定できる**設計にしてあります。
 
-use sshboard_ssh::{inspect_key, KeyFormat};
+use sshboard_ssh::{inspect_key, KeyFormat, KeyVerdict};
 
 /// PPK の見出しだけを組む。**鍵の中身は入っていません。**
 fn ppk_header(version: u8, encryption: &str) -> String {
@@ -39,7 +39,7 @@ fn a_putty_key_is_recognised_by_its_content() {
             facts.needs_passphrase,
             "暗号化された PPK を素の鍵と見ている"
         );
-        assert!(facts.usable, "russh は PPK を読めます（v2 / v3 とも）");
+        assert!(facts.usable(), "russh は PPK を読めます（v2 / v3 とも）");
     }
 }
 
@@ -73,9 +73,35 @@ fn the_older_pem_shapes_are_recognised_too() {
     assert_eq!(facts.format, KeyFormat::Pkcs1);
     assert!(facts.needs_passphrase);
 
+    // 素の PKCS#8 は読める。
+    let plain = inspect_key(b"-----BEGIN PRIVATE KEY-----\n");
+    assert_eq!(plain.format, KeyFormat::Pkcs8);
+    assert!(plain.usable());
+    assert!(!plain.needs_passphrase);
+}
+
+#[test]
+fn a_shape_russh_cannot_decrypt_is_refused_with_its_own_reason() {
+    // **「秘密鍵を指してください」は的外れ**です（指しているので）。
+    // 使えない理由を分けないと、人は正しい鍵を疑いはじめます。
+    //
+    // 実測（2026-08-30・tests/key_formats_really_load.rs）:
+    // - 暗号化された PKCS#8 は `russh` が復号できない
+    // - PKCS#1 の AES-256-CBC は `russh` が `unimplemented!()` に落ちる（**アプリが落ちる**）
     let pkcs8 = inspect_key(b"-----BEGIN ENCRYPTED PRIVATE KEY-----\n");
     assert_eq!(pkcs8.format, KeyFormat::Pkcs8);
-    assert!(pkcs8.needs_passphrase);
+    assert_eq!(pkcs8.verdict, KeyVerdict::UnsupportedEncryption);
+    assert!(
+        !pkcs8.needs_passphrase,
+        "入れても通らないパスフレーズを聞いている"
+    );
+
+    let aes256 = inspect_key(
+        b"-----BEGIN RSA PRIVATE KEY-----\n\
+          Proc-Type: 4,ENCRYPTED\n\
+          DEK-Info: AES-256-CBC,E238345BDFC158AF353A7F7D72BC10B4\n",
+    );
+    assert_eq!(aes256.verdict, KeyVerdict::UnsupportedEncryption);
 }
 
 #[test]
@@ -84,14 +110,14 @@ fn a_public_key_is_named_rather_than_silently_accepted() {
     // 人は何度でも同じ間違いをします。
     let facts = inspect_key(b"ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI... someone@example\n");
     assert_eq!(facts.format, KeyFormat::PublicKey);
-    assert!(!facts.usable, "公開鍵で認証しに行こうとしている");
+    assert!(!facts.usable(), "公開鍵で認証しに行こうとしている");
 }
 
 #[test]
 fn something_that_is_not_a_key_at_all_is_refused_rather_than_guessed() {
     let facts = inspect_key(b"# just a config file\nHost example\n");
     assert_eq!(facts.format, KeyFormat::Unknown);
-    assert!(!facts.usable);
+    assert!(!facts.usable());
     assert!(!facts.needs_passphrase);
 }
 
@@ -107,5 +133,5 @@ fn a_binary_file_does_not_panic_the_inspection() {
     // 人はどんなファイルでも選べます。**落ちるより断る。**
     let facts = inspect_key(&[0x00, 0xff, 0xfe, 0x80, 0x01, 0x02]);
     assert_eq!(facts.format, KeyFormat::Unknown);
-    assert!(!facts.usable);
+    assert!(!facts.usable());
 }

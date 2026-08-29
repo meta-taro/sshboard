@@ -44,6 +44,28 @@ impl KeyFormat {
     }
 }
 
+/// 使えないなら、**なぜ使えないのか**。
+///
+/// 「使えません」だけでは人は直せません（product-baseline §17）。
+/// **公開鍵を指した**のと**暗号方式に未対応**とでは、次の一手がまるで違います。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum KeyVerdict {
+    /// 認証に使える。
+    Usable,
+    /// 公開鍵だった。**取り違えが一番多い。**
+    PublicKey,
+    /// 鍵に見えない。
+    NotAKey,
+    /// 鍵ではあるが、**この暗号方式を読めない。**
+    ///
+    /// 実測（2026-08-30）で 2 つ在りました。どちらも**繋ぐ前に断ります。**
+    ///
+    /// - **暗号化された PKCS#8** — `russh` が復号できない
+    /// - **PKCS#1 の AES-256-CBC** — `russh` の PKCS#5 復号が
+    ///   `unimplemented!()` に落ちる。**渡すとアプリが落ちる**
+    UnsupportedEncryption,
+}
+
 /// 鍵ファイルについて分かったこと。
 ///
 /// **「読めるか」と「パスフレーズが要るか」は別の話**です。
@@ -51,10 +73,16 @@ impl KeyFormat {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct KeyFacts {
     pub format: KeyFormat,
-    /// **この製品が認証に使えるか。**公開鍵と、鍵でないものは使えない。
-    pub usable: bool,
+    pub verdict: KeyVerdict,
     /// パスフレーズが要るか。**要らないものに聞かない**（聞くこと自体が壁になる）。
     pub needs_passphrase: bool,
+}
+
+impl KeyFacts {
+    /// **この製品が認証に使えるか。**
+    pub fn usable(&self) -> bool {
+        self.verdict == KeyVerdict::Usable
+    }
 }
 
 /// 見出しだけを読んで判定する。**鍵の中身は解釈しません。**
@@ -77,18 +105,25 @@ pub fn inspect_key(bytes: &[u8]) -> KeyFacts {
         || text.starts_with("-----BEGIN DSA PRIVATE KEY-----")
         || text.starts_with("-----BEGIN EC PRIVATE KEY-----")
     {
-        return usable(KeyFormat::Pkcs1, text.contains("Proc-Type: 4,ENCRYPTED"));
+        let encrypted = text.contains("Proc-Type: 4,ENCRYPTED");
+        // **AES-256-CBC の PKCS#1 を russh へ渡すとアプリが落ちる**（実測）。
+        // 落ちるより断る。緩められるようになったら、テストが教えてくれる。
+        if encrypted && text.contains("DEK-Info: AES-256-CBC") {
+            return unsupported(KeyFormat::Pkcs1);
+        }
+        return usable(KeyFormat::Pkcs1, encrypted);
     }
     if text.starts_with("-----BEGIN ENCRYPTED PRIVATE KEY-----") {
-        return usable(KeyFormat::Pkcs8, true);
+        // 暗号化された PKCS#8 は、この依存構成では復号できない（実測）。
+        return unsupported(KeyFormat::Pkcs8);
     }
     if text.starts_with("-----BEGIN PRIVATE KEY-----") {
         return usable(KeyFormat::Pkcs8, false);
     }
     if is_public_key(text) {
-        return refused(KeyFormat::PublicKey);
+        return refused(KeyFormat::PublicKey, KeyVerdict::PublicKey);
     }
-    refused(KeyFormat::Unknown)
+    refused(KeyFormat::Unknown, KeyVerdict::NotAKey)
 }
 
 /// PuTTY 形式かどうか。版と、暗号化の有無を見出しから読む。
@@ -132,15 +167,20 @@ fn openssh_body_is_unencrypted(text: &str) -> bool {
 fn usable(format: KeyFormat, needs_passphrase: bool) -> KeyFacts {
     KeyFacts {
         format,
-        usable: true,
+        verdict: KeyVerdict::Usable,
         needs_passphrase,
     }
 }
 
-fn refused(format: KeyFormat) -> KeyFacts {
+/// 鍵ではあるが、この暗号方式を読めない。**パスフレーズは聞かない**（入れても通らない）。
+fn unsupported(format: KeyFormat) -> KeyFacts {
+    refused(format, KeyVerdict::UnsupportedEncryption)
+}
+
+fn refused(format: KeyFormat, verdict: KeyVerdict) -> KeyFacts {
     KeyFacts {
         format,
-        usable: false,
+        verdict,
         needs_passphrase: false,
     }
 }

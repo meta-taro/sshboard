@@ -9,7 +9,7 @@ use sshboard_connections::{ConnectionEntry, Connections};
 use sshboard_credentials::SecretStore;
 use sshboard_diag::{Diagnostics, Stage};
 use sshboard_ssh::{
-    inspect_key, Auth, DirEntry, KeyFacts, KeyFormat, SshSession, Target, WriteScope,
+    inspect_key, Auth, DirEntry, KeyFacts, KeyFormat, KeyVerdict, SshSession, Target, WriteScope,
 };
 use sshboard_stream::OutputStream;
 use tokio::sync::{watch, Mutex};
@@ -384,7 +384,7 @@ impl Engine {
         // **中身で判定する**（D28）。拡張子は当てにならない —
         // `*.tera.ppk` の中身が OpenSSH 秘密鍵だった、が実際に在った。
         let facts = inspect_key_at(&path);
-        if !facts.usable {
+        if !facts.usable() {
             return Err(EngineError::UnusableKey {
                 id: entry.id.clone(),
                 format: facts.format.label().to_owned(),
@@ -462,7 +462,7 @@ fn inspect_key_at(path: &str) -> KeyFacts {
         Ok(bytes) => inspect_key(&bytes),
         Err(_) => KeyFacts {
             format: KeyFormat::Unknown,
-            usable: true,
+            verdict: KeyVerdict::Usable,
             needs_passphrase: false,
         },
     }

@@ -23,3 +23,5 @@ sha1 = "0.10"
 
 [dev-dependencies]
 tokio = { version = "1", features = ["sync", "time", "macros", "rt", "rt-multi-thread", "net"] }
+# 使い捨ての鍵をその場で作って捨てるため（tests/key_formats_really_load.rs）。
+tempfile = "3"

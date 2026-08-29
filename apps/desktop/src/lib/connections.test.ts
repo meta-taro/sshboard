@@ -102,6 +102,7 @@ describe('keyNotice', () => {
 		readable: true,
 		usable: true,
 		needsPassphrase: false,
+		unsupportedEncryption: false,
 		format: 'OpenSSH',
 		...over
 	});
@@ -136,6 +137,13 @@ describe('keyNotice', () => {
 			key: 'conn.key.ok',
 			format: 'PuTTY (PPK v3)'
 		});
+	});
+
+	test('gives its own reason when the format is readable but the cipher is not', () => {
+		// 「秘密鍵を指してください」は的外れ。**指している。**
+		expect(
+			keyNotice('/keys/x', report({ usable: false, unsupportedEncryption: true, format: 'PKCS#8' }))
+		).toEqual({ tone: 'error', key: 'conn.key.unsupported', format: 'PKCS#8' });
 	});
 
 	test('says up front that a passphrase will be asked for', () => {

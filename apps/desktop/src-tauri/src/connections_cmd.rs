@@ -139,6 +139,11 @@ pub struct KeyReport {
     pub usable: bool,
     /// パスフレーズが要るか。
     pub needs_passphrase: bool,
+    /// **鍵ではあるが、この暗号方式を読めない。**
+    ///
+    /// 「秘密鍵を指してください」と言うと的外れになります（指しているので）。
+    /// 別の文言を出すために、使えない理由をここで分けます。
+    pub unsupported_encryption: bool,
     /// 形式の名前（`OpenSSH` / `PuTTY (PPK v3)` など）。
     pub format: String,
 }
@@ -154,6 +159,7 @@ pub fn inspect_key_file(path: String) -> KeyReport {
             readable: false,
             usable: false,
             needs_passphrase: false,
+            unsupported_encryption: false,
             format: String::new(),
         };
     };
@@ -161,8 +167,9 @@ pub fn inspect_key_file(path: String) -> KeyReport {
     let facts = sshboard_engine::inspect_key(&bytes);
     KeyReport {
         readable: true,
-        usable: facts.usable,
+        usable: facts.usable(),
         needs_passphrase: facts.needs_passphrase,
+        unsupported_encryption: facts.verdict == sshboard_engine::KeyVerdict::UnsupportedEncryption,
         format: facts.format.label().to_owned(),
     }
 }

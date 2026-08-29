@@ -5050,6 +5050,7 @@ dependencies = [
  "sshboard-band",
  "sshboard-diag",
  "sshboard-stream",
+ "tempfile",
  "tokio",
 ]
 
