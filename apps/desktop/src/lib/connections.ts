@@ -89,7 +89,55 @@ export function whyNotSavable(
 	return null;
 }
 
-/** `.ppk` は OpenSSH 系が読めない（D19）。**登録時に気づかせる。** */
-export function isPuttyKey(keyPath: string | null | undefined): boolean {
-	return !!keyPath && keyPath.trim().toLowerCase().endsWith('.ppk');
+/**
+ * 鍵ファイルについて Rust 側が返すこと（D28）。
+ *
+ * **判定は中身で行われます。**拡張子は見ません — `*.tera.ppk` の中身が
+ * OpenSSH 秘密鍵だった、が実際に在りました。
+ */
+export type KeyReport = {
+	/** ファイルとして読めたか。**無いのか、形式が違うのかを分ける。** */
+	readable: boolean;
+	/** 認証に使えるか。公開鍵と、鍵でないものは使えない。 */
+	usable: boolean;
+	needsPassphrase: boolean;
+	/** 人に見せる形式の名前（`OpenSSH` / `PuTTY (PPK v3)` など）。 */
+	format: string;
+};
+
+/**
+ * 画面に出す 1 行。**強さまでここで決める**（画面側で分岐させない）。
+ *
+ * `key` を `string` にしないこと。**存在しない文言キーを渡せてしまい、
+ * 型検査を通ったまま画面から文字が消えます**（メニューで 1 回踏んでいます）。
+ */
+export type KeyNotice =
+	| { tone: 'none' }
+	| {
+			tone: 'info' | 'error';
+			key: 'conn.key.missing' | 'conn.key.unusable' | 'conn.key.ok' | 'conn.key.passphrase';
+			format: string;
+	  };
+
+/**
+ * 判定の結果を、人に見せる 1 行へ落とす。
+ *
+ * **PuTTY 形式を特別扱いしません**（D28 が D19 を覆した点）。
+ * `russh` がそのまま読めるので、変換を求める理由がありません。
+ */
+export function keyNotice(
+	keyPath: string | null | undefined,
+	report: KeyReport | null
+): KeyNotice {
+	if (!keyPath || !keyPath.trim() || !report) return { tone: 'none' };
+
+	if (!report.readable) return { tone: 'error', key: 'conn.key.missing', format: '' };
+	if (!report.usable) {
+		return { tone: 'error', key: 'conn.key.unusable', format: report.format };
+	}
+	return {
+		tone: 'info',
+		key: report.needsPassphrase ? 'conn.key.passphrase' : 'conn.key.ok',
+		format: report.format
+	};
 }

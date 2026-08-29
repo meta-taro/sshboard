@@ -42,6 +42,7 @@ pub fn run() {
             connections_cmd::connections_path,
             connections_cmd::connection_save,
             connections_cmd::connection_delete,
+            connections_cmd::inspect_key_file,
             session_cmd::session_connect,
             session_cmd::session_disconnect,
             session_cmd::session_status,

@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { invoke } from '@tauri-apps/api/core';
 	import { listen } from '@tauri-apps/api/event';
+	import { open as openDialog } from '@tauri-apps/plugin-dialog';
 	import { onMount } from 'svelte';
 
 	import Icon from '$lib/components/Icon.svelte';
@@ -18,9 +19,10 @@
 		CONNECTION_COLORS,
 		CONNECTION_TAG_MAX_CHARS,
 		emptyConnection,
-		isPuttyKey,
+		keyNotice,
 		whyNotSavable,
-		type Connection
+		type Connection,
+		type KeyReport
 	} from '$lib/connections';
 
 	let items = $state<Connection[]>([]);
@@ -81,7 +83,46 @@
 	const blockerText = $derived(
 		blocker ? i18n.t(blocker.key, { ...blocker }) : ''
 	);
-	const puttyWarning = $derived(isPuttyKey(draft.key_path));
+	/**
+	 * 指した鍵が何なのか。**判定は Rust が中身を見て返します**（D28）。
+	 *
+	 * ここで拡張子を見ないこと。`*.tera.ppk` の中身が OpenSSH 秘密鍵だった、が
+	 * 実際に在り、**要らない変換作業へ人を送っていました。**
+	 */
+	let keyReport = $state<KeyReport | null>(null);
+	const keyLine = $derived(keyNotice(draft.key_path, keyReport));
+
+	/** 鍵のパスが変わるたびに見に行く。**人が「判定」を押す必要は無い。** */
+	$effect(() => {
+		const path = draft.key_path?.trim() ?? '';
+		if (!path) {
+			keyReport = null;
+			return;
+		}
+		let alive = true;
+		invoke<KeyReport>('inspect_key_file', { path })
+			.then((report) => {
+				// 打っている途中の古い結果で上書きしない。
+				if (alive) keyReport = report;
+			})
+			.catch(() => {
+				// 見に行けないだけ。**登録は妨げない**（繋ぐときに正直に失敗する）。
+				if (alive) keyReport = null;
+			});
+		return () => {
+			alive = false;
+		};
+	});
+
+	/** 鍵をファイル選択で選ぶ。**パスを手で打たせない。** */
+	async function pickKey() {
+		try {
+			const picked = await openDialog({ multiple: false, directory: false });
+			if (typeof picked === 'string') draft = { ...draft, key_path: picked };
+		} catch (error: unknown) {
+			failure = String(error);
+		}
+	}
 
 	async function reload() {
 		try {
@@ -274,12 +315,23 @@
 
 		<label>
 			<span><Icon name="key" size={12} />{i18n.t('conn.key')}</span>
-			<input
-				bind:value={draft.key_path}
-				placeholder={i18n.t('conn.key.placeholder')}
-				spellcheck="false"
-			/>
-			<small>{i18n.t('conn.key.help')}</small>
+			<div class="key-row">
+				<input
+					bind:value={draft.key_path}
+					placeholder={i18n.t('conn.key.placeholder')}
+					spellcheck="false"
+				/>
+				<button type="button" onclick={pickKey}>{i18n.t('conn.key.pick')}</button>
+			</div>
+			<!-- **形式は製品が見分けます**（D28）。人が拡張子を気にする必要はありません。 -->
+			{#if keyLine.tone !== 'none'}
+				<small class="key-note" class:bad={keyLine.tone === 'error'}>
+					<Icon name={keyLine.tone === 'error' ? 'warning' : 'check'} size={11} />
+					{i18n.t(keyLine.key, { format: keyLine.format })}
+				</small>
+			{:else}
+				<small>{i18n.t('conn.key.help')}</small>
+			{/if}
 		</label>
 
 		<div class="mark-row">
@@ -330,15 +382,6 @@
 			></textarea>
 			<small>{i18n.t('conn.write.help')}</small>
 		</label>
-
-		{#if puttyWarning}
-			<p class="warning" role="alert">
-				<Icon name="warning" size={13} /><strong>{i18n.t('conn.ppk.title')}</strong>
-				{i18n.t('conn.ppk.body')}
-				<code>puttygen KEY.ppk -O private-openssh -o KEY</code>
-				{i18n.t('conn.ppk.after')}
-			</p>
-		{/if}
 
 		<div class="actions">
 			<button type="button" class="cta" onclick={save} disabled={blocker !== null}>
@@ -776,7 +819,6 @@
 	}
 
 	.failure,
-	.warning,
 	.confirm {
 		margin: 0;
 		padding: 0.55rem 0.7rem;
@@ -791,24 +833,27 @@
 		color: var(--danger);
 	}
 
-	.warning {
-		background: var(--warning-soft);
-		color: var(--warning);
-		font-size: 0.75rem;
+	/* 鍵の判定を出す 1 行（D28）。**普段は情報、駄目なときだけ強く。** */
+	.key-row {
+		display: flex;
+		align-items: center;
+		gap: 0.35rem;
 	}
 
-	.warning :global(.icon) {
-		display: inline-block;
-		vertical-align: -2px;
-		margin-right: 0.3rem;
+	.key-row input {
+		flex: 1 1 auto;
+		min-width: 0;
 	}
 
-	.warning code {
-		display: block;
-		margin-top: 0.3rem;
-		font-family: var(--font-mono);
-		font-size: 0.68rem;
-		color: var(--fg);
+	.key-note {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.25rem;
+		color: var(--fg-muted);
+	}
+
+	.key-note.bad {
+		color: var(--danger);
 	}
 
 	.confirm-actions {

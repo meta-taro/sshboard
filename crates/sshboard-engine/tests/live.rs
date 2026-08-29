@@ -2,7 +2,7 @@
 //!
 //! 建てるには `sh tools/test-server/up.sh`。
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use sshboard_band::{Actor, Band};
@@ -326,6 +326,101 @@ async fn a_missing_local_file_is_reported_as_a_local_problem_not_an_ssh_one() {
         .await;
 
     assert!(matches!(result, Err(EngineError::Local(_))), "{result:?}");
+}
+
+// --- 鍵の形式（D28） ---------------------------------------------------------
+
+/// 使い捨てのテスト鍵から、パスフレーズ付きの PPK を作る。
+///
+/// **本番の鍵は使いません。**`tools/test-server/.key` は毎回捨てられる鍵で、
+/// リポジトリにも入っていません。`puttygen` が無ければ `None`。
+fn disposable_ppk(dir: &tempfile::TempDir, passphrase: &str) -> Option<PathBuf> {
+    let source = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../tools/test-server/.key")
+        .canonicalize()
+        .ok()?;
+
+    let pass_file = dir.path().join("pass.txt");
+    std::fs::write(&pass_file, passphrase).ok()?;
+    let ppk = dir.path().join("disposable.ppk");
+
+    let done = std::process::Command::new("puttygen")
+        .arg(&source)
+        .args(["-O", "private", "--new-passphrase"])
+        .arg(&pass_file)
+        .arg("-o")
+        .arg(&ppk)
+        .output()
+        .ok()?;
+
+    // パスフレーズを書いた一時ファイルは、**使い終わったらすぐ消す。**
+    let _ = std::fs::remove_file(&pass_file);
+    done.status.success().then_some(ppk)
+}
+
+/// 鍵のパスを書いた接続一覧。
+async fn registry_with_key(dir: &tempfile::TempDir, key: &Path) -> PathBuf {
+    let path = dir.path().join("connections.toml");
+    let toml = format!(
+        "version = 1\n\n[[connections]]\nid = \"local\"\nname = \"Local test server\"\n\
+         host = \"{HOST}\"\nport = {PORT}\nuser = \"{USER}\"\n\
+         fingerprint = \"{}\"\nkey_path = \"{}\"\n",
+        known_fingerprint().await,
+        key.display()
+    );
+    std::fs::write(&path, toml).expect("接続一覧を書けない");
+    path
+}
+
+#[tokio::test]
+async fn a_putty_key_connects_without_being_converted_first() {
+    // **これが D28 の主張そのものです。**`.ppk` のまま繋がる。
+    // puttygen も ssh-add も要らない（人が鍵の形式を意識しない）。
+    if !server_is_up().await {
+        println!("テスト用サーバーが建っていません（想定内・飛ばします）");
+        return;
+    }
+    let dir = tempfile::tempdir().expect("一時ディレクトリ");
+    let Some(ppk) = disposable_ppk(&dir, "sshboard-test-pass") else {
+        println!("puttygen がありません（想定内・飛ばします）");
+        return;
+    };
+
+    let engine = engine_at(registry_with_key(&dir, &ppk).await);
+    let opened = engine
+        .connect(Actor::Human, "local", Some("sshboard-test-pass".into()))
+        .await
+        .expect("PPK のまま繋がらない");
+
+    assert_eq!(opened.id, "local");
+    // 本当に使える状態か、1 回サーバーへ触って確かめる。
+    engine
+        .list_dir(Actor::Human, "/home/probe")
+        .await
+        .expect("繋がったのに読めない");
+}
+
+#[tokio::test]
+async fn an_encrypted_putty_key_is_never_tried_without_its_passphrase() {
+    // 黙って認証へ行くと「鍵が違います」としか出ず、人は直しようがない。
+    if !server_is_up().await {
+        println!("テスト用サーバーが建っていません（想定内・飛ばします）");
+        return;
+    }
+    let dir = tempfile::tempdir().expect("一時ディレクトリ");
+    let Some(ppk) = disposable_ppk(&dir, "sshboard-test-pass") else {
+        println!("puttygen がありません（想定内・飛ばします）");
+        return;
+    };
+
+    let engine = engine_at(registry_with_key(&dir, &ppk).await);
+    let result = engine.connect(Actor::Human, "local", None).await;
+
+    assert!(
+        matches!(result, Err(EngineError::PassphraseNeeded { .. })),
+        "{:?}",
+        result.map(|open| open.id)
+    );
 }
 
 // --- ダウンロード（サーバー → 手元） -----------------------------------------

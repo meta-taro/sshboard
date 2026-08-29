@@ -8,7 +8,9 @@ use sshboard_band::{Actor, Band};
 use sshboard_connections::{ConnectionEntry, Connections};
 use sshboard_credentials::SecretStore;
 use sshboard_diag::{Diagnostics, Stage};
-use sshboard_ssh::{Auth, DirEntry, SshSession, Target, WriteScope};
+use sshboard_ssh::{
+    inspect_key, Auth, DirEntry, KeyFacts, KeyFormat, SshSession, Target, WriteScope,
+};
 use sshboard_stream::OutputStream;
 use tokio::sync::{watch, Mutex};
 
@@ -379,8 +381,18 @@ impl Engine {
             (None, None) => None,
         };
 
+        // **中身で判定する**（D28）。拡張子は当てにならない —
+        // `*.tera.ppk` の中身が OpenSSH 秘密鍵だった、が実際に在った。
+        let facts = inspect_key_at(&path);
+        if !facts.usable {
+            return Err(EngineError::UnusableKey {
+                id: entry.id.clone(),
+                format: facts.format.label().to_owned(),
+            });
+        }
+
         let secret = passphrase.or(stored);
-        if secret.is_none() && key_needs_passphrase(&path) {
+        if secret.is_none() && facts.needs_passphrase {
             return Err(EngineError::PassphraseNeeded {
                 id: entry.id.clone(),
             });
@@ -440,27 +452,18 @@ fn read_known_hosts(explicit: Option<&str>) -> String {
     std::fs::read_to_string(path).unwrap_or_default()
 }
 
-/// 鍵が暗号化されているか。**中身は見ますが、どこにも渡しません。**
+/// 鍵ファイルを見て、形式とパスフレーズの要否を得る（D28）。
 ///
-/// 判定を誤ると「パスフレーズを聞かずに失敗する」だけなので、
-/// 見出しだけを見る素朴な判定にしています。
-fn key_needs_passphrase(path: &str) -> bool {
-    let Ok(text) = std::fs::read_to_string(path) else {
-        // 読めないなら、ここでは判断しない。**繋ぎに行って正直に失敗させる。**
-        return false;
-    };
-    if text.contains("Proc-Type: 4,ENCRYPTED") || text.contains("ENCRYPTED PRIVATE KEY") {
-        return true;
+/// **中身はここを通り抜けるだけ**で、保持も記録もしません。
+/// 読めないときは「判定しない」に倒します。**繋ぎに行って正直に失敗させる**方が、
+/// こちらで勝手に断るより理由が分かる。
+fn inspect_key_at(path: &str) -> KeyFacts {
+    match std::fs::read(path) {
+        Ok(bytes) => inspect_key(&bytes),
+        Err(_) => KeyFacts {
+            format: KeyFormat::Unknown,
+            usable: true,
+            needs_passphrase: false,
+        },
     }
-    // OpenSSH 形式は本文の中に暗号方式が入る。`none` なら素のまま。
-    text.contains("OPENSSH PRIVATE KEY") && !openssh_body_is_unencrypted(&text)
-}
-
-fn openssh_body_is_unencrypted(text: &str) -> bool {
-    use std::sync::OnceLock;
-    // 本文の先頭は base64 で "openssh-key-v1\0" + 暗号方式名。
-    // 暗号方式が `none` の鍵は、この並びが必ず同じ前置きになる。
-    static PREFIX: OnceLock<String> = OnceLock::new();
-    let prefix = PREFIX.get_or_init(|| "b3BlbnNzaC1rZXktdjEAAAAABG5vbmU".to_string());
-    text.lines().any(|line| line.starts_with(prefix.as_str()))
 }

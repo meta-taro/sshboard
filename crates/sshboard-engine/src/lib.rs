@@ -19,3 +19,9 @@ pub use error::EngineError;
 pub use open::{Opened, WriteAccess};
 
 pub use sshboard_ssh::DirEntry;
+
+/// 鍵の形式を**中身で**見分ける口（D28）。
+///
+/// 画面もここから使います。**拡張子で判定する実装を 2 つ持たない**ため
+/// （持っていたときに、実際に食い違って人を要らない作業へ送りました）。
+pub use sshboard_ssh::{inspect_key, KeyFacts, KeyFormat};

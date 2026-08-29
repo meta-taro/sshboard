@@ -126,6 +126,47 @@ pub fn connections_path(path: State<'_, ConnectionsPath>) -> String {
     path.0.display().to_string()
 }
 
+/// 鍵ファイルについて画面へ返すこと（D28）。
+///
+/// **中身もパスも返しません。**返すのは「読めたか・使えるか・パスフレーズが要るか」と、
+/// 人に見せる形式の名前だけです。
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct KeyReport {
+    /// ファイルとして読めたか。**無いのか、形式が違うのかを分ける。**
+    pub readable: bool,
+    /// 認証に使えるか。公開鍵と、鍵でないものは使えない。
+    pub usable: bool,
+    /// パスフレーズが要るか。
+    pub needs_passphrase: bool,
+    /// 形式の名前（`OpenSSH` / `PuTTY (PPK v3)` など）。
+    pub format: String,
+}
+
+/// 指した鍵が何なのかを、**中身だけで**判定して返す（D28）。
+///
+/// **拡張子を見ません。**`*.tera.ppk` の中身が OpenSSH 秘密鍵だった、が実際に在り、
+/// 拡張子で判定していた頃は**要らない変換作業へ人を送っていました。**
+#[tauri::command]
+pub fn inspect_key_file(path: String) -> KeyReport {
+    let Ok(bytes) = std::fs::read(&path) else {
+        return KeyReport {
+            readable: false,
+            usable: false,
+            needs_passphrase: false,
+            format: String::new(),
+        };
+    };
+
+    let facts = sshboard_engine::inspect_key(&bytes);
+    KeyReport {
+        readable: true,
+        usable: facts.usable,
+        needs_passphrase: facts.needs_passphrase,
+        format: facts.format.label().to_owned(),
+    }
+}
+
 /// 一覧が変わったことを画面へ流し続ける。
 ///
 /// **中身は流さない。**「変わった」だけを送り、画面が読み直す。

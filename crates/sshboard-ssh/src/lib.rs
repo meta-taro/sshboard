@@ -4,9 +4,11 @@
 //! **ホスト鍵を必ず検証します**（D6）。
 
 mod hostkey;
+mod key_file;
 mod session;
 mod write_scope;
 
 pub use hostkey::{decide, fingerprint, fingerprints_for, SeenHostKey, Trust};
+pub use key_file::{inspect_key, KeyFacts, KeyFormat};
 pub use session::{Auth, DirEntry, SshError, SshSession, Target};
 pub use write_scope::{Refusal, WriteScope};

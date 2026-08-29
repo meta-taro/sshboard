@@ -14,6 +14,11 @@ pub enum EngineError {
     Connections(String),
     /// 鍵にパスフレーズが要る。**AI は受け取れない**（D14）。
     PassphraseNeeded { id: String },
+    /// 指した鍵を認証に使えない（公開鍵・鍵ではないファイル）。
+    ///
+    /// **形式の名前だけを持ちます。**鍵のパスは接続先の情報なので、
+    /// 画面にも記録にも出しません（CLAUDE.md 禁止事項 4）。
+    UnusableKey { id: String, format: String },
     /// **ホスト鍵を信用できない。**初見か、登録と食い違う。
     ///
     /// 文字列にせず**構造のまま**返す。画面が「この指紋で登録しますか」を
@@ -53,6 +58,11 @@ impl fmt::Display for EngineError {
                 f,
                 "{id} の鍵にはパスフレーズが要ります。\
                  sshboard の画面で人が入れてください（AI はパスフレーズを扱いません）"
+            ),
+            EngineError::UnusableKey { id, format } => write!(
+                f,
+                "{id} に指定されたファイルは認証に使えません（{format} と読めました）。\
+                 秘密鍵のファイルを指してください（`.pub` は公開鍵で、認証には使えません）"
             ),
             EngineError::UntrustedHost {
                 algorithm,

@@ -49,14 +49,14 @@ Phase 0 の 5 本は、実機と Windows 目視を除いてすべて通りまし
 
 ## テスト状況
 
-**Rust 175 ＋ フロント 43 ＝ 218 本。全部通っています。**（手元のテスト用サーバーを建てた状態）
+**Rust 189 ＋ フロント 47 ＝ 236 本。全部通っています。**（手元のテスト用サーバーを建てた状態）
 
 ```
-cargo test --workspace                                 →  175 passed; 0 failed
+cargo test --workspace                                 →  189 passed; 0 failed
 cargo fmt --all -- --check                             →  差分なし
 cargo clippy --workspace --all-targets -- -D warnings  →  警告なし
 pnpm --filter desktop check                            →  248 files, 0 errors, 0 warnings
-pnpm --filter desktop test                             →   43 passed
+pnpm --filter desktop test                             →   47 passed
 （別ワークスペース）tools/ssh-probe: cargo test        →   10 passed
 ```
 
@@ -67,11 +67,11 @@ pnpm --filter desktop test                             →   43 passed
 | `sshboard-credentials` | 16 | 2 |
 | `sshboard-connections` | 20 | |
 | `sshboard-diag` | 8 | |
-| `sshboard-ssh` | 42 | 16 |
-| `sshboard-engine` | 20 | 15 |
+| `sshboard-ssh` | 50 | 16 |
+| `sshboard-engine` | 26 | 17 |
 | `sshboard-mcp` | 27 | 4 |
 | `sshboard-desktop` | 9 | |
-| **フロント（vitest）** | **43** | |
+| **フロント（vitest）** | **47** | |
 
 **実機の通し 4 本が要です。**MCP（HTTP・合言葉つき）→ Engine → SSH → sftp を、
 **外部クライアントと同じ生の JSON-RPC** で叩き、囲いの外を断ったあと
@@ -94,8 +94,9 @@ pnpm --filter desktop test                             →   43 passed
 ## 次にやること
 
 1. **本番へ 1 台繋ぐ**（人）。**ここが本当の合否です。**
-   いま止まっているのは **ssh-agent に本番の鍵が入っていない**ことだけ。
-   `ssh-add` するか、接続タブでその接続に**鍵のパス**を書く
+   **接続タブで鍵のパスを書けば繋がります**（D28）。`.ppk` のままで構いません。
+   形式は製品が中身を見て判定し、パスフレーズが要るなら聞きます。
+   **puttygen も ssh-add も要りません。**
 2. **端末タブ**。ファイルの面はできたが、Tera Term 側の面がまだ
 3. **`run_readonly`**（許可リスト方式）。`df` / `ps` / `systemctl status` 相当
 4. **Windows 実機**（001 / 004）。CI はビルドとテストを回すが、画面は見られない
@@ -106,7 +107,7 @@ pnpm --filter desktop test                             →   43 passed
 
 ## 技術的決定
 
-`.claude/decisions.md`（D1〜D27）＋ `DESIGN.md`。**未決は D10（実装体制）のみ。**
+`.claude/decisions.md`（D1〜D28）＋ `DESIGN.md`。**未決は D10（実装体制）のみ。**
 
 ## 途中で止まっているもの
 
@@ -194,10 +195,17 @@ pnpm --filter desktop test                             →   43 passed
     ビルドのたびに別の相手になるので、「常に許可」を押しても毎回承認が出る
 13. **鍵が agent に入っていないことを、製品が言えていなかった。**
     「認証が通りません」だけでは、人も AI も手が出ない。**記録が無いのが原因**（診断を入れた）
+14. **拡張子は嘘をつく**（実測・2026-08-30）。運用者の `*.tera.ppk` の**中身が OpenSSH 秘密鍵**で、
+    拡張子で判定していた製品は「PuTTY 形式です。変換してください」と、
+    **要らない作業へ人を送っていた。**逆に本物の PPK は `russh` がそのまま読めるのに、
+    使えないかのように見せていた。**判定は中身で行う**（D28）
+15. **D19 の前提そのものが誤っていた。**「PPK を読める Rust crate が実質無い」と書いたが、
+    **既に採用している `russh` 0.63 が読める。**採用済みの依存の中身を確かめずに
+    決定を書くと、こうなる
 
 ## 人にしかできない工程で、止まっているもの
 
-- **実運用で 1 回上げること。**ここが通らなければ、上の 218 本は意味を持ちません
+- **実運用で 1 回上げること。**ここが通らなければ、上の 236 本は意味を持ちません
 - **macOS の目視**（001 / 005）と **Windows 実機**（001 / 004）
 - **ダウンロードを 1 回押すこと**（D27・2026-08-30 に実装）。
   右のペインでファイルを選び、左の現在地へ落ちるか。同じ名前があるとき断るか。

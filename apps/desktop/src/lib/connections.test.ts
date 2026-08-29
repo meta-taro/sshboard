@@ -10,9 +10,10 @@ import {
 	CONNECTION_TAG_MAX_CHARS,
 	emptyConnection,
 	isConnectionTag,
-	isPuttyKey,
+	keyNotice,
 	whyNotSavable,
-	type Connection
+	type Connection,
+	type KeyReport
 } from './connections';
 
 /** 保存できる最小の登録。**各テストはここから 1 か所だけ崩す。** */
@@ -94,13 +95,56 @@ describe('emptyConnection', () => {
 	});
 });
 
-describe('isPuttyKey', () => {
-	test('spots a .ppk so the person is warned before they hit the wall', () => {
-		// この層は鍵を .ppk で持っている（D19）。**登録時に気づかせる。**
-		expect(isPuttyKey('/keys/server.ppk')).toBe(true);
-		expect(isPuttyKey('/keys/SERVER.PPK')).toBe(true);
-		expect(isPuttyKey('/keys/id_ed25519')).toBe(false);
-		expect(isPuttyKey(null)).toBe(false);
+describe('keyNotice', () => {
+	// **拡張子で判定しない**（D28）。判定は Rust が中身を見て返し、
+	// ここは「その結果をどう見せるか」だけを決める。
+	const report = (over: Partial<KeyReport> = {}): KeyReport => ({
+		readable: true,
+		usable: true,
+		needsPassphrase: false,
+		format: 'OpenSSH',
+		...over
+	});
+
+	test('says nothing until a key has actually been chosen', () => {
+		expect(keyNotice('', report()).tone).toBe('none');
+		expect(keyNotice(null, report()).tone).toBe('none');
+	});
+
+	test('separates "the file is not there" from "the format is wrong"', () => {
+		// 一緒にすると、人は打ち間違いを疑わずに鍵を作り直しはじめる。
+		expect(keyNotice('/keys/x', report({ readable: false }))).toEqual({
+			tone: 'error',
+			key: 'conn.key.missing',
+			format: ''
+		});
+	});
+
+	test('names the format when the file cannot be used to authenticate', () => {
+		expect(keyNotice('/keys/x.pub', report({ usable: false, format: 'public key' }))).toEqual({
+			tone: 'error',
+			key: 'conn.key.unusable',
+			format: 'public key'
+		});
+	});
+
+	test('treats a PuTTY key as ordinary — no conversion is asked for', () => {
+		// **ここが D19 との違いです。**以前は .ppk を見ると
+		// 「puttygen で変換してください」と出していた。russh はそのまま読める。
+		expect(keyNotice('/keys/x.ppk', report({ format: 'PuTTY (PPK v3)' }))).toEqual({
+			tone: 'info',
+			key: 'conn.key.ok',
+			format: 'PuTTY (PPK v3)'
+		});
+	});
+
+	test('says up front that a passphrase will be asked for', () => {
+		// 繋ぐ瞬間に初めて聞かれると、人は「失敗した」と受け取る。
+		expect(keyNotice('/keys/x', report({ needsPassphrase: true }))).toEqual({
+			tone: 'info',
+			key: 'conn.key.passphrase',
+			format: 'OpenSSH'
+		});
 	});
 });
 

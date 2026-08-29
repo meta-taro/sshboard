@@ -30,6 +30,11 @@ const en = {
 	'conn.key': 'Private key path (empty = ssh-agent)',
 	'conn.key.placeholder': 'leave empty to use ssh-agent',
 	'conn.key.help': 'Leaving this empty is recommended. With ssh-agent, sshboard never receives your passphrase.',
+	'conn.key.pick': 'Choose…',
+	'conn.key.ok': 'Read as a {format} key. Ready to use.',
+	'conn.key.passphrase': 'A {format} key. sshboard will ask for its passphrase when connecting.',
+	'conn.key.missing': 'That file is not there.',
+	'conn.key.unusable': 'This file cannot be used to authenticate (read as {format}). Point at the private key.',
 	'conn.tag': 'Tag (up to {max} characters)',
 	'conn.tag.help': 'The half of the mark that works when colour cannot be seen — greyscale screenshots included.',
 	'conn.color': 'Colour',
@@ -52,9 +57,6 @@ const en = {
 	'conn.err.dup': 'Identifier {id} is already taken',
 	'conn.err.tag': 'Tag may be at most {max} characters',
 
-	'conn.ppk.title': 'This is a PuTTY key (.ppk).',
-	'conn.ppk.body': 'OpenSSH cannot read it. Convert it first.',
-	'conn.ppk.after': 'Once converted and added with ssh-add, you can leave this path empty.',
 
 	'stream.label': 'Output (colour for you, plain for the AI)',
 	'stream.scaffold': 'scaffolding — removed once 002 passes',
@@ -176,6 +178,11 @@ const ja: Catalog = {
 	'conn.key': '秘密鍵のパス（空なら ssh-agent）',
 	'conn.key.placeholder': '空のまま = ssh-agent を使う',
 	'conn.key.help': '空のままを推奨します。ssh-agent なら、パスフレーズを sshboard が一度も受け取りません。',
+	'conn.key.pick': '選ぶ…',
+	'conn.key.ok': '{format} の鍵として読めました。そのまま使えます。',
+	'conn.key.passphrase': '{format} の鍵です。パスフレーズは繋ぐときに聞きます。',
+	'conn.key.missing': 'そのファイルが見つかりません。',
+	'conn.key.unusable': 'このファイルは認証に使えません（{format} と読めました）。秘密鍵を指してください。',
 	'conn.tag': 'タグ（{max} 文字まで）',
 	'conn.tag.help': '色が見えなくても効く方の印です。白黒の画面写真でも読めます。',
 	'conn.color': '色',
@@ -198,9 +205,6 @@ const ja: Catalog = {
 	'conn.err.dup': '識別子 {id} は既に使われています',
 	'conn.err.tag': 'タグは {max} 文字までです',
 
-	'conn.ppk.title': 'これは PuTTY 形式（.ppk）です。',
-	'conn.ppk.body': 'OpenSSH 系は読めません。先に変換してください。',
-	'conn.ppk.after': '変換して ssh-add しておけば、このパスは空で構いません。',
 
 	'stream.label': '出力（GUI は色付き / MCP はプレーン）',
 	'stream.scaffold': '足場 — 002 が通ったら消えます',
