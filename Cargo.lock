@@ -4984,6 +4984,7 @@ dependencies = [
  "serde",
  "sshboard-band",
  "sshboard-connections",
+ "sshboard-diag",
  "sshboard-engine",
  "sshboard-mcp",
  "sshboard-stream",
@@ -4994,6 +4995,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "sshboard-diag"
+version = "0.0.0"
+dependencies = [
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "sshboard-engine"
 version = "0.0.0"
 dependencies = [
@@ -5001,6 +5010,7 @@ dependencies = [
  "sshboard-band",
  "sshboard-connections",
  "sshboard-credentials",
+ "sshboard-diag",
  "sshboard-ssh",
  "sshboard-stream",
  "tempfile",
@@ -5019,6 +5029,7 @@ dependencies = [
  "serde_json",
  "sshboard-band",
  "sshboard-connections",
+ "sshboard-diag",
  "sshboard-engine",
  "sshboard-ssh",
  "sshboard-stream",
@@ -5037,6 +5048,7 @@ dependencies = [
  "sha1 0.10.7",
  "sha2 0.10.9",
  "sshboard-band",
+ "sshboard-diag",
  "sshboard-stream",
  "tokio",
 ]

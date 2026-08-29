@@ -95,6 +95,12 @@ export const ko: Catalog = {
 	"files.step2": "처음이라면 표시된 지문을 확인하고 등록합니다.",
 	"files.step3": "왼쪽에 파일을 끌어다 놓고 [올리기]를 누릅니다.",
 	"files.notconnected": "연결되지 않았습니다. 위에서 서버를 고르고 [연결]을 누르세요.",
+	// 診断（何が起きたか）。**AI が MCP から読むのと同じ記録。**
+	"tab.diag": "진단",
+	"diag.label": "무슨 일이 있었나",
+	"diag.help": "AI가 MCP로 읽는 것과 같은 기록입니다. 호스트명·사용자명·비밀은 들어가지 않습니다.",
+	"diag.refresh": "다시 읽기",
+	"diag.empty": "아직 없습니다. 연결을 시도하면 그 경과가 여기 나옵니다.",
 };
 
 export const zhCN: Catalog = {
@@ -189,6 +195,12 @@ export const zhCN: Catalog = {
 	"files.step2": "第一次连接时，核对显示的指纹并登记。",
 	"files.step3": "把文件拖到左边，按［上传］。",
 	"files.notconnected": "尚未连接。请在上面选一台服务器并按［连接］。",
+	// 診断（何が起きたか）。**AI が MCP から読むのと同じ記録。**
+	"tab.diag": "诊断",
+	"diag.label": "发生了什么",
+	"diag.help": "与 AI 通过 MCP 读取的是同一份记录。不含主机名、用户名和机密。",
+	"diag.refresh": "重新读取",
+	"diag.empty": "还没有内容。试着连接，过程会显示在这里。",
 };
 
 export const zhTW: Catalog = {
@@ -283,4 +295,10 @@ export const zhTW: Catalog = {
 	"files.step2": "第一次連線時，核對顯示的指紋並登記。",
 	"files.step3": "把檔案拖到左邊，按［上傳］。",
 	"files.notconnected": "尚未連線。請在上面選一台伺服器並按［連線］。",
+	// 診断（何が起きたか）。**AI が MCP から読むのと同じ記録。**
+	"tab.diag": "診斷",
+	"diag.label": "發生了什麼",
+	"diag.help": "與 AI 透過 MCP 讀取的是同一份記錄。不含主機名稱、使用者名稱和機密。",
+	"diag.refresh": "重新讀取",
+	"diag.empty": "還沒有內容。試著連線，過程會顯示在這裡。",
 };

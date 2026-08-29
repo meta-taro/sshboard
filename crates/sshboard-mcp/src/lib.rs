@@ -8,4 +8,4 @@ mod ssh_tools;
 
 pub use http::{new_token, serve, McpEndpoint, MCP_PATH};
 pub use server::{MarkConnection, RegisterConnection, SshboardMcp, DEFAULT_ACK_TIMEOUT};
-pub use ssh_tools::{ConnectionId, RemotePath, UploadFile, WriteFile};
+pub use ssh_tools::{ConnectionId, HowMany, RemotePath, UploadFile, WriteFile};

@@ -95,6 +95,12 @@ export const ptBR: Catalog = {
 	"files.step2": "Na primeira vez, confira a impressão mostrada e registre.",
 	"files.step3": "Solte arquivos à esquerda e aperte Enviar.",
 	"files.notconnected": "Sem conexão. Escolha um servidor acima e aperte Conectar.",
+	// 診断（何が起きたか）。**AI が MCP から読むのと同じ記録。**
+	"tab.diag": "Diagnóstico",
+	"diag.label": "O que aconteceu",
+	"diag.help": "O mesmo registro que a IA lê pelo MCP. Sem nomes de host, usuários ou segredos.",
+	"diag.refresh": "Recarregar",
+	"diag.empty": "Nada ainda. Tente conectar e os passos aparecem aqui.",
 };
 
 export const ru: Catalog = {
@@ -189,6 +195,12 @@ export const ru: Catalog = {
 	"files.step2": "В первый раз сверьте показанный отпечаток и запишите его.",
 	"files.step3": "Перетащите файлы слева и нажмите «Загрузить».",
 	"files.notconnected": "Нет подключения. Выберите сервер выше и нажмите «Подключиться».",
+	// 診断（何が起きたか）。**AI が MCP から読むのと同じ記録。**
+	"tab.diag": "Диагностика",
+	"diag.label": "Что произошло",
+	"diag.help": "Тот же журнал, что ИИ читает через MCP. Без имён хостов, пользователей и секретов.",
+	"diag.refresh": "Обновить",
+	"diag.empty": "Пока пусто. Попробуйте подключиться — здесь появятся шаги.",
 };
 
 export const it: Catalog = {
@@ -283,4 +295,10 @@ export const it: Catalog = {
 	"files.step2": "La prima volta, verifica l'impronta mostrata e registrala.",
 	"files.step3": "Trascina i file a sinistra e premi Carica.",
 	"files.notconnected": "Non connesso. Scegli un server qui sopra e premi Connetti.",
+	// 診断（何が起きたか）。**AI が MCP から読むのと同じ記録。**
+	"tab.diag": "Diagnostica",
+	"diag.label": "Cosa è successo",
+	"diag.help": "Lo stesso registro che l'IA legge via MCP. Senza nomi host, utenti o segreti.",
+	"diag.refresh": "Ricarica",
+	"diag.empty": "Ancora niente. Prova a connetterti e i passaggi appariranno qui.",
 };

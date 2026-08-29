@@ -10,6 +10,7 @@ use russh::client::{self, Handle};
 use russh::keys::{load_secret_key, PrivateKeyWithHashAlg, PublicKeyOrCertificate};
 use russh::{keys, ChannelMsg};
 use sshboard_band::{Actor, Band};
+use sshboard_diag::{Diagnostics, Stage};
 
 use crate::hostkey::{decide, fingerprint, fingerprints_for, SeenHostKey, Trust};
 use crate::write_scope::{Refusal, WriteScope};
@@ -72,6 +73,8 @@ pub enum Auth {
 
 /// 繋ぐときに要るもの。**接続先はここにしか無い。**
 pub struct Target {
+    /// 接続の識別子。**記録に出せる唯一の名前**（ホスト名は出せない・PRD §8）。
+    pub id: Option<String>,
     pub host: String,
     pub port: u16,
     pub user: String,
@@ -122,7 +125,19 @@ impl SshSession {
     /// 繋いで、ホスト鍵を確かめる。
     ///
     /// **信用できないホストとは、繋いだあとでもセッションを捨てます。**
-    pub async fn connect(target: &Target, auth: &Auth, band: Band) -> Result<Self, SshError> {
+    pub async fn connect(
+        target: &Target,
+        auth: &Auth,
+        band: Band,
+        diag: &Diagnostics,
+    ) -> Result<Self, SshError> {
+        let id = target.id.as_deref();
+        diag.info(
+            Stage::Reach,
+            id,
+            format!("繋ぎに行きます（ポート {}）", target.port),
+        );
+
         let seen = Arc::new(Mutex::new(None));
         let config = Arc::new(client::Config {
             inactivity_timeout: Some(TIMEOUT),
@@ -137,7 +152,16 @@ impl SshSession {
             },
         )
         .await
-        .map_err(|error| SshError::Connect(error.to_string()))?;
+        .map_err(|error| {
+            diag.error(
+                Stage::Reach,
+                id,
+                format!("繋がりません: {error}"),
+                "相手が動いているか、ポート番号と経路（VPN・許可 IP）を確かめてください",
+            );
+            SshError::Connect(error.to_string())
+        })?;
+        diag.info(Stage::Reach, id, "繋がりました");
 
         let host_key = seen
             .lock()
@@ -149,6 +173,28 @@ impl SshSession {
         let trust = decide(&host_key, target.pinned_fingerprint.as_deref(), &known);
 
         if !trust.is_acceptable() {
+            let (what, hint) = match &trust {
+                Trust::Mismatch { .. } => (
+                    "ホスト鍵が登録と違います",
+                    "サーバーを建て直したのでなければ、すり替えの疑いがあります。\
+                     建て直したと分かっているなら、接続の登録から指紋を消してください",
+                ),
+                _ => (
+                    "初めて見るホストです",
+                    "画面に出た指紋を確かめて登録してください（サーバー上の \
+                     `ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub` と見比べます）",
+                ),
+            };
+            diag.error(
+                Stage::HostKey,
+                id,
+                format!(
+                    "{what}（{} / {}）",
+                    host_key.algorithm, host_key.fingerprint
+                ),
+                hint,
+            );
+
             // **繋いだあとでも捨てる。**信用できないまま使わない。
             let _ = handle
                 .disconnect(russh::Disconnect::ByApplication, "", "")
@@ -159,7 +205,17 @@ impl SshSession {
             });
         }
 
-        authenticate(&mut handle, &target.user, auth).await?;
+        diag.info(
+            Stage::HostKey,
+            id,
+            format!(
+                "ホスト鍵を確かめました（{} / {}）",
+                host_key.algorithm, host_key.fingerprint
+            ),
+        );
+
+        authenticate(&mut handle, &target.user, auth, diag, id).await?;
+        diag.info(Stage::Auth, id, "認証が通りました");
 
         Ok(Self {
             handle,
@@ -221,10 +277,15 @@ async fn authenticate(
     handle: &mut Handle<Watcher>,
     user: &str,
     auth: &Auth,
+    diag: &Diagnostics,
+    id: Option<&str>,
 ) -> Result<(), SshError> {
     let result = match auth {
         // **agent へ委譲する道は OS ごとに違う**（D11）。分岐は下の関数に閉じている。
-        Auth::Agent => return authenticate_with_agent(handle, user).await,
+        Auth::Agent => {
+            diag.info(Stage::Auth, id, "ssh-agent の鍵で試します");
+            return authenticate_with_agent(handle, user, diag, id).await;
+        }
         Auth::Key { path, passphrase } => {
             let key = load_secret_key(path, passphrase.as_deref())
                 .map_err(|error| SshError::Authenticate(format!("鍵を読めません: {error}")))?;
@@ -257,11 +318,25 @@ async fn authenticate(
 /// **Pageant を見るのは実利です**（D19）。この層の利用者は鍵を `.ppk` で持っていて、
 /// Pageant に入っていればそのまま繋がります。
 #[cfg(unix)]
-async fn authenticate_with_agent(handle: &mut Handle<Watcher>, user: &str) -> Result<(), SshError> {
+async fn authenticate_with_agent(
+    handle: &mut Handle<Watcher>,
+    user: &str,
+    diag: &Diagnostics,
+    id: Option<&str>,
+) -> Result<(), SshError> {
     let mut agent = keys::agent::client::AgentClient::connect_env()
         .await
-        .map_err(|error| SshError::Authenticate(format!("ssh-agent: {error}")))?;
-    try_agent_identities(handle, user, &mut agent).await
+        .map_err(|error| {
+            diag.error(
+                Stage::Auth,
+                id,
+                format!("ssh-agent に繋げません: {error}"),
+                "ssh-agent が動いていないか、SSH_AUTH_SOCK が渡っていません。\
+                 端末で `ssh-add -l` が通るか確かめてください",
+            );
+            SshError::Authenticate(format!("ssh-agent: {error}"))
+        })?;
+    try_agent_identities(handle, user, &mut agent, diag, id).await
 }
 
 #[cfg(windows)]
@@ -272,55 +347,111 @@ async fn authenticate_with_agent(handle: &mut Handle<Watcher>, user: &str) -> Re
     // 1. Windows の OpenSSH agent
     let openssh_error =
         match keys::agent::client::AgentClient::connect_named_pipe(OPENSSH_PIPE).await {
-            Ok(mut agent) => return try_agent_identities(handle, user, &mut agent).await,
+            Ok(mut agent) => return try_agent_identities(handle, user, &mut agent, diag, id).await,
             Err(error) => error,
         };
 
     // 2. Pageant（PuTTY）。**`.ppk` を持っている人がここに居る**（D19）。
     match keys::agent::client::AgentClient::connect_pageant().await {
-        Ok(mut agent) => try_agent_identities(handle, user, &mut agent).await,
+        Ok(mut agent) => try_agent_identities(handle, user, &mut agent, diag, id).await,
         // **どちらが駄目だったかを両方出す。**片方だけだと人が探せない。
-        Err(pageant_error) => Err(SshError::Authenticate(format!(
-            "ssh-agent に繋げません（OpenSSH: {openssh_error} / Pageant: {pageant_error}）"
-        ))),
+        Err(pageant_error) => {
+            diag.error(
+                Stage::Auth,
+                id,
+                format!(
+                    "ssh-agent に繋げません（OpenSSH: {openssh_error} / Pageant: {pageant_error}）"
+                ),
+                "Windows の OpenSSH エージェントを起動するか、Pageant に鍵を入れてください",
+            );
+            Err(SshError::Authenticate(format!(
+                "ssh-agent に繋げません（OpenSSH: {openssh_error} / Pageant: {pageant_error}）"
+            )))
+        }
     }
 }
 
 /// agent が持っている鍵を順に試す。**通ったら、そこで終わり。**
+///
+/// **どの鍵を試したかを指紋で記録します。**指紋は秘密ではありません。
+/// **コメントは記録しません** — パスやメールアドレスが入っているためです。
 async fn try_agent_identities<S>(
     handle: &mut Handle<Watcher>,
     user: &str,
     agent: &mut keys::agent::client::AgentClient<S>,
+    diag: &Diagnostics,
+    id: Option<&str>,
 ) -> Result<(), SshError>
 where
     S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin + Send + 'static,
 {
-    let identities = agent
-        .request_identities()
-        .await
-        .map_err(|error| SshError::Authenticate(format!("ssh-agent: {error}")))?;
+    let identities = agent.request_identities().await.map_err(|error| {
+        diag.error(
+            Stage::Auth,
+            id,
+            format!("ssh-agent から鍵の一覧を取れません: {error}"),
+            "`ssh-add -l` が通るか確かめてください",
+        );
+        SshError::Authenticate(format!("ssh-agent: {error}"))
+    })?;
 
-    let mut tried = 0;
+    let mut tried = Vec::new();
     for identity in identities {
         let keys::agent::AgentIdentity::PublicKey { key, .. } = identity else {
             continue;
         };
-        tried += 1;
+        let shown = key.fingerprint(Default::default()).to_string();
+        tried.push(shown.clone());
+
         let attempt = handle
             .authenticate_publickey_with(user, key, None, agent)
             .await
-            .map_err(|error| SshError::Authenticate(error.to_string()))?;
+            .map_err(|error| {
+                diag.error(
+                    Stage::Auth,
+                    id,
+                    format!("鍵を出せません（{shown}）: {error}"),
+                    "接続が途中で切れた可能性があります。もう一度試してください",
+                );
+                SshError::Authenticate(error.to_string())
+            })?;
+
         if attempt.success() {
+            diag.info(Stage::Auth, id, format!("鍵が通りました（{shown}）"));
             return Ok(());
         }
+        diag.info(Stage::Auth, id, format!("受け付けられません（{shown}）"));
     }
 
     // **「鍵が無い」と「全部弾かれた」を混ぜない。**人が次にやることが違う。
-    Err(SshError::Authenticate(if tried == 0 {
-        "ssh-agent に鍵がありません（ssh-add してください）".into()
-    } else {
-        format!("ssh-agent の鍵 {tried} 本とも受け付けられませんでした")
-    }))
+    if tried.is_empty() {
+        diag.error(
+            Stage::Auth,
+            id,
+            "ssh-agent に鍵が 1 本も入っていません",
+            "`ssh-add <鍵のパス>` で入れるか、接続の登録に鍵のパスを書いてください",
+        );
+        return Err(SshError::Authenticate(
+            "ssh-agent に鍵がありません（ssh-add してください）".into(),
+        ));
+    }
+
+    diag.error(
+        Stage::Auth,
+        id,
+        format!(
+            "ssh-agent の鍵 {} 本とも受け付けられませんでした（{}）",
+            tried.len(),
+            tried.join(" / ")
+        ),
+        "この相手に対応する鍵が ssh-agent に入っていません。\
+         `ssh-add <鍵のパス>` で足すか、接続の登録に鍵のパスを書いてください",
+    );
+    Err(SshError::Authenticate(format!(
+        "ssh-agent の鍵 {} 本とも受け付けられませんでした。\
+         この相手に対応する鍵が入っていない可能性が高いです",
+        tried.len()
+    )))
 }
 
 /// `sftp` で見えたもの 1 件。**中身は持ちません。**

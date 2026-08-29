@@ -49,6 +49,7 @@ pub fn run() {
             session_cmd::remote_read_file,
             session_cmd::remote_ensure_dir,
             session_cmd::remote_upload,
+            session_cmd::diagnostics_recent,
             menu::set_menu_labels
         ])
         .setup(|app| {
@@ -99,12 +100,13 @@ pub fn run() {
             // **すべての操作が通る 1 か所**（PRD §4-1）。
             // GUI も MCP もここを共有する。ここを迂回した経路を作った瞬間に
             // 「裏で見えない SSH」が生まれる。
-            let engine = Arc::new(Engine::new(
+            let engine = Arc::new(Engine::with_diagnostics(
                 band.clone(),
                 Arc::clone(&stream),
                 // 置き場所が分からないときは、存在しないパスを渡して
                 // **「登録されていません」と正直に断らせる。**繋げてしまうよりよい。
                 connections_path.unwrap_or_else(|| std::path::PathBuf::from("connections.toml")),
+                sshboard_diag::Diagnostics::new(),
             ));
             app.manage(Arc::clone(&engine));
             session_cmd::spawn_bridge(app.handle().clone(), Arc::clone(&engine));

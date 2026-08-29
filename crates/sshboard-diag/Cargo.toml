@@ -1,0 +1,13 @@
+[package]
+name = "sshboard-diag"
+description = "何が起きたかの記録。**人にも AI にも読める形で残す。**"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+
+[dev-dependencies]
+serde_json = "1"

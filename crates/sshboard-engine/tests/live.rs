@@ -6,6 +6,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use sshboard_band::{Actor, Band};
+use sshboard_diag::Diagnostics;
 use sshboard_engine::{Engine, EngineError};
 use sshboard_ssh::{Auth, SshError, SshSession, Target, WriteScope};
 use sshboard_stream::OutputStream;
@@ -25,6 +26,7 @@ async fn known_fingerprint() -> &'static String {
     FINGERPRINT
         .get_or_init(|| async {
             let target = Target {
+                id: Some("local".into()),
                 host: HOST.into(),
                 port: PORT,
                 user: USER.into(),
@@ -32,7 +34,8 @@ async fn known_fingerprint() -> &'static String {
                 known_hosts: String::new(),
                 write_scope: WriteScope::default(),
             };
-            match SshSession::connect(&target, &Auth::Agent, Band::new()).await {
+            match SshSession::connect(&target, &Auth::Agent, Band::new(), &Diagnostics::new()).await
+            {
                 Err(SshError::UntrustedHost { seen, .. }) => seen.fingerprint,
                 Ok(_) => panic!("初見のホストを通している"),
                 Err(other) => panic!("繋げません: {other}"),

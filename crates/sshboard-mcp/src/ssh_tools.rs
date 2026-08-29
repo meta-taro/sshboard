@@ -19,6 +19,10 @@ use crate::server::SshboardMcp;
 /// 実測でここに当たったら、分割送信を入れて上げる（YAGNI）。
 const MAX_BYTES: usize = 8 * 1024 * 1024;
 
+/// 記録を何件返すか。**多すぎると AI の文脈を食う。**
+const DEFAULT_DIAGNOSTICS: usize = 40;
+const MAX_DIAGNOSTICS: usize = 200;
+
 /// 断り方を MCP の形へ。**接続先を混ぜない**（PRD §8）。
 fn refuse(error: EngineError) -> ErrorData {
     match error {
@@ -73,6 +77,34 @@ impl SshboardMcp {
             Some(open) => render(&open),
             None => Ok("{\"open\":false}".to_string()),
         }
+    }
+
+    /// 何が起きたかの記録。**サーバーへは触りません。**
+    ///
+    /// **詰まったときに、AI が自分で状況を掴むための口です。**
+    /// 「繋がりません」だけ返して終わりにすると、AI は次の一手を選べません。
+    #[tool(
+        description = "Read sshboard's recent diagnostic log: which stage each attempt reached, why it stopped, and what to do next. Call this first when something failed. Contains no hostnames, usernames, or secrets. Touches no remote server."
+    )]
+    pub async fn diagnostics(
+        &self,
+        Parameters(request): Parameters<HowMany>,
+    ) -> Result<String, ErrorData> {
+        self.show("diagnostics").await?;
+
+        let diag = self.engine()?.diagnostics();
+        let limit = request
+            .limit
+            .unwrap_or(DEFAULT_DIAGNOSTICS)
+            .min(MAX_DIAGNOSTICS);
+
+        serde_json::to_string(&serde_json::json!({
+            "events": diag.recent(limit),
+            "kept": diag.len(),
+            // **黙って消さない。**「全部見えている」と誤解させない。
+            "droppedBecauseOlderThanTheBuffer": diag.dropped(),
+        }))
+        .map_err(|error| ErrorData::internal_error(error.to_string(), None))
     }
 
     /// ディレクトリの一覧。
@@ -210,6 +242,14 @@ fn render(opened: &sshboard_engine::Opened) -> Result<String, ErrorData> {
         "connection": opened,
     }))
     .map_err(|error| ErrorData::internal_error(error.to_string(), None))
+}
+
+#[derive(Debug, Deserialize, rmcp::schemars::JsonSchema)]
+#[schemars(crate = "rmcp::schemars")]
+pub struct HowMany {
+    /// 何件まで返すか。省略すると 40 件、上限は 200 件。
+    #[serde(default)]
+    pub limit: Option<usize>,
 }
 
 #[derive(Debug, Deserialize, rmcp::schemars::JsonSchema)]

@@ -17,12 +17,38 @@
 
 	type McpAccess = { url: string; token: string };
 
+	/** 何が起きたかの記録。Rust 側の `Event` と対。**接続先は入っていない。** */
+	type DiagEvent = {
+		seq: number;
+		atMs: number;
+		level: 'info' | 'warn' | 'error';
+		stage: string;
+		connection?: string;
+		message: string;
+		hint?: string;
+	};
+
 	let lines = $state<BandLine[]>([]);
 	let mcp = $state<McpAccess | null>(null);
 	let mcpCopied = $state(false);
 	let failure = $state<string | null>(null);
 	let streaming = $state(false);
-	let view = $state<'files' | 'connections' | 'band'>('files');
+	let view = $state<'files' | 'connections' | 'band' | 'diag'>('files');
+	let diag = $state<DiagEvent[]>([]);
+
+	/** 記録を取り直す。**押したときと、診断を開いたときに読む。** */
+	async function loadDiagnostics() {
+		try {
+			diag = await invoke<DiagEvent[]>('diagnostics_recent', { limit: 200 });
+		} catch (error: unknown) {
+			failure = String(error);
+		}
+	}
+
+	// 診断を開いたら、その場で読む。**古い記録を見せない。**
+	$effect(() => {
+		if (view === 'diag') loadDiagnostics();
+	});
 
 	/**
 	 * エージェントへ貼る 1 行。
@@ -199,6 +225,10 @@
 				<Icon name="activity" />
 				{i18n.t('tab.band')}
 			</button>
+			<button type="button" class:active={view === 'diag'} onclick={() => (view = 'diag')}>
+				<Icon name="warning" />
+				{i18n.t('tab.diag')}
+			</button>
 		</nav>
 
 		<div class="settings">
@@ -274,6 +304,35 @@
 		<FileBrowser />
 	{:else if view === 'connections'}
 		<ConnectionManager />
+	{:else if view === 'diag'}
+		<!-- **何が起きたか。**MCP の `diagnostics` と同じ 1 つを見ている。 -->
+		<section class="diag" aria-label={i18n.t('tab.diag')}>
+			<div class="diag-head">
+				<span class="label">{i18n.t('diag.label')}</span>
+				<span class="scaffold">{i18n.t('diag.help')}</span>
+				<button type="button" onclick={loadDiagnostics}>
+					<Icon name="refresh" size={13} />
+					{i18n.t('diag.refresh')}
+				</button>
+			</div>
+			{#if diag.length === 0}
+				<p class="empty">{i18n.t('diag.empty')}</p>
+			{:else}
+				<ol class="diag-list">
+					{#each diag as event (event.seq)}
+						<li class={event.level}>
+							<span class="at">{(event.atMs / 1000).toFixed(1)}s</span>
+							<span class="stage">{event.stage}</span>
+							{#if event.connection}<span class="who">{event.connection}</span>{/if}
+							<span class="what">
+								{event.message}
+								{#if event.hint}<em class="hint">→ {event.hint}</em>{/if}
+							</span>
+						</li>
+					{/each}
+				</ol>
+			{/if}
+		</section>
 	{:else}
 	<section class="stream" aria-label={i18n.t('stream.label')}>
 		<div class="stream-head">
@@ -369,6 +428,87 @@
 		min-width: 2.2rem;
 		text-align: center;
 		font-variant-numeric: tabular-nums;
+	}
+
+	/* 診断。**帯とは別。**帯は「誰が何をしたか」、ここは「なぜそうなったか」。 */
+	.diag {
+		display: flex;
+		flex-direction: column;
+		min-height: 0;
+		flex: 1 1 auto;
+		gap: 0.4rem;
+	}
+
+	.diag-head {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+	}
+
+	.diag-list {
+		list-style: none;
+		margin: 0;
+		padding: 0.3rem;
+		overflow: auto;
+		flex: 1 1 auto;
+		min-height: 0;
+		background: var(--surface);
+		border: 1px solid var(--hairline);
+		border-radius: var(--r-shell);
+		font-size: 0.7rem;
+		line-height: 1.6;
+	}
+
+	.diag-list li {
+		display: flex;
+		gap: 0.45rem;
+		padding: 0.12rem 0.4rem;
+		align-items: baseline;
+	}
+
+	.diag-list li.error {
+		color: var(--danger);
+	}
+
+	.diag-list li.warn {
+		color: var(--warning);
+	}
+
+	.at {
+		font-family: var(--font-mono);
+		font-size: 0.62rem;
+		color: var(--fg-faint);
+		font-variant-numeric: tabular-nums;
+		flex: none;
+		min-width: 3.2rem;
+		text-align: right;
+	}
+
+	.stage,
+	.who {
+		font-size: 0.62rem;
+		color: var(--fg-muted);
+		flex: none;
+		white-space: nowrap;
+	}
+
+	.who {
+		padding: 0 0.3rem;
+		border: 1px solid var(--hairline);
+		border-radius: 999px;
+	}
+
+	.what {
+		flex: 1 1 auto;
+		min-width: 0;
+	}
+
+	/* 次の一手。**失敗には必ず付く。** */
+	.hint {
+		display: block;
+		font-style: normal;
+		color: var(--fg-muted);
+		font-size: 0.66rem;
 	}
 
 	.mcp {

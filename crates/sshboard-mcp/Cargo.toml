@@ -24,6 +24,8 @@ tokio-util = "0.7"
 # 起動ごとの合言葉に OS の乱数を使う（D23）。既に依存木にある。
 getrandom = "0.3"
 
+sshboard-diag = { path = "../sshboard-diag" }
+
 [dev-dependencies]
 tokio = { version = "1", features = ["sync", "time", "macros", "rt", "rt-multi-thread"] }
 # 実際の MCP クライアントと同じく、生の JSON-RPC を HTTP で投げて確かめる。

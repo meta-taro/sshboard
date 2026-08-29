@@ -95,6 +95,12 @@ export const de: Catalog = {
 	"files.step2": "Beim ersten Mal den angezeigten Fingerabdruck prüfen und hinterlegen.",
 	"files.step3": "Dateien links ablegen und auf Hochladen drücken.",
 	"files.notconnected": "Nicht verbunden. Oben einen Server wählen und auf Verbinden drücken.",
+	// 診断（何が起きたか）。**AI が MCP から読むのと同じ記録。**
+	"tab.diag": "Diagnose",
+	"diag.label": "Was passiert ist",
+	"diag.help": "Dasselbe Protokoll, das die KI über MCP liest. Ohne Hostnamen, Benutzernamen oder Geheimnisse.",
+	"diag.refresh": "Neu laden",
+	"diag.empty": "Noch nichts. Versuchen Sie zu verbinden, dann erscheinen die Schritte hier.",
 };
 
 export const fr: Catalog = {
@@ -189,6 +195,12 @@ export const fr: Catalog = {
 	"files.step2": "La première fois, vérifiez l'empreinte affichée et enregistrez-la.",
 	"files.step3": "Déposez des fichiers à gauche, puis appuyez sur Envoyer.",
 	"files.notconnected": "Non connecté. Choisissez un serveur ci-dessus et appuyez sur Connecter.",
+	// 診断（何が起きたか）。**AI が MCP から読むのと同じ記録。**
+	"tab.diag": "Diagnostic",
+	"diag.label": "Ce qui s'est passé",
+	"diag.help": "Le même journal que l'IA lit via MCP. Sans noms d'hôte, identifiants ni secrets.",
+	"diag.refresh": "Recharger",
+	"diag.empty": "Rien pour l'instant. Essayez de vous connecter, les étapes apparaîtront ici.",
 };
 
 export const es: Catalog = {
@@ -283,4 +295,10 @@ export const es: Catalog = {
 	"files.step2": "La primera vez, compruebe la huella mostrada y regístrela.",
 	"files.step3": "Suelte archivos a la izquierda y pulse Subir.",
 	"files.notconnected": "Sin conexión. Elija un servidor arriba y pulse Conectar.",
+	// 診断（何が起きたか）。**AI が MCP から読むのと同じ記録。**
+	"tab.diag": "Diagnóstico",
+	"diag.label": "Qué ha pasado",
+	"diag.help": "El mismo registro que la IA lee por MCP. Sin nombres de host, usuarios ni secretos.",
+	"diag.refresh": "Recargar",
+	"diag.empty": "Nada aún. Pruebe a conectar y los pasos aparecerán aquí.",
 };

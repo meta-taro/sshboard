@@ -162,6 +162,8 @@ async fn the_server_advertises_only_the_phase_zero_tools() {
         "session_status",
         "list_directory",
         "upload_file",
+        // **詰まったときに AI が自分で状況を掴む口。**
+        "diagnostics",
     ] {
         assert!(
             listed.contains(expected),

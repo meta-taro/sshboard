@@ -133,6 +133,12 @@ const en = {
 	"files.step2": "The first time, check the fingerprint shown and register it.",
 	"files.step3": "Drop files on the left, then press Upload.",
 	"files.notconnected": "Not connected. Pick a server above and press Connect.",
+	// 診断（何が起きたか）。**AI が MCP から読むのと同じ記録。**
+	"tab.diag": "Diagnostics",
+	"diag.label": "What happened",
+	"diag.help": "Same log the AI reads over MCP. No hostnames, usernames or secrets.",
+	"diag.refresh": "Reload",
+	"diag.empty": "Nothing yet. Try connecting, and the steps appear here.",
 } as const;
 
 export type MessageKey = keyof typeof en;
@@ -266,6 +272,12 @@ const ja: Catalog = {
 	"files.step2": "初めての相手なら、出てくる指紋を確かめて登録する。",
 	"files.step3": "左へファイルを放り込み、［上げる］を押す。",
 	"files.notconnected": "繋がっていません。上でサーバーを選び、［接続］を押してください。",
+	// 診断（何が起きたか）。**AI が MCP から読むのと同じ記録。**
+	"tab.diag": "診断",
+	"diag.label": "何が起きたか",
+	"diag.help": "AI が MCP から読むのと同じ記録です。ホスト名・利用者名・秘密は入りません。",
+	"diag.refresh": "読み直す",
+	"diag.empty": "まだ何もありません。接続を試すと、その経過がここに出ます。",
 };
 
 import { ko, zhCN, zhTW } from './messages-cjk';

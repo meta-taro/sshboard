@@ -8,6 +8,7 @@ use std::sync::Arc;
 
 use serde::Serialize;
 use sshboard_band::Actor;
+use sshboard_diag::Event;
 use sshboard_engine::{Engine, Opened};
 use tauri::{AppHandle, Emitter, State};
 
@@ -227,4 +228,15 @@ mod tests {
         assert_eq!(join_remote("/srv/app/", "a.tar.gz"), "/srv/app/a.tar.gz");
         assert_eq!(join_remote("/", "a.tar.gz"), "/a.tar.gz");
     }
+}
+
+/// 何が起きたかの記録。**新しい順。**
+///
+/// 画面と MCP で**同じ 1 つ**を見ます。片方にしか出ない失敗を作らないため。
+#[tauri::command]
+pub async fn diagnostics_recent(
+    limit: Option<usize>,
+    engine: State<'_, Arc<Engine>>,
+) -> Result<Vec<Event>, String> {
+    Ok(engine.diagnostics().recent(limit.unwrap_or(200)))
 }

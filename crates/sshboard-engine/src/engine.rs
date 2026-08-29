@@ -6,6 +6,7 @@ use std::sync::Arc;
 use sshboard_band::{Actor, Band};
 use sshboard_connections::{ConnectionEntry, Connections};
 use sshboard_credentials::SecretStore;
+use sshboard_diag::{Diagnostics, Stage};
 use sshboard_ssh::{Auth, DirEntry, SshSession, Target, WriteScope};
 use sshboard_stream::OutputStream;
 use tokio::sync::{watch, Mutex};
@@ -24,6 +25,9 @@ struct Live {
 /// **すべての操作が通る 1 か所**（PRD §4-1）。
 pub struct Engine {
     band: Band,
+    /// 何が起きたかの記録。**GUI と MCP で同じ 1 つを見る。**
+    /// 片方にしか出ない失敗を作らない。
+    diag: Diagnostics,
     stream: Arc<OutputStream>,
     connections_path: PathBuf,
     live: Mutex<Option<Live>>,
@@ -33,9 +37,19 @@ pub struct Engine {
 
 impl Engine {
     pub fn new(band: Band, stream: Arc<OutputStream>, connections_path: PathBuf) -> Self {
+        Self::with_diagnostics(band, stream, connections_path, Diagnostics::new())
+    }
+
+    pub fn with_diagnostics(
+        band: Band,
+        stream: Arc<OutputStream>,
+        connections_path: PathBuf,
+        diag: Diagnostics,
+    ) -> Self {
         let (changed, _) = watch::channel(None);
         Self {
             band,
+            diag,
             stream,
             connections_path,
             live: Mutex::new(None),
@@ -56,6 +70,11 @@ impl Engine {
     /// 共有している出力（`tail -f` の行き先）。
     pub fn stream(&self) -> &Arc<OutputStream> {
         &self.stream
+    }
+
+    /// 何が起きたかの記録。**人にも AI にも同じものを見せる。**
+    pub fn diagnostics(&self) -> &Diagnostics {
+        &self.diag
     }
 
     /// 接続一覧の置き場所。
@@ -85,7 +104,14 @@ impl Engine {
             });
         }
 
-        let entry = self.entry(id)?;
+        let entry = self.entry(id).inspect_err(|error| {
+            self.diag.error(
+                Stage::Registry,
+                Some(id),
+                error.to_string(),
+                "接続タブで登録するか、識別子を確かめてください",
+            );
+        })?;
         let scope = WriteScope::under(&entry.write_roots).map_err(|why| {
             EngineError::Connections(format!("書き込み許可の指定が不正です: {why}"))
         })?;
@@ -94,6 +120,7 @@ impl Engine {
             host: entry.host.clone(),
             port: entry.port,
             user: entry.user.clone(),
+            id: Some(entry.id.clone()),
             pinned_fingerprint: entry.fingerprint.clone(),
             known_hosts: read_known_hosts(entry.known_hosts.as_deref()),
             write_scope: scope,
@@ -104,7 +131,7 @@ impl Engine {
         // 誰がいつ開いたかが残らないなら、同じ 1 本を共有している意味がない。
         self.show(actor, &format!("connect {}", entry.id)).await?;
 
-        let session = SshSession::connect(&target, &auth, self.band.clone())
+        let session = SshSession::connect(&target, &auth, self.band.clone(), &self.diag)
             .await
             // **ホスト鍵の不一致だけは、構造のまま上へ返す。**
             // 文字列に潰すと、画面が「この指紋で登録しますか」を出せず、

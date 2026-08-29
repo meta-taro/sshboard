@@ -11,6 +11,7 @@ use std::time::Duration;
 
 use sshboard_band::{Actor, Band};
 use sshboard_connections::ConnectionsWatch;
+use sshboard_diag::Diagnostics;
 use sshboard_engine::Engine;
 use sshboard_mcp::{serve, McpEndpoint};
 use sshboard_ssh::{Auth, SshError, SshSession, Target, WriteScope};
@@ -35,6 +36,7 @@ async fn fingerprint() -> &'static String {
     FINGERPRINT
         .get_or_init(|| async {
             let target = Target {
+                id: Some("local".into()),
                 host: HOST.into(),
                 port: PORT,
                 user: USER.into(),
@@ -42,7 +44,8 @@ async fn fingerprint() -> &'static String {
                 known_hosts: String::new(),
                 write_scope: WriteScope::default(),
             };
-            match SshSession::connect(&target, &Auth::Agent, Band::new()).await {
+            match SshSession::connect(&target, &Auth::Agent, Band::new(), &Diagnostics::new()).await
+            {
                 Err(SshError::UntrustedHost { seen, .. }) => seen.fingerprint,
                 Ok(_) => panic!("初見のホストを通している"),
                 Err(other) => panic!("繋げません: {other}"),

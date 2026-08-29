@@ -8,6 +8,7 @@ repository.workspace = true
 
 [dependencies]
 sshboard-band = { path = "../sshboard-band" }
+sshboard-diag = { path = "../sshboard-diag" }
 sshboard-stream = { path = "../sshboard-stream" }
 # 既定は aws-lc-rs を引く。dbboard の ADR-0034 に合わせて ring へ寄せる。
 # **採用したら cargo tree で毎回確かめること**（D6）。
