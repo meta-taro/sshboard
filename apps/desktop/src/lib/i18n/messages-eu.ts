@@ -86,6 +86,11 @@ export const de: Catalog = {
 	"text.label": "Schriftgröße",
 	"text.smaller": "Kleiner",
 	"text.larger": "Größer",
+	// いまどの段かを画面に出すため
+	"text.small": "Klein",
+	"text.normal": "Normal",
+	"text.large": "Groß",
+	"text.xlarge": "Sehr groß",
 };
 
 export const fr: Catalog = {
@@ -171,6 +176,11 @@ export const fr: Catalog = {
 	"text.label": "Taille du texte",
 	"text.smaller": "Plus petit",
 	"text.larger": "Plus grand",
+	// いまどの段かを画面に出すため
+	"text.small": "Petit",
+	"text.normal": "Normal",
+	"text.large": "Grand",
+	"text.xlarge": "Très grand",
 };
 
 export const es: Catalog = {
@@ -256,4 +266,9 @@ export const es: Catalog = {
 	"text.label": "Tamaño del texto",
 	"text.smaller": "Más pequeño",
 	"text.larger": "Más grande",
+	// いまどの段かを画面に出すため
+	"text.small": "Pequeño",
+	"text.normal": "Normal",
+	"text.large": "Grande",
+	"text.xlarge": "Muy grande",
 };

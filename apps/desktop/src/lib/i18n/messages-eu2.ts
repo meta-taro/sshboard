@@ -86,6 +86,11 @@ export const ptBR: Catalog = {
 	"text.label": "Tamanho do texto",
 	"text.smaller": "Menor",
 	"text.larger": "Maior",
+	// いまどの段かを画面に出すため
+	"text.small": "Pequeno",
+	"text.normal": "Normal",
+	"text.large": "Grande",
+	"text.xlarge": "Muito grande",
 };
 
 export const ru: Catalog = {
@@ -171,6 +176,11 @@ export const ru: Catalog = {
 	"text.label": "Размер текста",
 	"text.smaller": "Меньше",
 	"text.larger": "Больше",
+	// いまどの段かを画面に出すため
+	"text.small": "Мелкий",
+	"text.normal": "Обычный",
+	"text.large": "Крупный",
+	"text.xlarge": "Очень крупный",
 };
 
 export const it: Catalog = {
@@ -256,4 +266,9 @@ export const it: Catalog = {
 	"text.label": "Dimensione del testo",
 	"text.smaller": "Più piccolo",
 	"text.larger": "Più grande",
+	// いまどの段かを画面に出すため
+	"text.small": "Piccolo",
+	"text.normal": "Normale",
+	"text.large": "Grande",
+	"text.xlarge": "Molto grande",
 };

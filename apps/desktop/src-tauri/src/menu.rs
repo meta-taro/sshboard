@@ -4,8 +4,14 @@
 //! 訳は `apps/desktop/src/lib/i18n/` に 1 箇所だけ置いてあります。
 
 use serde::Deserialize;
-use tauri::menu::{Menu, MenuItem, PredefinedMenuItem, Submenu};
-use tauri::{AppHandle, Wry};
+use tauri::menu::{AboutMetadata, Menu, MenuEvent, MenuItem, PredefinedMenuItem, Submenu};
+use tauri::{AppHandle, Emitter, Wry};
+
+/// 文字サイズの操作を画面へ渡すイベント。
+///
+/// **メニューは Rust 側にあるが、大きさを持っているのは画面側**（localStorage）。
+/// ここでは「どちらへ動かすか」だけを渡す。
+pub const TEXT_SIZE_EVENT: &str = "menu://text-size";
 
 /// 画面から渡されるメニューの文言。
 #[derive(Debug, Deserialize)]
@@ -13,6 +19,11 @@ use tauri::{AppHandle, Wry};
 pub struct MenuLabels {
     pub about: String,
     pub quit: String,
+    /// **「表示」メニュー。**Mac の人は文字サイズをまずここで探す（実際に探された）。
+    pub view: String,
+    pub text_larger: String,
+    pub text_smaller: String,
+    pub text_reset: String,
     pub edit: String,
     pub undo: String,
     pub redo: String,
@@ -31,14 +42,57 @@ pub struct MenuLabels {
 /// **言語を切り替えるたびに呼ばれます。**メニューは作り直すしかないので、
 /// 差分更新はしません（項目が十数個なので、作り直しの方が読みやすい）。
 pub fn apply(app: &AppHandle, labels: &MenuLabels) -> tauri::Result<()> {
+    // **OS の「〜について」を使う。**自前の項目には受け手が要り、
+    // 付け忘れると押しても何も起きない（**実際に起きなかった**）。
+    //
+    // 中身に個人名もメールも載せない（product-baseline §25）。
+    let about = AboutMetadata {
+        name: Some("sshboard".into()),
+        version: Some(env!("CARGO_PKG_VERSION").into()),
+        website: Some("https://github.com/meta-taro/sshboard".into()),
+        ..Default::default()
+    };
+
     let app_menu = Submenu::with_items(
         app,
         "sshboard",
         true,
         &[
-            &MenuItem::with_id(app, "about", &labels.about, true, None::<&str>)?,
+            &PredefinedMenuItem::about(app, Some(&labels.about), Some(about))?,
             &PredefinedMenuItem::separator(app)?,
             &PredefinedMenuItem::quit(app, Some(&labels.quit))?,
+        ],
+    )?;
+
+    // **文字サイズはここに置く。**右上のボタンだけだと見つからない（実際に見つからなかった）。
+    // 割り当ては OS の慣習どおり。**覚えなくても手が知っている操作**にする。
+    let view_menu = Submenu::with_items(
+        app,
+        &labels.view,
+        true,
+        &[
+            &MenuItem::with_id(
+                app,
+                "text-larger",
+                &labels.text_larger,
+                true,
+                Some("CmdOrCtrl+Plus"),
+            )?,
+            &MenuItem::with_id(
+                app,
+                "text-smaller",
+                &labels.text_smaller,
+                true,
+                Some("CmdOrCtrl+-"),
+            )?,
+            &PredefinedMenuItem::separator(app)?,
+            &MenuItem::with_id(
+                app,
+                "text-reset",
+                &labels.text_reset,
+                true,
+                Some("CmdOrCtrl+0"),
+            )?,
         ],
     )?;
 
@@ -69,9 +123,28 @@ pub fn apply(app: &AppHandle, labels: &MenuLabels) -> tauri::Result<()> {
         ],
     )?;
 
-    let menu = Menu::with_items(app, &[&app_menu, &edit_menu, &window_menu])?;
+    let menu = Menu::with_items(app, &[&app_menu, &edit_menu, &view_menu, &window_menu])?;
     app.set_menu(menu)?;
     Ok(())
+}
+
+/// メニューが押されたとき。**押しても何も起きない項目を残さない。**
+///
+/// 文字サイズを持っているのは画面側（localStorage）なので、
+/// ここでは**どちらへ動かすか**だけを渡します。
+pub fn handle_event(app: &AppHandle, event: MenuEvent) {
+    let direction = match event.id().as_ref() {
+        "text-larger" => "larger",
+        "text-smaller" => "smaller",
+        "text-reset" => "reset",
+        // OS が自分で処理する項目（about / quit / 編集 / ウインドウ）はここへ来ない。
+        _ => return,
+    };
+
+    if let Err(error) = app.emit(TEXT_SIZE_EVENT, direction) {
+        // 黙らない。**メニューが効かない理由が分からなくなる。**
+        eprintln!("[sshboard] 文字サイズの操作を画面へ渡せません: {error}");
+    }
 }
 
 /// 画面が言語を決めた（または切り替えた）ときに呼ぶ。

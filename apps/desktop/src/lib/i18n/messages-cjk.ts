@@ -86,6 +86,11 @@ export const ko: Catalog = {
 	"text.label": "글자 크기",
 	"text.smaller": "작게",
 	"text.larger": "크게",
+	// いまどの段かを画面に出すため
+	"text.small": "작게",
+	"text.normal": "보통",
+	"text.large": "크게",
+	"text.xlarge": "아주 크게",
 };
 
 export const zhCN: Catalog = {
@@ -171,6 +176,11 @@ export const zhCN: Catalog = {
 	"text.label": "文字大小",
 	"text.smaller": "缩小",
 	"text.larger": "放大",
+	// いまどの段かを画面に出すため
+	"text.small": "小",
+	"text.normal": "标准",
+	"text.large": "大",
+	"text.xlarge": "特大",
 };
 
 export const zhTW: Catalog = {
@@ -256,4 +266,9 @@ export const zhTW: Catalog = {
 	"text.label": "文字大小",
 	"text.smaller": "縮小",
 	"text.larger": "放大",
+	// いまどの段かを画面に出すため
+	"text.small": "小",
+	"text.normal": "標準",
+	"text.large": "大",
+	"text.xlarge": "特大",
 };

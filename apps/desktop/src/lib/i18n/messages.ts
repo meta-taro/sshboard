@@ -124,6 +124,11 @@ const en = {
 	"text.label": "Text size",
 	"text.smaller": "Smaller",
 	"text.larger": "Larger",
+	// いまどの段かを画面に出すため
+	"text.small": "Small",
+	"text.normal": "Normal",
+	"text.large": "Large",
+	"text.xlarge": "X-Large",
 } as const;
 
 export type MessageKey = keyof typeof en;
@@ -248,6 +253,11 @@ const ja: Catalog = {
 	"text.label": "文字サイズ",
 	"text.smaller": "小さく",
 	"text.larger": "大きく",
+	// いまどの段かを画面に出すため
+	"text.small": "小",
+	"text.normal": "標準",
+	"text.large": "大",
+	"text.xlarge": "特大",
 };
 
 import { ko, zhCN, zhTW } from './messages-cjk';

@@ -31,6 +31,8 @@ const PHASE0_DEMO_ENV: &str = "SSHBOARD_PHASE0_DEMO";
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
+        // **押しても何も起きない項目を残さない。**受け手はここ 1 か所。
+        .on_menu_event(menu::handle_event)
         .invoke_handler(tauri::generate_handler![
             commands::band_ack,
             commands::mcp_url,

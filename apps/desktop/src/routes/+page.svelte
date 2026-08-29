@@ -140,6 +140,16 @@
 				failure = i18n.t('err.subscribe', { detail: String(error) });
 			});
 
+		// OS のメニュー（表示 > 文字を大きく）から。**大きさを持っているのは画面側。**
+		listen<'larger' | 'smaller' | 'reset'>('menu://text-size', (event) => {
+			if (event.payload === 'reset') textSize.set('normal');
+			else textSize.step(event.payload === 'larger' ? 1 : -1);
+		})
+			.then((stop) => stops.push(stop))
+			.catch((error: unknown) => {
+				failure = i18n.t('err.subscribe', { detail: String(error) });
+			});
+
 		listen<McpAccess>('mcp://ready', (event) => {
 			mcp = event.payload;
 		})
@@ -192,7 +202,9 @@
 		</nav>
 
 		<div class="settings">
-			<!-- 文字サイズ。**この道具は小さい字が画面いっぱいに並ぶ。**読めなければ始まらない。 -->
+			<!-- 文字サイズ。**この道具は小さい字が画面いっぱいに並ぶ。**読めなければ始まらない。
+			     いまどの段かを間に出す。**出さないと、押した結果が分からない。**
+			     OS のメニュー（表示）にも同じものを置いてある。 -->
 			<button
 				type="button"
 				class="icon-only text-step"
@@ -201,8 +213,9 @@
 				title={`${i18n.t('text.label')}: ${i18n.t('text.smaller')}`}
 				aria-label={`${i18n.t('text.label')}: ${i18n.t('text.smaller')}`}
 			>
-				A<span class="minus">−</span>
+				<span class="smaller-a">A</span>
 			</button>
+			<span class="text-now" aria-hidden="true">{i18n.t(`text.${textSize.mode}`)}</span>
 			<button
 				type="button"
 				class="icon-only text-step"
@@ -211,7 +224,7 @@
 				title={`${i18n.t('text.label')}: ${i18n.t('text.larger')}`}
 				aria-label={`${i18n.t('text.label')}: ${i18n.t('text.larger')}`}
 			>
-				A<span class="plus">＋</span>
+				<span class="larger-a">A</span>
 			</button>
 
 			<span class="settings-icon"><Icon name="globe" size={13} /></span>
@@ -333,18 +346,29 @@
 	}
 
 	/* **合言葉ごと写せるボタン。**起動ごとに変わる値を人に書き写させない（D23）。 */
-	/* 文字サイズのボタン。**アイコンではなく字そのもの**で示す方が伝わる。 */
+	/* 文字サイズ。**アイコンではなく「A」の大小そのもの**で示す方が伝わる。 */
 	.text-step {
-		font-size: 0.72rem;
-		font-weight: 500;
 		line-height: 1;
-		letter-spacing: -0.02em;
+		font-weight: 600;
 	}
 
-	.text-step .minus,
-	.text-step .plus {
+	.smaller-a {
 		font-size: 0.62rem;
-		margin-left: 0.05rem;
+	}
+
+	.larger-a {
+		font-size: 0.86rem;
+	}
+
+	/* いまどの段か。**出さないと、押した結果が分からない。** */
+	.text-now {
+		font-size: 0.62rem;
+		color: var(--fg-muted);
+		white-space: nowrap;
+		padding: 0 0.1rem;
+		min-width: 2.2rem;
+		text-align: center;
+		font-variant-numeric: tabular-nums;
 	}
 
 	.mcp {
