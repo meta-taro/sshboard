@@ -1,11 +1,11 @@
 # プロジェクトステータス — sshboard
 
 - **現在フェーズ**: Phase 0 は技術項目を抜けた。**Phase 1 に入っています**
-- **最終更新**: 2026-08-28
+- **最終更新**: 2026-08-29
 
 ## いまの状態を一言で
 
-**人も AI も、同じ 1 本の SSH でファイルを上げられます。**
+**人も AI も、同じ SSH でファイルを上げられます。**接続はタブで複数持てます（D25）。
 
 Phase 0 の 5 本は、実機と Windows 目視を除いてすべて通りました。
 そのうえで **D2（読み取り専用）を D22 で覆し、囲いつきの書き込みを入れています。**
@@ -22,53 +22,61 @@ Phase 0 の 5 本は、実機と Windows 目視を除いてすべて通りまし
 | `crates/sshboard-credentials` | OS 資格情報ストア ＋ ssh-agent。**自前の鍵ストアを持たない**（D11） |
 | `crates/sshboard-connections` | 接続の一覧。秘密はファイルに置かず参照名だけ。印（色・タグ）付き |
 | `crates/sshboard-ssh` | SSH 1 本の上の `exec` / `sftp` / `tail -f`。ホスト鍵の検証。**書き込みの囲い**（D22） |
-| `crates/sshboard-engine` | **GUI と MCP が共有する実行体**（PRD §4-1）。開いている接続は 1 本だけ |
-| `crates/sshboard-mcp` | 同居 MCP・**合言葉必須**（D23）。13 本のツール（下記） |
-| `apps/desktop` | SvelteKit + Tauri 2。**ファイル 2 ペイン**・接続管理・帯・端末・11 言語・テーマ切替 |
+| `crates/sshboard-engine` | **GUI と MCP が共有する実行体**（PRD §4-1）。接続を複数持ち、**1 本残らずタブに出す**（D25） |
+| `crates/sshboard-diag` | 何が起きたかの記録。**人にも AI にも同じものを見せる**。接続先を入れない |
+| `crates/sshboard-mcp` | 同居 MCP・**合言葉必須**（D23）。16 本のツール（下記） |
+| `apps/desktop` | SvelteKit + Tauri 2。**ファイル 2 ペイン（左右とも本物の一覧）**・接続タブ・接続管理・帯・診断・端末・11 言語・テーマ・**文字サイズ 4 段** |
 | `tools/test-server` | 手元の AlmaLinux 9 sshd。`/var/log` の権限・EUC-JP のログ・色付きの成長ログを再現 |
 | `tools/ssh-probe` | 002 / 003 の確認コマンド（**製品ではない**。D6 が決まったので役目は終わり） |
 | `tools/check-005.sh` | 005 の確認スクリプト |
 | `.github/workflows/ci.yml` | format / clippy / test |
 
-## MCP のツール（13 本）
+## MCP のツール（16 本）
 
 | 何もしない側 | サーバーへ触る側 |
 |---|---|
-| `ping` / `read_stream` / `session_status` | `connect` / `disconnect` |
-| `list_connections` / `register_connection` / `mark_connection` | `list_directory` / `read_file` |
-| | **`make_directory` / `upload_file` / `write_file`**（囲いの中だけ・D22） |
+| `ping` / `read_stream` | `connect` / `disconnect` / `focus_connection` |
+| `session_status` / **`diagnostics`** | `list_directory` / `read_file` |
+| `list_connections` / `register_connection` / `mark_connection` | **`make_directory` / `upload_file` / `write_file`**（囲いの中だけ・D22） |
 
 **`run_command` 相当は 1 本もありません**（D3）。
 **消す・動かす・権限を変える・sudo もありません**（Phase 2 のまま）。
 どちらも**ツール一覧をテストで見張っています。**
 
+**`diagnostics` が要です。**「繋がりません」で会話が終わらないよう、
+**AI が自分で段階と次の一手を読めます。**GUI の診断タブと同じ 1 つを見ています。
+
 ## テスト状況
 
-**145 本。全部通っています。**（手元のテスト用サーバーを建てた状態）
+**Rust 167 ＋ フロント 40 ＝ 207 本。全部通っています。**（手元のテスト用サーバーを建てた状態）
 
 ```
-cargo test --workspace                                 →  145 passed; 0 failed
+cargo test --workspace                                 →  167 passed; 0 failed
 cargo fmt --all -- --check                             →  差分なし
 cargo clippy --workspace --all-targets -- -D warnings  →  警告なし
-pnpm --filter desktop check                            →  198 files, 0 errors, 0 warnings
-（別ワークスペース）tools/ssh-probe: cargo test        →  10 passed
+pnpm --filter desktop check                            →  247 files, 0 errors, 0 warnings
+pnpm --filter desktop test                             →   40 passed
+（別ワークスペース）tools/ssh-probe: cargo test        →   10 passed
 ```
 
-| どこ | 本数 |
-|---|---|
-| `sshboard-band` | 9 |
-| `sshboard-stream` | 24 |
-| `sshboard-credentials` | 16 |
-| `sshboard-connections` | 20 |
-| `sshboard-ssh` | 36（うち実機 13） |
-| `sshboard-engine` | 9（うち実機 7） |
-| `sshboard-mcp` | 27（うち実機の通し 4） |
-| `sshboard-desktop` | 4 |
-| `tools/ssh-probe`（別ワークスペース） | 10 |
+| どこ | 本数 | うち実機 |
+|---|---|---|
+| `sshboard-band` | 9 | |
+| `sshboard-stream` | 24 | |
+| `sshboard-credentials` | 16 | 2 |
+| `sshboard-connections` | 20 | |
+| `sshboard-diag` | 8 | |
+| `sshboard-ssh` | 42 | 16 |
+| `sshboard-engine` | 14 | 12 |
+| `sshboard-mcp` | 27 | 4 |
+| `sshboard-desktop` | 7 | |
+| **フロント（vitest）** | **40** | |
 
-**実機の通し 4 本**が要です。MCP（HTTP・合言葉つき）→ Engine → SSH 1 本 → sftp を、
+**実機の通し 4 本が要です。**MCP（HTTP・合言葉つき）→ Engine → SSH → sftp を、
 **外部クライアントと同じ生の JSON-RPC** で叩き、囲いの外を断ったあと
 **サーバー側の一覧を見て本当に届いていないこと**まで確かめています。
+
+**記録に接続先が混ざらないこと**も、実機で繋いだうえで検査しています。
 
 ## Phase 0 の 5 本
 
@@ -84,18 +92,19 @@ pnpm --filter desktop check                            →  198 files, 0 errors,
 
 ## 次にやること
 
-1. **実運用で 1 回上げてみる**（人）。**ここが本当の合否です。**
-   接続を登録し、`write_roots` を決め、ファイルの面から上げる。
-   そのあと MCP から同じことを AI にやらせる
+1. **本番へ 1 台繋ぐ**（人）。**ここが本当の合否です。**
+   いま止まっているのは **ssh-agent に本番の鍵が入っていない**ことだけ。
+   `ssh-add` するか、接続タブでその接続に**鍵のパス**を書く
 2. **ダウンロード**（サーバー → 手元）。いまは上げる側しかない
 3. **端末タブ**。ファイルの面はできたが、Tera Term 側の面がまだ
 4. **`run_readonly`**（許可リスト方式）。`df` / `ps` / `systemctl status` 相当
 5. **Windows 実機**（001 / 004）。CI はビルドとテストを回すが、画面は見られない
-6. **push の最終確認**（人）
+6. **画面そのもののテスト**。いまフロントのテストは純粋な関数だけで、
+   **コンポーネントを描画して確かめるものが 1 本も無い**
 
 ## 技術的決定
 
-`.claude/decisions.md`（D1〜D24）＋ `DESIGN.md`。**未決は D10（実装体制）のみ。**
+`.claude/decisions.md`（D1〜D25）＋ `DESIGN.md`。**未決は D10（実装体制）のみ。**
 
 ## Phase 0 で拾えた未知
 
@@ -119,6 +128,8 @@ pnpm --filter desktop check                            →  198 files, 0 errors,
 - **大きいファイルは丸ごとメモリに載ります**（上限 8 MB / MCP）。
   分割送信は、実測でそこに当たってから入れます
 - **ダウンロードがありません。**上げる側だけです
+- **画面のコンポーネントにテストがありません。**型検査と純粋な関数だけで、
+  「押したら動くか」は**人が見るまで分かりません**（実際に 3 件の崩れを見逃しました）
 - **`PerSourcePenalties` に当たる可能性**（D24）。製品側の連打防止はまだ入っていません
 - **Windows の ssh-agent は実機で未確認。**コンパイルは CI で通しますが、
   名前付きパイプ / Pageant に実際に繋がるかは**人が実機で見るまで分かりません**
@@ -147,6 +158,14 @@ pnpm --filter desktop check                            →  198 files, 0 errors,
 10. **`serve()` と `Engine` が別々に接続一覧の場所を持てた。**
     `list_connections` が見ている一覧と `connect` が引く一覧が食い違いうる状態だった。
     **テストで実際に食い違って気づいた**
+
+11. **画面を見てもらうまで、崩れは見つからない。**1 日で 3 件出た。
+    クラス名の衝突（`.bar` が幅 3px に潰す）、メニューの割り当て名（`Plus` は存在しない）、
+    項目の渡し忘れ（手書きの対応表）。**型検査は 3 件とも通していた**
+12. **macOS のキーチェーン ACL はバイナリに紐づく**（D23）。未署名の開発ビルドは
+    ビルドのたびに別の相手になるので、「常に許可」を押しても毎回承認が出る
+13. **鍵が agent に入っていないことを、製品が言えていなかった。**
+    「認証が通りません」だけでは、人も AI も手が出ない。**記録が無いのが原因**（診断を入れた）
 
 ## 人にしかできない工程で、止まっているもの
 
