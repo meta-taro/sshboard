@@ -25,14 +25,18 @@ Phase 0 の 5 本は、実機と Windows 目視を除いてすべて通りまし
 | `crates/sshboard-ssh` | SSH 1 本の上の `exec` / `sftp` / `tail -f`。ホスト鍵の検証。**書き込みの囲い**（D22） |
 | `crates/sshboard-engine` | **GUI と MCP が共有する実行体**（PRD §4-1）。接続を複数持ち、**1 本残らずタブに出す**（D25）。手元へ落とす側は**黙って上書きしない**（D27） |
 | `crates/sshboard-diag` | 何が起きたかの記録。**人にも AI にも同じものを見せる**。接続先を入れない |
-| `crates/sshboard-mcp` | 同居 MCP・**合言葉必須**（D23）。17 本のツール（下記） |
+| `crates/sshboard-mcp` | 同居 MCP・**合言葉必須**（D23）。16 本のツール（下記） |
 | `apps/desktop` | SvelteKit + Tauri 2。**ファイル 2 ペイン（左右とも本物の一覧・上げ下ろし両方）**・接続タブ・接続管理・帯・診断・端末・11 言語・テーマ・**文字サイズ 4 段** |
 | `tools/test-server` | 手元の AlmaLinux 9 sshd。`/var/log` の権限・EUC-JP のログ・色付きの成長ログを再現 |
 | `tools/ssh-probe` | 002 / 003 の確認コマンド（**製品ではない**。D6 が決まったので役目は終わり） |
 | `tools/check-005.sh` | 005 の確認スクリプト |
 | `.github/workflows/ci.yml` | format / clippy / test |
 
-## MCP のツール（17 本）
+## MCP のツール（16 本）
+
+> **数え直しました**（2026-08-30）。`capture_window` を足す前は **15 本**で、
+> それまで「16 本」と書いていたのは**元から 1 つ多い**誤りでした。
+> 実物は `grep -c '#\[tool('` で数えられます。
 
 | 何もしない側 | サーバーへ触る側 |
 |---|---|
