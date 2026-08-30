@@ -18,7 +18,7 @@ pub use engine::{Engine, OnConflict};
 pub use error::EngineError;
 pub use open::{Opened, WriteAccess};
 
-pub use sshboard_ssh::DirEntry;
+pub use sshboard_ssh::{DirEntry, Ran};
 
 /// 鍵の形式を**中身で**見分ける口（D28）。
 ///

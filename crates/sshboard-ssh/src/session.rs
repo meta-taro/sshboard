@@ -252,8 +252,12 @@ impl SshSession {
         &self.write_scope
     }
 
-    /// コマンドを実行し、出力を返す。**先に帯へ出す**（D16）。
-    pub async fn exec(&self, actor: Actor, command: &str) -> Result<String, SshError> {
+    /// コマンドを実行し、**出た物すべてと終了コード**を返す。**先に帯へ出す**（D16）。
+    ///
+    /// **stderr も終了コードも捨てません**（product-baseline §8）。
+    /// 捨てていた頃は、入っていないコマンドを打つと**空の成功**に見えました
+    /// （テスト用サーバーに `uptime` が無く、実際にそう見えた・2026-08-30）。
+    pub async fn exec(&self, actor: Actor, command: &str) -> Result<Ran, SshError> {
         self.show(actor, &format!("$ {command}")).await?;
 
         let mut channel = self
@@ -267,15 +271,28 @@ impl SshSession {
             .map_err(|error| SshError::Command(error.to_string()))?;
 
         let mut out = Vec::new();
+        let mut err = Vec::new();
+        let mut status = None;
         while let Some(message) = channel.wait().await {
             match message {
                 ChannelMsg::Data { ref data } => out.extend_from_slice(data),
-                ChannelMsg::Eof | ChannelMsg::Close => break,
+                // **ここを落としていた。**stderr は別の流れで来る。
+                ChannelMsg::ExtendedData { ref data, .. } => err.extend_from_slice(data),
+                ChannelMsg::ExitStatus { exit_status } => status = Some(exit_status),
+                // **`Eof` で抜けない。**終了コードはそのあとに来る
+                // （Data… → Eof → ExitStatus → Close）。抜けると `status` が
+                // いつも `None` になり、**成功と失敗を見分けられない**（実際になった）。
+                ChannelMsg::Eof => {}
+                ChannelMsg::Close => break,
                 _ => {}
             }
         }
 
-        Ok(String::from_utf8_lossy(&out).into_owned())
+        Ok(Ran {
+            out: String::from_utf8_lossy(&out).into_owned(),
+            err: String::from_utf8_lossy(&err).into_owned(),
+            status,
+        })
     }
 
     /// 帯へ載せ、画面が受け取るまで待つ（D16）。
@@ -469,6 +486,27 @@ where
          この相手に対応する鍵が入っていない可能性が高いです",
         tried.len()
     )))
+}
+
+/// コマンドを 1 回打った結果。
+///
+/// **成功と失敗を見分けられる形で返す。**`String` だけを返していた頃は、
+/// 入っていないコマンドが「空の成功」に見えました。
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Ran {
+    /// 標準出力。
+    pub out: String,
+    /// 標準エラー。**空とは限らないし、空でも失敗しているとは限らない。**
+    pub err: String,
+    /// 終了コード。**返してこないサーバーもある**ので `Option`。
+    pub status: Option<u32>,
+}
+
+impl Ran {
+    /// 終了コードが 0 か。**返ってこなかったときは判断しない。**
+    pub fn succeeded(&self) -> bool {
+        self.status == Some(0)
+    }
 }
 
 /// `sftp` で見えたもの 1 件。**中身は持ちません。**

@@ -9,7 +9,8 @@ use sshboard_connections::{ConnectionEntry, Connections};
 use sshboard_credentials::SecretStore;
 use sshboard_diag::{Diagnostics, Stage};
 use sshboard_ssh::{
-    inspect_key, Auth, DirEntry, KeyFacts, KeyFormat, KeyVerdict, SshSession, Target, WriteScope,
+    inspect_key, Auth, DirEntry, KeyFacts, KeyFormat, KeyVerdict, Ran, SshSession, Target,
+    WriteScope,
 };
 use sshboard_stream::OutputStream;
 use tokio::sync::{watch, Mutex};
@@ -281,7 +282,8 @@ impl Engine {
         Ok(self.session().await?.read_file(actor, path).await?)
     }
 
-    pub async fn exec(&self, actor: Actor, command: &str) -> Result<String, EngineError> {
+    /// コマンドを 1 回打つ。**stderr も終了コードも返します**（握り潰さない）。
+    pub async fn exec(&self, actor: Actor, command: &str) -> Result<Ran, EngineError> {
         Ok(self.session().await?.exec(actor, command).await?)
     }
 

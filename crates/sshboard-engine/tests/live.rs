@@ -659,3 +659,37 @@ async fn operations_follow_the_focus_rather_than_the_most_recent_connection() {
         .expect("宛先へ操作が通らない");
     assert!(!listed.is_empty());
 }
+
+// --- コマンドを打つ経路 --------------------------------------------------------
+
+#[tokio::test]
+async fn a_command_runs_through_the_engine_and_comes_back_whole() {
+    // `Engine::exec` は**エンジン層のテストが 1 本も無かった**（SSH 層にはあった）。
+    // 端末（D29）はこの経路の上に載るので、ここを押さえておく。
+    //
+    // **当たり障りのないコマンドだけを打つ。**サーバーの状態を変えない。
+    if !server_is_up().await {
+        println!("テスト用サーバーが建っていません（想定内・飛ばします）");
+        return;
+    }
+
+    let dir = tempfile::tempdir().expect("一時ディレクトリ");
+    let engine = engine_at(registry(&dir, &[]).await);
+    engine
+        .connect(Actor::Human, "local", None)
+        .await
+        .expect("繋がらない");
+
+    for command in ["cal", "date", "id -un", "df -h /"] {
+        let ran = engine
+            .exec(Actor::Human, command)
+            .await
+            .unwrap_or_else(|error| panic!("{command} が打てない: {error}"));
+        println!("--- $ {command} ---\n{}", ran.out);
+        if !ran.err.trim().is_empty() {
+            println!("--- $ {command} (stderr) ---\n{}", ran.err);
+        }
+        assert!(ran.succeeded(), "{command} が失敗した: {ran:?}");
+        assert!(!ran.out.trim().is_empty(), "{command} が何も返さない");
+    }
+}

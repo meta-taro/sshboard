@@ -54,10 +54,10 @@ Phase 0 の 5 本は、実機と Windows 目視を除いてすべて通りまし
 
 ## テスト状況
 
-**Rust 195 ＋ フロント 49 ＝ 244 本。全部通っています。**（手元のテスト用サーバーを建てた状態）
+**Rust 198 ＋ フロント 49 ＝ 247 本。全部通っています。**（手元のテスト用サーバーを建てた状態）
 
 ```
-cargo test --workspace                                 →  195 passed; 0 failed
+cargo test --workspace                                 →  198 passed; 0 failed
 cargo fmt --all -- --check                             →  差分なし
 cargo clippy --workspace --all-targets -- -D warnings  →  警告なし
 pnpm --filter desktop check                            →  248 files, 0 errors, 0 warnings
@@ -72,8 +72,8 @@ pnpm --filter desktop test                             →   49 passed
 | `sshboard-credentials` | 16 | 2 |
 | `sshboard-connections` | 20 | |
 | `sshboard-diag` | 8 | |
-| `sshboard-ssh` | 55 | 16 |
-| `sshboard-engine` | 26 | 17 |
+| `sshboard-ssh` | 57 | 18 |
+| `sshboard-engine` | 27 | 18 |
 | `sshboard-mcp` | 28 | 4 |
 | `sshboard-desktop` | 9 | |
 | **フロント（vitest）** | **49** | |
@@ -179,6 +179,13 @@ pnpm --filter desktop test                             →   49 passed
 
 ## Phase 1 で拾えた未知
 
+16. **`exec` が stderr と終了コードを捨てていた**（実測・2026-08-30）。
+    入っていないコマンドを打つと**空の成功**に見える。テスト用サーバーに `uptime` が
+    無く、実際にそう見えた。**握り潰しは「静かに間違える」形で現れる。**
+17. **`Eof` で読むのをやめると、終了コードが永久に取れない。**
+    SSH は Data… → **Eof → ExitStatus** → Close の順で来る。
+    直した直後は `status: None` のままで、**自分のテストがそれを捕まえた。**
+
 11. **`russh` の ssh-agent クライアントは、Unix と Windows で入口が違う。**
     `connect_env`（`SSH_AUTH_SOCK`）は `#[cfg(unix)]` にしか無く、
     **Windows では `sshboard-ssh` がコンパイルできなかった**（CI で判明）。
@@ -213,7 +220,7 @@ pnpm --filter desktop test                             →   49 passed
 
 ## 人にしかできない工程で、止まっているもの
 
-- **実運用で 1 回上げること。**ここが通らなければ、上の 244 本は意味を持ちません
+- **実運用で 1 回上げること。**ここが通らなければ、上の 247 本は意味を持ちません
 - **macOS の目視**（001 / 005）と **Windows 実機**（001 / 004）
 - **ダウンロードを 1 回押すこと**（D27・2026-08-30 に実装）。
   右のペインでファイルを選び、左の現在地へ落ちるか。同じ名前があるとき断るか。

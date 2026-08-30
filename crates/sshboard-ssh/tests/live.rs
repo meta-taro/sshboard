@@ -68,11 +68,12 @@ async fn a_pinned_host_connects_and_runs_a_command() {
 
     assert_eq!(session.host_key().fingerprint, expected);
 
-    let out = session
+    let ran = session
         .exec(Actor::Human, "echo sshboard-ok")
         .await
         .expect("コマンドが通らない");
-    assert_eq!(out.trim(), "sshboard-ok");
+    assert_eq!(ran.out.trim(), "sshboard-ok");
+    assert!(ran.succeeded(), "{ran:?}");
 }
 
 #[tokio::test]
@@ -178,7 +179,7 @@ async fn sftp_and_exec_run_on_the_same_session() {
         .await
         .expect("ls が通らない");
 
-    assert_eq!(out.trim(), "probe");
+    assert_eq!(out.out.trim(), "probe");
     assert!(
         entries.iter().any(|e| e.name == "app.log"),
         "実際: {entries:?}"
@@ -523,4 +524,51 @@ async fn reaching_the_server_and_checking_its_key_are_recorded_as_separate_stage
         "ホスト鍵が無い"
     );
     assert!(stages.contains(&sshboard_diag::Stage::Auth), "認証が無い");
+}
+
+#[tokio::test]
+async fn a_failing_command_is_not_reported_as_an_empty_success() {
+    // **握り潰さない**（product-baseline §8）。
+    //
+    // `exec` は stdout しか拾っておらず、**stderr も終了コードも捨てていた。**
+    // 入っていないコマンドを打つと「空の成功」に見える。実際に見えた —
+    // テスト用サーバーに `uptime` が無く、何も返らないのに成功扱いだった。
+    //
+    // 端末（D29）はこの経路の上に載るので、ここで塞ぐ。
+    if !server_is_up().await {
+        println!("テスト用サーバーが建っていません（想定内・飛ばします）");
+        return;
+    }
+    let session = trusted_session(Band::new()).await;
+
+    let ran = session
+        .exec(Actor::Human, "ls /definitely-not-here-sshboard")
+        .await
+        .expect("打てない");
+
+    assert!(ran.out.trim().is_empty(), "stdout に何か出ている: {ran:?}");
+    assert!(
+        !ran.err.trim().is_empty(),
+        "**stderr を捨てている。**失敗の理由が誰にも届かない: {ran:?}"
+    );
+    assert!(
+        matches!(ran.status, Some(code) if code != 0),
+        "**終了コードを捨てている。**失敗が成功と見分けられない: {ran:?}"
+    );
+}
+
+#[tokio::test]
+async fn a_command_that_works_reports_success() {
+    // 逆も押さえる。**成功を失敗と見せない。**
+    if !server_is_up().await {
+        println!("テスト用サーバーが建っていません（想定内・飛ばします）");
+        return;
+    }
+    let session = trusted_session(Band::new()).await;
+
+    let ran = session.exec(Actor::Human, "cal").await.expect("打てない");
+
+    assert!(ran.out.contains("Su"), "cal の出力に見えない: {ran:?}");
+    assert!(ran.err.trim().is_empty(), "余計な stderr: {ran:?}");
+    assert_eq!(ran.status, Some(0));
 }
