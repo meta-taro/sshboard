@@ -9,7 +9,7 @@ use std::time::Duration;
 
 use sshboard_band::{Actor, Band};
 use sshboard_connections::ConnectionsWatch;
-use sshboard_mcp::{serve, McpEndpoint};
+use sshboard_mcp::{serve, McpEndpoint, ServeParts};
 use sshboard_stream::OutputStream;
 
 const INIT_BODY: &str = r#"{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"sshboard-test","version":"0"}}}"#;
@@ -73,15 +73,16 @@ async fn an_external_client_calling_ping_over_http_puts_a_line_on_the_band() {
     // Arrange
     let band = Band::new();
     let screen = fake_screen(&band);
-    let endpoint = serve(
+    let endpoint = serve(ServeParts {
         band,
-        Arc::new(OutputStream::new()),
-        Arc::new(ConnectionsWatch::new()),
-        None,
-        None,
-        0,
-        Duration::from_secs(5),
-    )
+        stream: Arc::new(OutputStream::new()),
+        connections_watch: Arc::new(ConnectionsWatch::new()),
+        engine: None,
+        capture: None,
+        token: None,
+        port: 0,
+        ack_timeout: Duration::from_secs(5),
+    })
     .await
     .expect("MCP が立ち上がらない");
     let client = reqwest::Client::new();
@@ -124,15 +125,16 @@ async fn an_external_client_calling_ping_over_http_puts_a_line_on_the_band() {
 async fn the_server_advertises_only_the_phase_zero_tools() {
     // 任意コマンドの口を足していないことを、ここで機械的に見張る（decisions D3）。
     // Arrange
-    let endpoint = serve(
-        Band::new(),
-        Arc::new(OutputStream::new()),
-        Arc::new(ConnectionsWatch::new()),
-        None,
-        None,
-        0,
-        Duration::from_secs(5),
-    )
+    let endpoint = serve(ServeParts {
+        band: Band::new(),
+        stream: Arc::new(OutputStream::new()),
+        connections_watch: Arc::new(ConnectionsWatch::new()),
+        engine: None,
+        capture: None,
+        token: None,
+        port: 0,
+        ack_timeout: Duration::from_secs(5),
+    })
     .await
     .expect("MCP が立ち上がらない");
     let client = reqwest::Client::new();
@@ -166,6 +168,8 @@ async fn the_server_advertises_only_the_phase_zero_tools() {
         "diagnostics",
         // **複数の接続をタブで持つ**（D25）。宛先を変える口。
         "focus_connection",
+        // **AI が自分で画面を見る口**（D26）。型検査は崩れを 1 件も止められなかった。
+        "capture_window",
     ] {
         assert!(
             listed.contains(expected),
@@ -186,15 +190,20 @@ async fn the_server_advertises_only_the_phase_zero_tools() {
         "restart_service",
         "sudo",
     ] {
+        let as_name = format!("\"name\":\"{forbidden}\"");
         assert!(
-            !listed.contains(forbidden),
+            !listed.contains(&as_name),
             "Phase 2 の口が生えている（{forbidden}）: {listed}"
         );
     }
 
-    for forbidden in ["run_command", "shell", "system"] {
+    // **道具の名前で見る。**説明文に部分一致させると、無関係な文章に当たる
+    // （`passphrase` で 1 度踏んだ。今度は "operating system" が `system` に当たった）。
+    // 名前で見る方が**厳しく、かつ正確**。
+    for forbidden in ["run_command", "shell", "system", "exec", "eval"] {
+        let as_name = format!("\"name\":\"{forbidden}\"");
         assert!(
-            !listed.contains(forbidden),
+            !listed.contains(&as_name),
             "任意コマンドの口がある（{forbidden}）: {listed}"
         );
     }
@@ -223,15 +232,16 @@ async fn the_server_advertises_only_the_phase_zero_tools() {
 async fn the_mcp_port_is_bound_to_loopback_only() {
     // 外から叩ける口を開けていないこと（PRD §8 / 21）。
     // Arrange & Act
-    let endpoint = serve(
-        Band::new(),
-        Arc::new(OutputStream::new()),
-        Arc::new(ConnectionsWatch::new()),
-        None,
-        None,
-        0,
-        Duration::from_secs(5),
-    )
+    let endpoint = serve(ServeParts {
+        band: Band::new(),
+        stream: Arc::new(OutputStream::new()),
+        connections_watch: Arc::new(ConnectionsWatch::new()),
+        engine: None,
+        capture: None,
+        token: None,
+        port: 0,
+        ack_timeout: Duration::from_secs(5),
+    })
     .await
     .expect("MCP が立ち上がらない");
 
@@ -250,15 +260,16 @@ async fn a_caller_without_the_token_gets_nowhere() {
     // **同じ端末の別プロセスから叩ける口に、書き込みが載っている**（D23）。
     // 合言葉を知らない相手には、initialize すら通さない。
     // Arrange
-    let endpoint = serve(
-        Band::new(),
-        Arc::new(OutputStream::new()),
-        Arc::new(ConnectionsWatch::new()),
-        None,
-        None,
-        0,
-        Duration::from_secs(5),
-    )
+    let endpoint = serve(ServeParts {
+        band: Band::new(),
+        stream: Arc::new(OutputStream::new()),
+        connections_watch: Arc::new(ConnectionsWatch::new()),
+        engine: None,
+        capture: None,
+        token: None,
+        port: 0,
+        ack_timeout: Duration::from_secs(5),
+    })
     .await
     .expect("MCP が立ち上がらない");
     let client = reqwest::Client::new();
@@ -296,15 +307,16 @@ async fn the_token_is_different_for_every_endpoint() {
     // 起動ごとに変わらないなら、1 回覗かれた時点で以後ずっと通る。
     let mut made = Vec::new();
     for _ in 0..2 {
-        let endpoint = serve(
-            Band::new(),
-            Arc::new(OutputStream::new()),
-            Arc::new(ConnectionsWatch::new()),
-            None,
-            None,
-            0,
-            Duration::from_secs(5),
-        )
+        let endpoint = serve(ServeParts {
+            band: Band::new(),
+            stream: Arc::new(OutputStream::new()),
+            connections_watch: Arc::new(ConnectionsWatch::new()),
+            engine: None,
+            capture: None,
+            token: None,
+            port: 0,
+            ack_timeout: Duration::from_secs(5),
+        })
         .await
         .expect("MCP が立ち上がらない");
         made.push(endpoint.token().to_string());
@@ -312,4 +324,68 @@ async fn the_token_is_different_for_every_endpoint() {
     }
 
     assert_ne!(made[0], made[1], "合言葉が使い回されている");
+}
+
+/// **省略したら伏せる**（D26）。
+///
+/// ここが `false` に倒れた瞬間、引数を書き忘れた呼び出しが接続先を写します。
+/// 見えるのは道具の側の既定だけなので、**引数の定義そのものを見張ります。**
+#[tokio::test]
+async fn the_capture_tool_redacts_unless_it_is_told_otherwise() {
+    let endpoint = serve(ServeParts {
+        band: Band::new(),
+        stream: Arc::new(OutputStream::new()),
+        connections_watch: Arc::new(ConnectionsWatch::new()),
+        engine: None,
+        capture: None,
+        token: None,
+        port: 0,
+        ack_timeout: Duration::from_secs(5),
+    })
+    .await
+    .expect("MCP が立ち上がらない");
+    let client = reqwest::Client::new();
+
+    let init = post(&client, &endpoint, None, INIT_BODY).await;
+    let session = init
+        .headers()
+        .get("mcp-session-id")
+        .map(|v| v.to_str().unwrap().to_owned());
+    let _ = init.text().await;
+    post(&client, &endpoint, session.as_deref(), INITIALIZED_BODY).await;
+    let listed = post(&client, &endpoint, session.as_deref(), LIST_BODY)
+        .await
+        .text()
+        .await
+        .unwrap();
+
+    // **`redact` は省略できる引数**でなければならない（必須にすると呼ぶ側が面倒がる）。
+    // そのうえで、省略時の扱いが「伏せる」であることを説明文で約束している。
+    assert!(listed.contains("capture_window"), "{listed}");
+    assert!(
+        listed.contains("redact"),
+        "伏せるかどうかを選べない: {listed}"
+    );
+    assert!(
+        listed
+            .to_lowercase()
+            .contains("by default the capture is redacted"),
+        "既定で伏せることが道具の説明に書かれていない: {listed}"
+    );
+
+    // **画面が無いときは、正直に断る。**黙って伏せずに撮る、が一番危ない。
+    let called = post(
+        &client,
+        &endpoint,
+        session.as_deref(),
+        r#"{"jsonrpc":"2.0","id":9,"method":"tools/call","params":{"name":"capture_window","arguments":{}}}"#,
+    )
+    .await
+    .text()
+    .await
+    .unwrap();
+    assert!(
+        called.contains("画面がありません"),
+        "画面が無いのに撮ったことになっている: {called}"
+    );
 }

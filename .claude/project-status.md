@@ -25,19 +25,20 @@ Phase 0 の 5 本は、実機と Windows 目視を除いてすべて通りまし
 | `crates/sshboard-ssh` | SSH 1 本の上の `exec` / `sftp` / `tail -f`。ホスト鍵の検証。**書き込みの囲い**（D22） |
 | `crates/sshboard-engine` | **GUI と MCP が共有する実行体**（PRD §4-1）。接続を複数持ち、**1 本残らずタブに出す**（D25）。手元へ落とす側は**黙って上書きしない**（D27） |
 | `crates/sshboard-diag` | 何が起きたかの記録。**人にも AI にも同じものを見せる**。接続先を入れない |
-| `crates/sshboard-mcp` | 同居 MCP・**合言葉必須**（D23）。16 本のツール（下記） |
+| `crates/sshboard-mcp` | 同居 MCP・**合言葉必須**（D23）。17 本のツール（下記） |
 | `apps/desktop` | SvelteKit + Tauri 2。**ファイル 2 ペイン（左右とも本物の一覧・上げ下ろし両方）**・接続タブ・接続管理・帯・診断・端末・11 言語・テーマ・**文字サイズ 4 段** |
 | `tools/test-server` | 手元の AlmaLinux 9 sshd。`/var/log` の権限・EUC-JP のログ・色付きの成長ログを再現 |
 | `tools/ssh-probe` | 002 / 003 の確認コマンド（**製品ではない**。D6 が決まったので役目は終わり） |
 | `tools/check-005.sh` | 005 の確認スクリプト |
 | `.github/workflows/ci.yml` | format / clippy / test |
 
-## MCP のツール（16 本）
+## MCP のツール（17 本）
 
 | 何もしない側 | サーバーへ触る側 |
 |---|---|
 | `ping` / `read_stream` | `connect` / `disconnect` / `focus_connection` |
 | `session_status` / **`diagnostics`** | `list_directory` / `read_file` |
+| **`capture_window`**（画面を撮る・既定で伏せる・D26） | |
 | `list_connections` / `register_connection` / `mark_connection` | **`make_directory` / `upload_file` / `write_file`**（囲いの中だけ・D22） |
 
 **`run_command` 相当は 1 本もありません**（D3）。
@@ -49,10 +50,10 @@ Phase 0 の 5 本は、実機と Windows 目視を除いてすべて通りまし
 
 ## テスト状況
 
-**Rust 194 ＋ フロント 48 ＝ 242 本。全部通っています。**（手元のテスト用サーバーを建てた状態）
+**Rust 195 ＋ フロント 48 ＝ 243 本。全部通っています。**（手元のテスト用サーバーを建てた状態）
 
 ```
-cargo test --workspace                                 →  194 passed; 0 failed
+cargo test --workspace                                 →  195 passed; 0 failed
 cargo fmt --all -- --check                             →  差分なし
 cargo clippy --workspace --all-targets -- -D warnings  →  警告なし
 pnpm --filter desktop check                            →  248 files, 0 errors, 0 warnings
@@ -69,7 +70,7 @@ pnpm --filter desktop test                             →   48 passed
 | `sshboard-diag` | 8 | |
 | `sshboard-ssh` | 55 | 16 |
 | `sshboard-engine` | 26 | 17 |
-| `sshboard-mcp` | 27 | 4 |
+| `sshboard-mcp` | 28 | 4 |
 | `sshboard-desktop` | 9 | |
 | **フロント（vitest）** | **48** | |
 
@@ -111,18 +112,19 @@ pnpm --filter desktop test                             →   48 passed
 
 ## 途中で止まっているもの
 
-### D26 — 画面のキャプチャを MCP へ（**着手・未完**）
-
-**決定は記録済み**（D26）。**動くものはまだありません。**
+### D26 — 画面のキャプチャを MCP へ（**実装済み・人の許可待ち**）
 
 | | 状態 |
 |---|---|
-| `apps/desktop/src/lib/redaction/redaction.svelte.ts` | **書いた。ただしどこからも呼んでいない**（つまり死んだコード） |
-| `[data-redact='on']` の CSS | **まだ無い** |
-| `+layout.svelte` からの `redaction.watch()` | **まだ無い** |
-| Rust 側の撮影（`xcap 0.9.8` を使う予定） | **まだ無い** |
-| MCP ツール `capture_window` | **まだ無い** |
-| テスト | **1 本も無い** |
+| `apps/desktop/src/lib/redaction/redaction.svelte.ts` | **`+layout.svelte` から繋いだ**（死んだコードではなくなった） |
+| `[data-redact='on']` の CSS | **入れた**（`tokens.css`）。伏せても**位置と大きさが 1px も動かない**ことを実測 |
+| Rust 側の撮影（`xcap 0.9`） | **入れた**（`apps/desktop/src-tauri/src/capture.rs`） |
+| MCP ツール `capture_window` | **入れた。**既定は `redact: true` |
+| テスト | ツール一覧に載ること・**既定で伏せると説明していること**・画面が無ければ正直に断ること |
+
+**残りは人にしかできません** — macOS の「画面収録」の許可。
+システム設定 → プライバシーとセキュリティ → 画面収録 で sshboard を許すまで、
+`capture_window` は「許可が要ります」と断ります（**黙って失敗はしません**）。
 
 **次に書く人へ。**要点は D26 に全部あります。特に:
 
@@ -205,7 +207,7 @@ pnpm --filter desktop test                             →   48 passed
 
 ## 人にしかできない工程で、止まっているもの
 
-- **実運用で 1 回上げること。**ここが通らなければ、上の 242 本は意味を持ちません
+- **実運用で 1 回上げること。**ここが通らなければ、上の 243 本は意味を持ちません
 - **macOS の目視**（001 / 005）と **Windows 実機**（001 / 004）
 - **ダウンロードを 1 回押すこと**（D27・2026-08-30 に実装）。
   右のペインでファイルを選び、左の現在地へ落ちるか。同じ名前があるとき断るか。

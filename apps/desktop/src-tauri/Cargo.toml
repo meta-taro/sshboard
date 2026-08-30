@@ -23,6 +23,10 @@ sshboard-stream = { path = "../../../crates/sshboard-stream" }
 tauri = { version = "2", features = [] }
 # ファイルを選ぶ窓（OS のもの）。**自前のファイル選択を作らない。**
 tauri-plugin-dialog = "2"
+# 画面を撮る（D26）。**Windows / macOS 対応・Apache-2.0。**
+xcap = "0.9"
+# 撮った画を縮めて PNG にする。**xcap が返す image と版を揃える。**
+image = { version = "0.25", default-features = false, features = ["png"] }
 tokio = { workspace = true, features = ["rt-multi-thread"] }
 serde = { version = "1", features = ["derive"] }
 

@@ -71,15 +71,35 @@ impl McpEndpoint {
 /// `port` に 0 を渡すと空きポートを OS が選ぶ。
 /// `engine` が `None` なら、サーバーへ触るツールが正直に断るだけで、
 /// 帯・出力・接続一覧のツールは動く。
-pub async fn serve(
-    band: Band,
-    stream: Arc<OutputStream>,
-    connections_watch: Arc<ConnectionsWatch>,
-    engine: Option<Arc<Engine>>,
-    token: Option<String>,
-    port: u16,
-    ack_timeout: Duration,
-) -> std::io::Result<McpEndpoint> {
+/// MCP を立てるのに要るもの。
+///
+/// **位置引数で並べない。**8 個も並ぶと、呼ぶ側で `None, None,` が何を指すのか
+/// 読めなくなる（実際に読めなくなった）。名前で書かせる。
+pub struct ServeParts {
+    pub band: Band,
+    pub stream: Arc<OutputStream>,
+    pub connections_watch: Arc<ConnectionsWatch>,
+    /// サーバーへ触る経路。**無ければ SSH 系が正直に断るだけ。**
+    pub engine: Option<Arc<Engine>>,
+    /// 画面を撮る口（D26）。**無ければ `capture_window` が正直に断るだけ。**
+    pub capture: Option<Arc<dyn crate::WindowCapture>>,
+    /// 合言葉（D23）。省略すると起動ごとに作る。
+    pub token: Option<String>,
+    pub port: u16,
+    pub ack_timeout: Duration,
+}
+
+pub async fn serve(parts: ServeParts) -> std::io::Result<McpEndpoint> {
+    let ServeParts {
+        band,
+        stream,
+        connections_watch,
+        engine,
+        capture,
+        token,
+        port,
+        ack_timeout,
+    } = parts;
     let cancel = CancellationToken::new();
     // 渡されなければ起動ごとに作る。**渡された合言葉が弱くないかは、渡す側の責任。**
     let token = token.unwrap_or_else(new_token);
@@ -98,6 +118,9 @@ pub async fn serve(
                         .with_connections_watch(Arc::clone(&connections_watch));
                 if let Some(engine) = engine.clone() {
                     server = server.with_engine(engine);
+                }
+                if let Some(capture) = capture.clone() {
+                    server = server.with_capture(capture);
                 }
                 Ok(server)
             },

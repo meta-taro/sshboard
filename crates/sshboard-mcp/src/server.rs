@@ -8,15 +8,20 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 
+use base64::engine::general_purpose::STANDARD as BASE64;
+use base64::Engine as _;
 use rmcp::handler::server::router::tool::ToolRouter;
 use rmcp::handler::server::wrapper::Parameters;
-use rmcp::model::{ServerCapabilities, ServerInfo};
+use rmcp::model::{CallToolResult, ContentBlock, ServerCapabilities, ServerInfo};
 use rmcp::{tool, tool_handler, tool_router, ErrorData, ServerHandler};
 use serde::Deserialize;
 use sshboard_band::{Actor, Band, DeliveryOutcome};
 use sshboard_connections::{ConnectionEntry, ConnectionSummary, Connections, ConnectionsWatch};
 use sshboard_engine::Engine;
 use sshboard_stream::OutputStream;
+
+/// 撮った画像の長辺の既定値。**dbboard と揃える**（同じ操作感にする）。
+const DEFAULT_MAX_EDGE: u32 = 1400;
 
 /// 帯が受け取りを返すまで待つ上限。
 /// 画面が固まっていることを、ここで初めて検出する。
@@ -37,6 +42,9 @@ pub struct SshboardMcp {
     /// **無ければ SSH 系のツールが「繋げません」と正直に断るだけ**で、
     /// 帯・出力・接続一覧のツールはそのまま使える（ヘッドレスのテストがそれ）。
     engine: Option<Arc<Engine>>,
+    /// 画面を撮る口（D26）。**無ければ「画面がありません」と正直に断る。**
+    /// ヘッドレスのテストは、これが無いまま走る。
+    capture: Option<Arc<dyn crate::capture::WindowCapture>>,
     ack_timeout: Duration,
     tool_router: ToolRouter<Self>,
 }
@@ -53,6 +61,7 @@ impl SshboardMcp {
             connections_path: None,
             connections_watch: None,
             engine: None,
+            capture: None,
             ack_timeout,
             // 帯・出力・接続一覧の口と、サーバーへ触る口。**同じ 1 つのサーバーに載る。**
             tool_router: Self::tool_router() + Self::ssh_tool_router(),
@@ -81,6 +90,12 @@ impl SshboardMcp {
     }
 
     /// 接続一覧の置き場所を差し替える。**テストで OS の設定を汚さないため。**
+    /// 画面を撮る口を差す（D26）。**Tauri を持っている側だけが差せる。**
+    pub fn with_capture(mut self, capture: Arc<dyn crate::capture::WindowCapture>) -> Self {
+        self.capture = Some(capture);
+        self
+    }
+
     pub fn with_connections(mut self, path: PathBuf) -> Self {
         self.connections_path = Some(path);
         self
@@ -297,6 +312,83 @@ impl SshboardMcp {
     ///
     /// **識別子と名前だけを返します。**ホスト名・IP・利用者名・鍵のパス・
     /// 認証情報は 1 つも返しません（D11 / CLAUDE.md 禁止事項 5）。
+    /// 画面を 1 枚撮る（D26）。**既定は伏せる。**
+    ///
+    /// 型検査は崩れを 1 件も止められなかった（1 日で 3 件出て、3 件とも人が見つけた）。
+    /// **AI が自分で画面を見られないと、同じことが繰り返されます。**
+    #[tool(
+        description = "Photograph the sshboard window and return it as a PNG, so you can see \
+                       what the app actually renders — a broken layout, a menu that fell back to \
+                       English, text overflowing its box. Nothing here touches a remote server. \
+                       \
+                       By default the capture is redacted: connection names, tags, remote paths, \
+                       fingerprints and file listings are painted over BEFORE the shot is taken, \
+                       so an unredacted image is never produced. Sizes, positions, overlaps and \
+                       overflow are all preserved, which is what you need to spot a broken layout. \
+                       \
+                       Ask for redact=false only when a human has told you to. The window belongs \
+                       to the person sitting in front of it: describe what you see, and do not \
+                       paste the image anywhere public. \
+                       \
+                       It fails when the sshboard window is not open, or when the operating system \
+                       has not granted screen-recording permission. Neither is fixed by retrying — \
+                       say so and ask a human."
+    )]
+    pub async fn capture_window(
+        &self,
+        Parameters(request): Parameters<CaptureWindow>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let Some(capture) = self.capture.as_ref() else {
+            return Err(ErrorData::internal_error(
+                "画面がありません。sshboard のウィンドウが開いている必要があります".to_string(),
+                None,
+            ));
+        };
+
+        // **省略したら伏せる**（D26）。ここを `unwrap_or(false)` にした瞬間、
+        // 引数を書き忘れた呼び出しが接続先を写します。
+        let redact = request.redact.unwrap_or(true);
+        let max_edge = request
+            .max_edge
+            .unwrap_or(DEFAULT_MAX_EDGE)
+            .clamp(200, 4000);
+
+        // **人の画面を撮ることも帯に出す**（PRD §4-2）。黙って撮らない。
+        self.show(&format!(
+            "capture_window（{}）",
+            if redact {
+                "伏せて撮る"
+            } else {
+                "**伏せずに撮る**"
+            }
+        ))
+        .await?;
+
+        let shot = capture
+            .capture(redact, max_edge)
+            .await
+            .map_err(|why| ErrorData::internal_error(why, None))?;
+
+        let told = format!(
+            "{} / 実寸 {}x{} / 返した画像 {}x{} / {}",
+            shot.title,
+            shot.width,
+            shot.height,
+            shot.scaled_width,
+            shot.scaled_height,
+            if shot.redacted {
+                "伏せて撮りました"
+            } else {
+                "**伏せずに撮りました**"
+            }
+        );
+        let encoded = BASE64.encode(&shot.png);
+        Ok(CallToolResult::success(vec![
+            ContentBlock::text(told),
+            ContentBlock::image(encoded, "image/png"),
+        ]))
+    }
+
     #[tool(
         description = "List the connections registered in sshboard. Returns identifiers and display names only - never hosts, users, or credentials."
     )]
@@ -308,6 +400,18 @@ impl SshboardMcp {
             ErrorData::internal_error(format!("cannot render connections: {error}"), None)
         })
     }
+}
+
+/// `capture_window` の引数。**どちらも省略できます。**
+#[derive(Debug, Deserialize, rmcp::schemars::JsonSchema)]
+#[schemars(crate = "rmcp::schemars")]
+pub struct CaptureWindow {
+    /// 伏せて撮るか。**省略したら伏せます**（D26）。
+    ///
+    /// 偽にしてよいのは、**人がそう言ったときだけ**です。
+    pub redact: Option<bool>,
+    /// 返す画像の長辺（画素）。**引き伸ばしはしません。**
+    pub max_edge: Option<u32>,
 }
 
 /// `mark_connection` の引数。**印だけを変えます。**

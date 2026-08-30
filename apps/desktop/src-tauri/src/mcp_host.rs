@@ -9,7 +9,7 @@ use std::sync::Arc;
 use sshboard_band::Band;
 use sshboard_connections::ConnectionsWatch;
 use sshboard_engine::Engine;
-use sshboard_mcp::DEFAULT_ACK_TIMEOUT;
+use sshboard_mcp::{ServeParts, DEFAULT_ACK_TIMEOUT};
 use sshboard_stream::OutputStream;
 use tauri::{AppHandle, Emitter, Manager};
 
@@ -106,15 +106,20 @@ pub fn spawn(
     engine: Arc<Engine>,
 ) {
     tauri::async_runtime::spawn(async move {
-        let endpoint = match sshboard_mcp::serve(
+        // **画面を撮る口を差す**（D26）。AI が自分で崩れを見つけられるように。
+        // 伏せるのは画面側で、**伏せ終わってから撮る**（capture.rs）。
+        let capture = crate::capture::TauriCapture::new(app.clone());
+
+        let endpoint = match sshboard_mcp::serve(ServeParts {
             band,
             stream,
             connections_watch,
-            Some(engine),
-            resolve_token(),
-            MCP_PORT,
-            DEFAULT_ACK_TIMEOUT,
-        )
+            engine: Some(engine),
+            capture: Some(capture),
+            token: resolve_token(),
+            port: MCP_PORT,
+            ack_timeout: DEFAULT_ACK_TIMEOUT,
+        })
         .await
         {
             Ok(endpoint) => endpoint,

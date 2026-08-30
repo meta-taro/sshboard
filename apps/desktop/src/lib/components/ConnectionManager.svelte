@@ -235,14 +235,18 @@
 									style:border-color={item.color ? `var(--mark-${item.color})` : '#3a4049'}
 									aria-hidden="true"
 								></span>
-								<span class="row-name">{item.name || item.id}</span>
+								<span class="row-name" data-secret>{item.name || item.id}</span>
 								{#if item.tag}
-									<span class="row-tag" style:color={item.color ? `var(--mark-${item.color})` : '#8b929e'}>
+									<span
+										class="row-tag"
+										style:color={item.color ? `var(--mark-${item.color})` : '#8b929e'}
+										data-secret
+									>
 										{item.tag}
 									</span>
 								{/if}
 							</span>
-							<span class="row-id">{item.id}</span>
+							<span class="row-id" data-secret>{item.id}</span>
 						</button>
 					</li>
 				{/each}
@@ -250,7 +254,7 @@
 		{/if}
 
 		{#if storePath}
-			<p class="path" title={storePath}>{storePath}</p>
+			<p class="path" title={storePath} data-secret>{storePath}</p>
 		{/if}
 		</div>
 	</aside>

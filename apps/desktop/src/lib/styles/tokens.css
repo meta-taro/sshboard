@@ -232,3 +232,55 @@
 	text-transform: uppercase;
 	color: var(--fg-faint);
 }
+
+/* ---------------------------------------------------------------------------
+   撮る前に伏せる（D26）
+
+   **この製品は画面そのものに接続先が写り込む**（CLAUDE.md 禁止事項 4）。
+   撮った画像は AI の文脈に入り、記録に残る。**伏せていない画像は、そこから漏れる。**
+
+   伏せるのは**中身**であって**形ではない。**
+   大きさ・位置・重なり・はみ出しは残す。**残さないと崩れが見つからず、作った意味が無い。**
+
+   だから `display:none` も `visibility:hidden` も使わない。
+   **文字はその場に在るまま、読めなくする。**
+   --------------------------------------------------------------------------- */
+
+/* 接続先そのものが入る所。**名前・タグ・ホスト・利用者名・パス・指紋・一覧。** */
+[data-redact='on'] [data-secret] {
+	/* 文字は消すが、**文字の幅と行の高さはそのまま**（レイアウトが動かない）。 */
+	color: transparent !important;
+	/* 塗り潰す。ぼかしと違い、**拡大しても読み取れない。** */
+	background: var(--fg-muted) !important;
+	border-radius: 2px;
+	/* 影で輪郭が残らないように。 */
+	text-shadow: none !important;
+}
+
+/* 入力欄は中身が接続先そのもの。**印を付け忘れても伏せる**（漏れても閉じる側に倒す）。 */
+[data-redact='on'] input:not([type='checkbox']):not([type='radio']),
+[data-redact='on'] textarea {
+	color: transparent !important;
+	background: var(--fg-muted) !important;
+	/* 入力中のカーソルからも読めないように。 */
+	caret-color: transparent !important;
+}
+
+/* プレースホルダは製品の文言なので残す — と思いたいが、
+   **入力欄が空かどうかも情報**なので、揃えて伏せる。 */
+[data-redact='on'] input::placeholder,
+[data-redact='on'] textarea::placeholder {
+	color: transparent !important;
+}
+
+/* 伏せている間は、それが分かるようにしておく。
+   **伏せ忘れと、伏せた結果の区別が付かないと確かめられない。** */
+[data-redact='on']::before {
+	content: '';
+	position: fixed;
+	inset: 0 0 auto 0;
+	height: 2px;
+	background: var(--accent);
+	z-index: 9999;
+	pointer-events: none;
+}

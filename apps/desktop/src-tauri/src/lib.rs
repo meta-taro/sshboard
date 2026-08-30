@@ -4,6 +4,7 @@
 //! 裏で見えないセッションを 1 本も増やさないための前提（PRD §4-1）。
 
 mod bridge;
+mod capture;
 mod commands;
 mod connections_cmd;
 mod mcp_host;

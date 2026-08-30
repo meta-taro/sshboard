@@ -7,6 +7,8 @@ license.workspace = true
 repository.workspace = true
 
 [dependencies]
+# 撮った PNG を MCP へ返すため（D26）。**画像の加工はしない。**
+base64 = "0.22"
 sshboard-band = { path = "../sshboard-band" }
 sshboard-connections = { path = "../sshboard-connections" }
 sshboard-engine = { path = "../sshboard-engine" }

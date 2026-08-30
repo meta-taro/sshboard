@@ -13,7 +13,7 @@ use sshboard_band::{Actor, Band};
 use sshboard_connections::ConnectionsWatch;
 use sshboard_diag::Diagnostics;
 use sshboard_engine::Engine;
-use sshboard_mcp::{serve, McpEndpoint};
+use sshboard_mcp::{serve, McpEndpoint, ServeParts};
 use sshboard_ssh::{Auth, SshError, SshSession, Target, WriteScope};
 use sshboard_stream::OutputStream;
 
@@ -141,15 +141,17 @@ async fn harness(band: Band, write_roots: &[&str]) -> Harness {
         path,
     ));
 
-    let endpoint = serve(
+    let endpoint = serve(ServeParts {
         band,
-        Arc::new(OutputStream::new()),
-        Arc::new(ConnectionsWatch::new()),
-        Some(engine),
-        Some(TOKEN.to_string()),
-        0,
-        Duration::from_secs(5),
-    )
+        stream: Arc::new(OutputStream::new()),
+        connections_watch: Arc::new(ConnectionsWatch::new()),
+        engine: Some(engine),
+        capture: // 画面は無い（ヘッドレス）。**`capture_window` は正直に断るだけ。**
+        None,
+        token: Some(TOKEN.to_string()),
+        port: 0,
+        ack_timeout: Duration::from_secs(5),
+    })
     .await
     .expect("MCP が立ち上がらない");
 

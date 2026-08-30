@@ -375,8 +375,8 @@
 								title={held.fingerprint}
 							>
 								<span class="mark-bar" aria-hidden="true"></span>
-								{held.name}
-								{#if held.tag}<span class="tag">{held.tag}</span>{/if}
+								<span data-secret>{held.name}</span>
+								{#if held.tag}<span class="tag" data-secret>{held.tag}</span>{/if}
 							</button>
 							<button
 								type="button"
@@ -393,7 +393,9 @@
 				{#if session.open}
 					<span class="scope" title={i18n.t('files.scope.help')}>
 						{#if session.open.write.aiRoots.length > 0}
-							{i18n.t('files.scope.some', { roots: session.open.write.aiRoots.join(' , ') })}
+							<span data-secret
+							>{i18n.t('files.scope.some', { roots: session.open.write.aiRoots.join(' , ') })}</span
+						>
 						{:else}
 							{i18n.t('files.scope.none')}
 						{/if}
@@ -445,8 +447,8 @@
 							}}
 						>
 							<span class="mark-bar" aria-hidden="true"></span>
-							<span class="who">{entry.name || entry.id}</span>
-							{#if entry.tag}<span class="tag">{entry.tag}</span>{/if}
+							<span class="who" data-secret>{entry.name || entry.id}</span>
+							{#if entry.tag}<span class="tag" data-secret>{entry.tag}</span>{/if}
 							{#if entry.fingerprint}
 								<span class="known" title={i18n.t('files.known')}>
 									<Icon name="check" size={11} />
@@ -490,9 +492,9 @@
 					<p class="body">{i18n.t('files.trust.mismatch.body')}</p>
 					<dl>
 						<dt>{i18n.t('files.trust.seen')}</dt>
-						<dd><code>{untrusted.fingerprint}</code></dd>
+						<dd><code data-secret>{untrusted.fingerprint}</code></dd>
 						<dt>{i18n.t('files.trust.expected')}</dt>
-						<dd><code>{untrusted.expected}</code></dd>
+						<dd><code data-secret>{untrusted.expected}</code></dd>
 					</dl>
 					<!-- **一押しで受け入れる道を置かない。**すり替えかもしれないため。 -->
 					<p class="body">{i18n.t('files.trust.mismatch.how')}</p>
@@ -504,7 +506,7 @@
 					<p class="body">{i18n.t('files.trust.first.body')}</p>
 					<dl>
 						<dt>{untrusted.algorithm}</dt>
-						<dd><code>{untrusted.fingerprint}</code></dd>
+						<dd><code data-secret>{untrusted.fingerprint}</code></dd>
 					</dl>
 					<div class="trust-actions">
 						<button type="button" class="primary" onclick={trustFingerprint}>
@@ -561,7 +563,7 @@
 				{:else}
 					<ul class="list">
 						{#each localEntries as entry (entry.name)}
-							<li class:picked={!entry.isDir && isStaged(entry.name)}>
+							<li class:picked={!entry.isDir && isStaged(entry.name)} data-secret>
 								<Icon name={entry.isDir ? 'folder' : 'file'} size={12} />
 								{#if entry.isDir}
 									<button
@@ -599,7 +601,7 @@
 							{i18n.t('files.upload', { count: String(staged.length) })}
 						</button>
 						{#if connected}
-							<span class="to" title={remotePath}>
+							<span class="to" title={remotePath} data-secret>
 								<Icon name="arrow-up" size={11} />
 								{remotePath}
 							</span>
@@ -656,7 +658,7 @@
 				{:else}
 					<ul class="list">
 						{#each entries as entry (entry.name)}
-							<li class:picked={!entry.isDir && pickedRemote.includes(entry.name)}>
+							<li class:picked={!entry.isDir && pickedRemote.includes(entry.name)} data-secret>
 								<Icon name={entry.isDir ? 'folder' : 'file'} size={12} />
 								{#if entry.isDir}
 									<button type="button" class="link" onclick={() => enter(entry.name)}>
@@ -689,7 +691,7 @@
 							<Icon name="download" />
 							{i18n.t('files.download', { count: String(pickedRemote.length) })}
 						</button>
-						<span class="to" title={localPath}>
+						<span class="to" title={localPath} data-secret>
 							<Icon name="arrow-down" size={11} />
 							{localPath}
 						</span>
