@@ -54,14 +54,14 @@ Phase 0 の 5 本は、実機と Windows 目視を除いてすべて通りまし
 
 ## テスト状況
 
-**Rust 195 ＋ フロント 48 ＝ 243 本。全部通っています。**（手元のテスト用サーバーを建てた状態）
+**Rust 195 ＋ フロント 49 ＝ 244 本。全部通っています。**（手元のテスト用サーバーを建てた状態）
 
 ```
 cargo test --workspace                                 →  195 passed; 0 failed
 cargo fmt --all -- --check                             →  差分なし
 cargo clippy --workspace --all-targets -- -D warnings  →  警告なし
 pnpm --filter desktop check                            →  248 files, 0 errors, 0 warnings
-pnpm --filter desktop test                             →   48 passed
+pnpm --filter desktop test                             →   49 passed
 （別ワークスペース）tools/ssh-probe: cargo test        →   10 passed
 ```
 
@@ -76,7 +76,7 @@ pnpm --filter desktop test                             →   48 passed
 | `sshboard-engine` | 26 | 17 |
 | `sshboard-mcp` | 28 | 4 |
 | `sshboard-desktop` | 9 | |
-| **フロント（vitest）** | **48** | |
+| **フロント（vitest）** | **49** | |
 
 **実機の通し 4 本が要です。**MCP（HTTP・合言葉つき）→ Engine → SSH → sftp を、
 **外部クライアントと同じ生の JSON-RPC** で叩き、囲いの外を断ったあと
@@ -102,7 +102,8 @@ pnpm --filter desktop test                             →   48 passed
    **接続タブで鍵のパスを書けば繋がります**（D28）。`.ppk` のままで構いません。
    形式は製品が中身を見て判定し、パスフレーズが要るなら聞きます。
    **puttygen も ssh-add も要りません。**
-2. **端末タブ**。ファイルの面はできたが、Tera Term 側の面がまだ
+2. **端末タブ**（D29）。**人と AI が共有し、触っている側以外をロックする。**
+   いま在るのは片道の出力表示だけで、PTY も入力の経路も無い
 3. **`run_readonly`**（許可リスト方式）。`df` / `ps` / `systemctl status` 相当
 4. **Windows 実機**（001 / 004）。CI はビルドとテストを回すが、画面は見られない
 5. **画面のキャプチャを MCP へ（D26）— 着手したところで止まっています。**
@@ -112,7 +113,7 @@ pnpm --filter desktop test                             →   48 passed
 
 ## 技術的決定
 
-`.claude/decisions.md`（D1〜D28）＋ `DESIGN.md`。**未決は D10（実装体制）のみ。**
+`.claude/decisions.md`（D1〜D29）＋ `DESIGN.md`。**未決は D10（実装体制）のみ。**
 
 ## 途中で止まっているもの
 
@@ -169,8 +170,9 @@ pnpm --filter desktop test                             →   48 passed
 - **Windows の ssh-agent は実機で未確認。**コンパイルは CI で通しますが、
   名前付きパイプ / Pageant に実際に繋がるかは**人が実機で見るまで分かりません**
 - **アイコン・帯・端末の見た目は仮置き**（DESIGN.md）。人が決め直す前提
-- **`SSHBOARD_PHASE0_DEMO` と `start_demo_stream` は Phase 0 限り。**
-  002 が通って本物の `tail -f` に差し替えたら消すこと
+- **端末（Tera Term 側の面）がまだありません。**xterm.js は入っていますが
+  `disableStdin: true` の**見るだけ**で、Rust 側に PTY がありません
+  （`request_pty` / `request_shell` は 0 件）。**D29 を決めたので、次はここ**
 - **Windows 11 の Snap Layouts は落とす**（D17）。dbboard も解いていないので揃える
 - **文字コードを変換していません。**EUC-JP のログは実在します（実機・手元のサーバーで再現済み）。
   読み出しは U+FFFD へ置換したうえで「置換した」と伝えるだけで、変換はしていません
@@ -211,7 +213,7 @@ pnpm --filter desktop test                             →   48 passed
 
 ## 人にしかできない工程で、止まっているもの
 
-- **実運用で 1 回上げること。**ここが通らなければ、上の 243 本は意味を持ちません
+- **実運用で 1 回上げること。**ここが通らなければ、上の 244 本は意味を持ちません
 - **macOS の目視**（001 / 005）と **Windows 実機**（001 / 004）
 - **ダウンロードを 1 回押すこと**（D27・2026-08-30 に実装）。
   右のペインでファイルを選び、左の現在地へ落ちるか。同じ名前があるとき断るか。

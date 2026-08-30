@@ -105,9 +105,20 @@
 		event.preventDefault();
 	}
 
-	async function startDemoStream() {
+	/** 追いたいログのパス。**サーバー側**（右のペインで見ているのと同じ場所）。 */
+	let followPath = $state('/var/log/messages');
+
+	/**
+	 * サーバーのログを追う（`tail -f`）。
+	 *
+	 * **GUI へは色付き・MCP へは素**で流れます（Issue 005）。
+	 * コマンドは Rust 側が組み立てるので、**任意の文字列はシェルへ渡りません**（D3）。
+	 */
+	async function follow() {
+		const path = followPath.trim();
+		if (!path) return;
 		try {
-			await invoke('start_demo_stream');
+			await invoke('stream_follow', { path, lines: null });
 			streaming = true;
 		} catch (error: unknown) {
 			failure = i18n.t('err.stream.start', { detail: String(error) });
@@ -335,10 +346,21 @@
 		</section>
 	{:else}
 	<section class="stream" aria-label={i18n.t('stream.label')}>
+		<!-- **この面が何をする所かを、その場に書く。**
+		     読んで分からない面は、無いのと同じ（実際に分からなかった）。 -->
+		<p class="what">{i18n.t('stream.what')}</p>
 		<div class="stream-head">
 			<span class="label">{i18n.t('stream.label')}</span>
-			<span class="scaffold">{i18n.t('stream.scaffold')}</span>
-			<button type="button" onclick={startDemoStream} disabled={streaming}>
+			<input
+				class="path"
+				bind:value={followPath}
+				onkeydown={(event) => event.key === 'Enter' && follow()}
+				placeholder={i18n.t('stream.path')}
+				aria-label={i18n.t('stream.path')}
+				spellcheck="false"
+				data-secret
+			/>
+			<button type="button" onclick={follow} disabled={streaming}>
 				{i18n.t('stream.start')}
 			</button>
 			<button type="button" onclick={stopStream}>{i18n.t('stream.stop')}</button>
@@ -349,6 +371,9 @@
 	</section>
 
 	<section class="band" aria-label={i18n.t('band.label')}>
+		<!-- **帯が何なのかを書く。**「ここに何が出るのか」が分からないと、
+		     空のときに壊れているのか、何も起きていないのかが区別できない。 -->
+		<p class="what">{i18n.t('band.what')}</p>
 		{#if lines.length === 0}
 			<p class="empty">{i18n.t('band.empty')}</p>
 		{:else}
@@ -647,15 +672,20 @@
 		color: var(--fg-faint);
 	}
 
-	/* このボタンは製品の操作ではない。**002 が通ったら消える足場。** */
-	.stream-head .scaffold {
+	/* **この面が何をする所か**を書く 1 行。読んで分からない面は、無いのと同じ。 */
+	.what {
+		margin: 0 0 0.35rem;
+		font-size: 0.72rem;
+		line-height: 1.6;
+		color: var(--fg-muted);
+	}
+
+	/* 追うログのパス。**入力欄が伸びて、ボタンが右へ寄る。** */
+	.stream-head .path {
+		flex: 1 1 auto;
+		min-width: 0;
 		font-family: var(--font-mono);
-		font-size: 9px;
-		letter-spacing: 0.1em;
-		padding: 0.1rem 0.5rem;
-		border: 1px dashed var(--warning);
-		border-radius: 999px;
-		color: var(--warning);
+		font-size: 0.72rem;
 	}
 
 	.stream-head button {

@@ -4,10 +4,11 @@ use std::sync::{Arc, Mutex};
 
 use tauri::State;
 
+use sshboard_band::Actor;
+use sshboard_engine::Engine;
 use sshboard_stream::OutputStream;
 
 use crate::pending::PendingLines;
-use crate::stream_host;
 
 /// MCP クライアントへ渡すもの一式。
 ///
@@ -47,16 +48,34 @@ pub fn mcp_url(url: State<'_, McpUrl>) -> Option<McpAccess> {
     url.get()
 }
 
-/// **Phase 0 限りの確認用。**サーバーへ繋がずに色付きの出力を流す。
-/// 002 が通ったら本物の `tail -f` に差し替える。
+/// サーバーのログを追う（`tail -f`）。**GUI へは色付き・MCP へは素で流れます**（Issue 005）。
+///
+/// 引数は**パスだけ**です。コマンドはこちらで組み立てるので、
+/// **任意の文字列がシェルへ渡ることはありません**（D3）。
 #[tauri::command]
-pub fn start_demo_stream(stream: State<'_, Arc<OutputStream>>) -> Result<(), String> {
+pub async fn stream_follow(
+    path: String,
+    lines: Option<u32>,
+    engine: State<'_, Arc<Engine>>,
+    stream: State<'_, Arc<OutputStream>>,
+) -> Result<(), String> {
     // **止めたあとでも、人が押したら流す**（PRD §4-3「止めた後、人が同じセッションで
     // 続きをやれる」）。止めたら二度と流せない、では「止められる」ではなく「壊れる」。
     stream.resume();
-    stream_host::spawn_demo(Arc::clone(&stream));
+
+    let engine = Arc::clone(&engine);
+    let lines = lines.unwrap_or(DEFAULT_TAIL_LINES).clamp(1, 5000);
+    // 追い続けるので、ここでは待たない。**失敗したら記録に残る**（診断タブ）。
+    tauri::async_runtime::spawn(async move {
+        if let Err(error) = engine.follow(Actor::Human, &path, lines).await {
+            eprintln!("[sshboard] 追えません: {error}");
+        }
+    });
     Ok(())
 }
+
+/// 最初に何行さかのぼるか。**多すぎると画面が埋まる。**
+const DEFAULT_TAIL_LINES: u32 = 200;
 
 /// 人が止める（PRD §4-3）。**止めたあとは流れない。**
 #[tauri::command]

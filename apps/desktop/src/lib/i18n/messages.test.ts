@@ -65,3 +65,21 @@ describe('the first-run guidance', () => {
 		}
 	});
 });
+
+describe('the text that actually reaches the screen', () => {
+	test('carries no Markdown, because nothing renders it', () => {
+		// このリポジトリの文書は Markdown で書くので、**コードのコメントと同じ気分で
+		// 強調を書いてしまう。**画面はそれをそのまま出すため、
+		// アスタリスクが見えたままになる（**実際になった**・2026-08-30）。
+		//
+		// バッククォートは見張らない。**平文でもコマンドを囲む慣習として通じる**ので、
+		// `ssh-keygen -lf` のような書き方はそのままでよい。
+		const leaking: string[] = [];
+		for (const [code, catalog] of Object.entries(CATALOGS)) {
+			for (const [key, value] of Object.entries(catalog)) {
+				if (String(value).includes('**')) leaking.push(`${code}: ${key}`);
+			}
+		}
+		expect(leaking, `記号がそのまま出ます: ${leaking.join(' / ')}`).toEqual([]);
+	});
+});

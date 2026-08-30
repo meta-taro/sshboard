@@ -60,8 +60,10 @@ const en = {
 
 
 	'stream.label': 'Output (colour for you, plain for the AI)',
-	'stream.scaffold': 'scaffolding — removed once 002 passes',
-	'stream.start': 'Send synthetic output',
+	'stream.what': 'Follow a log on the connected server. You see it in colour here; the AI reads the same stream as plain text over MCP.',
+	'stream.path': 'path to a log on the server',
+	'band.what': "Every operation, yours and the AI's, one line each. This is how you see what the AI did without being asked.",
+	'stream.start': 'Follow',
 	'stream.stop': 'Stop',
 	'band.label': 'Band',
 	'band.empty': 'Nothing yet. Call ping over MCP and a line appears.',
@@ -209,8 +211,10 @@ const ja: Catalog = {
 
 
 	'stream.label': '出力（GUI は色付き / MCP はプレーン）',
-	'stream.scaffold': '足場 — 002 が通ったら消えます',
-	'stream.start': '合成の出力を流す',
+	'stream.what': '繋いだサーバーのログを追います。ここでは色付きで見え、AI は同じ流れを MCP から素のテキストで読みます。',
+	'stream.path': 'サーバー上のログのパス',
+	'band.what': '人と AI の操作が、1 行ずつ全部ここに出ます。AI が何をしたかを、聞かずに見られる場所です。',
+	'stream.start': '追う',
 	'stream.stop': '止める',
 	'band.label': '帯',
 	'band.empty': 'まだ何も流れていません。MCP から ping を呼ぶと 1 行増えます。',

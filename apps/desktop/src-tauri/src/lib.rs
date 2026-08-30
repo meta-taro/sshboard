@@ -24,11 +24,6 @@ use tauri::Manager;
 use crate::commands::McpUrl;
 use crate::pending::PendingLines;
 
-/// 立ち上げと同時に Phase 0 の確認用の出力を流す環境変数。
-/// **人が押すボタンと同じことを、自動で確かめるためだけのもの。**
-/// 002 が通って本物の `tail -f` に差し替えたら消す。
-const PHASE0_DEMO_ENV: &str = "SSHBOARD_PHASE0_DEMO";
-
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
@@ -37,7 +32,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::band_ack,
             commands::mcp_url,
-            commands::start_demo_stream,
+            commands::stream_follow,
             commands::stop_stream,
             connections_cmd::connections_list,
             connections_cmd::connections_path,
@@ -94,13 +89,6 @@ pub fn run() {
 
             bridge::spawn(app.handle().clone(), subscriber);
             stream_host::spawn_bridge(app.handle().clone(), Arc::clone(&stream));
-
-            // **Phase 0 限り。**画面のボタンは人が押すものなので、
-            // 自動で確かめたいときのために口を 1 つ開けておく。
-            // 002 が通って本物の `tail -f` に差し替えたら消す。
-            if std::env::var_os(PHASE0_DEMO_ENV).is_some() {
-                stream_host::spawn_demo(Arc::clone(&stream));
-            }
 
             // **すべての操作が通る 1 か所**（PRD §4-1）。
             // GUI も MCP もここを共有する。ここを迂回した経路を作った瞬間に
