@@ -442,3 +442,91 @@ pub async fn diagnostics_recent(
 ) -> Result<Vec<Event>, String> {
     Ok(engine.diagnostics().recent(limit.unwrap_or(200)))
 }
+
+// --- 端末（D29） -------------------------------------------------------------
+
+/// 握りが変わったことを画面へ配るイベント。
+pub const CONSOLE_EVENT: &str = "console://holder";
+
+/// 誰が握っているか。**画面はこれを見て入力を締めます。**
+fn holder_name(holder: Option<Actor>) -> Option<&'static str> {
+    holder.map(|held| match held {
+        Actor::Human => "human",
+        Actor::Ai => "ai",
+    })
+}
+
+/// 握りの変化を画面へ押し出す。
+///
+/// **AI が握った瞬間に、人の側の入力が締まる**必要があります（D29）。
+/// 画面が知らないまま AI が打っている、を作らないため。
+pub fn spawn_console_bridge(app: AppHandle, engine: Arc<Engine>) {
+    tauri::async_runtime::spawn(async move {
+        let mut watching = engine.subscribe_console();
+        while watching.changed().await.is_ok() {
+            let holder = holder_name(*watching.borrow());
+            if let Err(error) = app.emit(CONSOLE_EVENT, holder) {
+                eprintln!("[sshboard] 握りの変化を画面へ渡せません: {error}");
+            }
+        }
+    });
+}
+
+/// 端末を開いて握る。**人の操作。**
+#[tauri::command]
+pub async fn console_open(
+    cols: u32,
+    rows: u32,
+    engine: State<'_, Arc<Engine>>,
+) -> Result<(), String> {
+    engine
+        .console_open(Actor::Human, cols.max(20), rows.max(5))
+        .await
+        .map_err(|error| error.to_string())
+}
+
+/// 打ち込む。**握っている側だけ**（Engine が判断します）。
+///
+/// **帯へは載せません**（D29）。1 キーずつ載せると帯が溢れ、
+/// 受け取り待ちを挟むと端末が使い物になりません。
+#[tauri::command]
+pub async fn console_type(bytes: Vec<u8>, engine: State<'_, Arc<Engine>>) -> Result<(), String> {
+    engine
+        .console_type(Actor::Human, &bytes)
+        .await
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub async fn console_resize(
+    cols: u32,
+    rows: u32,
+    engine: State<'_, Arc<Engine>>,
+) -> Result<(), String> {
+    engine
+        .console_resize(cols.max(20), rows.max(5))
+        .await
+        .map_err(|error| error.to_string())
+}
+
+/// 取り返す。**人は常に勝ちます**（D29）。
+#[tauri::command]
+pub async fn console_take(engine: State<'_, Arc<Engine>>) -> Result<(), String> {
+    engine
+        .console_take(Actor::Human)
+        .await
+        .map_err(|error| error.to_string())
+}
+
+/// 止める。**失敗しません**（D29 の停止ボタン）。
+#[tauri::command]
+pub async fn console_stop(engine: State<'_, Arc<Engine>>) -> Result<(), String> {
+    engine.console_stop().await;
+    Ok(())
+}
+
+/// いま誰が握っているか。**画面を開いた直後に読みます。**
+#[tauri::command]
+pub async fn console_holder(engine: State<'_, Arc<Engine>>) -> Result<Option<String>, String> {
+    Ok(holder_name(engine.console_holder().await).map(|name| name.to_string()))
+}

@@ -33,7 +33,15 @@
 	let mcpCopied = $state(false);
 	let failure = $state<string | null>(null);
 	let streaming = $state(false);
-	let view = $state<'files' | 'connections' | 'band' | 'diag'>('files');
+	let view = $state<'files' | 'console' | 'connections' | 'band' | 'diag'>('files');
+
+	// --- 端末（D29）------------------------------------------------------------
+	// **同時に触れるのは 1 人。**AI が握っている間、人の入力は締まる。
+	let consoleHost: HTMLDivElement | undefined = $state();
+	let consoleTerm: Terminal | undefined;
+	/** 誰が握っているか。`null` は誰も握っていない。 */
+	let holder = $state<'human' | 'ai' | null>(null);
+	const iHold = $derived(holder === 'human');
 	let diag = $state<DiagEvent[]>([]);
 
 	/** 記録を取り直す。**押したときと、診断を開いたときに読む。** */
@@ -114,6 +122,42 @@
 	 * **GUI へは色付き・MCP へは素**で流れます（Issue 005）。
 	 * コマンドは Rust 側が組み立てるので、**任意の文字列はシェルへ渡りません**（D3）。
 	 */
+	/**
+	 * 端末を開いて握る（D29）。
+	 *
+	 * **打鍵は帯へ載せません。**1 キーずつ載せると帯が溢れ、
+	 * 受け取り待ちを挟むと端末が使い物になりません。開始と終了は載ります。
+	 */
+	async function openConsole() {
+		if (!consoleTerm) return;
+		try {
+			await invoke('console_open', { cols: consoleTerm.cols, rows: consoleTerm.rows });
+			holder = 'human';
+		} catch (error: unknown) {
+			failure = String(error);
+		}
+	}
+
+	/** 握りを取り返す。**人は常に勝ちます**（D29）。 */
+	async function takeConsole() {
+		try {
+			await invoke('console_take');
+			holder = 'human';
+		} catch (error: unknown) {
+			failure = String(error);
+		}
+	}
+
+	/** 止める。**失敗しません**（D29 の停止ボタン）。 */
+	async function stopConsole() {
+		try {
+			await invoke('console_stop');
+			holder = null;
+		} catch (error: unknown) {
+			failure = String(error);
+		}
+	}
+
 	async function follow() {
 		const path = followPath.trim();
 		if (!path) return;
@@ -153,6 +197,41 @@
 
 	onMount(() => {
 		const stops: Array<() => void> = [];
+
+		if (consoleHost) {
+			// **打てる面。**握っていないときは Rust 側が断るので、
+			// ここで打てること自体は塞がない（断り方で伝える）。
+			consoleTerm = createTerminal(consoleHost, textSize.terminalPx, true);
+			consoleTerm.onData((data) => {
+				// **握っていなければ打たない。**往復させて断られるより、
+				// 画面で止める方が速い（Rust 側でも同じ判断をしている）。
+				if (!iHold) return;
+				const bytes = Array.from(new TextEncoder().encode(data));
+				invoke('console_type', { bytes }).catch((error: unknown) => {
+					failure = String(error);
+				});
+			});
+			consoleTerm.onResize(({ cols, rows }) => {
+				invoke('console_resize', { cols, rows }).catch(() => {
+					/* まだ開いていないだけ。**開いてから効く。** */
+				});
+			});
+		}
+
+		invoke<string | null>('console_holder')
+			.then((who) => (holder = who as 'human' | 'ai' | null))
+			.catch(() => {
+				/* 取れなくても画面は出す */
+			});
+
+		// **AI が握った瞬間に、人の側の入力が締まる**（D29）。
+		listen<'human' | 'ai' | null>('console://holder', (event) => {
+			holder = event.payload;
+		})
+			.then((stop) => stops.push(stop))
+			.catch(() => {
+				/* 購読できないだけ。**画面は出す。** */
+			});
 
 		if (terminalHost) {
 			terminal = createTerminal(terminalHost, textSize.terminalPx);
@@ -207,6 +286,7 @@
 		return () => {
 			stops.forEach((stop) => stop());
 			terminal?.dispose();
+			consoleTerm?.dispose();
 		};
 	});
 </script>
@@ -231,6 +311,10 @@
 			>
 				<Icon name="server" />
 				{i18n.t('tab.connections')}
+			</button>
+			<button type="button" class:active={view === 'console'} onclick={() => (view = 'console')}>
+				<Icon name="terminal" />
+				{i18n.t('tab.console')}
 			</button>
 			<button type="button" class:active={view === 'band'} onclick={() => (view = 'band')}>
 				<Icon name="activity" />
@@ -311,7 +395,44 @@
 		<p class="failure" role="alert">{failure}</p>
 	{/if}
 
-	{#if view === 'files'}
+	{#if view === 'console'}
+		<section class="console" aria-label={i18n.t('tab.console')}>
+			<p class="what">{i18n.t('console.what')}</p>
+			<div class="console-head">
+				<!-- **誰が握っているかを、常に出す。**見えない所で AI が打っている、を作らない。 -->
+				<span class="holder" class:ai={holder === 'ai'} class:mine={iHold}>
+					<Icon name={holder ? 'lock' : 'terminal'} size={12} />
+					{holder === 'ai'
+						? i18n.t('console.held.ai')
+						: iHold
+							? i18n.t('console.held.me')
+							: i18n.t('console.held.none')}
+				</span>
+				{#if !holder}
+					<button type="button" class="primary" onclick={openConsole}>
+						<Icon name="terminal" />
+						{i18n.t('console.open')}
+					</button>
+				{:else if !iHold}
+					<!-- **人はいつでも取り返せる**（D29）。 -->
+					<button type="button" class="primary" onclick={takeConsole}>
+						<Icon name="lock" />
+						{i18n.t('console.take')}
+					</button>
+				{/if}
+				{#if holder}
+					<!-- **止まらない停止ボタンは、無い方がまし。**必ず効く。 -->
+					<button type="button" class="danger" onclick={stopConsole}>
+						<Icon name="stop" />
+						{i18n.t('console.stop')}
+					</button>
+				{/if}
+			</div>
+			<div class="terminal shell" class:locked={holder === 'ai'}>
+				<div class="core terminal-core" bind:this={consoleHost}></div>
+			</div>
+		</section>
+	{:else if view === 'files'}
 		<FileBrowser />
 	{:else if view === 'connections'}
 		<ConnectionManager />
@@ -670,6 +791,78 @@
 		flex: 1;
 		font-size: 0.72rem;
 		color: var(--fg-faint);
+	}
+
+	/* 端末（D29）。**誰が握っているかを常に出す。** */
+	.console {
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+		min-height: 0;
+		flex: 1 1 auto;
+	}
+
+	/* **説明文を伸ばさない。**他のルールを拾って 340px に伸び、
+	   端末の上に大きな空白ができていた（実際にそうなった）。 */
+	.console .what {
+		flex: 0 0 auto;
+	}
+
+	.console-head {
+		display: flex;
+		align-items: center;
+		gap: 0.45rem;
+		flex: 0 0 auto;
+	}
+
+	/* **この面のボタンは自前で整える。**素のままだと OS 既定の灰色になり、
+	   アイコンの下に文字が回り込んで潰れる（実際に潰れた）。 */
+	.console-head button {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.3rem;
+		white-space: nowrap;
+		padding: 0.35rem 0.7rem;
+		border: 1px solid var(--hairline);
+		border-radius: var(--r-control);
+		background: var(--surface);
+		color: var(--fg);
+		font-size: 0.76rem;
+		cursor: pointer;
+	}
+
+	.console-head button.primary {
+		border-color: var(--accent);
+		color: var(--accent);
+	}
+
+	.console-head button.danger {
+		border-color: var(--danger);
+		color: var(--danger);
+	}
+
+	.holder {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.3rem;
+		font-size: 0.72rem;
+		color: var(--fg-muted);
+		margin-right: auto;
+	}
+
+	.holder.mine {
+		color: var(--ok);
+	}
+
+	/* **AI が握っている間は、見て分かるようにする。**締まっていることが伝わらないと、
+	   打てないのを不具合だと思われる。 */
+	.holder.ai {
+		color: var(--warning);
+	}
+
+	.terminal.locked {
+		outline: 1.5px solid var(--warning);
+		outline-offset: 2px;
 	}
 
 	/* **この面が何をする所か**を書く 1 行。読んで分からない面は、無いのと同じ。 */

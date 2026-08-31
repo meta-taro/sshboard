@@ -49,6 +49,12 @@ pub fn run() {
             session_cmd::remote_upload,
             session_cmd::remote_download,
             session_cmd::local_list_dir,
+            session_cmd::console_open,
+            session_cmd::console_type,
+            session_cmd::console_resize,
+            session_cmd::console_take,
+            session_cmd::console_stop,
+            session_cmd::console_holder,
             session_cmd::diagnostics_recent,
             menu::set_menu_labels
         ])
@@ -103,6 +109,8 @@ pub fn run() {
             ));
             app.manage(Arc::clone(&engine));
             session_cmd::spawn_bridge(app.handle().clone(), Arc::clone(&engine));
+            // **AI が握った瞬間に、人の側の入力が締まる**必要がある（D29）。
+            session_cmd::spawn_console_bridge(app.handle().clone(), Arc::clone(&engine));
 
             mcp_host::spawn(
                 app.handle().clone(),

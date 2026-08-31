@@ -17,11 +17,13 @@ const PLACEHOLDER_THEME = {
  *
  * xterm.js は自前で描画するため `rem` が効かない。**px を渡すしかない。**
  */
-export function createTerminal(host: HTMLElement, fontSize = 12): Terminal {
+export function createTerminal(host: HTMLElement, fontSize = 12, typable = false): Terminal {
 	const terminal = new Terminal({
 		convertEol: false,
-		cursorBlink: false,
-		disableStdin: true,
+		// **打てる面では点滅させる。**どこに入るのかが見えないと打てない。
+		cursorBlink: typable,
+		// 出力を見るだけの面では、打てないことを**構造で**示す（D29 のロック）。
+		disableStdin: !typable,
 		fontSize,
 		// 日本語のグリフを持つ等幅フォントを候補に入れる。
 		// **入れないと、xterm.js が 2 桁分を確保したところへ 1 桁幅の字が描かれ、
