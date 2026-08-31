@@ -10,5 +10,5 @@ mod write_scope;
 
 pub use hostkey::{decide, fingerprint, fingerprints_for, SeenHostKey, Trust};
 pub use key_file::{inspect_key, KeyFacts, KeyFormat, KeyVerdict};
-pub use session::{Auth, DirEntry, Ran, SshError, SshSession, Target};
+pub use session::{Auth, Console, DirEntry, Ran, SshError, SshSession, Target};
 pub use write_scope::{Refusal, WriteScope};

@@ -509,6 +509,43 @@ impl Ran {
     }
 }
 
+/// 開いている対話コンソール 1 本（D29）。
+///
+/// **打鍵はここを通ります。**帯へは載せません — 1 キーずつ載せると帯が溢れ、
+/// 受け取り待ち（D16）を挟むと端末が使い物になりません。
+/// **開始と終了は帯に出ます**ので、「誰がいつ握ったか」は残ります。
+///
+/// 出力は `OutputStream` へ流れます。**GUI も MCP も同じ 1 本を見ます**（PRD §4-1）。
+pub struct Console {
+    write: russh::ChannelWriteHalf<russh::client::Msg>,
+}
+
+impl Console {
+    /// 打ち込む。**中身を解釈しません。**バイト列のままシェルへ渡します。
+    pub async fn type_in(&self, bytes: &[u8]) -> Result<(), SshError> {
+        self.write
+            .data_bytes(bytes.to_vec())
+            .await
+            .map_err(|error| SshError::Command(error.to_string()))
+    }
+
+    /// 窓の大きさを伝える。**伝えないと `vi` や `top` が崩れます。**
+    pub async fn resize(&self, cols: u32, rows: u32) -> Result<(), SshError> {
+        self.write
+            .window_change(cols, rows, 0, 0)
+            .await
+            .map_err(|error| SshError::Command(error.to_string()))
+    }
+
+    /// 止める（D29 の停止）。**失敗させません。**
+    ///
+    /// 止まらない停止ボタンは、無い方がましです。切断と同じ扱いにします。
+    pub async fn close(&self) {
+        let _ = self.write.eof().await;
+        let _ = self.write.close().await;
+    }
+}
+
 /// `sftp` で見えたもの 1 件。**中身は持ちません。**
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DirEntry {
@@ -644,6 +681,58 @@ impl SshSession {
             .await
             .map_err(|error| SshError::Command(format!("{path}: {error}")))?;
         Ok(bytes.len() as u64)
+    }
+
+    /// 対話コンソールを 1 本開く（D29）。**PTY を要求し、シェルを起こします。**
+    ///
+    /// 出力は `into` へ流れ、**GUI へは生・MCP へは素**で配られます（Issue 005）。
+    /// 人が止めたら（`OutputStream::stop`）、そこで読むのをやめます。
+    pub async fn open_console(
+        &self,
+        actor: Actor,
+        cols: u32,
+        rows: u32,
+        into: Arc<sshboard_stream::OutputStream>,
+    ) -> Result<Console, SshError> {
+        // **握ったことは帯に出す**（D29）。打鍵は出さないが、開始は出す。
+        self.show(actor, "console opened").await?;
+
+        let channel = self
+            .handle
+            .channel_open_session()
+            .await
+            .map_err(|error| SshError::Command(error.to_string()))?;
+
+        // `xterm-256color` は xterm.js が解釈できる並びを出させるため（D7）。
+        channel
+            .request_pty(true, "xterm-256color", cols, rows, 0, 0, &[])
+            .await
+            .map_err(|error| SshError::Command(error.to_string()))?;
+        channel
+            .request_shell(true)
+            .await
+            .map_err(|error| SshError::Command(error.to_string()))?;
+
+        let (mut read, write) = channel.split();
+
+        // 読む側は回しっぱなしにする。**stderr も同じ流れへ入れる**
+        // （端末では区別せずに見えるのが正しい）。
+        tokio::spawn(async move {
+            while let Some(message) = read.wait().await {
+                let chunk = match message {
+                    ChannelMsg::Data { ref data } => data.to_vec(),
+                    ChannelMsg::ExtendedData { ref data, .. } => data.to_vec(),
+                    ChannelMsg::Eof | ChannelMsg::Close => break,
+                    _ => continue,
+                };
+                // 人が止めたら、そこで終わり（PRD §4-3）。
+                if into.push(&chunk).is_err() {
+                    break;
+                }
+            }
+        });
+
+        Ok(Console { write })
     }
 
     /// ログを追う。**同じ 1 本の出力を、GUI へは生・MCP へは素で流します**（Issue 005）。

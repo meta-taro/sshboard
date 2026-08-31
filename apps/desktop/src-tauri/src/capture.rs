@@ -28,6 +28,52 @@ const REDACT_TIMEOUT: Duration = Duration::from_secs(3);
 /// 撮る相手のウィンドウ。**メインの 1 枚だけ**を撮ります。
 const MAIN_WINDOW: &str = "main";
 
+/// macOS の画面収録の許可を尋ねる／求める。
+///
+/// **許可が無くても撮影は失敗しません。**真っ白な画像が返ってきます（実測・2026-08-31）。
+/// エラーで返らないので、**こちらから先に尋ねないと嘘をつく**ことになります。
+///
+/// `CGRequestScreenCaptureAccess` を呼ぶと、OS が 1 回だけ確認を出し、
+/// **以後この実行ファイルがシステム設定の一覧に載ります。**
+/// 呼ばないと一覧に出てこないので、人は許可のしようがありません。
+#[cfg(target_os = "macos")]
+mod screen_permission {
+    #[link(name = "CoreGraphics", kind = "framework")]
+    extern "C" {
+        fn CGPreflightScreenCaptureAccess() -> bool;
+        fn CGRequestScreenCaptureAccess() -> bool;
+    }
+
+    /// いま許可されているか。**尋ねるだけで、確認は出さない。**
+    pub fn granted() -> bool {
+        unsafe { CGPreflightScreenCaptureAccess() }
+    }
+
+    /// 許可を求める。**OS の確認が 1 回出る**（人が押すまで返らないことはない）。
+    pub fn request() -> bool {
+        unsafe { CGRequestScreenCaptureAccess() }
+    }
+}
+
+/// 画素が全部同じ色か。**許可が無いときに返る真っ白を捕まえる。**
+///
+/// sshboard の窓が 1 色だけ、ということは起こりません。
+/// macOS 以外でも、**撮れていないのに撮れたと言わない**ための最後の網です。
+fn is_blank(image: &image::RgbaImage) -> bool {
+    let mut pixels = image.pixels();
+    let Some(first) = pixels.next() else {
+        return true;
+    };
+    pixels.all(|pixel| pixel == first)
+}
+
+/// 許可が無いときに返す説明。**次に何をすればよいかまで書く**（§17）。
+const PERMISSION_HINT: &str = "画面収録が許可されていないため、撮っても真っ白になります。\
+     macOS の「システム設定 → プライバシーとセキュリティ → 画面収録とシステムオーディオ録音」で \
+     sshboard を入にしてください。**一覧に sshboard が出ていない場合は、\
+     いまこの呼び出しが登録したので、開き直すと出てきます。**\
+     許可したあとは sshboard を再起動してください（macOS は起動中のアプリに反映しません）。";
+
 pub struct TauriCapture {
     app: AppHandle,
 }
@@ -68,6 +114,15 @@ impl TauriCapture {
 
     /// ウィンドウを 1 枚撮る。**画面の許可が要ります**（macOS）。
     fn photograph(&self, max_edge: u32, redacted: bool) -> Result<WindowShot, String> {
+        // **撮る前に尋ねる。**許可が無いと真っ白が返るだけで、失敗してくれない。
+        #[cfg(target_os = "macos")]
+        if !screen_permission::granted() {
+            // ここで求めておくと、**システム設定の一覧に sshboard が載る。**
+            // 載らないと、人は許可を出しようがない。
+            screen_permission::request();
+            return Err(PERMISSION_HINT.to_string());
+        }
+
         let window = self
             .app
             .get_webview_window(MAIN_WINDOW)
@@ -93,6 +148,11 @@ impl TauriCapture {
         let image = found
             .capture_image()
             .map_err(|error| format!("画面を撮れません: {error}"))?;
+
+        // **撮れていないのに撮れたと言わない。**許可を落とした直後などに起こる。
+        if is_blank(&image) {
+            return Err(PERMISSION_HINT.to_string());
+        }
 
         let (width, height) = (image.width(), image.height());
         // **引き伸ばさない。**小さい窓を大きく返しても、崩れは見やすくならない。

@@ -3,9 +3,13 @@
 //! **サーバーが無い環境でも走ります**（product-baseline §4）。
 //! 建てるには `sh tools/test-server/up.sh`。
 
+use std::sync::Arc;
+use std::time::Duration;
+
 use sshboard_band::{Actor, Band};
 use sshboard_diag::Diagnostics;
 use sshboard_ssh::{Auth, SshError, SshSession, Target};
+use sshboard_stream::OutputStream;
 
 const HOST: &str = "127.0.0.1";
 const PORT: u16 = 2222;
@@ -571,4 +575,91 @@ async fn a_command_that_works_reports_success() {
     assert!(ran.out.contains("Su"), "cal の出力に見えない: {ran:?}");
     assert!(ran.err.trim().is_empty(), "余計な stderr: {ran:?}");
     assert_eq!(ran.status, Some(0));
+}
+
+// --- 端末（D29） -------------------------------------------------------------
+
+/// 出力に目印が現れるまで待つ。**現れなければ落とす**（黙って通さない）。
+async fn wait_for(stream: &Arc<OutputStream>, marker: &str) -> String {
+    let deadline = std::time::Instant::now() + Duration::from_secs(10);
+    loop {
+        let seen = stream.plain_tail();
+        if seen.contains(marker) {
+            return seen;
+        }
+        if std::time::Instant::now() > deadline {
+            panic!("{marker} が出てこない。いま見えているもの:\n{seen}");
+        }
+        tokio::time::sleep(Duration::from_millis(50)).await;
+    }
+}
+
+#[tokio::test]
+async fn a_console_runs_a_real_shell_and_answers_what_is_typed() {
+    // **端末の芯。**ここが通らなければ Tera Term の代わりにはならない。
+    if !server_is_up().await {
+        println!("テスト用サーバーが建っていません（想定内・飛ばします）");
+        return;
+    }
+    let session = trusted_session(Band::new()).await;
+    let stream = Arc::new(OutputStream::new());
+
+    let console = session
+        .open_console(Actor::Human, 80, 24, Arc::clone(&stream))
+        .await
+        .expect("シェルが開けない");
+
+    // **打ったものが本当にシェルへ届くか。**
+    console
+        .type_in(b"echo sshboard-shell-ok\n")
+        .await
+        .expect("打てない");
+    let seen = wait_for(&stream, "sshboard-shell-ok").await;
+    assert!(seen.contains("sshboard-shell-ok"), "{seen}");
+
+    // **窓の大きさを伝えられるか。**伝えないと vi や top が崩れる。
+    // `tput` はコンテナに入っていないことがある（`uptime` と同じ）。
+    // `stty size` は「行 列」を返すので、そちらで見る。
+    console.resize(120, 40).await.expect("大きさを変えられない");
+    tokio::time::sleep(Duration::from_millis(200)).await;
+    console.type_in(b"stty size\n").await.expect("打てない");
+    let seen = wait_for(&stream, "40 120").await;
+    assert!(
+        seen.contains("40 120"),
+        "窓の大きさが伝わっていない:\n{seen}"
+    );
+
+    console.close().await;
+}
+
+#[tokio::test]
+async fn closing_a_console_stops_it_answering() {
+    // **止められることが要件**（D29 の停止ボタン）。
+    if !server_is_up().await {
+        println!("テスト用サーバーが建っていません（想定内・飛ばします）");
+        return;
+    }
+    let session = trusted_session(Band::new()).await;
+    let stream = Arc::new(OutputStream::new());
+    let console = session
+        .open_console(Actor::Human, 80, 24, Arc::clone(&stream))
+        .await
+        .expect("シェルが開けない");
+
+    console
+        .type_in(b"echo before-close\n")
+        .await
+        .expect("打てない");
+    wait_for(&stream, "before-close").await;
+
+    console.close().await;
+
+    // 閉じたあとに打っても、**返ってこない**。
+    let _ = console.type_in(b"echo after-close\n").await;
+    tokio::time::sleep(Duration::from_millis(600)).await;
+    assert!(
+        !stream.plain_tail().contains("after-close"),
+        "閉じたのに返事が来ている:\n{}",
+        stream.plain_tail()
+    );
 }

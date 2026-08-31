@@ -54,10 +54,10 @@ Phase 0 の 5 本は、実機と Windows 目視を除いてすべて通りまし
 
 ## テスト状況
 
-**Rust 198 ＋ フロント 49 ＝ 247 本。全部通っています。**（手元のテスト用サーバーを建てた状態）
+**Rust 200 ＋ フロント 49 ＝ 249 本。全部通っています。**（手元のテスト用サーバーを建てた状態）
 
 ```
-cargo test --workspace                                 →  198 passed; 0 failed
+cargo test --workspace                                 →  200 passed; 0 failed
 cargo fmt --all -- --check                             →  差分なし
 cargo clippy --workspace --all-targets -- -D warnings  →  警告なし
 pnpm --filter desktop check                            →  248 files, 0 errors, 0 warnings
@@ -72,7 +72,7 @@ pnpm --filter desktop test                             →   49 passed
 | `sshboard-credentials` | 16 | 2 |
 | `sshboard-connections` | 20 | |
 | `sshboard-diag` | 8 | |
-| `sshboard-ssh` | 57 | 18 |
+| `sshboard-ssh` | 59 | 20 |
 | `sshboard-engine` | 27 | 18 |
 | `sshboard-mcp` | 28 | 4 |
 | `sshboard-desktop` | 9 | |
@@ -170,15 +170,22 @@ pnpm --filter desktop test                             →   49 passed
 - **Windows の ssh-agent は実機で未確認。**コンパイルは CI で通しますが、
   名前付きパイプ / Pageant に実際に繋がるかは**人が実機で見るまで分かりません**
 - **アイコン・帯・端末の見た目は仮置き**（DESIGN.md）。人が決め直す前提
-- **端末（Tera Term 側の面）がまだありません。**xterm.js は入っていますが
-  `disableStdin: true` の**見るだけ**で、Rust 側に PTY がありません
-  （`request_pty` / `request_shell` は 0 件）。**D29 を決めたので、次はここ**
+- **端末は SSH 層まで通りました**（D29）。実機で対話シェルが開き、`echo` に応え、
+  `stty size` が伝えた大きさを返します。**ロック・停止ボタン・端末タブ・MCP の口はまだ**
 - **Windows 11 の Snap Layouts は落とす**（D17）。dbboard も解いていないので揃える
 - **文字コードを変換していません。**EUC-JP のログは実在します（実機・手元のサーバーで再現済み）。
   読み出しは U+FFFD へ置換したうえで「置換した」と伝えるだけで、変換はしていません
 
 ## Phase 1 で拾えた未知
 
+18. **macOS は画面収録の許可が無くても、撮影を失敗させない。真っ白な画像が返る**
+    （実測・2026-08-31）。`capture_window` が「撮れました」と言って白紙を返していた。
+    **エラーより悪い。**`CGPreflightScreenCaptureAccess` で先に尋ねる。
+    `CGRequestScreenCaptureAccess` を呼ばないと、**そもそもシステム設定の一覧に
+    アプリが載らない**ので、人は許可のしようがない。
+19. **Tauri の開発ビルドは `devUrl`（127.0.0.1:1420）を読む。**
+    別のポートで開発サーバーを立てていると**窓が空になり**、帯の受け取りが返らない。
+    症状は「MCP のツールが `0/1 views acknowledged` で断られる」。**D16 が正しく働いた例**
 16. **`exec` が stderr と終了コードを捨てていた**（実測・2026-08-30）。
     入っていないコマンドを打つと**空の成功**に見える。テスト用サーバーに `uptime` が
     無く、実際にそう見えた。**握り潰しは「静かに間違える」形で現れる。**
@@ -220,7 +227,7 @@ pnpm --filter desktop test                             →   49 passed
 
 ## 人にしかできない工程で、止まっているもの
 
-- **実運用で 1 回上げること。**ここが通らなければ、上の 247 本は意味を持ちません
+- **実運用で 1 回上げること。**ここが通らなければ、上の 249 本は意味を持ちません
 - **macOS の目視**（001 / 005）と **Windows 実機**（001 / 004）
 - **ダウンロードを 1 回押すこと**（D27・2026-08-30 に実装）。
   右のペインでファイルを選び、左の現在地へ落ちるか。同じ名前があるとき断るか。
