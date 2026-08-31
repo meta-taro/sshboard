@@ -54,10 +54,10 @@ Phase 0 の 5 本は、実機と Windows 目視を除いてすべて通りまし
 
 ## テスト状況
 
-**Rust 200 ＋ フロント 49 ＝ 249 本。全部通っています。**（手元のテスト用サーバーを建てた状態）
+**Rust 203 ＋ フロント 49 ＝ 252 本。全部通っています。**（手元のテスト用サーバーを建てた状態）
 
 ```
-cargo test --workspace                                 →  200 passed; 0 failed
+cargo test --workspace                                 →  203 passed; 0 failed
 cargo fmt --all -- --check                             →  差分なし
 cargo clippy --workspace --all-targets -- -D warnings  →  警告なし
 pnpm --filter desktop check                            →  248 files, 0 errors, 0 warnings
@@ -73,7 +73,7 @@ pnpm --filter desktop test                             →   49 passed
 | `sshboard-connections` | 20 | |
 | `sshboard-diag` | 8 | |
 | `sshboard-ssh` | 59 | 20 |
-| `sshboard-engine` | 27 | 18 |
+| `sshboard-engine` | 30 | 21 |
 | `sshboard-mcp` | 28 | 4 |
 | `sshboard-desktop` | 9 | |
 | **フロント（vitest）** | **49** | |
@@ -170,8 +170,9 @@ pnpm --filter desktop test                             →   49 passed
 - **Windows の ssh-agent は実機で未確認。**コンパイルは CI で通しますが、
   名前付きパイプ / Pageant に実際に繋がるかは**人が実機で見るまで分かりません**
 - **アイコン・帯・端末の見た目は仮置き**（DESIGN.md）。人が決め直す前提
-- **端末は SSH 層まで通りました**（D29）。実機で対話シェルが開き、`echo` に応え、
-  `stty size` が伝えた大きさを返します。**ロック・停止ボタン・端末タブ・MCP の口はまだ**
+- **端末は Engine 層まで通りました**（D29）。実機で対話シェルが開き、
+  **握っている側しか打てず、人はいつでも取り返せ、停止が必ず効く**ことを確認済み。
+  **端末タブ（画面）と MCP の口はまだ**
 - **Windows 11 の Snap Layouts は落とす**（D17）。dbboard も解いていないので揃える
 - **文字コードを変換していません。**EUC-JP のログは実在します（実機・手元のサーバーで再現済み）。
   読み出しは U+FFFD へ置換したうえで「置換した」と伝えるだけで、変換はしていません
@@ -227,7 +228,7 @@ pnpm --filter desktop test                             →   49 passed
 
 ## 人にしかできない工程で、止まっているもの
 
-- **実運用で 1 回上げること。**ここが通らなければ、上の 249 本は意味を持ちません
+- **実運用で 1 回上げること。**ここが通らなければ、上の 252 本は意味を持ちません
 - **macOS の目視**（001 / 005）と **Windows 実機**（001 / 004）
 - **ダウンロードを 1 回押すこと**（D27・2026-08-30 に実装）。
   右のペインでファイルを選び、左の現在地へ落ちるか。同じ名前があるとき断るか。

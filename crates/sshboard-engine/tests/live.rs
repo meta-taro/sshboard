@@ -693,3 +693,108 @@ async fn a_command_runs_through_the_engine_and_comes_back_whole() {
         assert!(!ran.out.trim().is_empty(), "{command} が何も返さない");
     }
 }
+
+// --- 端末のロックと停止（D29） -------------------------------------------------
+
+async fn engine_connected(dir: &tempfile::TempDir) -> Engine {
+    let engine = engine_at(registry(dir, &[]).await);
+    engine
+        .connect(Actor::Human, "local", None)
+        .await
+        .expect("繋がらない");
+    engine
+}
+
+#[tokio::test]
+async fn only_the_side_holding_the_console_can_type_into_it() {
+    // **同時に触れるのは 1 人**（D29）。
+    // 人と AI が交互に打つと、**どちらの意図でもない文字列**がシェルへ入る。
+    if !server_is_up().await {
+        println!("テスト用サーバーが建っていません（想定内・飛ばします）");
+        return;
+    }
+    let dir = tempfile::tempdir().expect("一時ディレクトリ");
+    let engine = engine_connected(&dir).await;
+
+    engine
+        .console_open(Actor::Human, 80, 24)
+        .await
+        .expect("開けない");
+    assert_eq!(engine.console_holder().await, Some(Actor::Human));
+
+    let refused = engine.console_type(Actor::Ai, b"echo nope\n").await;
+    assert!(
+        matches!(refused, Err(EngineError::ConsoleHeldByOther { .. })),
+        "**握っていない側が打ててしまう**: {refused:?}"
+    );
+
+    engine
+        .console_type(Actor::Human, b"echo mine\n")
+        .await
+        .expect("握っている側が打てない");
+}
+
+#[tokio::test]
+async fn a_person_can_always_take_the_console_back() {
+    // **人の解除が常に勝つ**（D29）。AI が握ったまま離さない状態を作らない。
+    if !server_is_up().await {
+        println!("テスト用サーバーが建っていません（想定内・飛ばします）");
+        return;
+    }
+    let dir = tempfile::tempdir().expect("一時ディレクトリ");
+    let engine = engine_connected(&dir).await;
+
+    engine
+        .console_open(Actor::Ai, 80, 24)
+        .await
+        .expect("開けない");
+    assert_eq!(engine.console_holder().await, Some(Actor::Ai));
+
+    // AI が握っていても、人は取り返せる。
+    engine
+        .console_take(Actor::Human)
+        .await
+        .expect("取り返せない");
+    assert_eq!(engine.console_holder().await, Some(Actor::Human));
+    engine
+        .console_type(Actor::Human, b"echo taken\n")
+        .await
+        .expect("取り返したのに打てない");
+
+    // **逆は勝たない。**AI は人から奪えない。
+    let refused = engine.console_take(Actor::Ai).await;
+    assert!(
+        matches!(refused, Err(EngineError::ConsoleHeldByOther { .. })),
+        "**AI が人から奪えてしまう**: {refused:?}"
+    );
+}
+
+#[tokio::test]
+async fn stopping_the_console_always_works_and_frees_it() {
+    // **止まらない停止ボタンは、無い方がまし**（D29）。
+    if !server_is_up().await {
+        println!("テスト用サーバーが建っていません（想定内・飛ばします）");
+        return;
+    }
+    let dir = tempfile::tempdir().expect("一時ディレクトリ");
+    let engine = engine_connected(&dir).await;
+
+    engine
+        .console_open(Actor::Ai, 80, 24)
+        .await
+        .expect("開けない");
+    engine.console_stop().await;
+    assert_eq!(
+        engine.console_holder().await,
+        None,
+        "止めたのに握られたまま"
+    );
+
+    // 止めたあとは、誰でも開き直せる。**止めたら二度と使えない、にしない。**
+    engine
+        .console_open(Actor::Human, 80, 24)
+        .await
+        .expect("止めたあとに開けない");
+    assert_eq!(engine.console_holder().await, Some(Actor::Human));
+    engine.console_stop().await;
+}

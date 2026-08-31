@@ -9,7 +9,7 @@ use sshboard_connections::{ConnectionEntry, Connections};
 use sshboard_credentials::SecretStore;
 use sshboard_diag::{Diagnostics, Stage};
 use sshboard_ssh::{
-    inspect_key, Auth, DirEntry, KeyFacts, KeyFormat, KeyVerdict, Ran, SshSession, Target,
+    inspect_key, Auth, Console, DirEntry, KeyFacts, KeyFormat, KeyVerdict, Ran, SshSession, Target,
     WriteScope,
 };
 use sshboard_stream::OutputStream;
@@ -24,6 +24,16 @@ const KEYRING_SERVICE: &str = "sshboard";
 struct Live {
     session: Arc<SshSession>,
     opened: Opened,
+}
+
+/// 端末を握っている側と、その 1 本（D29）。
+///
+/// **ロックはここ 1 か所だけが持ちます。**画面と MCP が別々に持つと、
+/// 必ず食い違います（D25 で実際に食い違って気づきました）。
+#[derive(Default)]
+struct ConsoleSlot {
+    console: Option<Console>,
+    holder: Option<Actor>,
 }
 
 /// 開いているもの全部と、いま操作の宛先になっているもの。
@@ -46,6 +56,10 @@ pub struct Engine {
     stream: Arc<OutputStream>,
     connections_path: PathBuf,
     held: Mutex<Held>,
+    /// 端末の 1 本と、握っている側（D29）。
+    console: Mutex<ConsoleSlot>,
+    /// 誰が握っているかを配る。**画面が知らないまま AI が打っている、を作らない。**
+    console_changed: watch::Sender<Option<Actor>>,
     /// 開いているものが変わったことを配る。**画面が知らないまま繋がっている、を作らない。**
     changed: watch::Sender<Vec<Opened>>,
 }
@@ -62,12 +76,15 @@ impl Engine {
         diag: Diagnostics,
     ) -> Self {
         let (changed, _) = watch::channel(Vec::new());
+        let (console_changed, _) = watch::channel(None);
         Self {
             band,
             diag,
             stream,
             connections_path,
             held: Mutex::new(Held::default()),
+            console: Mutex::new(ConsoleSlot::default()),
+            console_changed,
             changed,
         }
     }
@@ -272,6 +289,114 @@ impl Engine {
             .ok_or(EngineError::NotConnected)
     }
 
+    // --- 端末（D29） --------------------------------------------------------
+
+    /// 誰が端末を握っているか。**画面はこれを見て入力を締めます。**
+    pub async fn console_holder(&self) -> Option<Actor> {
+        self.console.lock().await.holder
+    }
+
+    /// 握っている側の変化を受け取る口。**画面が知らないまま AI が打っている、を作らない。**
+    pub fn subscribe_console(&self) -> watch::Receiver<Option<Actor>> {
+        self.console_changed.subscribe()
+    }
+
+    /// 端末を開いて握る（D29）。**既に誰かが握っていれば断ります。**
+    pub async fn console_open(
+        &self,
+        actor: Actor,
+        cols: u32,
+        rows: u32,
+    ) -> Result<(), EngineError> {
+        {
+            let slot = self.console.lock().await;
+            if let Some(holder) = slot.holder {
+                // 同じ側が開き直すのは、握り直しとして通す。
+                if holder != actor {
+                    return Err(held_by(holder));
+                }
+            }
+        }
+
+        let session = self.session().await?;
+        let console = session
+            .open_console(actor, cols, rows, Arc::clone(&self.stream))
+            .await?;
+
+        let mut slot = self.console.lock().await;
+        // 開いている間に別の側が入っていたら、開いたものは捨てて断る。
+        if let Some(holder) = slot.holder {
+            if holder != actor {
+                drop(slot);
+                console.close().await;
+                return Err(held_by(holder));
+            }
+        }
+        if let Some(previous) = slot.console.take() {
+            previous.close().await;
+        }
+        slot.console = Some(console);
+        slot.holder = Some(actor);
+        drop(slot);
+
+        let _ = self.console_changed.send(Some(actor));
+        Ok(())
+    }
+
+    /// 打ち込む。**握っている側だけ**（D29）。
+    pub async fn console_type(&self, actor: Actor, bytes: &[u8]) -> Result<(), EngineError> {
+        let slot = self.console.lock().await;
+        match slot.holder {
+            None => Err(EngineError::ConsoleNotOpen),
+            Some(holder) if holder != actor => Err(held_by(holder)),
+            Some(_) => {
+                let console = slot.console.as_ref().ok_or(EngineError::ConsoleNotOpen)?;
+                Ok(console.type_in(bytes).await?)
+            }
+        }
+    }
+
+    /// 窓の大きさを伝える。**握っていなくても通す**（見ている側の画面も追従するため）。
+    pub async fn console_resize(&self, cols: u32, rows: u32) -> Result<(), EngineError> {
+        let slot = self.console.lock().await;
+        let console = slot.console.as_ref().ok_or(EngineError::ConsoleNotOpen)?;
+        Ok(console.resize(cols, rows).await?)
+    }
+
+    /// 握りを取り返す。**人は常に勝ちます**（D29）。
+    ///
+    /// AI は、誰も握っていないか自分が握っているときだけ取れます。
+    /// **AI が人から奪える形にしない。**
+    pub async fn console_take(&self, actor: Actor) -> Result<(), EngineError> {
+        let mut slot = self.console.lock().await;
+        match slot.holder {
+            Some(holder) if holder != actor && actor != Actor::Human => Err(held_by(holder)),
+            _ => {
+                slot.holder = Some(actor);
+                drop(slot);
+                let _ = self.console_changed.send(Some(actor));
+                Ok(())
+            }
+        }
+    }
+
+    /// 止める（D29 の停止ボタン）。**失敗しません。**
+    ///
+    /// 帯の受け取りを待ちません。切断と同じ扱いです — **止まらない停止は、
+    /// 無い方がまし。**握りも外すので、次の側が開き直せます。
+    pub async fn console_stop(&self) {
+        let mut slot = self.console.lock().await;
+        let console = slot.console.take();
+        slot.holder = None;
+        drop(slot);
+
+        if let Some(console) = console {
+            console.close().await;
+            self.diag.info(Stage::Reach, None, "端末を止めました");
+        }
+        let _ = self.console_changed.send(None);
+    }
+
     // --- 読み取り -----------------------------------------------------------
 
     pub async fn list_dir(&self, actor: Actor, path: &str) -> Result<Vec<DirEntry>, EngineError> {
@@ -403,6 +528,16 @@ impl Engine {
             path,
             passphrase: secret,
         })
+    }
+}
+
+/// 「別の側が握っています」を組み立てる。**誰が握っているかを名前で返す。**
+fn held_by(holder: Actor) -> EngineError {
+    EngineError::ConsoleHeldByOther {
+        holder: match holder {
+            Actor::Human => "人".to_string(),
+            Actor::Ai => "AI".to_string(),
+        },
     }
 }
 

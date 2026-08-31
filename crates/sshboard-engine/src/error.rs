@@ -14,6 +14,13 @@ pub enum EngineError {
     Connections(String),
     /// 鍵にパスフレーズが要る。**AI は受け取れない**（D14）。
     PassphraseNeeded { id: String },
+    /// 端末を別の側が握っている（D29）。
+    ///
+    /// **同時に触れるのは 1 人。**人と AI が交互に打つと、
+    /// **どちらの意図でもない文字列**がシェルへ入る。
+    ConsoleHeldByOther { holder: String },
+    /// 端末がまだ開いていない。
+    ConsoleNotOpen,
     /// 指した鍵を認証に使えない（公開鍵・鍵ではないファイル）。
     ///
     /// **形式の名前だけを持ちます。**鍵のパスは接続先の情報なので、
@@ -58,6 +65,15 @@ impl fmt::Display for EngineError {
                 f,
                 "{id} の鍵にはパスフレーズが要ります。\
                  sshboard の画面で人が入れてください（AI はパスフレーズを扱いません）"
+            ),
+            EngineError::ConsoleHeldByOther { holder } => write!(
+                f,
+                "端末は{holder}が握っています。**同時に触れるのは 1 人です**（D29）。\
+                 人は画面の［取り返す］でいつでも取り返せます"
+            ),
+            EngineError::ConsoleNotOpen => write!(
+                f,
+                "端末がまだ開いていません。先に開いてから打ってください"
             ),
             EngineError::UnusableKey { id, format } => write!(
                 f,
