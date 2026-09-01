@@ -31,6 +31,9 @@ fn refuse(error: EngineError) -> ErrorData {
         | EngineError::AlreadyConnected { .. }
         | EngineError::UnknownConnection(_)
         | EngineError::PassphraseNeeded { .. }
+        // **許可リストに足せるのは人だけ**（D3）。AI へは「人に頼め」と返す。
+        | EngineError::NotAllowed { .. }
+        | EngineError::Allowlist(_)
         // **指紋を確かめて登録できるのは人だけ。**AI へは「人に頼め」と返す。
         | EngineError::UntrustedHost { .. } => {
             ErrorData::invalid_params(error.to_string(), None)
@@ -265,6 +268,121 @@ impl SshboardMcp {
             .await
             .map_err(refuse)?;
         Ok(format!("wrote {written} bytes to {}", request.remote_path))
+    }
+
+    // --- 許可リストのコマンド（D3） -----------------------------------------
+
+    /// 人が許したコマンドの一覧。**サーバーへは触りません。**
+    ///
+    /// **これが無いと AI は当てずっぽうで呼びます。**呼んで断られた分は
+    /// 記録に残り、人が「本当に要ったもの」を足す材料になります（D3 追記）。
+    #[tool(
+        description = "List the commands a human has allowed sshboard to run for you, with the \
+                       exact text each one runs. This list is empty until a person fills it in - \
+                       that is normal, not a fault. You cannot add to it yourself. Touches no \
+                       remote server."
+    )]
+    pub async fn list_readonly_commands(&self) -> Result<String, ErrorData> {
+        self.show("list_readonly_commands").await?;
+
+        let listed = self.engine()?.readonly_commands().map_err(refuse)?;
+        serde_json::to_string(&serde_json::json!({
+            "commands": listed,
+            // **空だったときに、AI が行き止まりにならないように。**
+            "howToAdd": "A person adds entries to readonly.toml. Ask them; you cannot add any.",
+        }))
+        .map_err(|error| ErrorData::internal_error(error.to_string(), None))
+    }
+
+    /// 許可された 1 本を走らせる（D3）。
+    ///
+    /// **引数で任意の文字列をシェルへ渡す口ではありません。**
+    /// 渡せるのは一覧の識別子だけで、走るのは人が書いた文字列そのものです。
+    #[tool(
+        description = "Run one of the commands a human listed in sshboard's allowlist, chosen by \
+                       its id. You cannot pass a command line, arguments, or a shell string - only \
+                       an id from list_readonly_commands. If the id is not on the list it is \
+                       refused and the refusal is shown to the person and written down; ask them \
+                       to add it rather than looking for another way in."
+    )]
+    pub async fn run_readonly(
+        &self,
+        Parameters(request): Parameters<ReadonlyCommandId>,
+    ) -> Result<String, ErrorData> {
+        let ran = self
+            .engine()?
+            .run_readonly(Actor::Ai, &request.command_id)
+            .await
+            .map_err(refuse)?;
+
+        let (out, out_cut) = capped(ran.out);
+        let (err, err_cut) = capped(ran.err);
+        serde_json::to_string(&serde_json::json!({
+            "commandId": request.command_id,
+            "stdout": out,
+            // **空とは限らないし、空でも失敗しているとは限らない。**
+            "stderr": err,
+            // **返してこないサーバーもある。**分からないことを 0 と言わない。
+            "exitCode": ran.status,
+            "outputWasTruncated": out_cut || err_cut,
+        }))
+        .map_err(|error| ErrorData::internal_error(error.to_string(), None))
+    }
+}
+
+/// 1 回の出力で返す上限。**AI の文脈を丸ごと食わせない。**
+/// 実測でここに当たったら、分割して返す形を入れて上げる（YAGNI）。
+const MAX_OUTPUT_BYTES: usize = 256 * 1024;
+
+/// 長い出力を切る。**切ったことを隠しません**（呼ぶ側が印を返します）。
+fn capped(text: String) -> (String, bool) {
+    if text.len() <= MAX_OUTPUT_BYTES {
+        return (text, false);
+    }
+
+    // 文字の途中で切らない。**壊れた文字を返すと、原因の分からない化けになる。**
+    let mut end = MAX_OUTPUT_BYTES;
+    while end > 0 && !text.is_char_boundary(end) {
+        end -= 1;
+    }
+    (text[..end].to_string(), true)
+}
+
+#[derive(Debug, Deserialize, rmcp::schemars::JsonSchema)]
+#[schemars(crate = "rmcp::schemars")]
+pub struct ReadonlyCommandId {
+    /// `list_readonly_commands` が返す識別子。**コマンドそのものではありません。**
+    pub command_id: String,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{capped, MAX_OUTPUT_BYTES};
+
+    #[test]
+    fn short_output_comes_back_whole() {
+        let (text, cut) = capped("uptime".to_string());
+
+        assert_eq!(text, "uptime");
+        assert!(!cut);
+    }
+
+    #[test]
+    fn long_output_is_cut_and_says_so() {
+        let (text, cut) = capped("a".repeat(MAX_OUTPUT_BYTES + 10));
+
+        assert_eq!(text.len(), MAX_OUTPUT_BYTES);
+        assert!(cut, "切ったことを伝えていない");
+    }
+
+    #[test]
+    fn cutting_never_splits_a_character_in_half() {
+        // **化けた文字を返すと、原因が出力なのか通信なのか分からなくなる。**
+        let (text, cut) = capped("あ".repeat(MAX_OUTPUT_BYTES));
+
+        assert!(cut);
+        assert!(text.len() <= MAX_OUTPUT_BYTES);
+        assert!(text.chars().all(|c| c == 'あ'), "文字が壊れている");
     }
 }
 

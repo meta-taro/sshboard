@@ -11,6 +11,7 @@ sshboard-band = { path = "../sshboard-band" }
 sshboard-connections = { path = "../sshboard-connections" }
 sshboard-credentials = { path = "../sshboard-credentials" }
 sshboard-diag = { path = "../sshboard-diag" }
+sshboard-readonly = { path = "../sshboard-readonly" }
 sshboard-ssh = { path = "../sshboard-ssh" }
 sshboard-stream = { path = "../sshboard-stream" }
 tokio = { workspace = true, features = ["fs"] }

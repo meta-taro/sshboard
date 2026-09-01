@@ -1,7 +1,7 @@
 # プロジェクトステータス — sshboard
 
 - **現在フェーズ**: Phase 0 は技術項目を抜けた。**Phase 1 に入っています**
-- **最終更新**: 2026-08-30
+- **最終更新**: 2026-09-01
 
 ## いまの状態を一言で
 
@@ -25,14 +25,15 @@ Phase 0 の 5 本は、実機と Windows 目視を除いてすべて通りまし
 | `crates/sshboard-ssh` | SSH 1 本の上の `exec` / `sftp` / `tail -f`。ホスト鍵の検証。**書き込みの囲い**（D22） |
 | `crates/sshboard-engine` | **GUI と MCP が共有する実行体**（PRD §4-1）。接続を複数持ち、**1 本残らずタブに出す**（D25）。手元へ落とす側は**黙って上書きしない**（D27） |
 | `crates/sshboard-diag` | 何が起きたかの記録。**人にも AI にも同じものを見せる**。接続先を入れない |
-| `crates/sshboard-mcp` | 同居 MCP・**合言葉必須**（D23）。19 本のツール（下記） |
+| `crates/sshboard-readonly` | **AI が呼べるコマンドの許可リスト**（D3）。**既定は空**・断った分を追記で残す |
+| `crates/sshboard-mcp` | 同居 MCP・**合言葉必須**（D23）。21 本のツール（下記） |
 | `apps/desktop` | SvelteKit + Tauri 2。**ファイル 2 ペイン（上げ下ろし両方）**・**端末タブ（D29・ロックと停止つき）**・接続タブ・接続管理・帯・診断・11 言語・テーマ・**文字サイズ 4 段** |
 | `tools/test-server` | 手元の AlmaLinux 9 sshd。`/var/log` の権限・EUC-JP のログ・色付きの成長ログを再現 |
 | `tools/ssh-probe` | 002 / 003 の確認コマンド（**製品ではない**。D6 が決まったので役目は終わり） |
 | `tools/check-005.sh` | 005 の確認スクリプト |
 | `.github/workflows/ci.yml` | format / clippy / test |
 
-## MCP のツール（19 本）
+## MCP のツール（21 本）
 
 > **数え直しました**（2026-08-30）。`capture_window` を足す前は **15 本**で、
 > それまで「16 本」と書いていたのは**元から 1 つ多い**誤りでした。
@@ -44,8 +45,12 @@ Phase 0 の 5 本は、実機と Windows 目視を除いてすべて通りまし
 | `session_status` / **`diagnostics`** | `list_directory` / `read_file` |
 | **`capture_window`**（画面を撮る・既定で伏せる・D26） | **`console_open` / `console_type` / `console_stop`**（人と AI が共有する端末・D29） |
 | `list_connections` / `register_connection` / `mark_connection` | **`make_directory` / `upload_file` / `write_file`**（囲いの中だけ・D22） |
+| **`list_readonly_commands`**（人が許した一覧・**既定は空**） | **`run_readonly`**（許可リストの識別子だけ・D3） |
 
 **`run_command` 相当は 1 本もありません**（D3）。
+`run_readonly` が受け取るのは**識別子だけ**で、引数のスロットがありません。
+**既定の許可リストは空**なので、人が `readonly.toml` を書くまで 1 本も走りません。
+ただし **「本当に読み取り専用か」を製品は検証できません** — 走るのは人が書いた文字列です。
 **消す・動かす・権限を変える・sudo もありません**（Phase 2 のまま）。
 どちらも**ツール一覧をテストで見張っています。**
 
@@ -54,10 +59,10 @@ Phase 0 の 5 本は、実機と Windows 目視を除いてすべて通りまし
 
 ## テスト状況
 
-**Rust 204 ＋ フロント 49 ＝ 253 本。全部通っています。**（手元のテスト用サーバーを建てた状態）
+**Rust 235 ＋ フロント 49 ＝ 284 本。全部通っています。**（手元のテスト用サーバーを建てた状態）
 
 ```
-cargo test --workspace                                 →  204 passed; 0 failed
+cargo test --workspace                                 →  235 passed; 0 failed
 cargo fmt --all -- --check                             →  差分なし
 cargo clippy --workspace --all-targets -- -D warnings  →  警告なし
 pnpm --filter desktop check                            →  248 files, 0 errors, 0 warnings
@@ -166,6 +171,9 @@ pnpm --filter desktop test                             →   49 passed
   **画面での操作は人が見るまで分かりません**（D27・下の「人にしかできない工程」）
 - **画面の端末は、タブを離れると表示が消えます**（シェルは生きています）。
   作り直しているため。**巻き戻しが要るなら、xterm の内容を保つ作りに変えます**
+- **許可リストを画面から編集できません**（D3・2026-09-01）。人は `readonly.toml` を
+  手で開いて書きます。**断られたことは帯に出ますが、ファイルの場所は画面に出ていません。**
+  GUI を付けるかは人が決める領域（DESIGN.md）なので、AI が先回りして作っていません
 - **画面のコンポーネントにテストがありません。**型検査と純粋な関数だけで、
   「押したら動くか」は**人が見るまで分かりません**（実際に 3 件の崩れを見逃しました）
 - **`PerSourcePenalties` に当たる可能性**（D24）。製品側の連打防止はまだ入っていません
@@ -236,4 +244,8 @@ pnpm --filter desktop test                             →   49 passed
   **上書きの印が 1 回ごとに戻るか。**ここは人が押さないと分かりません
 - **端末を画面で 1 回打つこと**（D29・2026-09-01 に実装）。
   ［端末を開く］→ 何か打つ →［止める］。**AI が握っている間、入力が締まって見えるか**
+- **`readonly.toml` を書くこと**（D3・2026-09-01 に実装）。
+  **既定は空なので、書くまで AI は 1 本も走らせられません。**これは仕様であって欠陥ではない。
+  何を書けばよいかは、AI が呼んで断られた分が `readonly-refused.log` に溜まってから決まります。
+  **先回りして AI が埋めません**（D3 追記の 4 番目）
 - **push の最終確認**

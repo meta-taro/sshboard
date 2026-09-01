@@ -1,0 +1,18 @@
+[package]
+name = "sshboard-readonly"
+description = "AI が呼べるコマンドの許可リスト（D3）。**既定は空。足すのは人。**"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+sshboard-band = { path = "../sshboard-band" }
+serde = { version = "1", features = ["derive"] }
+toml = "0.8"
+# 拒否の記録に付ける時刻。**すでに依存木に居るもの**を直接依存へ上げただけで、
+# 新しい供給元を増やしていません（Cargo.lock の chrono 0.4.45）。
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+
+[dev-dependencies]
+tempfile = "3"

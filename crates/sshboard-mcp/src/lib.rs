@@ -13,6 +13,6 @@ pub use server::{
     CaptureWindow, MarkConnection, RegisterConnection, SshboardMcp, DEFAULT_ACK_TIMEOUT,
 };
 pub use ssh_tools::{
-    ConnectionId, HowMany, MaybeConnectionId, OpenConsole, RemotePath, TypeIntoConsole, UploadFile,
-    WriteFile,
+    ConnectionId, HowMany, MaybeConnectionId, OpenConsole, ReadonlyCommandId, RemotePath,
+    TypeIntoConsole, UploadFile, WriteFile,
 };

@@ -42,6 +42,17 @@ pub enum EngineError {
         /// 登録済みの指紋。**あるのに食い違っているなら、すり替えの疑い。**
         expected: Option<String>,
     },
+    /// **許可リストに無いコマンド**（D3）。
+    ///
+    /// AI が渡せるのは人が書いた一覧の中の識別子だけです。
+    /// **これは故障ではありません。**足りていないものが 1 つ見つかった、という報せで、
+    /// 断った事実は `readonly-refused.log` に残ります（足す判断は人）。
+    NotAllowed { id: String },
+    /// 許可リストそのものが読めない。
+    ///
+    /// **空として扱いません。**扱うと「許可したのに断られる」になり、
+    /// 原因がファイルの書き間違いだと誰も気づけません。
+    Allowlist(String),
     /// SSH 側の失敗。ホスト鍵の不一致もここに入る。
     Ssh(sshboard_ssh::SshError),
     /// ローカルのファイルが読めない・書けない。
@@ -107,6 +118,17 @@ impl fmt::Display for EngineError {
             } => write!(
                 f,
                 "初めて見るホストです（{algorithm} / {fingerprint}）。確かめて登録してください"
+            ),
+            EngineError::NotAllowed { id } => write!(
+                f,
+                "`{id}` は許可リストにありません。\
+                 sshboard が AI に走らせるのは、人が readonly.toml へ書いたものだけです（D3）。\
+                 断ったことは記録に残りました。**足すかどうかは人が決めます**"
+            ),
+            EngineError::Allowlist(detail) => write!(
+                f,
+                "コマンドの許可リストを読めません: {detail}。\
+                 読めない一覧を空として扱わないので、いまは 1 本も走りません"
             ),
             EngineError::Ssh(error) => write!(f, "{error}"),
             EngineError::Local(detail) => write!(f, "手元のファイルを扱えません: {detail}"),

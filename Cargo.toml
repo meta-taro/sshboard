@@ -10,6 +10,7 @@ members = [
     "crates/sshboard-diag",
     "crates/sshboard-engine",
     "crates/sshboard-mcp",
+    "crates/sshboard-readonly",
     "crates/sshboard-ssh",
     "crates/sshboard-stream",
 ]

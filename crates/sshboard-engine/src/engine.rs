@@ -8,6 +8,7 @@ use sshboard_band::{Actor, Band};
 use sshboard_connections::{ConnectionEntry, Connections};
 use sshboard_credentials::SecretStore;
 use sshboard_diag::{Diagnostics, Stage};
+use sshboard_readonly::{Allowlist, ReadonlyCommand, Refusals};
 use sshboard_ssh::{
     inspect_key, Auth, Console, DirEntry, KeyFacts, KeyFormat, KeyVerdict, Ran, SshSession, Target,
     WriteScope,
@@ -437,6 +438,85 @@ impl Engine {
     /// コマンドを 1 回打つ。**stderr も終了コードも返します**（握り潰さない）。
     pub async fn exec(&self, actor: Actor, command: &str) -> Result<Ran, EngineError> {
         Ok(self.session().await?.exec(actor, command).await?)
+    }
+
+    // --- 許可リストのコマンド（D3） -----------------------------------------
+
+    /// 許可リストの置き場所。**接続一覧と同じディレクトリ。**
+    ///
+    /// 2 か所に置くと、人は「どちらを編集したのか」を追えなくなります。
+    pub fn readonly_path(&self) -> PathBuf {
+        self.beside_connections("readonly.toml")
+    }
+
+    /// 断った事実の置き場所（D3 追記）。
+    pub fn readonly_refusals_path(&self) -> PathBuf {
+        self.beside_connections("readonly-refused.log")
+    }
+
+    fn beside_connections(&self, name: &str) -> PathBuf {
+        self.connections_path
+            .parent()
+            .unwrap_or_else(|| Path::new("."))
+            .join(name)
+    }
+
+    /// 人が許したコマンド全部。**製品は既定を 1 本も持ちません**（D3 追記）。
+    pub fn readonly_commands(&self) -> Result<Vec<ReadonlyCommand>, EngineError> {
+        Ok(self.allowlist()?.commands().to_vec())
+    }
+
+    /// 許可された 1 本を走らせる（D3）。
+    ///
+    /// **AI が渡せるのは識別子だけです。**引数で文字列がシェルへ渡る口はありません。
+    /// 走るのは、人が `readonly.toml` に書いた文字列そのものです。
+    ///
+    /// **許可の判定はサーバーへ触る前に済ませます。**繋がっていないことより先に
+    /// 「許可されていない」を返すのは、繋がった瞬間だけ何でも通る作りを
+    /// テストで捕まえられるようにするためです。
+    pub async fn run_readonly(&self, actor: Actor, id: &str) -> Result<Ran, EngineError> {
+        let allowlist = self.allowlist()?;
+
+        let Some(command) = allowlist.get(id) else {
+            return Err(self.refuse_readonly(actor, id).await);
+        };
+
+        // 帯へは `exec` が `$ ...` を出します。**二重に出しません。**
+        self.exec(actor, &command.run).await
+    }
+
+    fn allowlist(&self) -> Result<Allowlist, EngineError> {
+        Allowlist::load_or_empty(&self.readonly_path())
+            .map_err(|error| EngineError::Allowlist(error.to_string()))
+    }
+
+    /// 断って、**断ったことを残す**（D3 追記）。
+    ///
+    /// 記録できなくても帯へ出せなくても、**断るのは断ります。**
+    /// 「記録できないから通す」が、ここでいちばんやってはいけない転び方です。
+    async fn refuse_readonly(&self, actor: Actor, id: &str) -> EngineError {
+        if let Err(error) = Refusals::at(self.readonly_refusals_path()).record(actor, id) {
+            // 握り潰さない。**記録が落ちたこと自体が、許可リストの育ち方に効く。**
+            self.diag.error(
+                Stage::Exec,
+                None,
+                format!("断った記録を残せませんでした: {error}"),
+                "readonly-refused.log を置くディレクトリの権限を確かめてください",
+            );
+        }
+
+        let told = self
+            .show(
+                actor,
+                &format!("run_readonly `{id}` — 許可リストに無いので断りました"),
+            )
+            .await;
+        if let Err(error) = told {
+            self.diag
+                .warn(Stage::Exec, None, format!("帯へ出せませんでした: {error}"));
+        }
+
+        EngineError::NotAllowed { id: id.to_owned() }
     }
 
     /// ログを追う。**GUI へは生・MCP へは素**（Issue 005）。

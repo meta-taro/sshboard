@@ -20,6 +20,12 @@ pub use open::{Opened, WriteAccess};
 
 pub use sshboard_ssh::{DirEntry, Ran};
 
+/// **AI が呼べるコマンドの許可リスト**（D3）。
+///
+/// 画面も MCP もここから使います。`run_command(cmd)` を作らない代わりに、
+/// **人が書いた一覧の識別子だけ**を AI に渡させます。**既定は空です。**
+pub use sshboard_readonly::{Allowlist, AllowlistError, ReadonlyCommand};
+
 /// 鍵の形式を**中身で**見分ける口（D28）。
 ///
 /// 画面もここから使います。**拡張子で判定する実装を 2 つ持たない**ため

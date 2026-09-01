@@ -5579,6 +5579,7 @@ dependencies = [
  "sshboard-connections",
  "sshboard-credentials",
  "sshboard-diag",
+ "sshboard-readonly",
  "sshboard-ssh",
  "sshboard-stream",
  "tempfile",
@@ -5605,6 +5606,17 @@ dependencies = [
  "tempfile",
  "tokio",
  "tokio-util",
+]
+
+[[package]]
+name = "sshboard-readonly"
+version = "0.0.0"
+dependencies = [
+ "chrono",
+ "serde",
+ "sshboard-band",
+ "tempfile",
+ "toml 0.8.2",
 ]
 
 [[package]]
