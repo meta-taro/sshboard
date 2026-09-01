@@ -38,9 +38,13 @@
 	// --- 端末（D29）------------------------------------------------------------
 	// **同時に触れるのは 1 人。**AI が握っている間、人の入力は締まる。
 	let consoleHost: HTMLDivElement | undefined = $state();
-	let consoleTerm: Terminal | undefined;
+	// **`$state` にする。**そうしないと、文字サイズの効果が
+	// 「端末ができたこと」を追えず、片方だけ取り残される（実際に取り残された）。
+	let consoleTerm = $state<Terminal | undefined>();
 	/** 誰が握っているか。`null` は誰も握っていない。 */
 	let holder = $state<'human' | 'ai' | null>(null);
+	/** **どの接続の端末か。**タブを移しても端末は付いてこない（D25）。 */
+	let consoleOn = $state<string | null>(null);
 	const iHold = $derived(holder === 'human');
 	let diag = $state<DiagEvent[]>([]);
 
@@ -83,13 +87,66 @@
 	}
 
 	let terminalHost: HTMLDivElement | undefined = $state();
-	let terminal: Terminal | undefined;
+	let terminal = $state<Terminal | undefined>();
 
 	// **端末の字も一緒に変える。**xterm.js は自前で描くので `rem` が効かない。
 	// 画面だけ大きくなって端末が小さいままだと、同じ 1 つの道具に見えない。
+	/**
+	 * 端末は**要素が現れてから**作る。
+	 *
+	 * `onMount` で作ろうとすると、そのときのタブが「ファイル」なので
+	 * 貼る先がまだ無く、**一度も作られません**（実際にそうなっていて、
+	 * 帯と出力の面は何も映していませんでした・2026-09-01）。
+	 *
+	 * タブを行き来すると要素が作り直されるので、**同じ端末を貼り直します。**
+	 * 作り直すと、それまでの表示が消えます。
+	 */
+	$effect(() => {
+		const host = consoleHost;
+		if (!host) return;
+		if (!consoleTerm) {
+			// **打てる面。**握っていないときは Rust 側が断るので、
+			// ここで打てること自体は塞がない（断り方で伝える）。
+			consoleTerm = createTerminal(host, textSize.terminalPx, true);
+			consoleTerm.onData((data) => {
+				// **握っていなければ打たない。**往復させて断られるより、
+				// 画面で止める方が速い（Rust 側でも同じ判断をしている）。
+				if (!iHold) return;
+				const bytes = Array.from(new TextEncoder().encode(data));
+				invoke('console_type', { bytes }).catch((error: unknown) => {
+					failure = String(error);
+				});
+			});
+			consoleTerm.onResize(({ cols, rows }) => {
+				invoke('console_resize', { cols, rows }).catch(() => {
+					/* まだ開いていないだけ。**開いてから効く。** */
+				});
+			});
+		} else if (!host.contains(consoleTerm.element ?? null)) {
+			// **貼り直しでは戻らなかった**（実測）。作り直す。
+			// 表示は消えますが、**シェルは Engine 側で生き続けます。**
+			consoleTerm.dispose();
+			consoleTerm = undefined;
+		}
+	});
+
+	$effect(() => {
+		const host = terminalHost;
+		if (!host) return;
+		if (!terminal) {
+			terminal = createTerminal(host, textSize.terminalPx);
+		} else if (!host.contains(terminal.element ?? null)) {
+			terminal.dispose();
+			terminal = undefined;
+		}
+	});
+
 	$effect(() => {
 		const px = textSize.terminalPx;
 		if (terminal) terminal.options.fontSize = px;
+		// **端末タブにも効かせる。**片方だけ変わると、同じ 1 つの道具に見えない
+		// （実際に端末タブだけ取り残されていた）。
+		if (consoleTerm) consoleTerm.options.fontSize = px;
 	});
 
 	/**
@@ -198,44 +255,26 @@
 	onMount(() => {
 		const stops: Array<() => void> = [];
 
-		if (consoleHost) {
-			// **打てる面。**握っていないときは Rust 側が断るので、
-			// ここで打てること自体は塞がない（断り方で伝える）。
-			consoleTerm = createTerminal(consoleHost, textSize.terminalPx, true);
-			consoleTerm.onData((data) => {
-				// **握っていなければ打たない。**往復させて断られるより、
-				// 画面で止める方が速い（Rust 側でも同じ判断をしている）。
-				if (!iHold) return;
-				const bytes = Array.from(new TextEncoder().encode(data));
-				invoke('console_type', { bytes }).catch((error: unknown) => {
-					failure = String(error);
-				});
-			});
-			consoleTerm.onResize(({ cols, rows }) => {
-				invoke('console_resize', { cols, rows }).catch(() => {
-					/* まだ開いていないだけ。**開いてから効く。** */
-				});
-			});
-		}
-
-		invoke<string | null>('console_holder')
-			.then((who) => (holder = who as 'human' | 'ai' | null))
+		type ConsoleState = { holder: 'human' | 'ai' | null; connection: string | null };
+		invoke<ConsoleState>('console_holder')
+			.then((state) => {
+				holder = state.holder;
+				consoleOn = state.connection;
+			})
 			.catch(() => {
 				/* 取れなくても画面は出す */
 			});
 
 		// **AI が握った瞬間に、人の側の入力が締まる**（D29）。
-		listen<'human' | 'ai' | null>('console://holder', (event) => {
-			holder = event.payload;
+		listen<ConsoleState>('console://holder', (event) => {
+			holder = event.payload.holder;
+			consoleOn = event.payload.connection;
 		})
 			.then((stop) => stops.push(stop))
 			.catch(() => {
 				/* 購読できないだけ。**画面は出す。** */
 			});
 
-		if (terminalHost) {
-			terminal = createTerminal(terminalHost, textSize.terminalPx);
-		}
 
 		// **ANSI を落とさずに渡す。**色は人の側にだけ残す（Issue 005）。
 		listen<number[]>('stream://raw', (event) => {
@@ -400,6 +439,11 @@
 			<p class="what">{i18n.t('console.what')}</p>
 			<div class="console-head">
 				<!-- **誰が握っているかを、常に出す。**見えない所で AI が打っている、を作らない。 -->
+				<!-- **どの接続の端末かを常に出す**（D25）。
+				     タブを移しても端末は付いてこないので、書いていないと迷子になる。 -->
+				{#if consoleOn}
+					<span class="on" data-secret>{consoleOn}</span>
+				{/if}
 				<span class="holder" class:ai={holder === 'ai'} class:mine={iHold}>
 					<Icon name={holder ? 'lock' : 'terminal'} size={12} />
 					{holder === 'ai'
@@ -839,6 +883,15 @@
 	.console-head button.danger {
 		border-color: var(--danger);
 		color: var(--danger);
+	}
+
+	.console-head .on {
+		font-family: var(--font-mono);
+		font-size: 0.7rem;
+		padding: 0.15rem 0.4rem;
+		border: 1px solid var(--hairline);
+		border-radius: var(--r-control);
+		color: var(--fg-muted);
 	}
 
 	.holder {

@@ -370,8 +370,16 @@ impl SshboardMcp {
             .console_open(Actor::Ai, cols, rows)
             .await
             .map_err(refuse)?;
+        // **どの接続の端末かを必ず添える**（D25）。
+        // 添えないと、タブを移したあとに「どこへ打っているのか」が分からなくなる。
+        let on = self
+            .engine()?
+            .console_connection()
+            .await
+            .unwrap_or_else(|| "?".to_string());
         Ok(format!(
-            "console opened ({cols}x{rows}). Read the output with read_stream."
+            "console opened on {on} ({cols}x{rows}). Read the output with read_stream. \
+             It stays on {on} even if the focus moves to another connection."
         ))
     }
 

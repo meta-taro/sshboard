@@ -34,6 +34,12 @@ struct Live {
 struct ConsoleSlot {
     console: Option<Console>,
     holder: Option<Actor>,
+    /// **どの接続の端末か**（D25 と噛み合わせる）。
+    ///
+    /// これを持たないと、タブを移したあとの打鍵が**前のサーバーへ行き続け**、
+    /// 画面は別の接続を向いたままになります。**識別子だけ**を持ちます
+    /// （ホスト名は持たない・CLAUDE.md 禁止事項 4）。
+    connection: Option<String>,
 }
 
 /// 開いているもの全部と、いま操作の宛先になっているもの。
@@ -296,6 +302,11 @@ impl Engine {
         self.console.lock().await.holder
     }
 
+    /// **どの接続の端末か。**画面にも MCP にも、これを添えて出します。
+    pub async fn console_connection(&self) -> Option<String> {
+        self.console.lock().await.connection.clone()
+    }
+
     /// 握っている側の変化を受け取る口。**画面が知らないまま AI が打っている、を作らない。**
     pub fn subscribe_console(&self) -> watch::Receiver<Option<Actor>> {
         self.console_changed.subscribe()
@@ -308,12 +319,26 @@ impl Engine {
         cols: u32,
         rows: u32,
     ) -> Result<(), EngineError> {
+        let target = self
+            .active()
+            .await
+            .map(|open| open.id)
+            .ok_or(EngineError::NotConnected)?;
         {
             let slot = self.console.lock().await;
             if let Some(holder) = slot.holder {
                 // 同じ側が開き直すのは、握り直しとして通す。
                 if holder != actor {
                     return Err(held_by(holder));
+                }
+            }
+            // **別の接続では開き直さない**（D25）。
+            // 黙って乗り換えると、打鍵がどちらへ行くのか分からなくなる。
+            if let Some(open_on) = slot.connection.as_deref() {
+                if open_on != target {
+                    return Err(EngineError::ConsoleOnOtherConnection {
+                        id: open_on.to_owned(),
+                    });
                 }
             }
         }
@@ -337,6 +362,7 @@ impl Engine {
         }
         slot.console = Some(console);
         slot.holder = Some(actor);
+        slot.connection = Some(target);
         drop(slot);
 
         let _ = self.console_changed.send(Some(actor));
@@ -388,6 +414,7 @@ impl Engine {
         let mut slot = self.console.lock().await;
         let console = slot.console.take();
         slot.holder = None;
+        slot.connection = None;
         drop(slot);
 
         if let Some(console) = console {

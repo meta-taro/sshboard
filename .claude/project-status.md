@@ -54,10 +54,10 @@ Phase 0 の 5 本は、実機と Windows 目視を除いてすべて通りまし
 
 ## テスト状況
 
-**Rust 203 ＋ フロント 49 ＝ 252 本。全部通っています。**（手元のテスト用サーバーを建てた状態）
+**Rust 204 ＋ フロント 49 ＝ 253 本。全部通っています。**（手元のテスト用サーバーを建てた状態）
 
 ```
-cargo test --workspace                                 →  203 passed; 0 failed
+cargo test --workspace                                 →  204 passed; 0 failed
 cargo fmt --all -- --check                             →  差分なし
 cargo clippy --workspace --all-targets -- -D warnings  →  警告なし
 pnpm --filter desktop check                            →  248 files, 0 errors, 0 warnings
@@ -73,7 +73,7 @@ pnpm --filter desktop test                             →   49 passed
 | `sshboard-connections` | 20 | |
 | `sshboard-diag` | 8 | |
 | `sshboard-ssh` | 59 | 20 |
-| `sshboard-engine` | 30 | 21 |
+| `sshboard-engine` | 31 | 22 |
 | `sshboard-mcp` | 28 | 4 |
 | `sshboard-desktop` | 9 | |
 | **フロント（vitest）** | **49** | |
@@ -164,6 +164,8 @@ pnpm --filter desktop test                             →   49 passed
   分割送信は、実測でそこに当たってから入れます
 - **ダウンロードを人が実際に押していません。**テストは通っていますが、
   **画面での操作は人が見るまで分かりません**（D27・下の「人にしかできない工程」）
+- **画面の端末は、タブを離れると表示が消えます**（シェルは生きています）。
+  作り直しているため。**巻き戻しが要るなら、xterm の内容を保つ作りに変えます**
 - **画面のコンポーネントにテストがありません。**型検査と純粋な関数だけで、
   「押したら動くか」は**人が見るまで分かりません**（実際に 3 件の崩れを見逃しました）
 - **`PerSourcePenalties` に当たる可能性**（D24）。製品側の連打防止はまだ入っていません
@@ -227,7 +229,7 @@ pnpm --filter desktop test                             →   49 passed
 
 ## 人にしかできない工程で、止まっているもの
 
-- **実運用で 1 回上げること。**ここが通らなければ、上の 252 本は意味を持ちません
+- **実運用で 1 回上げること。**ここが通らなければ、上の 253 本は意味を持ちません
 - **macOS の目視**（001 / 005）と **Windows 実機**（001 / 004）
 - **ダウンロードを 1 回押すこと**（D27・2026-08-30 に実装）。
   右のペインでファイルを選び、左の現在地へ落ちるか。同じ名前があるとき断るか。

@@ -798,3 +798,61 @@ async fn stopping_the_console_always_works_and_frees_it() {
     assert_eq!(engine.console_holder().await, Some(Actor::Human));
     engine.console_stop().await;
 }
+
+#[tokio::test]
+async fn a_console_says_which_connection_it_belongs_to() {
+    // **一番危ない食い違い。**サーバー A で端末を開き、タブで B へ切り替えて打つと、
+    // 打鍵は A のシェルへ行く。**画面は B を向いているのに。**
+    //
+    // 端末が「どの接続のものか」を覚えていないと、人も AI も気づけない。
+    if !server_is_up().await {
+        println!("テスト用サーバーが建っていません（想定内・飛ばします）");
+        return;
+    }
+    let dir = tempfile::tempdir().expect("一時ディレクトリ");
+    let engine = engine_at(registry_pair(&dir).await);
+    engine
+        .connect(Actor::Human, "first", None)
+        .await
+        .expect("繋がらない");
+    engine
+        .connect(Actor::Human, "second", None)
+        .await
+        .expect("繋がらない");
+
+    // いまの宛先は second。**first を宛先にしてから端末を開く。**
+    engine.focus("first").await.expect("向けられない");
+    engine
+        .console_open(Actor::Human, 80, 24)
+        .await
+        .expect("開けない");
+    assert_eq!(
+        engine.console_connection().await.as_deref(),
+        Some("first"),
+        "端末がどの接続のものか覚えていない"
+    );
+
+    // タブを second へ移す。**端末は first のまま**でなければならない。
+    engine.focus("second").await.expect("向けられない");
+    assert_eq!(
+        engine.console_connection().await.as_deref(),
+        Some("first"),
+        "宛先を変えたら端末まで別の接続を指してしまった"
+    );
+
+    // **黙って乗り換えない。**別の接続で開こうとしたら、どこで開いているかを言って断る。
+    let refused = engine.console_open(Actor::Human, 80, 24).await;
+    assert!(
+        matches!(refused, Err(EngineError::ConsoleOnOtherConnection { ref id }) if id == "first"),
+        "別の接続へ黙って乗り換えた: {refused:?}"
+    );
+
+    engine.console_stop().await;
+    // 止めたあとは、いまの宛先で開ける。
+    engine
+        .console_open(Actor::Human, 80, 24)
+        .await
+        .expect("止めたあとに開けない");
+    assert_eq!(engine.console_connection().await.as_deref(), Some("second"));
+    engine.console_stop().await;
+}

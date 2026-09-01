@@ -21,6 +21,11 @@ pub enum EngineError {
     ConsoleHeldByOther { holder: String },
     /// 端末がまだ開いていない。
     ConsoleNotOpen,
+    /// 端末は**別の接続**で開いている（D29 ＋ D25）。
+    ///
+    /// **黙って乗り換えない。**タブを移したつもりで、打鍵が前のサーバーへ
+    /// 行き続けるのが一番危ない。
+    ConsoleOnOtherConnection { id: String },
     /// 指した鍵を認証に使えない（公開鍵・鍵ではないファイル）。
     ///
     /// **形式の名前だけを持ちます。**鍵のパスは接続先の情報なので、
@@ -74,6 +79,11 @@ impl fmt::Display for EngineError {
             EngineError::ConsoleNotOpen => write!(
                 f,
                 "端末がまだ開いていません。先に開いてから打ってください"
+            ),
+            EngineError::ConsoleOnOtherConnection { id } => write!(
+                f,
+                "端末は {id} で開いています。**別の接続では開き直しません**（打鍵が\
+                 どちらへ行くのか分からなくなるため）。先に［止める］を押してください"
             ),
             EngineError::UnusableKey { id, format } => write!(
                 f,

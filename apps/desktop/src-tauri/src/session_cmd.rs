@@ -464,8 +464,14 @@ pub fn spawn_console_bridge(app: AppHandle, engine: Arc<Engine>) {
     tauri::async_runtime::spawn(async move {
         let mut watching = engine.subscribe_console();
         while watching.changed().await.is_ok() {
-            let holder = holder_name(*watching.borrow());
-            if let Err(error) = app.emit(CONSOLE_EVENT, holder) {
+            // **借用を `await` へ持ち越さない。**持ち越すと、この橋が
+            // スレッド間で送れなくなる（コンパイラが止めた）。
+            let holder = holder_name(*watching.borrow()).map(|name| name.to_string());
+            let state = ConsoleState {
+                holder,
+                connection: engine.console_connection().await,
+            };
+            if let Err(error) = app.emit(CONSOLE_EVENT, state) {
                 eprintln!("[sshboard] 握りの変化を画面へ渡せません: {error}");
             }
         }
@@ -525,8 +531,23 @@ pub async fn console_stop(engine: State<'_, Arc<Engine>>) -> Result<(), String> 
     Ok(())
 }
 
-/// いま誰が握っているか。**画面を開いた直後に読みます。**
+/// 端末の今。**握っている側と、どの接続のものか**を一緒に返します。
+///
+/// 別々に返すと、画面で組み合わせるときに食い違います（D25 で実際に食い違った）。
+#[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct ConsoleState {
+    /// `"human"` / `"ai"` / `null`。
+    pub holder: Option<String>,
+    /// **どの接続の端末か**（識別子だけ）。
+    pub connection: Option<String>,
+}
+
+/// 端末の今を読む。**画面を開いた直後に読みます。**
 #[tauri::command]
-pub async fn console_holder(engine: State<'_, Arc<Engine>>) -> Result<Option<String>, String> {
-    Ok(holder_name(engine.console_holder().await).map(|name| name.to_string()))
+pub async fn console_holder(engine: State<'_, Arc<Engine>>) -> Result<ConsoleState, String> {
+    Ok(ConsoleState {
+        holder: holder_name(engine.console_holder().await).map(|name| name.to_string()),
+        connection: engine.console_connection().await,
+    })
 }
