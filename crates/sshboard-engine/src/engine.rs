@@ -519,6 +519,40 @@ impl Engine {
         EngineError::NotAllowed { id: id.to_owned() }
     }
 
+    // --- 用途別の読み取り（D3） ---------------------------------------------
+    //
+    // **AI はコマンドを組み立てません。**組み立てるのは `probes`、走らせるのはここ。
+    // 引数を取るものは、**サーバーへ行く前に**足りているかを見ます。
+
+    /// 空き容量。
+    pub async fn disk_usage(&self, actor: Actor) -> Result<Ran, EngineError> {
+        self.exec(actor, &crate::probes::disk_usage()).await
+    }
+
+    /// プロセス一覧。
+    pub async fn process_list(&self, actor: Actor) -> Result<Ran, EngineError> {
+        self.exec(actor, &crate::probes::process_list()).await
+    }
+
+    /// listen しているポート。
+    pub async fn network_listen(&self, actor: Actor) -> Result<Ran, EngineError> {
+        self.exec(actor, &crate::probes::network_listen()).await
+    }
+
+    /// サービスの状態。**名前は囲われます**（`probes`）。
+    pub async fn service_status(&self, actor: Actor, name: &str) -> Result<Ran, EngineError> {
+        let command = crate::probes::service_status(name)
+            .map_err(|missing| EngineError::BadArgument(missing.to_string()))?;
+        self.exec(actor, &command).await
+    }
+
+    /// ログの末尾。**追いかけません**（追うのは [`Engine::follow`]）。
+    pub async fn read_log(&self, actor: Actor, path: &str, lines: u32) -> Result<Ran, EngineError> {
+        let command = crate::probes::read_log(path, lines)
+            .map_err(|missing| EngineError::BadArgument(missing.to_string()))?;
+        self.exec(actor, &command).await
+    }
+
     /// ログを追う。**GUI へは生・MCP へは素**（Issue 005）。
     pub async fn follow(&self, actor: Actor, path: &str, lines: u32) -> Result<(), EngineError> {
         let session = self.session().await?;

@@ -34,6 +34,8 @@ fn refuse(error: EngineError) -> ErrorData {
         // **許可リストに足せるのは人だけ**（D3）。AI へは「人に頼め」と返す。
         | EngineError::NotAllowed { .. }
         | EngineError::Allowlist(_)
+        // 値が足りないだけ。**AI が直せる。**
+        | EngineError::BadArgument(_)
         // **指紋を確かめて登録できるのは人だけ。**AI へは「人に頼め」と返す。
         | EngineError::UntrustedHost { .. } => {
             ErrorData::invalid_params(error.to_string(), None)
@@ -328,6 +330,116 @@ impl SshboardMcp {
         }))
         .map_err(|error| ErrorData::internal_error(error.to_string(), None))
     }
+}
+
+#[tool_router(router = probe_tool_router, vis = "pub")]
+impl SshboardMcp {
+    /// 空き容量（D3・用途別）。
+    #[tool(
+        description = "Report free disk space on the connected server (df). Read-only: sshboard \
+                       builds the command, you cannot alter it."
+    )]
+    pub async fn disk_usage(&self) -> Result<String, ErrorData> {
+        let ran = self.engine()?.disk_usage(Actor::Ai).await.map_err(refuse)?;
+        probe_json("disk_usage", ran)
+    }
+
+    /// プロセス一覧（D3・用途別）。
+    #[tool(
+        description = "List the processes running on the connected server (ps). Read-only: \
+                       sshboard builds the command, you cannot alter it."
+    )]
+    pub async fn process_list(&self) -> Result<String, ErrorData> {
+        let ran = self
+            .engine()?
+            .process_list(Actor::Ai)
+            .await
+            .map_err(refuse)?;
+        probe_json("process_list", ran)
+    }
+
+    /// listen しているポート（D3・用途別）。
+    #[tool(
+        description = "List the TCP ports the connected server is listening on. Falls back to \
+                       netstat where ss is missing. Read-only: sshboard builds the command."
+    )]
+    pub async fn network_listen(&self) -> Result<String, ErrorData> {
+        let ran = self
+            .engine()?
+            .network_listen(Actor::Ai)
+            .await
+            .map_err(refuse)?;
+        probe_json("network_listen", ran)
+    }
+
+    /// サービスの状態（D3・用途別）。
+    #[tool(
+        description = "Show the status of one systemd service on the connected server. You pass \
+                       only the unit name - it is quoted, so it cannot become a second command. \
+                       This reads the status; it does not start, stop or restart anything."
+    )]
+    pub async fn service_status(
+        &self,
+        Parameters(request): Parameters<ServiceName>,
+    ) -> Result<String, ErrorData> {
+        let ran = self
+            .engine()?
+            .service_status(Actor::Ai, &request.service)
+            .await
+            .map_err(refuse)?;
+        probe_json("service_status", ran)
+    }
+
+    /// ログの末尾（D3・用途別）。
+    #[tool(
+        description = "Read the last lines of one log file on the connected server (tail). The \
+                       path is quoted, so it cannot become a command. This returns once - to \
+                       keep watching a file, the person starts a follow on screen."
+    )]
+    pub async fn read_log(
+        &self,
+        Parameters(request): Parameters<ReadLog>,
+    ) -> Result<String, ErrorData> {
+        let ran = self
+            .engine()?
+            .read_log(Actor::Ai, &request.path, request.lines.unwrap_or(200))
+            .await
+            .map_err(refuse)?;
+        probe_json("read_log", ran)
+    }
+}
+
+/// 走らせた結果を返す形。**stderr も終了コードも捨てません。**
+fn probe_json(tool: &str, ran: sshboard_engine::Ran) -> Result<String, ErrorData> {
+    let (out, out_cut) = capped(ran.out);
+    let (err, err_cut) = capped(ran.err);
+    serde_json::to_string(&serde_json::json!({
+        "tool": tool,
+        "stdout": out,
+        // **空とは限らないし、空でも失敗しているとは限らない。**
+        "stderr": err,
+        // **返してこないサーバーもある。**分からないことを 0 と言わない。
+        "exitCode": ran.status,
+        "outputWasTruncated": out_cut || err_cut,
+    }))
+    .map_err(|error| ErrorData::internal_error(error.to_string(), None))
+}
+
+#[derive(Debug, Deserialize, rmcp::schemars::JsonSchema)]
+#[schemars(crate = "rmcp::schemars")]
+pub struct ServiceName {
+    /// systemd のユニット名（`nginx` / `postfix.service`）。
+    pub service: String,
+}
+
+#[derive(Debug, Deserialize, rmcp::schemars::JsonSchema)]
+#[schemars(crate = "rmcp::schemars")]
+pub struct ReadLog {
+    /// サーバー上の絶対パス。
+    pub path: String,
+    /// 末尾から何行返すか。**省略すると 200 行。**
+    #[serde(default)]
+    pub lines: Option<u32>,
 }
 
 /// 1 回の出力で返す上限。**AI の文脈を丸ごと食わせない。**

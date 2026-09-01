@@ -66,7 +66,9 @@ impl SshboardMcp {
             // 帯・出力・接続一覧の口と、サーバーへ触る口。**同じ 1 つのサーバーに載る。**
             tool_router: Self::tool_router()
                 + Self::ssh_tool_router()
-                + Self::console_tool_router(),
+                + Self::console_tool_router()
+                // 用途別の読み取り（D3）。**任意コマンドを作らずに済ませる方の半分。**
+                + Self::probe_tool_router(),
         }
     }
 

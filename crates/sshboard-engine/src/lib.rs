@@ -14,6 +14,12 @@ mod engine;
 mod error;
 mod open;
 
+/// 用途別ツールが打つコマンド（D3）。
+///
+/// **AI はコマンドを組み立てません。**組み立てるのはここで、
+/// 引数は例外なく囲われます（`tests/probes.rs` が見張っています）。
+pub mod probes;
+
 pub use engine::{Engine, OnConflict};
 pub use error::EngineError;
 pub use open::{Opened, WriteAccess};

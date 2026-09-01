@@ -53,6 +53,11 @@ pub enum EngineError {
     /// **空として扱いません。**扱うと「許可したのに断られる」になり、
     /// 原因がファイルの書き間違いだと誰も気づけません。
     Allowlist(String),
+    /// 用途別ツールに渡す値が足りない・使えない。
+    ///
+    /// **空のまま投げると、別のものが返ってきます**（`systemctl status` は
+    /// 名前が無いと全ユニットを吐く）。サーバーへ行く前に断ります。
+    BadArgument(String),
     /// SSH 側の失敗。ホスト鍵の不一致もここに入る。
     Ssh(sshboard_ssh::SshError),
     /// ローカルのファイルが読めない・書けない。
@@ -130,6 +135,7 @@ impl fmt::Display for EngineError {
                 "コマンドの許可リストを読めません: {detail}。\
                  読めない一覧を空として扱わないので、いまは 1 本も走りません"
             ),
+            EngineError::BadArgument(detail) => write!(f, "{detail}"),
             EngineError::Ssh(error) => write!(f, "{error}"),
             EngineError::Local(detail) => write!(f, "手元のファイルを扱えません: {detail}"),
         }
