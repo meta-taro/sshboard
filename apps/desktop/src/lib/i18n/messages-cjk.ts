@@ -124,6 +124,9 @@ export const ko: Catalog = {
 	"files.clear": "선택 해제",
 	// 複数の接続をタブで持つ（D25）
 	"files.another": "다른 연결 열기",
+	'search.label': '찾기', 'search.placeholder': '터미널에서 찾기',
+	'search.next': '다음', 'search.prev': '이전', 'search.close': '닫기',
+	'search.none': '찾을 수 없습니다',
 };
 
 export const zhCN: Catalog = {
@@ -247,6 +250,9 @@ export const zhCN: Catalog = {
 	"files.clear": "取消选择",
 	// 複数の接続をタブで持つ（D25）
 	"files.another": "再开一个连接",
+	'search.label': '查找', 'search.placeholder': '在终端中查找',
+	'search.next': '下一个', 'search.prev': '上一个', 'search.close': '关闭',
+	'search.none': '未找到',
 };
 
 export const zhTW: Catalog = {
@@ -370,4 +376,7 @@ export const zhTW: Catalog = {
 	"files.clear": "取消選擇",
 	// 複数の接続をタブで持つ（D25）
 	"files.another": "再開一個連線",
+	'search.label': '尋找', 'search.placeholder': '在終端機中尋找',
+	'search.next': '下一個', 'search.prev': '上一個', 'search.close': '關閉',
+	'search.none': '找不到',
 };

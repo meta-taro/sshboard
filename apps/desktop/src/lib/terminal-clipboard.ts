@@ -80,6 +80,13 @@ export function isPasteShortcut(event: ShortcutEvent): boolean {
 export interface ClipboardOptions {
 	/** 打てない面（`disableStdin`）では `false`。**既定は打てる面。** */
 	readonly allowPaste?: boolean;
+	/**
+	 * 他の持ち主に先に見せる。**処理したら `true` を返してもらう。**
+	 *
+	 * xterm のキー処理は **1 本しか付けられません。**検索もここを通る必要があり、
+	 * かといってクリップボードが検索を知る筋合いはないので、口だけ開けます。
+	 */
+	readonly handledElsewhere?: (event: ShortcutEvent) => boolean;
 }
 
 /**
@@ -101,6 +108,9 @@ export function attachClipboard(
 	});
 
 	terminal.attachCustomKeyEventHandler((event) => {
+		// **先に他の持ち主へ。**処理されたなら、シェルへは渡さない。
+		if (options.handledElsewhere?.(event)) return false;
+
 		if (isCopyShortcut(event, platform)) {
 			const selected = terminal.getSelection();
 			// 何も選んでいなければ**その組み合わせを塞がない。**

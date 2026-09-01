@@ -124,6 +124,9 @@ export const ptBR: Catalog = {
 	"files.clear": "Limpar a seleção",
 	// 複数の接続をタブで持つ（D25）
 	"files.another": "Abrir outra conexão",
+	'search.label': 'Procurar', 'search.placeholder': 'Procurar no terminal',
+	'search.next': 'Próximo', 'search.prev': 'Anterior', 'search.close': 'Fechar',
+	'search.none': 'Não encontrado',
 };
 
 export const ru: Catalog = {
@@ -247,6 +250,9 @@ export const ru: Catalog = {
 	"files.clear": "Снять выделение",
 	// 複数の接続をタブで持つ（D25）
 	"files.another": "Открыть ещё одно подключение",
+	'search.label': 'Найти', 'search.placeholder': 'Искать в терминале',
+	'search.next': 'Далее', 'search.prev': 'Назад', 'search.close': 'Закрыть',
+	'search.none': 'Не найдено',
 };
 
 export const it: Catalog = {
@@ -370,4 +376,7 @@ export const it: Catalog = {
 	"files.clear": "Annulla la selezione",
 	// 複数の接続をタブで持つ（D25）
 	"files.another": "Apri un'altra connessione",
+	'search.label': 'Cerca', 'search.placeholder': 'Cerca nel terminale',
+	'search.next': 'Successivo', 'search.prev': 'Precedente', 'search.close': 'Chiudi',
+	'search.none': 'Non trovato',
 };

@@ -11,8 +11,9 @@
 	import { LOCALES } from '$lib/i18n/locales';
 	import { textSize } from '$lib/text-size/text-size.svelte';
 	import { theme, type ThemeMode } from '$lib/theme/theme.svelte';
-	import { attachFit, createTerminal, writeChunk } from '$lib/terminal.svelte';
+	import { attachFit, attachSearch, createTerminal, writeChunk } from '$lib/terminal.svelte';
 	import { attachClipboard, browserClipboard, detectPlatform } from '$lib/terminal-clipboard';
+	import { isFindShortcut, type TerminalSearch } from '$lib/terminal-search';
 	import '@xterm/xterm/css/xterm.css';
 	import type { Terminal } from '@xterm/xterm';
 
@@ -63,6 +64,64 @@
 	/** 端末を作り直すときに外すもの。**溜めっぱなしにすると監視が二重に走る。** */
 	let detachConsole: Array<() => void> = [];
 	let detachOutput: Array<() => void> = [];
+
+	// --- 検索 --------------------------------------------------------------------
+	// `⌘F` / `Ctrl+Shift+F`。**素の `Ctrl+F` は端末の「1 文字進む」なので取りません。**
+	type SearchPane = 'console' | 'output';
+	let searchOpen = $state<SearchPane | null>(null);
+	let searchTerm = $state('');
+	/** 打った語が無かったか。**「押したのに何も起きない」を作らないため。** */
+	let searchMissed = $state(false);
+	let searchInput: HTMLInputElement | undefined = $state();
+	let consoleSearch: TerminalSearch | undefined;
+	let outputSearch: TerminalSearch | undefined;
+
+	function searchFor(pane: SearchPane): TerminalSearch | undefined {
+		return pane === 'console' ? consoleSearch : outputSearch;
+	}
+
+	function openSearch(pane: SearchPane) {
+		searchOpen = pane;
+		searchMissed = false;
+		// 開いた先に入力があるので、**そこへ手を渡す。**開いて空振りさせない。
+		tick().then(() => searchInput?.focus());
+	}
+
+	function closeSearch() {
+		// **強調を消してから閉じる。**残ると、いま何を見ているのか分からなくなる。
+		if (searchOpen) searchFor(searchOpen)?.close();
+		searchOpen = null;
+		searchMissed = false;
+	}
+
+	function runSearch(backwards = false) {
+		if (!searchOpen) return;
+		const search = searchFor(searchOpen);
+		if (!search) return;
+		const found = backwards ? search.previous(searchTerm) : search.next(searchTerm);
+		// 空の語は「見つからない」ではなく「まだ何も打っていない」。**区別する。**
+		searchMissed = !found && searchTerm.trim() !== '';
+	}
+
+	function onSearchKeydown(event: KeyboardEvent) {
+		if (event.key === 'Escape') {
+			closeSearch();
+			event.preventDefault();
+		} else if (event.key === 'Enter') {
+			// Shift で戻る。**ブラウザの検索と同じ手つき。**
+			runSearch(event.shiftKey);
+			event.preventDefault();
+		}
+	}
+
+	/** 端末のキー処理は 1 本しか付かないので、検索はここから割り込む。 */
+	function findFrom(pane: SearchPane) {
+		return (event: { type: string; key: string; ctrlKey: boolean; metaKey: boolean; shiftKey: boolean }) => {
+			if (!isFindShortcut(event, platform)) return false;
+			openSearch(pane);
+			return true;
+		};
+	}
 
 	/** 記録を取り直す。**押したときと、診断を開いたときに読む。** */
 	async function loadDiagnostics() {
@@ -142,7 +201,14 @@
 			detachConsole.push(attachFit(consoleTerm, host));
 			// **なぞるだけでコピー**。ショートカットは ⌘C / Ctrl+Shift+C / Ctrl+Shift+V。
 			// **素の Ctrl+C は横取りしません**（走っているものを止められなくなるため）。
-			detachConsole.push(attachClipboard(consoleTerm, clipboard, platform));
+			consoleSearch = attachSearch(consoleTerm, (error: unknown) => {
+				failure = String(error);
+			});
+			detachConsole.push(
+				attachClipboard(consoleTerm, clipboard, platform, {
+					handledElsewhere: findFrom('console')
+				})
+			);
 		} else if (!host.contains(consoleTerm.element ?? null)) {
 			// **貼り直しでは戻らなかった**（実測）。作り直す。
 			// 表示は消えますが、**シェルは Engine 側で生き続けます。**
@@ -161,7 +227,15 @@
 			detachOutput.push(attachFit(terminal, host));
 			// **見るだけの面でも、なぞればコピーできます。**ログを拾うのはここ。
 			// 貼り付けは付けません（`disableStdin` の面から文字が出ると嘘になる）。
-			detachOutput.push(attachClipboard(terminal, clipboard, platform, { allowPaste: false }));
+			outputSearch = attachSearch(terminal, (error: unknown) => {
+				failure = String(error);
+			});
+			detachOutput.push(
+				attachClipboard(terminal, clipboard, platform, {
+					allowPaste: false,
+					handledElsewhere: findFrom('output')
+				})
+			);
 		} else if (!host.contains(terminal.element ?? null)) {
 			detachOutput.forEach((detach) => detach());
 			detachOutput = [];
@@ -361,6 +435,33 @@
 
 <svelte:window onkeydown={onKeydown} />
 
+<!--
+	端末の検索バー。**2 つの面で同じものを出す**ので 1 か所に書く。
+	出したままにしない — 閉じると強調も消える（`closeSearch`）。
+-->
+{#snippet searchBar(pane: SearchPane)}
+	{#if searchOpen === pane}
+		<div class="search-bar">
+			<input
+				bind:this={searchInput}
+				bind:value={searchTerm}
+				oninput={() => runSearch()}
+				onkeydown={onSearchKeydown}
+				placeholder={i18n.t('search.placeholder')}
+				aria-label={i18n.t('search.placeholder')}
+				spellcheck="false"
+			/>
+			<button type="button" onclick={() => runSearch(true)}>{i18n.t('search.prev')}</button>
+			<button type="button" onclick={() => runSearch()}>{i18n.t('search.next')}</button>
+			<!-- **無かったことを言う。**黙って何も起きないと、壊れたのかと思う。 -->
+			{#if searchMissed}
+				<span class="missed" role="status">{i18n.t('search.none')}</span>
+			{/if}
+			<button type="button" onclick={closeSearch}>{i18n.t('search.close')}</button>
+		</div>
+	{/if}
+{/snippet}
+
 <main>
 	<!-- **上の帯は 1 行に収める。**6 段積むと、道具として使う面積が消える。 -->
 	<header>
@@ -500,7 +601,12 @@
 						{i18n.t('console.stop')}
 					</button>
 				{/if}
+				<!-- **押せる所にも置く。**ショートカットだけだと、知らない人には無いのと同じ。 -->
+				<button type="button" onclick={() => openSearch('console')}>
+					{i18n.t('search.label')}
+				</button>
 			</div>
+			{@render searchBar('console')}
 			<div class="terminal shell" class:locked={holder === 'ai'}>
 				<div class="core terminal-core" bind:this={consoleHost}></div>
 			</div>
@@ -558,7 +664,11 @@
 				{i18n.t('stream.start')}
 			</button>
 			<button type="button" onclick={stopStream}>{i18n.t('stream.stop')}</button>
+			<button type="button" onclick={() => openSearch('output')}>
+				{i18n.t('search.label')}
+			</button>
 		</div>
+		{@render searchBar('output')}
 		<div class="terminal shell">
 			<div class="core terminal-core" bind:this={terminalHost}></div>
 		</div>
@@ -863,6 +973,28 @@
 	.stream-head .label {
 		flex: 1;
 		font-size: 0.72rem;
+		color: var(--fg-faint);
+	}
+
+	/* 端末の検索バー。**帯やログの並びに合わせただけ**の仮置き（DESIGN.md）。 */
+	.search-bar {
+		display: flex;
+		align-items: center;
+		gap: 0.45rem;
+		font-size: 0.72rem;
+		color: var(--fg-muted);
+		flex-wrap: wrap;
+	}
+
+	.search-bar input {
+		flex: 1 1 auto;
+		min-width: 0;
+		font-family: var(--font-mono);
+		font-size: 0.72rem;
+	}
+
+	/* **無かったことを、その場に出す。**色に頼らず文字で言う。 */
+	.search-bar .missed {
 		color: var(--fg-faint);
 	}
 

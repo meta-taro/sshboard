@@ -202,6 +202,25 @@ describe('attachClipboard', () => {
 		expect(writeText).toHaveBeenCalledWith('見えている行');
 	});
 
+	test('lets another owner take a key first, without knowing what it is for', () => {
+		// xterm のキー処理は **1 本しか付けられません。**検索もここを通る必要がある。
+		// クリップボード側は「誰かが処理した」しか知りません（検索を知らない）。
+		const terminal = fakeTerminal();
+		const taken: string[] = [];
+		attachClipboard(terminal, { writeText: vi.fn(), readText: vi.fn(), onError: vi.fn() }, 'mac', {
+			handledElsewhere: (event) => {
+				if (event.key !== 'f') return false;
+				taken.push(event.key);
+				return true;
+			}
+		});
+
+		const passedThrough = terminal.press(keydown({ key: 'f', metaKey: true }));
+
+		expect(taken).toEqual(['f']);
+		expect(passedThrough).toBe(false);
+	});
+
 	test('says so when the clipboard refuses, instead of doing nothing', async () => {
 		// **握り潰さない。**押したのに何も起きないと、人は壊れたと思います。
 		const terminal = fakeTerminal();

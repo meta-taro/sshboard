@@ -5,7 +5,10 @@
  * Rust から届いたバイト列をそのまま渡すことだけ。
  */
 import { FitAddon } from '@xterm/addon-fit';
+import { SearchAddon } from '@xterm/addon-search';
 import { Terminal } from '@xterm/xterm';
+
+import { createSearch, type TerminalSearch } from './terminal-search';
 
 /** Phase 0 の確認用。配色・字送りは DESIGN.md で人が決める。 */
 const PLACEHOLDER_THEME = {
@@ -67,6 +70,18 @@ export function attachFit(terminal: Terminal, host: HTMLElement): () => void {
 	const observer = new ResizeObserver(refit);
 	observer.observe(host);
 	return () => observer.disconnect();
+}
+
+/**
+ * 端末に検索を付ける。**探し方も強調も xterm 公式の addon 任せ**（D7）。
+ */
+export function attachSearch(
+	terminal: Terminal,
+	onError: (error: unknown) => void
+): TerminalSearch {
+	const addon = new SearchAddon();
+	terminal.loadAddon(addon);
+	return createSearch(addon, onError);
 }
 
 /**

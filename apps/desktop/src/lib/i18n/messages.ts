@@ -159,6 +159,13 @@ const en = {
 	"files.clear": "Clear the selection",
 	// 複数の接続をタブで持つ（D25）
 	"files.another": "Open another connection",
+	// 端末の検索。**Ctrl+F は端末の「1 文字進む」なので取っていない**
+	'search.label': 'Find',
+	'search.placeholder': 'Find in the terminal',
+	'search.next': 'Next',
+	'search.prev': 'Previous',
+	'search.close': 'Close',
+	'search.none': 'Not found',
 } as const;
 
 export type MessageKey = keyof typeof en;
@@ -318,6 +325,12 @@ const ja: Catalog = {
 	"files.clear": "選択を外す",
 	// 複数の接続をタブで持つ（D25）
 	"files.another": "別の接続を開く",
+	'search.label': '検索',
+	'search.placeholder': '端末の中を検索',
+	'search.next': '次へ',
+	'search.prev': '前へ',
+	'search.close': '閉じる',
+	'search.none': '見つかりません',
 };
 
 import { ko, zhCN, zhTW } from './messages-cjk';

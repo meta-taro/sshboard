@@ -124,6 +124,9 @@ export const de: Catalog = {
 	"files.clear": "Auswahl aufheben",
 	// 複数の接続をタブで持つ（D25）
 	"files.another": "Weitere Verbindung öffnen",
+	'search.label': 'Suchen', 'search.placeholder': 'Im Terminal suchen',
+	'search.next': 'Weiter', 'search.prev': 'Zurück', 'search.close': 'Schließen',
+	'search.none': 'Nicht gefunden',
 };
 
 export const fr: Catalog = {
@@ -247,6 +250,9 @@ export const fr: Catalog = {
 	"files.clear": "Annuler la sélection",
 	// 複数の接続をタブで持つ（D25）
 	"files.another": "Ouvrir une autre connexion",
+	'search.label': 'Rechercher', 'search.placeholder': 'Rechercher dans le terminal',
+	'search.next': 'Suivant', 'search.prev': 'Précédent', 'search.close': 'Fermer',
+	'search.none': 'Introuvable',
 };
 
 export const es: Catalog = {
@@ -370,4 +376,7 @@ export const es: Catalog = {
 	"files.clear": "Quitar la selección",
 	// 複数の接続をタブで持つ（D25）
 	"files.another": "Abrir otra conexión",
+	'search.label': 'Buscar', 'search.placeholder': 'Buscar en la terminal',
+	'search.next': 'Siguiente', 'search.prev': 'Anterior', 'search.close': 'Cerrar',
+	'search.none': 'No encontrado',
 };
