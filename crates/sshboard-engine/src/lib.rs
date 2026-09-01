@@ -24,7 +24,7 @@ pub use engine::{Engine, OnConflict};
 pub use error::EngineError;
 pub use open::{Opened, WriteAccess};
 
-pub use sshboard_ssh::{DirEntry, Ran};
+pub use sshboard_ssh::{DirEntry, FileFacts, Ran};
 
 /// **AI が呼べるコマンドの許可リスト**（D3）。
 ///

@@ -26,14 +26,14 @@ Phase 0 の 5 本は、実機と Windows 目視を除いてすべて通りまし
 | `crates/sshboard-engine` | **GUI と MCP が共有する実行体**（PRD §4-1）。接続を複数持ち、**1 本残らずタブに出す**（D25）。手元へ落とす側は**黙って上書きしない**（D27） |
 | `crates/sshboard-diag` | 何が起きたかの記録。**人にも AI にも同じものを見せる**。接続先を入れない |
 | `crates/sshboard-readonly` | **AI が呼べるコマンドの許可リスト**（D3）。**既定は空**・断った分を追記で残す |
-| `crates/sshboard-mcp` | 同居 MCP・**合言葉必須**（D23）。26 本のツール（下記） |
+| `crates/sshboard-mcp` | 同居 MCP・**合言葉必須**（D23）。29 本のツール（下記） |
 | `apps/desktop` | SvelteKit + Tauri 2。**ファイル 2 ペイン（上げ下ろし両方）**・**端末タブ（D29・ロックと停止つき・なぞってコピー・検索・窓に追従）**・接続タブ・接続管理・帯・診断・11 言語・テーマ・**文字サイズ 4 段** |
 | `tools/test-server` | 手元の AlmaLinux 9 sshd。`/var/log` の権限・EUC-JP のログ・色付きの成長ログを再現 |
 | `tools/ssh-probe` | 002 / 003 の確認コマンド（**製品ではない**。D6 が決まったので役目は終わり） |
 | `tools/check-005.sh` | 005 の確認スクリプト |
 | `.github/workflows/ci.yml` | format / clippy / test |
 
-## MCP のツール（26 本）
+## MCP のツール（29 本）
 
 > **数え直しました**（2026-08-30）。`capture_window` を足す前は **15 本**で、
 > それまで「16 本」と書いていたのは**元から 1 つ多い**誤りでした。
@@ -47,7 +47,8 @@ Phase 0 の 5 本は、実機と Windows 目視を除いてすべて通りまし
 | `list_connections` / `register_connection` / `mark_connection` | **`make_directory` / `upload_file` / `write_file`**（囲いの中だけ・D22） |
 | **`list_readonly_commands`**（人が許した一覧・**既定は空**） | **`run_readonly`**（許可リストの識別子だけ・D3） |
 | | **`disk_usage` / `process_list` / `network_listen`**（引数なし） |
-| | **`service_status` / `read_log`**（**引数は必ず囲う**・D3） |
+| | **`service_status` / `read_log` / `search`**（**引数は必ず囲う**・D3） |
+| | **`stat`**（権限は 8 進数）**/ `runtime_versions`**（無いものは出さない） |
 
 **`run_command` 相当は 1 本もありません**（D3）。
 `run_readonly` が受け取るのは**識別子だけ**で、引数のスロットがありません。
@@ -61,10 +62,10 @@ Phase 0 の 5 本は、実機と Windows 目視を除いてすべて通りまし
 
 ## テスト状況
 
-**Rust 257 ＋ フロント 75 ＝ 332 本。全部通っています。**（手元のテスト用サーバーを建てた状態）
+**Rust 266 ＋ フロント 75 ＝ 341 本。全部通っています。**（手元のテスト用サーバーを建てた状態）
 
 ```
-cargo test --workspace                                 →  257 passed; 0 failed
+cargo test --workspace                                 →  266 passed; 0 failed
 cargo fmt --all -- --check                             →  差分なし
 cargo clippy --workspace --all-targets -- -D warnings  →  警告なし
 pnpm --filter desktop check                            →  248 files, 0 errors, 0 warnings

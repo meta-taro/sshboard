@@ -81,6 +81,55 @@ async fn a_pinned_host_connects_and_runs_a_command() {
 }
 
 #[tokio::test]
+async fn stat_tells_apart_a_directory_and_a_file_and_carries_the_permissions() {
+    // `list_directory` は名前と大きさしか返しません。**権限と更新日時は、
+    // 「なぜ読めないのか」を人にも AI にも説明できる唯一の材料**です。
+    if !server_is_up().await {
+        println!("テスト用サーバーが建っていません（想定内・飛ばします）");
+        return;
+    }
+
+    let session = trusted_session(Band::new()).await;
+
+    let dir = session
+        .stat(Actor::Human, "/etc")
+        .await
+        .expect("/etc を見られない");
+    assert!(dir.is_dir, "実際: {dir:?}");
+
+    let file = session
+        .stat(Actor::Human, "/etc/hostname")
+        .await
+        .expect("/etc/hostname を見られない");
+    assert!(!file.is_dir, "実際: {file:?}");
+    // **8 進数で返す。**`33188` を見せられても、人は読めない。
+    let mode = file.permissions.expect("権限が返っていない");
+    assert!(mode.len() == 4, "8 進数 4 桁ではない: {mode}");
+    assert!(file.modified.is_some(), "更新日時が返っていない");
+}
+
+#[tokio::test]
+async fn stat_says_which_path_was_missing_instead_of_a_bare_failure() {
+    // 「駄目でした」で終わらせない（product-baseline §17）。
+    if !server_is_up().await {
+        println!("テスト用サーバーが建っていません（想定内・飛ばします）");
+        return;
+    }
+
+    let session = trusted_session(Band::new()).await;
+
+    let error = session
+        .stat(Actor::Human, "/etc/there-is-no-such-file")
+        .await
+        .expect_err("無いファイルが通った");
+
+    assert!(
+        error.to_string().contains("there-is-no-such-file"),
+        "どのパスの話か分からない: {error}"
+    );
+}
+
+#[tokio::test]
 async fn a_wrong_pin_is_refused() {
     if !server_is_up().await {
         println!("テスト用サーバーが建っていません（想定内・飛ばします）");

@@ -14,5 +14,5 @@ pub use server::{
 };
 pub use ssh_tools::{
     ConnectionId, HowMany, MaybeConnectionId, OpenConsole, ReadLog, ReadonlyCommandId, RemotePath,
-    ServiceName, TypeIntoConsole, UploadFile, WriteFile,
+    Search, ServiceName, TypeIntoConsole, UploadFile, WriteFile,
 };

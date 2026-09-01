@@ -71,6 +71,91 @@ pub fn service_status(name: &str) -> Result<String, MissingArgument> {
     ))
 }
 
+/// 探して返す件数の上限。**切らないと返ってきません。**
+pub const MAX_SEARCH_HITS: u32 = 500;
+
+/// どこまで潜って探すか。**シンボリックリンクの輪に落ちないため**にも要る。
+const SEARCH_DEPTH: u32 = 8;
+
+/// 名前で探す。
+///
+/// **`/` から探されたら終わりません。**深さと件数の両方を切ります。
+/// `head` で止めるので、`find` は途中で終わります（SIGPIPE）。
+pub fn search_names(root: &str, pattern: &str, hits: u32) -> Result<String, MissingArgument> {
+    if root.trim().is_empty() {
+        return Err(MissingArgument {
+            what: "探す場所"
+        });
+    }
+    if pattern.trim().is_empty() {
+        return Err(MissingArgument {
+            what: "探す名前"
+        });
+    }
+    let hits = clamp_hits(hits);
+    // 読めないディレクトリの苦情は捨てる。**それは「見つからなかった」ではない**ので、
+    // 結果の件数には効きません。
+    Ok(format!(
+        "find {} -maxdepth {SEARCH_DEPTH} -name {} -print 2>/dev/null | head -n {hits}",
+        quote(root),
+        quote(pattern)
+    ))
+}
+
+/// 中身で探す。
+///
+/// `-I` でバイナリを飛ばします。**混ぜると端末が壊れます。**
+/// `-n` は行番号で、これが無いと見つけたあとに人が辿れません。
+pub fn search_content(root: &str, pattern: &str, hits: u32) -> Result<String, MissingArgument> {
+    if root.trim().is_empty() {
+        return Err(MissingArgument {
+            what: "探す場所"
+        });
+    }
+    if pattern.trim().is_empty() {
+        return Err(MissingArgument { what: "探す語" });
+    }
+    let hits = clamp_hits(hits);
+    // `--` を置く。**`-e` で始まる語がオプションとして読まれない。**
+    // フラグは `df` と同じくまとめない。**帯に出て人が読む**ので、
+    // `-rnI` より `-r -n -I` の方が、何が効いているか見て分かる。
+    Ok(format!(
+        "grep -r -n -I -- {} {} 2>/dev/null | head -n {hits}",
+        quote(pattern),
+        quote(root)
+    ))
+}
+
+/// 何が入っていて、どの版か。
+///
+/// **入っていないことは異常ではありません。**`command -v` で在るものだけ尋ねます。
+/// 無いものを走らせて「エラー」を返すと、AI は原因を探しに行って時間を溶かします。
+///
+/// `java` のように**版を標準エラーへ出す**ものがあるので `2>&1` で拾います。
+pub fn runtime_versions() -> String {
+    // 何の上で動いているかは、版と同じくらい効く。
+    let mut command = String::from(
+        ". /etc/os-release 2>/dev/null; printf 'os: %s\\n' \"${PRETTY_NAME:-unknown}\"; ",
+    );
+    command.push_str("for c in ");
+    command.push_str(RUNTIMES.join(" ").as_str());
+    command.push_str(
+        "; do if command -v \"$c\" >/dev/null 2>&1; then \
+         printf '%s: %s\\n' \"$c\" \"$(\"$c\" --version 2>&1 | head -n 1)\"; fi; done",
+    );
+    command
+}
+
+/// 版を尋ねる相手。**`--version` で答えるものだけ**を並べます。
+/// `nginx` / `httpd` は `-v` なので入れません（**苦情を版として返さない**）。
+const RUNTIMES: &[&str] = &[
+    "python3", "node", "npm", "php", "ruby", "perl", "java", "go", "rustc", "psql", "mysql",
+];
+
+fn clamp_hits(hits: u32) -> u32 {
+    hits.clamp(1, MAX_SEARCH_HITS)
+}
+
 /// ログの末尾。**追いかけません**（追うのは `follow`）。
 pub fn read_log(path: &str, lines: u32) -> Result<String, MissingArgument> {
     if path.trim().is_empty() {

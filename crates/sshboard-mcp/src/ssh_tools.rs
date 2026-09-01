@@ -171,6 +171,37 @@ impl SshboardMcp {
             .map_err(|error| ErrorData::internal_error(error.to_string(), None))
     }
 
+    /// 1 件の属性。
+    #[tool(
+        description = "Look at one file or directory on the connected server: size, permissions \
+                       (octal), last modified time and owner ids. Use this when a read failed - \
+                       the permissions usually say why. Owner ids are numbers; sshboard does not \
+                       resolve them to names."
+    )]
+    pub async fn stat(
+        &self,
+        Parameters(request): Parameters<RemotePath>,
+    ) -> Result<String, ErrorData> {
+        let facts = self
+            .engine()?
+            .stat(Actor::Ai, &request.path)
+            .await
+            .map_err(refuse)?;
+
+        serde_json::to_string(&serde_json::json!({
+            "path": facts.path,
+            "isDir": facts.is_dir,
+            "size": facts.size,
+            // **8 進数 4 桁の文字列**（`0644`）。数値で返すと先頭の 0 が落ちる。
+            "permissions": facts.permissions,
+            // UNIX 秒。**返してこないサーバーもある。**
+            "modifiedUnixSeconds": facts.modified,
+            "uid": facts.uid,
+            "gid": facts.gid,
+        }))
+        .map_err(|error| ErrorData::internal_error(error.to_string(), None))
+    }
+
     /// ファイルを読む。
     ///
     /// **UTF-8 でない中身が実在します**（EUC-JP のログ・Issue 002）。
@@ -407,6 +438,66 @@ impl SshboardMcp {
             .map_err(refuse)?;
         probe_json("read_log", ran)
     }
+}
+
+#[tool_router(router = search_tool_router, vis = "pub")]
+impl SshboardMcp {
+    /// 探す（D3・用途別）。
+    #[tool(
+        description = "Search the connected server for files by name, or for text inside files. \
+                       You pass a directory to start from and a pattern - both are quoted, so \
+                       neither can become a command. The search is bounded in depth and in how \
+                       many hits come back, so a search from / will still return."
+    )]
+    pub async fn search(
+        &self,
+        Parameters(request): Parameters<Search>,
+    ) -> Result<String, ErrorData> {
+        let engine = self.engine()?;
+        let hits = request.hits.unwrap_or(100);
+        let ran = if request.in_contents.unwrap_or(false) {
+            engine
+                .search_content(Actor::Ai, &request.path, &request.pattern, hits)
+                .await
+        } else {
+            engine
+                .search_names(Actor::Ai, &request.path, &request.pattern, hits)
+                .await
+        }
+        .map_err(refuse)?;
+
+        probe_json("search", ran)
+    }
+
+    /// 何が入っていて、どの版か（D3・用途別）。
+    #[tool(
+        description = "Report the operating system of the connected server and the versions of \
+                       the language runtimes it has. A runtime that is absent is simply left out \
+                       - that is not a failure, so do not go looking for a cause."
+    )]
+    pub async fn runtime_versions(&self) -> Result<String, ErrorData> {
+        let ran = self
+            .engine()?
+            .runtime_versions(Actor::Ai)
+            .await
+            .map_err(refuse)?;
+        probe_json("runtime_versions", ran)
+    }
+}
+
+#[derive(Debug, Deserialize, rmcp::schemars::JsonSchema)]
+#[schemars(crate = "rmcp::schemars")]
+pub struct Search {
+    /// どこから探すか。サーバー上の絶対パス。
+    pub path: String,
+    /// 名前で探すときはワイルドカード（`*.conf`）、中身で探すときは語。
+    pub pattern: String,
+    /// `true` でファイルの中身を探す。**省略すると名前で探す。**
+    #[serde(default)]
+    pub in_contents: Option<bool>,
+    /// 何件まで返すか。**省略すると 100 件。**
+    #[serde(default)]
+    pub hits: Option<u32>,
 }
 
 /// 走らせた結果を返す形。**stderr も終了コードも捨てません。**

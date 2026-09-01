@@ -127,6 +127,82 @@ fn read_log_holds_the_line_count_inside_something_sane() {
     );
 }
 
+#[test]
+fn searching_by_name_quotes_both_the_place_and_the_pattern() {
+    // **2 つとも囲う。**片方だけ囲って安心するのが、いちばん危ない。
+    let command = probes::search_names("/etc; id", "*.conf; id", 50).expect("引数はある");
+
+    assert!(command.contains("'/etc; id'"), "実際: {command}");
+    assert!(command.contains("'*.conf; id'"), "実際: {command}");
+    let outside = command
+        .replace("'/etc; id'", "")
+        .replace("'*.conf; id'", "");
+    assert!(!outside.contains(';'), "囲いの外に区切りがある: {command}");
+}
+
+#[test]
+fn searching_by_name_stops_instead_of_walking_the_whole_disk() {
+    // **件数を切らないと返ってきません。**`/` から探されたら終わらない。
+    let command = probes::search_names("/etc", "*.conf", 50).expect("引数はある");
+
+    assert!(command.contains("head -n 50"), "実際: {command}");
+    // 深さも切る。**シンボリックリンクの輪に落ちない。**
+    assert!(command.contains("-maxdepth"), "実際: {command}");
+}
+
+#[test]
+fn searching_inside_files_skips_binaries_and_keeps_line_numbers() {
+    let command = probes::search_content("/var/log", "error", 50).expect("引数はある");
+
+    assert!(command.starts_with("grep "), "実際: {command}");
+    // 行番号が無いと、見つけたあとに人が辿れない。
+    assert!(command.contains("-n"), "実際: {command}");
+    // バイナリを混ぜると**端末が壊れます。**
+    assert!(command.contains("-I"), "実際: {command}");
+    assert!(command.contains("head -n 50"), "実際: {command}");
+}
+
+#[test]
+fn searching_inside_files_never_lets_the_pattern_become_an_option() {
+    // `-e` で始まる語を素で渡すと、**grep のオプションとして読まれます。**
+    let command = probes::search_content("/var/log", "-e", 10).expect("引数はある");
+
+    let before = command.split("'-e'").next().expect("囲いの前");
+    assert!(before.contains("--"), "オプションの終わりが無い: {command}");
+}
+
+#[test]
+fn a_search_refuses_when_it_has_nothing_to_look_for() {
+    assert!(probes::search_names("/etc", "", 10).is_err());
+    assert!(probes::search_names("", "*.conf", 10).is_err());
+    assert!(probes::search_content("/var/log", "   ", 10).is_err());
+}
+
+#[test]
+fn a_search_holds_the_result_count_inside_something_sane() {
+    let none = probes::search_names("/etc", "*.conf", 0).expect("引数はある");
+    let huge = probes::search_names("/etc", "*.conf", 10_000_000).expect("引数はある");
+
+    assert!(none.contains("head -n 1"), "実際: {none}");
+    assert!(
+        huge.contains(&format!("head -n {}", probes::MAX_SEARCH_HITS)),
+        "実際: {huge}"
+    );
+}
+
+#[test]
+fn runtime_versions_does_not_call_a_missing_command_a_failure() {
+    // **入っていないことは異常ではありません。**
+    // 「エラーが出た」と返すと、AI は原因を探しに行って時間を溶かします。
+    let command = probes::runtime_versions();
+
+    assert!(command.contains("command -v"), "実際: {command}");
+    // `java` は版を標準エラーへ出す。**拾わないと空に見える。**
+    assert!(command.contains("2>&1"), "実際: {command}");
+    // 何の上で動いているかは、版と同じくらい効く。
+    assert!(command.contains("os-release"), "実際: {command}");
+}
+
 /// 1 件も繋いでいない Engine。
 fn engine_in(dir: &tempfile::TempDir) -> Engine {
     let path = dir.path().join("connections.toml");
@@ -179,6 +255,9 @@ fn no_probe_carries_a_word_that_changes_the_server() {
         probes::network_listen(),
         probes::service_status("nginx").expect("名前はある"),
         probes::read_log("/var/log/messages", 10).expect("パスはある"),
+        probes::search_names("/etc", "*.conf", 10).expect("引数はある"),
+        probes::search_content("/var/log", "error", 10).expect("引数はある"),
+        probes::runtime_versions(),
     ];
 
     for command in all {

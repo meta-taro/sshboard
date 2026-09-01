@@ -10,8 +10,8 @@ use sshboard_credentials::SecretStore;
 use sshboard_diag::{Diagnostics, Stage};
 use sshboard_readonly::{Allowlist, ReadonlyCommand, Refusals};
 use sshboard_ssh::{
-    inspect_key, Auth, Console, DirEntry, KeyFacts, KeyFormat, KeyVerdict, Ran, SshSession, Target,
-    WriteScope,
+    inspect_key, Auth, Console, DirEntry, FileFacts, KeyFacts, KeyFormat, KeyVerdict, Ran,
+    SshSession, Target, WriteScope,
 };
 use sshboard_stream::OutputStream;
 use tokio::sync::{watch, Mutex};
@@ -431,6 +431,11 @@ impl Engine {
         Ok(self.session().await?.list_dir(actor, path).await?)
     }
 
+    /// 1 件の属性。**権限と更新日時は「なぜ読めないのか」を説明する材料。**
+    pub async fn stat(&self, actor: Actor, path: &str) -> Result<FileFacts, EngineError> {
+        Ok(self.session().await?.stat(actor, path).await?)
+    }
+
     pub async fn read_file(&self, actor: Actor, path: &str) -> Result<Vec<u8>, EngineError> {
         Ok(self.session().await?.read_file(actor, path).await?)
     }
@@ -551,6 +556,37 @@ impl Engine {
         let command = crate::probes::read_log(path, lines)
             .map_err(|missing| EngineError::BadArgument(missing.to_string()))?;
         self.exec(actor, &command).await
+    }
+
+    /// 名前で探す。**深さと件数を切ります**（切らないと返ってこない）。
+    pub async fn search_names(
+        &self,
+        actor: Actor,
+        root: &str,
+        pattern: &str,
+        hits: u32,
+    ) -> Result<Ran, EngineError> {
+        let command = crate::probes::search_names(root, pattern, hits)
+            .map_err(|missing| EngineError::BadArgument(missing.to_string()))?;
+        self.exec(actor, &command).await
+    }
+
+    /// 中身で探す。**バイナリは飛ばします**（混ぜると端末が壊れる）。
+    pub async fn search_content(
+        &self,
+        actor: Actor,
+        root: &str,
+        pattern: &str,
+        hits: u32,
+    ) -> Result<Ran, EngineError> {
+        let command = crate::probes::search_content(root, pattern, hits)
+            .map_err(|missing| EngineError::BadArgument(missing.to_string()))?;
+        self.exec(actor, &command).await
+    }
+
+    /// 何が入っていて、どの版か。**入っていないことは異常ではありません。**
+    pub async fn runtime_versions(&self, actor: Actor) -> Result<Ran, EngineError> {
+        self.exec(actor, &crate::probes::runtime_versions()).await
     }
 
     /// ログを追う。**GUI へは生・MCP へは素**（Issue 005）。

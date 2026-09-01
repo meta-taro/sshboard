@@ -554,6 +554,26 @@ pub struct DirEntry {
     pub size: u64,
 }
 
+/// 1 件の属性（`stat`）。
+///
+/// **持つのはサーバー上のパスと属性だけ**で、ホスト名も利用者名も入りません
+/// （PRD §8）。`uid` / `gid` は数値で、**名前は引きません**
+/// （引くには別のコマンドが要り、それは `stat` の仕事ではない）。
+/// **この crate は serde に依存しません。**JSON にするのは MCP 側の仕事です
+/// （`DirEntry` も同じ扱い）。
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FileFacts {
+    pub path: String,
+    pub is_dir: bool,
+    pub size: u64,
+    /// 8 進数 4 桁（`0644`）。**返してこないサーバーもある**ので `Option`。
+    pub permissions: Option<String>,
+    /// 最終更新（UNIX 秒）。**返してこないサーバーもある。**
+    pub modified: Option<u32>,
+    pub uid: Option<u32>,
+    pub gid: Option<u32>,
+}
+
 impl SshSession {
     /// 同じセッションの上に `sftp` を開く。**2 本目の接続を張りません。**
     async fn sftp(&self) -> Result<russh_sftp::client::SftpSession, SshError> {
@@ -588,6 +608,35 @@ impl SshSession {
                 size: entry.metadata().size.unwrap_or(0),
             })
             .collect())
+    }
+
+    /// 1 件の属性を見る。**シンボリックリンクは辿った先**を返します。
+    ///
+    /// `list_dir` は名前と大きさしか返しません。**権限と更新日時は、
+    /// 「なぜ読めないのか」を人にも AI にも説明できる唯一の材料**です。
+    pub async fn stat(&self, actor: Actor, path: &str) -> Result<FileFacts, SshError> {
+        self.show(actor, &format!("stat {path}")).await?;
+
+        let sftp = self.sftp().await?;
+        let metadata = sftp
+            .metadata(path)
+            .await
+            // **どのパスの話かを必ず添える。**「駄目でした」で終わらせない。
+            .map_err(|error| SshError::Command(format!("{path} を見られません: {error}")))?;
+
+        Ok(FileFacts {
+            path: path.to_string(),
+            is_dir: metadata.is_dir(),
+            size: metadata.size.unwrap_or(0),
+            // **8 進数の 4 桁で返す。**`33188` を見せられても人は読めない。
+            // 種別のビットは落として、権限だけを残す。
+            permissions: metadata
+                .permissions
+                .map(|bits| format!("{:04o}", bits & 0o7777)),
+            modified: metadata.mtime,
+            uid: metadata.uid,
+            gid: metadata.gid,
+        })
     }
 
     /// ファイルを丸ごと読む。**バイト列のまま返します。**

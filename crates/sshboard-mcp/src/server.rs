@@ -68,7 +68,8 @@ impl SshboardMcp {
                 + Self::ssh_tool_router()
                 + Self::console_tool_router()
                 // 用途別の読み取り（D3）。**任意コマンドを作らずに済ませる方の半分。**
-                + Self::probe_tool_router(),
+                + Self::probe_tool_router()
+                + Self::search_tool_router(),
         }
     }
 

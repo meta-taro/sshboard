@@ -11,7 +11,7 @@ mod write_scope;
 
 pub use hostkey::{decide, fingerprint, fingerprints_for, SeenHostKey, Trust};
 pub use key_file::{inspect_key, KeyFacts, KeyFormat, KeyVerdict};
-pub use session::{Auth, Console, DirEntry, Ran, SshError, SshSession, Target};
+pub use session::{Auth, Console, DirEntry, FileFacts, Ran, SshError, SshSession, Target};
 /// 遠くのシェルへ渡す引数を囲う。**引数を素で埋め込む経路を作らない。**
 pub use shell::quote;
 pub use write_scope::{Refusal, WriteScope};
