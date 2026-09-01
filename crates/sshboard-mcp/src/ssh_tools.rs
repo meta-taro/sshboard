@@ -324,3 +324,91 @@ pub struct WriteFile {
     /// 書く中身。
     pub content: String,
 }
+
+// --- 端末（D29） -------------------------------------------------------------
+
+/// 一度に打てる上限。**貼り付け事故を小さくする。**
+const MAX_TYPED: usize = 4096;
+
+/// `console_open` の引数。
+#[derive(Debug, Deserialize, rmcp::schemars::JsonSchema)]
+#[schemars(crate = "rmcp::schemars")]
+pub struct OpenConsole {
+    /// 桁数。**省略すると 80。**
+    pub cols: Option<u32>,
+    /// 行数。**省略すると 24。**
+    pub rows: Option<u32>,
+}
+
+/// `console_type` の引数。
+#[derive(Debug, Deserialize, rmcp::schemars::JsonSchema)]
+#[schemars(crate = "rmcp::schemars")]
+pub struct TypeIntoConsole {
+    /// 打ち込む文字列。**改行を入れないと実行されません**（本物の端末と同じ）。
+    pub text: String,
+}
+
+#[tool_router(router = console_tool_router, vis = "pub")]
+impl SshboardMcp {
+    /// 端末を握る（D29）。
+    #[tool(
+        description = "Take hold of the interactive console on the connected server and open a \
+                       shell. sshboard shares one console between you and the person at the \
+                       screen, and only one side may type at a time - while you hold it, their \
+                       typing is locked, and they see on screen that you are holding it. \
+                       They can take it back at any moment, and their Stop always works. If they \
+                       do, your next keystroke is refused: that is them intervening, not a fault. \
+                       Say so and ask, rather than trying to take it back."
+    )]
+    pub async fn console_open(
+        &self,
+        Parameters(request): Parameters<OpenConsole>,
+    ) -> Result<String, ErrorData> {
+        let cols = request.cols.unwrap_or(80).clamp(20, 500);
+        let rows = request.rows.unwrap_or(24).clamp(5, 200);
+        self.engine()?
+            .console_open(Actor::Ai, cols, rows)
+            .await
+            .map_err(refuse)?;
+        Ok(format!(
+            "console opened ({cols}x{rows}). Read the output with read_stream."
+        ))
+    }
+
+    /// 打ち込む。**握っているときだけ。**
+    #[tool(
+        description = "Type into the console you are holding. The text goes to the shell exactly \
+                       as given - include a newline to run it. Read what came back with \
+                       read_stream. Refused if the person has taken the console back."
+    )]
+    pub async fn console_type(
+        &self,
+        Parameters(request): Parameters<TypeIntoConsole>,
+    ) -> Result<String, ErrorData> {
+        let bytes = request.text.as_bytes();
+        if bytes.len() > MAX_TYPED {
+            return Err(ErrorData::invalid_params(
+                format!("一度に打てるのは {MAX_TYPED} バイトまでです"),
+                None,
+            ));
+        }
+        self.engine()?
+            .console_type(Actor::Ai, bytes)
+            .await
+            .map_err(refuse)?;
+        Ok(format!(
+            "typed {} bytes. Read the output with read_stream.",
+            bytes.len()
+        ))
+    }
+
+    /// 手を離す（D29）。**握ったまま離さない、を作らない。**
+    #[tool(
+        description = "Let go of the console and close the shell. Do this when you are done, so \
+                       the person is not left locked out. Never fails."
+    )]
+    pub async fn console_stop(&self) -> Result<String, ErrorData> {
+        self.engine()?.console_stop().await;
+        Ok("console released".to_string())
+    }
+}

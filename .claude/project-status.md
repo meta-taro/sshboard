@@ -25,14 +25,14 @@ Phase 0 の 5 本は、実機と Windows 目視を除いてすべて通りまし
 | `crates/sshboard-ssh` | SSH 1 本の上の `exec` / `sftp` / `tail -f`。ホスト鍵の検証。**書き込みの囲い**（D22） |
 | `crates/sshboard-engine` | **GUI と MCP が共有する実行体**（PRD §4-1）。接続を複数持ち、**1 本残らずタブに出す**（D25）。手元へ落とす側は**黙って上書きしない**（D27） |
 | `crates/sshboard-diag` | 何が起きたかの記録。**人にも AI にも同じものを見せる**。接続先を入れない |
-| `crates/sshboard-mcp` | 同居 MCP・**合言葉必須**（D23）。16 本のツール（下記） |
+| `crates/sshboard-mcp` | 同居 MCP・**合言葉必須**（D23）。19 本のツール（下記） |
 | `apps/desktop` | SvelteKit + Tauri 2。**ファイル 2 ペイン（上げ下ろし両方）**・**端末タブ（D29・ロックと停止つき）**・接続タブ・接続管理・帯・診断・11 言語・テーマ・**文字サイズ 4 段** |
 | `tools/test-server` | 手元の AlmaLinux 9 sshd。`/var/log` の権限・EUC-JP のログ・色付きの成長ログを再現 |
 | `tools/ssh-probe` | 002 / 003 の確認コマンド（**製品ではない**。D6 が決まったので役目は終わり） |
 | `tools/check-005.sh` | 005 の確認スクリプト |
 | `.github/workflows/ci.yml` | format / clippy / test |
 
-## MCP のツール（16 本）
+## MCP のツール（19 本）
 
 > **数え直しました**（2026-08-30）。`capture_window` を足す前は **15 本**で、
 > それまで「16 本」と書いていたのは**元から 1 つ多い**誤りでした。
@@ -42,7 +42,7 @@ Phase 0 の 5 本は、実機と Windows 目視を除いてすべて通りまし
 |---|---|
 | `ping` / `read_stream` | `connect` / `disconnect` / `focus_connection` |
 | `session_status` / **`diagnostics`** | `list_directory` / `read_file` |
-| **`capture_window`**（画面を撮る・既定で伏せる・D26） | |
+| **`capture_window`**（画面を撮る・既定で伏せる・D26） | **`console_open` / `console_type` / `console_stop`**（人と AI が共有する端末・D29） |
 | `list_connections` / `register_connection` / `mark_connection` | **`make_directory` / `upload_file` / `write_file`**（囲いの中だけ・D22） |
 
 **`run_command` 相当は 1 本もありません**（D3）。
@@ -102,8 +102,8 @@ pnpm --filter desktop test                             →   49 passed
    **接続タブで鍵のパスを書けば繋がります**（D28）。`.ppk` のままで構いません。
    形式は製品が中身を見て判定し、パスフレーズが要るなら聞きます。
    **puttygen も ssh-add も要りません。**
-2. **端末を人が実際に打ってみる**（D29）。SSH・Engine・画面まで通ったが、
-   **人が打った確認がまだ**。MCP の口（AI 側）も残っている
+2. **端末を人が画面で打ってみる**（D29）。AI 側は通しで動いた。
+   **人の側は、人が押すまで分からない**
 3. **`run_readonly`**（許可リスト方式）。`df` / `ps` / `systemctl status` 相当
 4. **Windows 実機**（001 / 004）。CI はビルドとテストを回すが、画面は見られない
 5. **画面のキャプチャを MCP へ（D26）— 着手したところで止まっています。**
@@ -170,8 +170,8 @@ pnpm --filter desktop test                             →   49 passed
 - **Windows の ssh-agent は実機で未確認。**コンパイルは CI で通しますが、
   名前付きパイプ / Pageant に実際に繋がるかは**人が実機で見るまで分かりません**
 - **アイコン・帯・端末の見た目は仮置き**（DESIGN.md）。人が決め直す前提
-- **端末は画面まで通りました**（D29）。タブが出て、握りの表示・［端末を開く］
-  ［取り返す］［止める］が並びます。**人が実際に打った確認と、MCP の口はまだ**
+- **端末は通しで動きました**（D29）。AI が MCP から握って `cal` を打ち、
+  プロンプトごと返りました。**人が画面で打った確認はまだ**（人にしかできない）
 - **Windows 11 の Snap Layouts は落とす**（D17）。dbboard も解いていないので揃える
 - **文字コードを変換していません。**EUC-JP のログは実在します（実機・手元のサーバーで再現済み）。
   読み出しは U+FFFD へ置換したうえで「置換した」と伝えるだけで、変換はしていません
@@ -232,4 +232,6 @@ pnpm --filter desktop test                             →   49 passed
 - **ダウンロードを 1 回押すこと**（D27・2026-08-30 に実装）。
   右のペインでファイルを選び、左の現在地へ落ちるか。同じ名前があるとき断るか。
   **上書きの印が 1 回ごとに戻るか。**ここは人が押さないと分かりません
+- **端末を画面で 1 回打つこと**（D29・2026-09-01 に実装）。
+  ［端末を開く］→ 何か打つ →［止める］。**AI が握っている間、入力が締まって見えるか**
 - **push の最終確認**

@@ -170,6 +170,11 @@ async fn the_server_advertises_only_the_phase_zero_tools() {
         "focus_connection",
         // **AI が自分で画面を見る口**（D26）。型検査は崩れを 1 件も止められなかった。
         "capture_window",
+        // **人と AI が共有する端末**（D29 が D3 を条件つきで覆した）。
+        // 投げっぱなしの `run_command` ではなく、**人が見ていて止められる対話コンソール**。
+        "console_open",
+        "console_type",
+        "console_stop",
     ] {
         assert!(
             listed.contains(expected),

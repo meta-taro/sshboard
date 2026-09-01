@@ -64,7 +64,9 @@ impl SshboardMcp {
             capture: None,
             ack_timeout,
             // 帯・出力・接続一覧の口と、サーバーへ触る口。**同じ 1 つのサーバーに載る。**
-            tool_router: Self::tool_router() + Self::ssh_tool_router(),
+            tool_router: Self::tool_router()
+                + Self::ssh_tool_router()
+                + Self::console_tool_router(),
         }
     }
 

@@ -12,4 +12,7 @@ pub use http::{new_token, serve, McpEndpoint, ServeParts, MCP_PATH};
 pub use server::{
     CaptureWindow, MarkConnection, RegisterConnection, SshboardMcp, DEFAULT_ACK_TIMEOUT,
 };
-pub use ssh_tools::{ConnectionId, HowMany, MaybeConnectionId, RemotePath, UploadFile, WriteFile};
+pub use ssh_tools::{
+    ConnectionId, HowMany, MaybeConnectionId, OpenConsole, RemotePath, TypeIntoConsole, UploadFile,
+    WriteFile,
+};
