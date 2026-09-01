@@ -4,6 +4,7 @@
  * **ANSI の解釈を自前で書かない**（D7）。ここがやるのは、
  * Rust から届いたバイト列をそのまま渡すことだけ。
  */
+import { FitAddon } from '@xterm/addon-fit';
 import { Terminal } from '@xterm/xterm';
 
 /** Phase 0 の確認用。配色・字送りは DESIGN.md で人が決める。 */
@@ -36,6 +37,36 @@ export function createTerminal(host: HTMLElement, fontSize = 12, typable = false
 	});
 	terminal.open(host);
 	return terminal;
+}
+
+/**
+ * 端末を入れ物の大きさに合わせ、**その後もついていくようにする。**
+ *
+ * これが無いと xterm.js は **80×24 のまま**で、窓を広げても増えません
+ * （実際にそうなっていました・2026-09-01）。桁数が合わないと、
+ * サーバー側が折り返しの位置を誤り、**表示が崩れます。**
+ *
+ * 大きさが変わると `onResize` が出るので、そこから `console_resize` が
+ * サーバーへ伝わります。**配線はあったのに、変わる元が無かった。**
+ */
+export function attachFit(terminal: Terminal, host: HTMLElement): () => void {
+	const addon = new FitAddon();
+	terminal.loadAddon(addon);
+
+	const refit = () => {
+		try {
+			addon.fit();
+		} catch {
+			// **要素がまだ 0px のときに投げます。**タブを切り替えた直後がこれ。
+			// 次の通知で正しい大きさが来るので、ここは待つのが正しい。
+			// 握り潰しに見えますが、**捨てているのは「まだ測れない」という事実だけ**です。
+		}
+	};
+
+	refit();
+	const observer = new ResizeObserver(refit);
+	observer.observe(host);
+	return () => observer.disconnect();
 }
 
 /**

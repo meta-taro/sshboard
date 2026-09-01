@@ -11,7 +11,8 @@
 	import { LOCALES } from '$lib/i18n/locales';
 	import { textSize } from '$lib/text-size/text-size.svelte';
 	import { theme, type ThemeMode } from '$lib/theme/theme.svelte';
-	import { createTerminal, writeChunk } from '$lib/terminal.svelte';
+	import { attachFit, createTerminal, writeChunk } from '$lib/terminal.svelte';
+	import { attachClipboard, browserClipboard, detectPlatform } from '$lib/terminal-clipboard';
 	import '@xterm/xterm/css/xterm.css';
 	import type { Terminal } from '@xterm/xterm';
 
@@ -47,6 +48,21 @@
 	let consoleOn = $state<string | null>(null);
 	const iHold = $derived(holder === 'human');
 	let diag = $state<DiagEvent[]>([]);
+
+	// --- コピー & ペースト --------------------------------------------------------
+	// **なぞるだけでコピー**は、端末では当たり前の挙動。無いと毎回ためらう。
+	// ショートカットは `terminal-clipboard.ts` を見ること（**Ctrl+C は横取りしない**）。
+	const platform = detectPlatform(
+		// `navigator.platform` は古い口だが、**要るのは「⌘ があるか」だけ。**
+		typeof navigator === 'undefined' ? '' : navigator.platform
+	);
+	const clipboard = browserClipboard((error: unknown) => {
+		// 押したのに何も起きない、を作らない。**断られたら画面に出す。**
+		failure = String(error);
+	});
+	/** 端末を作り直すときに外すもの。**溜めっぱなしにすると監視が二重に走る。** */
+	let detachConsole: Array<() => void> = [];
+	let detachOutput: Array<() => void> = [];
 
 	/** 記録を取り直す。**押したときと、診断を開いたときに読む。** */
 	async function loadDiagnostics() {
@@ -122,9 +138,16 @@
 					/* まだ開いていないだけ。**開いてから効く。** */
 				});
 			});
+			// **窓に追従させる。**無いと 80×24 で固定され、上の `onResize` も一度も出ない。
+			detachConsole.push(attachFit(consoleTerm, host));
+			// **なぞるだけでコピー**。ショートカットは ⌘C / Ctrl+Shift+C / Ctrl+Shift+V。
+			// **素の Ctrl+C は横取りしません**（走っているものを止められなくなるため）。
+			detachConsole.push(attachClipboard(consoleTerm, clipboard, platform));
 		} else if (!host.contains(consoleTerm.element ?? null)) {
 			// **貼り直しでは戻らなかった**（実測）。作り直す。
 			// 表示は消えますが、**シェルは Engine 側で生き続けます。**
+			detachConsole.forEach((detach) => detach());
+			detachConsole = [];
 			consoleTerm.dispose();
 			consoleTerm = undefined;
 		}
@@ -135,7 +158,13 @@
 		if (!host) return;
 		if (!terminal) {
 			terminal = createTerminal(host, textSize.terminalPx);
+			detachOutput.push(attachFit(terminal, host));
+			// **見るだけの面でも、なぞればコピーできます。**ログを拾うのはここ。
+			// 貼り付けは付けません（`disableStdin` の面から文字が出ると嘘になる）。
+			detachOutput.push(attachClipboard(terminal, clipboard, platform, { allowPaste: false }));
 		} else if (!host.contains(terminal.element ?? null)) {
+			detachOutput.forEach((detach) => detach());
+			detachOutput = [];
 			terminal.dispose();
 			terminal = undefined;
 		}
