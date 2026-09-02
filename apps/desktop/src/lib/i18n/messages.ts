@@ -49,6 +49,7 @@ const en = {
 	'conn.saved': 'Saved {id}',
 	'conn.removed': 'Removed {id}',
 	'conn.splitter': 'List width (double-click to reset)',
+	'files.splitter': 'Split between panes (double-click to centre)',
 
 	'conn.err.id.empty': 'Enter an identifier',
 	'conn.err.id.chars': 'Identifier may use only letters, digits, . _ -',
@@ -215,6 +216,7 @@ const ja: Catalog = {
 	'conn.saved': '{id} を保存しました',
 	'conn.removed': '{id} を消しました',
 	'conn.splitter': '一覧の幅（ダブルクリックで定位置へ戻ります）',
+	'files.splitter': '左右の取り分（ダブルクリックで真ん中へ戻ります）',
 
 	'conn.err.id.empty': '識別子を入れてください',
 	'conn.err.id.chars': '識別子は英数字と . _ - だけにしてください',

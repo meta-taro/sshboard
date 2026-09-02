@@ -14,6 +14,13 @@
 	import type { Connection } from '$lib/connections';
 	import { i18n } from '$lib/i18n/i18n.svelte';
 	import {
+		clampPaneRatio,
+		DEFAULT_PANE_RATIO,
+		loadPaneRatio,
+		MIN_PANE_RATIO,
+		savePaneRatio
+	} from '$lib/splitter.svelte';
+	import {
 		baseName,
 		humanSize,
 		joinPath,
@@ -325,7 +332,51 @@
 		}
 	}
 
+	/* --- 左右の取り分（掴んで動かす・ダブルクリックで真ん中） --- */
+
+	let panes: HTMLElement | undefined = $state();
+	let paneRatio = $state(DEFAULT_PANE_RATIO);
+	let draggingPanes = $state(false);
+
+	function applyRatio(next: number) {
+		paneRatio = clampPaneRatio(next);
+		savePaneRatio(paneRatio);
+	}
+
+	function startPaneDrag(event: PointerEvent) {
+		draggingPanes = true;
+		(event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+	}
+
+	function onPaneDrag(event: PointerEvent) {
+		if (!draggingPanes || !panes) return;
+		const box = panes.getBoundingClientRect();
+		if (box.width <= 0) return;
+		applyRatio((event.clientX - box.left) / box.width);
+	}
+
+	function endPaneDrag(event: PointerEvent) {
+		draggingPanes = false;
+		(event.currentTarget as HTMLElement).releasePointerCapture(event.pointerId);
+	}
+
+	/** **ダブルクリックで真ん中へ戻す。** */
+	function resetRatio() {
+		applyRatio(DEFAULT_PANE_RATIO);
+	}
+
+	/** 掴めない人のために、矢印キーでも動かせるようにする（接続管理と同じ作り）。 */
+	function onPaneSplitterKey(event: KeyboardEvent) {
+		const step = event.shiftKey ? 0.05 : 0.02;
+		if (event.key === 'ArrowLeft') applyRatio(paneRatio - step);
+		else if (event.key === 'ArrowRight') applyRatio(paneRatio + step);
+		else if (event.key === 'Home' || event.key === 'Enter') resetRatio();
+		else return;
+		event.preventDefault();
+	}
+
 	onMount(() => {
+		paneRatio = loadPaneRatio();
 		const stops: Array<() => void> = [];
 		loadRegistered();
 		loadLocal();
@@ -529,7 +580,7 @@
 		<p class="notice" role="status">{notice}</p>
 	{/if}
 
-	<div class="panes">
+	<div class="panes" bind:this={panes} style:--pane-ratio={paneRatio}>
 		<!-- 手元。**右と同じ形にする。**どの階層から上げるのかが見えないと、
 		     「どこからどこへ」が分からない（実際に分からなかった）。 -->
 		<div class="pane shell">
@@ -615,6 +666,32 @@
 				</footer>
 			</div>
 		</div>
+
+		<!--
+			左右の取り分。**掴んで動かし、ダブルクリックで真ん中に戻る。**
+			接続管理の仕切りと同じ作りです（`$lib/splitter.svelte`）。
+			WAI-ARIA の「window splitter」は焦点を当てられる separator がそのまま定義なので、
+			lint をここだけ黙らせます。**キーボードで動かせる状態を保つこと。**
+		-->
+		<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+		<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+		<div
+			class="pane-splitter"
+			class:dragging={draggingPanes}
+			role="separator"
+			aria-orientation="vertical"
+			aria-label={i18n.t('files.splitter')}
+			aria-valuenow={Math.round(paneRatio * 100)}
+			aria-valuemin={Math.round(MIN_PANE_RATIO * 100)}
+			aria-valuemax={Math.round((1 - MIN_PANE_RATIO) * 100)}
+			tabindex="0"
+			onpointerdown={startPaneDrag}
+			onpointermove={onPaneDrag}
+			onpointerup={endPaneDrag}
+			onpointercancel={endPaneDrag}
+			ondblclick={resetRatio}
+			onkeydown={onPaneSplitterKey}
+		></div>
 
 		<!-- サーバー -->
 		<div class="pane shell">
@@ -971,7 +1048,8 @@
 
 	.panes {
 		display: grid;
-		grid-template-columns: 1fr 1fr;
+		/* **取り分は割合で持つ。**ピクセルで持つと、窓を広げたとき片側だけが伸びる。 */
+		grid-template-columns: calc(var(--pane-ratio, 0.5) * 100%) auto 1fr;
 		gap: 0.5rem;
 		min-height: 0;
 		flex: 1 1 auto;
@@ -982,6 +1060,44 @@
 		.panes {
 			grid-template-columns: 1fr;
 		}
+
+		/* 積んだら左右の仕切りは意味を失う。**残すと掴めない棒が挟まる。** */
+		.pane-splitter {
+			display: none;
+		}
+	}
+
+	.pane-splitter {
+		width: 8px;
+		margin: 0 -0.25rem;
+		cursor: col-resize;
+		border-radius: 999px;
+		background: transparent;
+		position: relative;
+		align-self: stretch;
+	}
+
+	/* **掴む所は広く、見える線は細く。**細い線を狙わせると外す。 */
+	.pane-splitter::after {
+		content: '';
+		position: absolute;
+		inset-block: 0;
+		left: 50%;
+		width: 2px;
+		transform: translateX(-50%);
+		border-radius: 999px;
+		background: var(--border);
+	}
+
+	.pane-splitter:hover::after,
+	.pane-splitter:focus-visible::after,
+	.pane-splitter.dragging::after {
+		background: var(--accent);
+	}
+
+	.pane-splitter:focus-visible {
+		outline: 2px solid var(--accent);
+		outline-offset: 2px;
 	}
 
 	.pane {
