@@ -220,10 +220,10 @@ sh tools/test-server/up.sh down   # 片付ける
   用途別のツール（`disk_usage` など）は、書かなくても動きます
 - **端末は人と AI で共有します。**AI が握っている間は人の入力が締まり、
   **［止める］はいつでも効きます**
-- **インストーラは束ねられます**（2026-09-02 に CI で確認）。
-  Windows は `.msi` と NSIS の `-setup.exe`、macOS は `.app`。
-  **ただし Release には添付していません**（未署名のため・D30）。
-  必要なら Actions の実行ページから artifact を取ってください（14 日で消えます）
+- **インストーラは Release に付けます**（D32）。
+  Windows は `.msi` と NSIS の `-setup.exe`、macOS は `.app.zip`。
+  **未署名なので、Windows は SmartScreen、macOS は Gatekeeper が止めます。**
+  **警告が出て分からなかった、は Issue に書いてください** — 署名を買う判断の材料です（D12）
 
 ## 技術スタック
 

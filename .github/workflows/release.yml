@@ -2,13 +2,16 @@ name: release
 
 # タグを押したときに、**束ねられることを確かめてから** Release を作る。
 #
-# **バイナリは Release へ添付しません**（α は署名していないため）。
-# 未署名の SSH クライアントを配ると、受け取った人は最初に
-# 「警告を無視して開く」手順を踏むことになります。**鍵を扱う道具で、それを最初に教えない。**
-# 署名を入れてからバイナリを出します。
+# **バイナリを添付します**（D32・2026-09-02 に D30 を覆した）。
+# public リポなので誰でも任意のコミットをビルドでき、artifact は 14 日で消えるため、
+# 「配らない」ことに効果が無かった。**決めたのは人。**
 #
-# 束ねた成果物は workflow の artifact に残します。**`tauri build` はこれが初めて**なので、
-# まずここで通ることを見ます。通らなければ Release も作りません（`needs`）。
+# **未署名であることは変わっていません。**受け取った人は SmartScreen / Gatekeeper の
+# 警告を踏みます。**打ち消せないので、Release ノートの先頭に何が起きるかを書く**
+# （`.github/release-note-alpha.md`）。署名の判断は D12 のまま
+# — 未署名で脱落する人が実際に出てから買う。
+#
+# 束ねられなければ Release も作りません（`needs`）。
 
 on:
   push:
@@ -54,6 +57,16 @@ jobs:
       - name: 束ねる
         run: pnpm --filter desktop tauri build
 
+      # **`.app` はディレクトリなので、そのままでは Release へ添付できません。**
+      # `ditto` で zip にします（macOS 標準・拡張属性を保ったまま束ねる）。
+      - name: macOS の .app を zip にする
+        if: runner.os == 'macOS'
+        run: |
+          set -eu
+          cd target/release/bundle/macos
+          ditto -c -k --keepParent sshboard.app sshboard_0.1.0_macos.app.zip
+          ls -la sshboard_0.1.0_macos.app.zip
+
       - name: 成果物を残す
         uses: actions/upload-artifact@v4
         with:
@@ -66,13 +79,30 @@ jobs:
           retention-days: 14
 
   release:
-    name: release（ソースのみ）
+    name: release（バイナリ添付・D32）
     needs: bundle
     # 手動実行では Release を作りません。**タグを押したときだけ。**
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+
+      - name: 束ねたものを集める
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+
+      # **添付するものを名指しする。**`dist/**` をそのまま渡すと、
+      # 展開された `sshboard.app/` の中身が 1 ファイルずつ付いてしまう。
+      - name: 添付するファイルを選ぶ
+        run: |
+          set -eu
+          mkdir -p upload
+          find dist -type f \( -name '*.msi' -o -name '*-setup.exe' -o -name '*.app.zip' \) \
+            -exec cp {} upload/ \;
+          ls -la upload/
+          # **黙って空を出さない。**1 つも無ければ Release を作らない。
+          [ "$(ls -A upload/)" ] || { echo "添付するものがありません"; exit 1; }
 
       - name: Release を作る
         env:
@@ -86,10 +116,11 @@ jobs:
             *-*) PRERELEASE="--prerelease" ;;
           esac
 
-          gh release create "${TAG}" --title "${TAG}" --generate-notes ${PRERELEASE}
+          gh release create "${TAG}" --title "${TAG}" --generate-notes ${PRERELEASE} \
+            upload/*
 
-          # **断り書きを先頭に置く。**自動生成のコミット一覧だけでは、
-          # 受け取った人は「バイナリはどこか」を探して迷う。
+          # **断り書きを先頭に置く。**未署名で何が起きるかを、
+          # 自動生成のコミット一覧より先に読ませる。
           gh release view "${TAG}" --json body --jq .body > generated.md
           cat .github/release-note-alpha.md generated.md > note.md
           gh release edit "${TAG}" --notes-file note.md
