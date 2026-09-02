@@ -18,6 +18,7 @@
 	import type { Terminal } from '@xterm/xterm';
 
 	type McpAccess = { url: string; token: string };
+	type McpFailure = { port: number; detail: string };
 
 	/** 何が起きたかの記録。Rust 側の `Event` と対。**接続先は入っていない。** */
 	type DiagEvent = {
@@ -32,6 +33,8 @@
 
 	let lines = $state<BandLine[]>([]);
 	let mcp = $state<McpAccess | null>(null);
+	/** **立ち上がらなかったこと。**出さないと「起動中」のまま止まって見える。 */
+	let mcpFailure = $state<McpFailure | null>(null);
 	let mcpCopied = $state(false);
 	let failure = $state<string | null>(null);
 	let streaming = $state(false);
@@ -416,6 +419,15 @@
 				/* 下の取り直しで拾う */
 			});
 
+		// **立たなかったときも受け取る。**番号を固定した分、ぶつかる場面が増える。
+		listen<McpFailure>('mcp://failed', (event) => {
+			mcpFailure = event.payload;
+		})
+			.then((stop) => stops.push(stop))
+			.catch(() => {
+				/* 失敗の通知が届かないこと自体は、下の帯で気づける */
+			});
+
 		// 起動が速いと 'mcp://ready' を購読より先に取りこぼす。取り直す。
 		invoke<McpAccess | null>('mcp_url')
 			.then((access) => {
@@ -549,14 +561,19 @@
 		<button
 			type="button"
 			class="mcp"
+			class:failed={mcpFailure !== null}
 			onclick={copyMcpCommand}
 			disabled={!mcp}
-			title={mcp ? i18n.t('mcp.token.help') : 'MCP'}
+			title={mcpFailure
+				? i18n.t('mcp.failed.help', { port: String(mcpFailure.port), detail: mcpFailure.detail })
+				: mcp
+					? i18n.t('mcp.token.help')
+					: 'MCP'}
 		>
-			<Icon name={mcpCopied ? 'check' : 'copy'} size={12} />
-			{#if !mcp}{i18n.t('mcp.starting')}{:else if mcpCopied}{i18n.t('mcp.copied')}{:else}{i18n.t(
-					'mcp.copy'
-				)}{/if}
+			<Icon name={mcpFailure ? 'warning' : mcpCopied ? 'check' : 'copy'} size={12} />
+			{#if mcpFailure}{i18n.t('mcp.failed', { port: String(mcpFailure.port) })}{:else if !mcp}{i18n.t(
+					'mcp.starting'
+				)}{:else if mcpCopied}{i18n.t('mcp.copied')}{:else}{i18n.t('mcp.copy')}{/if}
 		</button>
 	</header>
 

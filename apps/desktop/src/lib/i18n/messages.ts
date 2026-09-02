@@ -119,6 +119,8 @@ const en = {
 	"conn.write.placeholder": "/srv/app/releases",
 	"conn.write.help": "Empty means the AI cannot write a single byte here. One absolute path per line. You are never restricted by this.",
 	"mcp.copy": "Copy the MCP command",
+	'mcp.failed': 'MCP could not start (port {port})',
+	'mcp.failed.help': 'Port {port} is already in use — is another sshboard running? Set SSHBOARD_MCP_PORT to move it. Detail: {detail}',
 	"mcp.copied": "Copied.",
 	"mcp.token.help": "The token changes every time sshboard starts. Paste this command into your agent.",
 
@@ -286,6 +288,8 @@ const ja: Catalog = {
 	"conn.write.placeholder": "/srv/app/releases",
 	"conn.write.help": "空なら AI は 1 バイトも書けません。絶対パスを 1 行に 1 つ。あなたはこれに縛られません。",
 	"mcp.copy": "MCP の登録コマンドを写す",
+	'mcp.failed': 'MCP が立ち上がりませんでした（ポート {port}）',
+	'mcp.failed.help': 'ポート {port} が既に使われています。別の sshboard が起動していませんか。移すなら環境変数 SSHBOARD_MCP_PORT を設定してください。詳細: {detail}',
 	"mcp.copied": "写しました。",
 	"mcp.token.help": "トークンは sshboard を起動するたびに変わります。このコマンドをエージェントへ貼ってください。",
 

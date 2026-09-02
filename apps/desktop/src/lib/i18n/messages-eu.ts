@@ -84,6 +84,8 @@ export const de: Catalog = {
 	"conn.write.placeholder": "/srv/app/releases",
 	"conn.write.help": "Leer heißt: die KI schreibt kein einziges Byte. Ein absoluter Pfad pro Zeile. Sie selbst sind davon nie betroffen.",
 	"mcp.copy": "MCP-Befehl kopieren",
+	'mcp.failed': 'MCP konnte nicht starten (Port {port})',
+	'mcp.failed.help': 'Port {port} ist bereits belegt — läuft ein weiteres sshboard? Zum Verschieben SSHBOARD_MCP_PORT setzen. Detail: {detail}',
 	"mcp.copied": "Kopiert.",
 	"mcp.token.help": "Das Token ändert sich bei jedem Start von sshboard. Fügen Sie diesen Befehl in Ihren Agenten ein.",
 
@@ -211,6 +213,8 @@ export const fr: Catalog = {
 	"conn.write.placeholder": "/srv/app/releases",
 	"conn.write.help": "Vide signifie que l'IA n'écrit pas un seul octet ici. Un chemin absolu par ligne. Vous n'êtes jamais concerné.",
 	"mcp.copy": "Copier la commande MCP",
+	'mcp.failed': 'MCP n\'a pas pu démarrer (port {port})',
+	'mcp.failed.help': 'Le port {port} est déjà utilisé — un autre sshboard est-il lancé ? Définissez SSHBOARD_MCP_PORT pour le déplacer. Détail : {detail}',
 	"mcp.copied": "Copié.",
 	"mcp.token.help": "Le jeton change à chaque démarrage de sshboard. Collez cette commande dans votre agent.",
 
@@ -338,6 +342,8 @@ export const es: Catalog = {
 	"conn.write.placeholder": "/srv/app/releases",
 	"conn.write.help": "Vacío significa que la IA no escribe ni un byte aquí. Una ruta absoluta por línea. A usted nunca le afecta.",
 	"mcp.copy": "Copiar el comando MCP",
+	'mcp.failed': 'MCP no pudo iniciarse (puerto {port})',
+	'mcp.failed.help': 'El puerto {port} ya está en uso: ¿hay otro sshboard abierto? Defina SSHBOARD_MCP_PORT para cambiarlo. Detalle: {detail}',
 	"mcp.copied": "Copiado.",
 	"mcp.token.help": "El token cambia cada vez que se inicia sshboard. Pegue este comando en su agente.",
 

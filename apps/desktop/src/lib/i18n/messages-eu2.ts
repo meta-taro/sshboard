@@ -84,6 +84,8 @@ export const ptBR: Catalog = {
 	"conn.write.placeholder": "/srv/app/releases",
 	"conn.write.help": "Vazio significa que a IA não escreve um único byte aqui. Um caminho absoluto por linha. Você nunca é limitado por isso.",
 	"mcp.copy": "Copiar o comando MCP",
+	'mcp.failed': 'O MCP não conseguiu iniciar (porta {port})',
+	'mcp.failed.help': 'A porta {port} já está em uso — há outro sshboard aberto? Defina SSHBOARD_MCP_PORT para a mudar. Detalhe: {detail}',
 	"mcp.copied": "Copiado.",
 	"mcp.token.help": "O token muda a cada início do sshboard. Cole este comando no seu agente.",
 
@@ -211,6 +213,8 @@ export const ru: Catalog = {
 	"conn.write.placeholder": "/srv/app/releases",
 	"conn.write.help": "Пусто — значит ИИ не запишет сюда ни байта. По одному абсолютному пути в строке. Вас это не ограничивает.",
 	"mcp.copy": "Скопировать команду MCP",
+	'mcp.failed': 'MCP не запустился (порт {port})',
+	'mcp.failed.help': 'Порт {port} уже занят — не запущен ли другой sshboard? Чтобы сменить, задайте SSHBOARD_MCP_PORT. Подробности: {detail}',
 	"mcp.copied": "Скопировано.",
 	"mcp.token.help": "Токен меняется при каждом запуске sshboard. Вставьте эту команду в своего агента.",
 
@@ -338,6 +342,8 @@ export const it: Catalog = {
 	"conn.write.placeholder": "/srv/app/releases",
 	"conn.write.help": "Vuoto significa che l'IA non scrive un solo byte qui. Un percorso assoluto per riga. Tu non sei mai limitato.",
 	"mcp.copy": "Copia il comando MCP",
+	'mcp.failed': 'MCP non è riuscito ad avviarsi (porta {port})',
+	'mcp.failed.help': 'La porta {port} è già in uso: c\'è un altro sshboard aperto? Imposta SSHBOARD_MCP_PORT per spostarla. Dettaglio: {detail}',
 	"mcp.copied": "Copiato.",
 	"mcp.token.help": "Il token cambia a ogni avvio di sshboard. Incolla questo comando nel tuo agente.",
 
