@@ -26,9 +26,9 @@ zip から出した直後の Windows ファイルには Mark of the Web が付�
 
 | ファイル | 何 |
 |---|---|
-| `sshboard_0.1.0_x64-setup.exe` | Windows インストーラ（NSIS）。**こちらが素直です** |
-| `sshboard_0.1.0_x64_en-US.msi` | Windows インストーラ（MSI） |
-| `sshboard_0.1.0_macos.app.zip` | macOS。展開して `/Applications` へ |
+| `sshboard_<版>_x64-setup.exe` | Windows インストーラ（NSIS）。**こちらが素直です** |
+| `sshboard_<版>_x64_en-US.msi` | Windows インストーラ（MSI） |
+| `sshboard_<版>_macos.app.zip` | macOS。展開して `/Applications` へ |
 
 Windows は **WebView2** が要ります。Windows 11 と最近の 10 には入っています。
 無ければインストーラが取りに行くので、**初回はインターネット接続が必要**です。
