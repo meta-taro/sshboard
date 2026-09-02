@@ -5,6 +5,7 @@
 
 mod hostkey;
 mod key_file;
+mod pkcs8_cipher;
 mod session;
 mod shell;
 mod write_scope;

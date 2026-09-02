@@ -85,15 +85,26 @@ fn a_shape_russh_cannot_decrypt_is_refused_with_its_own_reason() {
     // **「秘密鍵を指してください」は的外れ**です（指しているので）。
     // 使えない理由を分けないと、人は正しい鍵を疑いはじめます。
     //
-    // 実測（2026-08-30・tests/key_formats_really_load.rs）:
-    // - 暗号化された PKCS#8 は `russh` が復号できない
+    // 実測（tests/key_formats_really_load.rs）:
     // - PKCS#1 の AES-256-CBC は `russh` が `unimplemented!()` に落ちる（**アプリが落ちる**）
-    let pkcs8 = inspect_key(b"-----BEGIN ENCRYPTED PRIVATE KEY-----\n");
-    assert_eq!(pkcs8.format, KeyFormat::Pkcs8);
-    assert_eq!(pkcs8.verdict, KeyVerdict::UnsupportedEncryption);
+    //
+    // **暗号化された PKCS#8 はここでは判定できません。**見出しが同じまま
+    // 読めるものと読めないものが混ざるためで、暗号方式の名前まで見る必要があります
+    // （`src/pkcs8_cipher.rs`）。方式ごとの実測は結合テスト側にあります
+    // — **鍵の実物をリポジトリへ置かない**ため、その場で作って捨てています。
+    //
+    // ここでは、**見出しだけの断片をどう扱うか**を決めておきます。
+    // 中身が無く方式が分からないので、**「使える」に倒します。**
+    // 分からないまま断ると、正しい鍵が丸ごと行き止まりになるからです（D28）。
+    let fragment = inspect_key(b"-----BEGIN ENCRYPTED PRIVATE KEY-----\n");
+    assert_eq!(fragment.format, KeyFormat::Pkcs8);
     assert!(
-        !pkcs8.needs_passphrase,
-        "入れても通らないパスフレーズを聞いている"
+        fragment.usable(),
+        "方式が読めないだけで断っている（D28 の「止めるべき条件」）"
+    );
+    assert!(
+        fragment.needs_passphrase,
+        "暗号化された鍵なのにパスフレーズを聞いていない"
     );
 
     let aes256 = inspect_key(

@@ -174,10 +174,33 @@ fn openssl_key(dir: &Path, source: &Path, name: &str, extra: &[&str]) -> Option<
     done.status.success().then_some(path)
 }
 
+/// 暗号化された PKCS#8 を、方式を指定して 1 本作る。
+///
+/// **`ssh-keygen -m PKCS8` では方式を選べません。**しかも既定が OS で違い、
+/// macOS（LibreSSL）は PRF に hmacWithSHA1、Linux / Windows（OpenSSL 3）は
+/// hmacWithSHA256 を使います。**同じコマンドが別の鍵を作る。**
+/// ここを実測に使うと、テストが「その OS で偶然できた鍵」を測ることになります。
+fn pkcs8_with(dir: &Path, source: &Path, name: &str, extra: &[&str]) -> Option<PathBuf> {
+    let path = dir.join(name);
+    let done = Command::new("openssl")
+        .args(["pkcs8", "-topk8", "-in"])
+        .arg(source)
+        .args(["-passout", "pass:sshboard-pass", "-out"])
+        .arg(&path)
+        .args(extra)
+        .output()
+        .ok()?;
+    done.status.success().then_some(path)
+}
+
 #[test]
 fn a_key_russh_cannot_read_is_refused_up_front_rather_than_failing_later() {
     // **「使えます」と言って読めないのが一番たちが悪い。**
     // 繋いだ先で理由の分からない失敗になり、人は鍵を作り直しはじめる。
+    //
+    // **その逆も同じだけ悪い**（D28 の「止めるべき条件」）。
+    // 読める鍵を「使えません」と断ると、正しい鍵が丸ごと行き止まりになる。
+    // 一律で断っていた頃、**Linux / Windows の ssh-keygen が作る鍵が全部これでした。**
     if !have("ssh-keygen") {
         println!("ssh-keygen がありません（想定内・飛ばします）");
         return;
@@ -185,11 +208,62 @@ fn a_key_russh_cannot_read_is_refused_up_front_rather_than_failing_later() {
     let dir = tempfile::tempdir().expect("一時ディレクトリ");
     let at = dir.path();
 
-    // 暗号化された PKCS#8。**実測で読めない**（この依存構成では復号できない）。
+    // 1. その OS の ssh-keygen が作るものは、**どちらに転んでも判定と一致すること。**
+    //    ここは「読める / 読めない」を決め打ちしない。OS で変わるため。
     let p8 = ["-t", "rsa", "-b", "2048", "-m", "PKCS8"];
-    let encrypted = keygen(at, "p8_enc", &p8, "sshboard-pass");
-    agrees(&encrypted, Some("sshboard-pass"));
-    assert!(!inspect_key(&std::fs::read(&encrypted).unwrap()).usable());
+    agrees(
+        &keygen(at, "p8_enc", &p8, "sshboard-pass"),
+        Some("sshboard-pass"),
+    );
+
+    // 2. 方式を名指しして、**実測表のとおりに分かれること。**
+    if !have("openssl") {
+        println!("openssl がありません（想定内・ここまで）");
+        return;
+    }
+    let plain = keygen(at, "plain", &["-t", "rsa", "-b", "2048", "-m", "PEM"], "");
+
+    // 読めない側 — PRF が hmacWithSHA1（省略時の既定でもある）。
+    for (name, extra) in [
+        ("sha1", vec!["-v2", "aes-256-cbc", "-v2prf", "hmacWithSHA1"]),
+        (
+            "3des",
+            vec!["-v2", "des-ede3-cbc", "-v2prf", "hmacWithSHA256"],
+        ),
+        ("pbes1", vec!["-v1", "PBE-SHA1-3DES"]),
+    ] {
+        let Some(path) = pkcs8_with(at, &plain, &format!("p8_{name}"), &extra) else {
+            println!("openssl が {name} を作れません（想定内・飛ばします）");
+            continue;
+        };
+        agrees(&path, Some("sshboard-pass"));
+        assert!(
+            !inspect_key(&std::fs::read(&path).unwrap()).usable(),
+            "{name}: 読めないのに「使える」と言っている"
+        );
+    }
+
+    // 読める側 — **ここを断ってはいけない。**
+    for (name, extra) in [
+        (
+            "sha256",
+            vec!["-v2", "aes-256-cbc", "-v2prf", "hmacWithSHA256"],
+        ),
+        (
+            "sha512",
+            vec!["-v2", "aes-128-cbc", "-v2prf", "hmacWithSHA512"],
+        ),
+    ] {
+        let Some(path) = pkcs8_with(at, &plain, &format!("p8_{name}"), &extra) else {
+            println!("openssl が {name} を作れません（想定内・飛ばします）");
+            continue;
+        };
+        agrees(&path, Some("sshboard-pass"));
+        assert!(
+            inspect_key(&std::fs::read(&path).unwrap()).usable(),
+            "{name}: 読めるのに断っている（D28 の「止めるべき条件」）"
+        );
+    }
 }
 
 #[test]

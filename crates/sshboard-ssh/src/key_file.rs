@@ -58,9 +58,11 @@ pub enum KeyVerdict {
     NotAKey,
     /// 鍵ではあるが、**この暗号方式を読めない。**
     ///
-    /// 実測（2026-08-30）で 2 つ在りました。どちらも**繋ぐ前に断ります。**
+    /// 実測で分かっているのは 2 つ。どちらも**繋ぐ前に断ります。**
     ///
-    /// - **暗号化された PKCS#8** — `russh` が復号できない
+    /// - **暗号化された PKCS#8 のうち、読めない方式だけ**（2026-09-02 に絞り込み）。
+    ///   PBKDF2 の PRF が hmacWithSHA1・3DES・PBES1 の 3 つ。
+    ///   **見出しでは分けられません**（`pkcs8_cipher` を見ること）
     /// - **PKCS#1 の AES-256-CBC** — `russh` の PKCS#5 復号が
     ///   `unimplemented!()` に落ちる。**渡すとアプリが落ちる**
     UnsupportedEncryption,
@@ -114,8 +116,14 @@ pub fn inspect_key(bytes: &[u8]) -> KeyFacts {
         return usable(KeyFormat::Pkcs1, encrypted);
     }
     if text.starts_with("-----BEGIN ENCRYPTED PRIVATE KEY-----") {
-        // 暗号化された PKCS#8 は、この依存構成では復号できない（実測）。
-        return unsupported(KeyFormat::Pkcs8);
+        // **見出しが同じまま、読めるものと読めないものが混ざります。**
+        // 暗号方式の名前まで見ないと分かりません（`pkcs8_cipher`）。
+        // 一律で断っていた頃は、**Linux / Windows の ssh-keygen が作る鍵を
+        // まるごと拒んでいました**（D28 の「止めるべき条件」）。
+        if !crate::pkcs8_cipher::encrypted_pkcs8_is_readable(text) {
+            return unsupported(KeyFormat::Pkcs8);
+        }
+        return usable(KeyFormat::Pkcs8, true);
     }
     if text.starts_with("-----BEGIN PRIVATE KEY-----") {
         return usable(KeyFormat::Pkcs8, false);

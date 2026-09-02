@@ -374,7 +374,12 @@ async fn authenticate_with_agent(
 }
 
 #[cfg(windows)]
-async fn authenticate_with_agent(handle: &mut Handle<Watcher>, user: &str) -> Result<(), SshError> {
+async fn authenticate_with_agent(
+    handle: &mut Handle<Watcher>,
+    user: &str,
+    diag: &Diagnostics,
+    id: Option<&str>,
+) -> Result<(), SshError> {
     /// Windows の OpenSSH agent が待っている場所。**固定の名前。**
     const OPENSSH_PIPE: &str = r"\\.\pipe\openssh-ssh-agent";
 
