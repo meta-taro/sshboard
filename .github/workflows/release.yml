@@ -53,21 +53,36 @@ jobs:
       - name: 依存を入れる
         run: pnpm install --frozen-lockfile
 
-      # **鍵が無いまま進ませない**（D34）。
-      # 署名の無い成果物を静かに出すと、`latest.json` が作れず
-      # **更新が永久に届きません。**落ちて気づく方がましです。
-      - name: 更新用の鍵があるか確かめる
+      # **鍵で実際に署名してみる**（D34）。
+      #
+      # 「設定されているか」だけを見ていた頃、**3 回とも 10 分ビルドしたあとで
+      # 署名の瞬間に落ちました。**鍵とパスワードが噛み合うかは、
+      # ここで 1 ファイル署名してみれば数秒で分かります。
+      #
+      # 署名の無い成果物を静かに出すと `latest.json` が作れず、
+      # **更新が永久に届きません。**先に落ちる方がましです。
+      - name: 更新用の鍵で署名できるか確かめる
         env:
-          KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         shell: bash
         run: |
           set -eu
-          if [ -z "${KEY}" ]; then
-            echo "::error::TAURI_SIGNING_PRIVATE_KEY が設定されていません。" \
-                 "更新用の鍵が無いと、署名付きの成果物が作れず自動更新が届きません（D34）。"
+          if [ -z "${TAURI_SIGNING_PRIVATE_KEY}" ]; then
+            echo "::error::TAURI_SIGNING_PRIVATE_KEY が設定されていません（D34）。"
             exit 1
           fi
-          echo "鍵は設定されています"
+          # **`pnpm --filter desktop exec` は apps/desktop で走ります。**
+          # リポジトリ直下に置くと相対パスがずれて「ファイルが無い」で落ちます。
+          echo "smoke" > apps/desktop/signing-smoke.txt
+          if ! pnpm --filter desktop exec tauri signer sign signing-smoke.txt > /dev/null; then
+            echo "::error::更新用の鍵で署名できません。" \
+                 "鍵とパスワードが噛み合っていません（鍵にパスワードが無いのに" \
+                 "TAURI_SIGNING_PRIVATE_KEY_PASSWORD が設定されている、など）。"
+            exit 1
+          fi
+          rm -f apps/desktop/signing-smoke.txt apps/desktop/signing-smoke.txt.sig
+          echo "署名できました"
 
       # `tauri build` が `beforeBuildCommand`（`pnpm build`）を先に走らせます。
       # **`createUpdaterArtifacts` が true なので、`.sig` も一緒に出ます。**

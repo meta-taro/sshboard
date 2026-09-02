@@ -32,7 +32,7 @@
       "endpoints": [
         "https://github.com/meta-taro/sshboard/releases/download/updater/latest.json"
       ],
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDQxMjBGRjVBQThCRjlGMEQKUldRTm43K29XdjhnUVgzMHRSaXlEc3lMdm1sZGJ2VFVoZTJiTy9ndTZIcW5mdTFLQ1RDK1d3eVQK"
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEE2QTA5QTJBQjk1N0M1MQpSV1JSZkpXcm9nbHFDZzYzVjNIb0MrNmJObGZzanZxM0Evanc3N2xLNHEwUEY5b2l2bEIxQjZ0bwo="
     }
   },
   "bundle": {
