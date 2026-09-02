@@ -604,9 +604,6 @@
 						aria-label={i18n.t('files.local')}
 						spellcheck="false"
 					/>
-					<button type="button" onclick={pickFiles} title={i18n.t('files.pick')}>
-						<Icon name="plus" size={13} />
-					</button>
 				</header>
 
 				{#if localEntries.length === 0}
@@ -658,11 +655,26 @@
 							</span>
 						{/if}
 					</div>
-					{#if staged.length > 0}
-						<button type="button" class="ghost tiny" onclick={() => (staged = [])}>
-							{i18n.t('files.clear')}
+					<div class="staging">
+						<!--
+							**押した結果が見える場所に置く。**
+							以前はパス欄の隣に無地の「＋」があり、
+							**何が起きるのか分からない**と言われました（α の実機から）。
+							上げ待ちの件数のすぐ隣なら、足した結果がその場で数字に出ます。
+						-->
+						<button type="button" class="ghost tiny" onclick={pickFiles}>
+							<Icon name="plus" size={11} />
+							{i18n.t('files.pick')}
 						</button>
-					{/if}
+						{#if staged.length > 0}
+							<button type="button" class="ghost tiny" onclick={() => (staged = [])}>
+								{i18n.t('files.clear')}
+							</button>
+						{:else}
+							<!-- **選び方を、選んでいないときだけ出す。**選べている人には邪魔。 -->
+							<span class="hint">{i18n.t('files.pick.how')}</span>
+						{/if}
+					</div>
 				</footer>
 			</div>
 		</div>
@@ -1065,6 +1077,18 @@
 		.pane-splitter {
 			display: none;
 		}
+	}
+
+	.staging {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		flex-wrap: wrap;
+	}
+
+	.staging .hint {
+		font-size: 0.7rem;
+		color: var(--fg-muted);
 	}
 
 	.pane-splitter {
