@@ -53,19 +53,36 @@ jobs:
       - name: 依存を入れる
         run: pnpm install --frozen-lockfile
 
+      # **鍵が無いまま進ませない**（D34）。
+      # 署名の無い成果物を静かに出すと、`latest.json` が作れず
+      # **更新が永久に届きません。**落ちて気づく方がましです。
+      - name: 更新用の鍵があるか確かめる
+        env:
+          KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+        shell: bash
+        run: |
+          set -eu
+          if [ -z "${KEY}" ]; then
+            echo "::error::TAURI_SIGNING_PRIVATE_KEY が設定されていません。" \
+                 "更新用の鍵が無いと、署名付きの成果物が作れず自動更新が届きません（D34）。"
+            exit 1
+          fi
+          echo "鍵は設定されています"
+
       # `tauri build` が `beforeBuildCommand`（`pnpm build`）を先に走らせます。
+      # **`createUpdaterArtifacts` が true なので、`.sig` も一緒に出ます。**
       - name: 束ねる
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: pnpm --filter desktop tauri build
 
       # **`.app` はディレクトリなので、そのままでは Release へ添付できません。**
-      # `ditto` で zip にします（macOS 標準・拡張属性を保ったまま束ねる）。
-      - name: macOS の .app を zip にする
-        if: runner.os == 'macOS'
-        run: |
-          set -eu
-          cd target/release/bundle/macos
-          ditto -c -k --keepParent sshboard.app sshboard_0.1.0_macos.app.zip
-          ls -la sshboard_0.1.0_macos.app.zip
+      # `createUpdaterArtifacts` が `.app.tar.gz` を作るので、**それをそのまま配ります**
+      # （更新機構が要求する形と、人が落とす形を 1 つにする。D34）。
+      - name: 束ねたものを見る
+        shell: bash
+        run: ls -R target/release/bundle
 
       - name: 成果物を残す
         uses: actions/upload-artifact@v4
@@ -98,11 +115,73 @@ jobs:
         run: |
           set -eu
           mkdir -p upload
-          find dist -type f \( -name '*.msi' -o -name '*-setup.exe' -o -name '*.app.zip' \) \
+          find dist -type f \
+            \( -name '*.msi' -o -name '*-setup.exe' -o -name '*.app.tar.gz' -o -name '*.sig' \) \
             -exec cp {} upload/ \;
           ls -la upload/
           # **黙って空を出さない。**1 つも無ければ Release を作らない。
           [ "$(ls -A upload/)" ] || { echo "添付するものがありません"; exit 1; }
+          # **署名が 1 つも無ければ、更新は届きません。**そこで止めます（D34）。
+          ls upload/*.sig >/dev/null 2>&1 || {
+            echo "::error::署名（.sig）がありません。createUpdaterArtifacts と鍵を確かめてください"
+            exit 1
+          }
+
+      # 更新の目録を組み立てる（D34）。
+      #
+      # **`releases/latest` は prerelease を含みません。**α は prerelease で出す（D30）ので、
+      # そこを指すと更新が永久に見つかりません。
+      # **`updater` という固定タグの Release に `latest.json` だけを置き、毎回差し替えます。**
+      - name: latest.json を作る
+        env:
+          TAG: ${{ github.ref_name }}
+        shell: bash
+        run: |
+          set -eu
+          # **目録の version は「アプリが名乗る番号」でなければなりません。**
+          #
+          # タグ（v0.1.1-alpha.2）をそのまま入れると、semver では
+          # `0.1.1-alpha.2` < `0.1.1` なので、**0.1.1 を名乗るアプリからは
+          # 「古い版」に見えて、更新が永久に来ません。**
+          # 目録は `tauri.conf.json` の番号を使います。
+          VERSION="$(sed -n 's/.*"version": "\([0-9.]*\)".*/\1/p' \
+            apps/desktop/src-tauri/tauri.conf.json | head -1)"
+          [ -n "$VERSION" ] || { echo "::error::tauri.conf.json から version を読めません"; exit 1; }
+
+          # **タグとアプリの番号が食い違っていたら止める。**
+          # ここがずれると「更新が来ない」「更新し続ける」のどちらかになります。
+          TAG_VERSION="${TAG#v}"
+          TAG_VERSION="${TAG_VERSION%%-*}"
+          if [ "$TAG_VERSION" != "$VERSION" ]; then
+            echo "::error::タグ ${TAG} とアプリの番号 ${VERSION} が違います。" \
+                 "`sh tools/bump-version.sh ${TAG_VERSION}` を先に流してください"
+            exit 1
+          fi
+
+          BASE="https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}"
+
+          win_exe="$(cd upload && ls *-setup.exe 2>/dev/null | head -1 || true)"
+          mac_tar="$(cd upload && ls *.app.tar.gz 2>/dev/null | head -1 || true)"
+
+          platforms=""
+          add() {
+            # $1 = プラットフォーム名, $2 = ファイル名
+            sig="$(cat "upload/$2.sig")"
+            entry=$(printf '"%s":{"signature":"%s","url":"%s/%s"}' \
+              "$1" "$sig" "$BASE" "$2")
+            if [ -z "$platforms" ]; then platforms="$entry"; else platforms="$platforms,$entry"; fi
+          }
+
+          [ -n "$win_exe" ] && [ -f "upload/$win_exe.sig" ] && add "windows-x86_64" "$win_exe"
+          [ -n "$mac_tar" ] && [ -f "upload/$mac_tar.sig" ] && add "darwin-aarch64" "$mac_tar"
+
+          # **1 つも組めなければ止める。**空の目録を配ると、更新が静かに死にます。
+          [ -n "$platforms" ] || { echo "::error::latest.json に載せるものがありません"; exit 1; }
+
+          printf '{"version":"%s","pub_date":"%s","notes":"%s","platforms":{%s}}\n' \
+            "$VERSION" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            "sshboard ${TAG}" "$platforms" > latest.json
+          cat latest.json
 
       - name: Release を作る
         env:
@@ -124,3 +203,17 @@ jobs:
           gh release view "${TAG}" --json body --jq .body > generated.md
           cat .github/release-note-alpha.md generated.md > note.md
           gh release edit "${TAG}" --notes-file note.md
+
+      # **更新の宛先は 1 つに固定する。**アプリに焼き込んだ URL は変えられないため。
+      - name: updater タグの目録を差し替える
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -eu
+          # 既にあれば消して作り直す。**prerelease にしない** — ここは版ではなく宛先。
+          gh release delete updater --yes --cleanup-tag 2>/dev/null || true
+          gh release create updater \
+            --title "更新の宛先（自動生成・触らないでください）" \
+            --notes "アプリが更新を探しに来る先です（D34）。中身は ${TAG} を指しています。" \
+            latest.json

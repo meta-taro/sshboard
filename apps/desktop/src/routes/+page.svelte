@@ -9,6 +9,7 @@
 	import Icon from '$lib/components/Icon.svelte';
 	import { i18n } from '$lib/i18n/i18n.svelte';
 	import { titlebar } from '$lib/window/titlebar.svelte';
+	import { updater } from '$lib/update/updater.svelte';
 	import { LOCALES } from '$lib/i18n/locales';
 	import { textSize } from '$lib/text-size/text-size.svelte';
 	import { theme, type ThemeMode } from '$lib/theme/theme.svelte';
@@ -362,6 +363,8 @@
 	onMount(() => {
 		// **この帯が OS のタイトルバー**（D17）。最大化の状態を取り込む。
 		titlebar.init();
+		// **起動時に 1 回だけ。**定期的に叩きません（D34）。
+		updater.check();
 
 		const stops: Array<() => void> = [];
 
@@ -626,6 +629,45 @@
 		</div>
 	</header>
 
+	<!--
+		更新の知らせ（D34）。**黙って入れ替えません。**押すのは人。
+		「何も無い」「調べている」は出しません — **静かなときは静かでいる。**
+	-->
+	{#if updater.state.kind === 'found'}
+		<p class="update" role="status">
+			<Icon name="download" size={12} />
+			<span>{i18n.t('update.found', { version: updater.state.version })}</span>
+			<button type="button" class="cta" onclick={() => updater.install()}>
+				{i18n.t('update.install')}
+			</button>
+			<button type="button" onclick={() => updater.dismiss()}>{i18n.t('update.later')}</button>
+		</p>
+	{:else if updater.state.kind === 'downloading'}
+		<p class="update" role="status">
+			<Icon name="download" size={12} />
+			<span>
+				{i18n.t('update.downloading', { version: updater.state.version })}
+				{#if updater.state.percent !== null}&nbsp;{updater.state.percent}%{/if}
+			</span>
+		</p>
+	{:else if updater.state.kind === 'ready'}
+		<p class="update" role="status">
+			<Icon name="check" size={12} />
+			<span>{i18n.t('update.ready', { version: updater.state.version })}</span>
+			<button type="button" class="cta" onclick={() => updater.restart()}>
+				{i18n.t('update.restart')}
+			</button>
+			<button type="button" onclick={() => updater.dismiss()}>{i18n.t('update.later')}</button>
+		</p>
+	{:else if updater.state.kind === 'failed'}
+		<!-- **黙らない。**繋がらないのか署名が合わないのかで、人の次の一手が違う。 -->
+		<p class="update failed" role="status">
+			<Icon name="warning" size={12} />
+			<span>{i18n.t('update.failed', { detail: updater.state.detail })}</span>
+			<button type="button" onclick={() => updater.dismiss()}>{i18n.t('update.later')}</button>
+		</p>
+	{/if}
+
 	{#if failure}
 		<p class="failure" role="alert">{failure}</p>
 	{/if}
@@ -789,6 +831,29 @@
 		min-height: 34px;
 		/* 掴む所に文字を選ばせない。**掴んだつもりで選択が始まると、窓が動かない。** */
 		user-select: none;
+	}
+
+	/* --- 更新の知らせ（D34） --- */
+
+	.update {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		margin: 0;
+		padding: 0.4rem 0.6rem;
+		font-size: 0.8rem;
+		border: 1px solid var(--border);
+		border-radius: 6px;
+		background: var(--surface-2, transparent);
+	}
+
+	.update.failed {
+		border-color: var(--warning, var(--border));
+	}
+
+	.update button {
+		font-size: 0.75rem;
+		padding: 0.2rem 0.5rem;
 	}
 
 	/* --- 窓の操作（自前タイトルバー・D17） --- */

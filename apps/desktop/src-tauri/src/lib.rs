@@ -28,6 +28,11 @@ use crate::pending::PendingLines;
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
+        // 自動更新（D34）。**黙って入れ替えません。**
+        // 見つけたら画面に出し、押すのは人。SSH の鍵を扱う道具が
+        // 無断で自分を書き換えるのは、この製品の性格に合いません。
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init())
         // **押しても何も起きない項目を残さない。**受け手はここ 1 か所。
         .on_menu_event(menu::handle_event)
         .invoke_handler(tauri::generate_handler![
