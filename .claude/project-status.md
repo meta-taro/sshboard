@@ -75,8 +75,8 @@ Phase 0 の 5 本は、実機と Windows 目視を除いてすべて通りまし
 cargo test --workspace                                 →  266 passed; 0 failed
 cargo fmt --all -- --check                             →  差分なし
 cargo clippy --workspace --all-targets -- -D warnings  →  警告なし
-pnpm --filter desktop check                            →  248 files, 0 errors, 0 warnings
-pnpm --filter desktop test                             →   49 passed
+pnpm --filter desktop check                            →  254 files, 0 errors, 0 warnings
+pnpm --filter desktop test                             →   75 passed
 （別ワークスペース）tools/ssh-probe: cargo test        →   10 passed
 ```
 
@@ -87,11 +87,12 @@ pnpm --filter desktop test                             →   49 passed
 | `sshboard-credentials` | 16 | 2 |
 | `sshboard-connections` | 20 | |
 | `sshboard-diag` | 8 | |
-| `sshboard-ssh` | 59 | 20 |
-| `sshboard-engine` | 31 | 22 |
-| `sshboard-mcp` | 28 | 4 |
+| `sshboard-ssh` | 69 | 22 |
+| `sshboard-engine` | 61 | 24 |
+| `sshboard-mcp` | 34 | 4 |
+| `sshboard-readonly` | 16 | |
 | `sshboard-desktop` | 9 | |
-| **フロント（vitest）** | **49** | |
+| **フロント（vitest）** | **75** | |
 
 **実機の通し 4 本が要です。**MCP（HTTP・合言葉つき）→ Engine → SSH → sftp を、
 **外部クライアントと同じ生の JSON-RPC** で叩き、囲いの外を断ったあと
