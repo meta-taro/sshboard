@@ -1,0 +1,95 @@
+name: release
+
+# タグを押したときに、**束ねられることを確かめてから** Release を作る。
+#
+# **バイナリは Release へ添付しません**（α は署名していないため）。
+# 未署名の SSH クライアントを配ると、受け取った人は最初に
+# 「警告を無視して開く」手順を踏むことになります。**鍵を扱う道具で、それを最初に教えない。**
+# 署名を入れてからバイナリを出します。
+#
+# 束ねた成果物は workflow の artifact に残します。**`tauri build` はこれが初めて**なので、
+# まずここで通ることを見ます。通らなければ Release も作りません（`needs`）。
+
+on:
+  push:
+    tags:
+      - 'v*'
+  # タグを押さずに試せるようにしておく。**初回はどこかで落ちる前提。**
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  bundle:
+    name: bundle (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # 配布対象は Windows と macOS（PRD §7）。Linux は対象外。
+        os: [macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Rust をツールチェイン指定で用意
+        run: rustup show
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: 依存を入れる
+        run: pnpm install --frozen-lockfile
+
+      # `tauri build` が `beforeBuildCommand`（`pnpm build`）を先に走らせます。
+      - name: 束ねる
+        run: pnpm --filter desktop tauri build
+
+      - name: 成果物を残す
+        uses: actions/upload-artifact@v4
+        with:
+          name: sshboard-${{ matrix.os }}
+          # **ワークスペース直下**に出ます（`apps/desktop/src-tauri/target` ではない）。
+          # 手元で 1 回束ねるまで、ここを間違えていました。
+          path: target/release/bundle/**
+          # **黙って空を残さない。**無いなら落とす。
+          if-no-files-found: error
+          retention-days: 14
+
+  release:
+    name: release（ソースのみ）
+    needs: bundle
+    # 手動実行では Release を作りません。**タグを押したときだけ。**
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Release を作る
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -eu
+          # `-` を含むタグ（v0.1.0-alpha.1）は α / β。**prerelease の印を必ず付ける。**
+          PRERELEASE=""
+          case "${TAG}" in
+            *-*) PRERELEASE="--prerelease" ;;
+          esac
+
+          gh release create "${TAG}" --title "${TAG}" --generate-notes ${PRERELEASE}
+
+          # **断り書きを先頭に置く。**自動生成のコミット一覧だけでは、
+          # 受け取った人は「バイナリはどこか」を探して迷う。
+          gh release view "${TAG}" --json body --jq .body > generated.md
+          cat .github/release-note-alpha.md generated.md > note.md
+          gh release edit "${TAG}" --notes-file note.md

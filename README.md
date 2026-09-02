@@ -162,6 +162,65 @@ description = "稼働時間"
 | レポート生成機能を作る | 読めれば提案は AI が書く。足すものが無い |
 | サーバーの移行を促す | 従来構成のまま使えることが価値 |
 
+## 動かす
+
+**まだ α です。**実運用のサーバーへ向ける前に、**手元のテスト用サーバーで一度動かしてください。**
+
+### 前提
+
+| | |
+|---|---|
+| OS | macOS / Windows（Linux は配布対象外） |
+| Rust | `rust-toolchain.toml` が 1.98.0 を指定。`rustup` が入っていれば自動で揃います |
+| Node | 20 以上 |
+| pnpm | `corepack enable`（**npm / yarn は使いません**） |
+| Docker | 手元のテスト用サーバーを建てる場合だけ |
+
+**鍵は ssh-agent に入れておくのを勧めます。**そうすれば sshboard はパスフレーズを
+一度も受け取りません。
+
+### 起動
+
+```sh
+pnpm install
+pnpm --filter desktop tauri dev
+```
+
+### テスト
+
+```sh
+cargo test --workspace         # Rust
+pnpm --filter desktop test     # フロント
+pnpm --filter desktop check    # 型検査
+```
+
+### 手元のテスト用サーバー
+
+**あなたのサーバーには一切触りません。**使い捨ての鍵を作り、Docker で 1 台建てます。
+
+```sh
+sh tools/test-server/up.sh        # 建てる
+sh tools/test-server/up.sh down   # 片付ける
+```
+
+### AI（MCP）から繋ぐ
+
+起動すると、画面に MCP の URL と合言葉が出ます。それを `claude mcp add` へ渡します。
+
+> **ポートは起動するたびに変わります**（未決の課題）。
+> **いまは、立ち上げ直すたびに登録し直しになります。**
+
+### α で知っておいてほしいこと
+
+- **署名していません。**macOS は Gatekeeper が、Windows は SmartScreen が止めます
+- **AI が書けるのは、接続ごとに人が列挙したディレクトリの下だけ**です。**既定は空 ＝ 1 バイトも書けません**
+- **`run_readonly` の許可リストも既定は空**です。`readonly.toml` に人が書くまで 1 本も走りません。
+  用途別のツール（`disk_usage` など）は、書かなくても動きます
+- **端末は人と AI で共有します。**AI が握っている間は人の入力が締まり、
+  **［止める］はいつでも効きます**
+- **`tauri build`（配布物を束ねる工程）は、まだ一度も通していません。**
+  手元で動かす分には関係ありませんが、**インストーラが作れるかは未確認**です
+
 ## 技術スタック（予定）
 
 | | |
