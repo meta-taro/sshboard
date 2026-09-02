@@ -20,6 +20,10 @@
 //! `age`（scrypt で鍵導出 ＋ ChaCha20-Poly1305 の認証付き暗号）に任せます。
 //! **中身を 1 バイト書き換えたら開かない**のは、その認証のためです。
 
+mod transfer;
+
+pub use transfer::{apply_payload, build_payload, SecretVault, TransferError};
+
 use std::io::{Read, Write};
 
 use serde::{Deserialize, Serialize};
