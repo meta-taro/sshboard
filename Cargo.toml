@@ -5,6 +5,7 @@ resolver = "2"
 members = [
     "apps/desktop/src-tauri",
     "crates/sshboard-band",
+    "crates/sshboard-bundle",
     "crates/sshboard-connections",
     "crates/sshboard-credentials",
     "crates/sshboard-diag",

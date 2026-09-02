@@ -1,0 +1,20 @@
+[package]
+name = "sshboard-bundle"
+description = "接続情報を 1 ファイルへ書き出し／取り込む（D18）。**パスフレーズで暗号化する。**"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+sshboard-connections = { path = "../sshboard-connections" }
+# パスフレーズ暗号（scrypt + ChaCha20-Poly1305）。**自前で暗号を書かない。**
+# dbboard の ADR-0038 と同じ選定（D18）。
+age = "0.11"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+# 平文を握っていた場所を消す。**落ちたときのメモリに残さない。**
+zeroize = "1"
+
+[dev-dependencies]
+tempfile = "3"
