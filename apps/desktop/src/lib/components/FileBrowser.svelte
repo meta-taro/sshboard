@@ -14,6 +14,17 @@
 	import type { Connection } from '$lib/connections';
 	import { i18n } from '$lib/i18n/i18n.svelte';
 	import {
+		back as histBack,
+		canBack,
+		canForward,
+		createHistory,
+		current as histCurrent,
+		forward as histForward,
+		visit,
+		type History
+	} from '$lib/history';
+	import { mirrorMove, type Move } from '$lib/sync-browse';
+	import {
 		clampPaneRatio,
 		DEFAULT_PANE_RATIO,
 		loadPaneRatio,
@@ -92,6 +103,147 @@
 		return entry?.color ? `var(--mark-${entry.color})` : 'transparent';
 	}
 
+	/* --- 戻る／進む・同期移動 --- */
+
+	/**
+	 * 左右それぞれの道のり。**別々に持ちます。**
+	 * 片方で戻ったらもう片方も戻る、という作りは混乱の元でした（実装前に却下）。
+	 */
+	let localHist = $state<History>(createHistory(''));
+	let remoteHist = $state<History>(createHistory('.'));
+
+	/** 履歴で飛んでいる最中は、履歴へ積まない。**押すたびに増えていく事故を防ぐ。** */
+	let navigating = false;
+
+	/** 左右を連れて歩くか。**既定は切**（勝手に付いてくると驚く）。 */
+	let syncBrowse = $state(false);
+
+	/** 手元の区切り。Windows は `\\`。 */
+	const localSeparator = $derived(localPath.includes('\\') ? '\\' : '/');
+
+	/** もう片方を、同じ「動き」で連れて行く。 */
+	async function mirror(from: 'local' | 'remote', move: Move) {
+		if (!syncBrowse) return;
+		if (from === 'local') {
+			if (!connected) return;
+			const next = mirrorMove(remotePath, move, '/');
+			if (next === null || next === remotePath) return;
+			remotePath = next;
+			await refresh();
+		} else {
+			const next = mirrorMove(localPath, move, localSeparator);
+			if (next === null || next === localPath) return;
+			await loadLocal(next);
+		}
+	}
+
+	async function localBack() {
+		if (!canBack(localHist)) return;
+		navigating = true;
+		localHist = histBack(localHist);
+		await loadLocal(histCurrent(localHist));
+		navigating = false;
+	}
+
+	async function localForward() {
+		if (!canForward(localHist)) return;
+		navigating = true;
+		localHist = histForward(localHist);
+		await loadLocal(histCurrent(localHist));
+		navigating = false;
+	}
+
+	async function remoteBack() {
+		if (!canBack(remoteHist) || !connected) return;
+		navigating = true;
+		remoteHist = histBack(remoteHist);
+		remotePath = histCurrent(remoteHist);
+		await refresh();
+		navigating = false;
+	}
+
+	async function remoteForward() {
+		if (!canForward(remoteHist) || !connected) return;
+		navigating = true;
+		remoteHist = histForward(remoteHist);
+		remotePath = histCurrent(remoteHist);
+		await refresh();
+		navigating = false;
+	}
+
+	/**
+	 * マウスの「戻る／進む」。**押しても戻らない**と言われた所です。
+	 *
+	 * `button` の 3 が戻る、4 が進む。**`auxclick` ではなく `pointerdown`**
+	 * で拾います（WebView によっては `auxclick` が来ない）。
+	 * どちらのペインの上で押したかで、動かす側を変えます。
+	 */
+	function onSideButton(event: PointerEvent, side: 'local' | 'remote') {
+		if (event.button !== 3 && event.button !== 4) return;
+		event.preventDefault();
+		const goBack = event.button === 3;
+		if (side === 'local') {
+			void (goBack ? localBack() : localForward());
+		} else {
+			void (goBack ? remoteBack() : remoteForward());
+		}
+	}
+
+	/**
+	 * キーボード。**OS の慣習どおり**にします（覚えなくても手が知っている）。
+	 *
+	 * - `Alt + ←` / `Alt + →` … 戻る／進む
+	 * - `Alt + ↑` … 1 つ上へ
+	 * - `F5` … 読み直す
+	 *
+	 * **どちらのペインを動かすかは、いま焦点がある側**で決めます。
+	 * 焦点が無ければ、繋がっていればサーバー側、居なければ手元。
+	 */
+	function onKey(event: KeyboardEvent) {
+		const inField =
+			event.target instanceof HTMLElement &&
+			(event.target.tagName === 'INPUT' || event.target.tagName === 'TEXTAREA');
+
+		if (event.key === 'F5') {
+			event.preventDefault();
+			void (connected ? refresh() : loadLocal(localPath));
+			return;
+		}
+		if (!event.altKey || inField) return;
+
+		const side = focusedSide();
+		if (event.key === 'ArrowLeft') {
+			event.preventDefault();
+			void (side === 'local' ? localBack() : remoteBack());
+		} else if (event.key === 'ArrowRight') {
+			event.preventDefault();
+			void (side === 'local' ? localForward() : remoteForward());
+		} else if (event.key === 'ArrowUp') {
+			event.preventDefault();
+			void (side === 'local' ? localUp() : goUp());
+		}
+	}
+
+	function focusedSide(): 'local' | 'remote' {
+		const active = document.activeElement;
+		if (active instanceof HTMLElement && active.closest('[data-side="remote"]')) return 'remote';
+		if (active instanceof HTMLElement && active.closest('[data-side="local"]')) return 'local';
+		return connected ? 'remote' : 'local';
+	}
+
+	/** 手元でフォルダへ入る。**サーバー側の `enter` と対になる。** */
+	async function enterLocal(name: string) {
+		await loadLocal(localJoin(localPath, name));
+		await mirror('local', { kind: 'into', name });
+	}
+
+	/** 手元で 1 つ上へ。**サーバー側の `goUp` と対になる。** */
+	async function localUp() {
+		if (localParent === null) return;
+		await loadLocal(localParent);
+		await mirror('local', { kind: 'up' });
+	}
+
 	/** 手元を読む。**繋がっていなくても使える**（左は手元だけの話）。 */
 	async function loadLocal(path?: string) {
 		try {
@@ -103,6 +255,8 @@
 			localPath = listing.path;
 			localParent = listing.parent;
 			localEntries = listing.entries;
+			// **履歴で飛んでいる最中は積まない。**積むと戻るたびに増えます。
+			if (!navigating) localHist = visit(localHist, listing.path);
 		} catch (error: unknown) {
 			failure = String(error);
 		}
@@ -217,6 +371,7 @@
 		pickedRemote = [];
 		try {
 			entries = await invoke<Listed[]>('remote_list_dir', { path: remotePath });
+			if (!navigating) remoteHist = visit(remoteHist, remotePath);
 		} catch (error: unknown) {
 			failure = String(error);
 		} finally {
@@ -267,11 +422,13 @@
 	async function enter(name: string) {
 		remotePath = remotePath === '.' ? name : joinPath(remotePath, name);
 		await refresh();
+		await mirror('remote', { kind: 'into', name });
 	}
 
 	async function goUp() {
 		remotePath = parentOf(remotePath);
 		await refresh();
+		await mirror('remote', { kind: 'up' });
 	}
 
 	async function pickFiles() {
@@ -405,6 +562,8 @@
 		return () => stops.forEach((stop) => stop());
 	});
 </script>
+
+<svelte:window onkeydown={onKey} />
 
 <section class="files" class:dropping>
 	<!-- 開いている接続。**1 本残らずここに出る**（D25）。裏に持つ場所は無い。 -->
@@ -580,17 +739,51 @@
 		<p class="notice" role="status">{notice}</p>
 	{/if}
 
+	<!--
+		**左右を連れて歩く**（同期移動）。既定は切 — 勝手に付いてくると驚きます。
+		絶対パスを合わせるのではなく、**同じ動きをもう片方でもする**作りです
+		（手元が `C:\Users\me`・相手が `/srv/app` でも成立させるため）。
+	-->
+	<label class="sync">
+		<input type="checkbox" bind:checked={syncBrowse} />
+		{i18n.t('files.sync')}
+		<span class="hint">{i18n.t('files.sync.how')}</span>
+	</label>
+
 	<div class="panes" bind:this={panes} style:--pane-ratio={paneRatio}>
 		<!-- 手元。**右と同じ形にする。**どの階層から上げるのかが見えないと、
 		     「どこからどこへ」が分からない（実際に分からなかった）。 -->
-		<div class="pane shell">
+		<div
+			class="pane shell"
+			data-side="local"
+			role="group"
+			aria-label={i18n.t('files.local')}
+			onpointerdown={(event) => onSideButton(event, 'local')}
+		>
 			<div class="core">
 				<header>
 					<Icon name="file" />
+					<!-- **戻る／進む。**マウスの側面ボタン（3 / 4）と Alt+←→ でも同じことをします。 -->
+					<button
+						type="button"
+						class="ghost nav"
+						onclick={localBack}
+						disabled={!canBack(localHist)}
+						aria-label={i18n.t('files.back')}
+						title={i18n.t('files.back')}
+					>‹</button>
+					<button
+						type="button"
+						class="ghost nav"
+						onclick={localForward}
+						disabled={!canForward(localHist)}
+						aria-label={i18n.t('files.forward')}
+						title={i18n.t('files.forward')}
+					>›</button>
 					<button
 						type="button"
 						class="ghost"
-						onclick={() => localParent && loadLocal(localParent)}
+						onclick={localUp}
 						disabled={!localParent}
 						aria-label={i18n.t('files.up')}
 						title={i18n.t('files.up')}
@@ -617,7 +810,7 @@
 									<button
 										type="button"
 										class="link"
-										onclick={() => loadLocal(localJoin(localPath, entry.name))}
+										onclick={() => enterLocal(entry.name)}
 									>
 										{entry.name}
 									</button>
@@ -706,10 +899,32 @@
 		></div>
 
 		<!-- サーバー -->
-		<div class="pane shell">
+		<div
+			class="pane shell"
+			data-side="remote"
+			role="group"
+			aria-label={i18n.t('files.remote')}
+			onpointerdown={(event) => onSideButton(event, 'remote')}
+		>
 			<div class="core">
 				<header>
 					<Icon name="server" />
+					<button
+						type="button"
+						class="ghost nav"
+						onclick={remoteBack}
+						disabled={!connected || !canBack(remoteHist)}
+						aria-label={i18n.t('files.back')}
+						title={i18n.t('files.back')}
+					>‹</button>
+					<button
+						type="button"
+						class="ghost nav"
+						onclick={remoteForward}
+						disabled={!connected || !canForward(remoteHist)}
+						aria-label={i18n.t('files.forward')}
+						title={i18n.t('files.forward')}
+					>›</button>
 					<button
 						type="button"
 						class="ghost"
@@ -1089,6 +1304,26 @@
 	.staging .hint {
 		font-size: 0.7rem;
 		color: var(--fg-muted);
+	}
+
+	.sync {
+		display: flex;
+		align-items: center;
+		gap: 0.4rem;
+		font-size: 0.75rem;
+		padding: 0 0.1rem 0.35rem;
+	}
+
+	.sync .hint {
+		color: var(--fg-muted);
+		font-size: 0.7rem;
+	}
+
+	/* 戻る／進む。**細い記号なので、当たり判定は文字より広く。** */
+	.nav {
+		min-width: 22px;
+		font-size: 1rem;
+		line-height: 1;
 	}
 
 	.pane-splitter {
