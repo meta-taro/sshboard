@@ -23,6 +23,8 @@ sshboard-stream = { path = "../../../crates/sshboard-stream" }
 tauri = { version = "2", features = [] }
 # ファイルを選ぶ窓（OS のもの）。**自前のファイル選択を作らない。**
 tauri-plugin-dialog = "2"
+# 2 つ目の起動を許さない（D35 / Issue #2）。**ポートは 1 つしか無い。**
+tauri-plugin-single-instance = "2"
 # 自動更新（D34）。**署名を検証できない更新は入れません**（minisign・鍵は人が作る）。
 tauri-plugin-updater = "2"
 # 更新を入れたあとの再起動。**押すのは人**（`updater.svelte.ts`）。

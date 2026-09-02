@@ -27,6 +27,27 @@ use crate::pending::PendingLines;
 
 pub fn run() {
     tauri::Builder::default()
+        // **いちばん先に登録する**（Tauri の作法）。
+        //
+        // 2 つ目を起動させない（D35 / Issue #2）。理由は 2 つ:
+        //
+        // 1. **MCP の口は 1 つしか無い。**ポートを固定した（D33）ので、
+        //    2 つ目は必ず bind に失敗する。**失敗した方の画面は MCP を持たない**
+        //    まま開き、人からは「なぜか AI から見えない窓」に見える
+        // 2. **「人と AI が同じ画面を見る」が前提**（PRD §4-1）。
+        //    画面が 2 枚ある状態は、そもそも想定していない
+        //
+        // **黙って終わらない。**既にある窓を前へ出してから終わります。
+        .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
+            let Some(window) = app.get_webview_window("main") else {
+                return;
+            };
+            // **最小化されている・裏に隠れている**の両方を戻す。
+            // 片方だけだと「押したのに何も起きない」に見える。
+            let _ = window.unminimize();
+            let _ = window.show();
+            let _ = window.set_focus();
+        }))
         .plugin(tauri_plugin_dialog::init())
         // 自動更新（D34）。**黙って入れ替えません。**
         // 見つけたら画面に出し、押すのは人。SSH の鍵を扱う道具が
