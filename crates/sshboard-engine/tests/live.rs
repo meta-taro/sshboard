@@ -11,6 +11,9 @@ use sshboard_engine::{Engine, EngineError, OnConflict};
 use sshboard_ssh::{Auth, SshError, SshSession, Target, WriteScope};
 use sshboard_stream::OutputStream;
 
+mod common;
+use common::toml_string;
+
 const HOST: &str = "127.0.0.1";
 const PORT: u16 = 2222;
 const USER: &str = "probe";
@@ -366,7 +369,7 @@ async fn registry_with_key(dir: &tempfile::TempDir, key: &Path) -> PathBuf {
          host = \"{HOST}\"\nport = {PORT}\nuser = \"{USER}\"\n\
          fingerprint = \"{}\"\nkey_path = \"{}\"\n",
         known_fingerprint().await,
-        key.display()
+        toml_string(key)
     );
     std::fs::write(&path, toml).expect("接続一覧を書けない");
     path

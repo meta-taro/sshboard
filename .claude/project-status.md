@@ -69,10 +69,10 @@ Phase 0 の 5 本は、実機と Windows 目視を除いてすべて通りまし
 
 ## テスト状況
 
-**Rust 266 ＋ フロント 75 ＝ 341 本。全部通っています。**（手元のテスト用サーバーを建てた状態）
+**Rust 267 ＋ フロント 75 ＝ 342 本。全部通っています。**（手元のテスト用サーバーを建てた状態）
 
 ```
-cargo test --workspace                                 →  266 passed; 0 failed
+cargo test --workspace                                 →  267 passed; 0 failed
 cargo fmt --all -- --check                             →  差分なし
 cargo clippy --workspace --all-targets -- -D warnings  →  警告なし
 pnpm --filter desktop check                            →  254 files, 0 errors, 0 warnings
@@ -88,7 +88,7 @@ pnpm --filter desktop test                             →   75 passed
 | `sshboard-connections` | 20 | |
 | `sshboard-diag` | 8 | |
 | `sshboard-ssh` | 69 | 22 |
-| `sshboard-engine` | 61 | 24 |
+| `sshboard-engine` | 62 | 24 |
 | `sshboard-mcp` | 34 | 4 |
 | `sshboard-readonly` | 16 | |
 | `sshboard-desktop` | 9 | |

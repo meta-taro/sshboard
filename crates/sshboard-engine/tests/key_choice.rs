@@ -15,6 +15,9 @@ use sshboard_band::{Actor, Band};
 use sshboard_engine::{Engine, EngineError};
 use sshboard_stream::OutputStream;
 
+mod common;
+use common::toml_string;
+
 /// 鍵のパスだけを書いた接続一覧。**繋ぎに行く前に断られる想定。**
 fn registry_with_key(dir: &tempfile::TempDir, key: &Path) -> PathBuf {
     let path = dir.path().join("connections.toml");
@@ -22,7 +25,7 @@ fn registry_with_key(dir: &tempfile::TempDir, key: &Path) -> PathBuf {
         "version = 1\n\n[[connections]]\nid = \"pending\"\nname = \"Pending\"\n\
          host = \"127.0.0.1\"\nport = 65000\nuser = \"nobody\"\n\
          key_path = \"{}\"\n",
-        key.display()
+        toml_string(key)
     );
     std::fs::write(&path, toml).expect("接続一覧を書けない");
     path
@@ -120,5 +123,33 @@ async fn the_refusal_never_carries_the_path_to_the_key() {
     assert!(
         !shown.contains("secret-place") && !shown.contains(dir.path().to_str().unwrap()),
         "断り文にパスが混ざっている: {shown}"
+    );
+}
+
+#[tokio::test]
+async fn a_windows_style_path_does_not_corrupt_the_connection_list() {
+    // **CI（windows-latest）で実際に落ちた穴です。**
+    // `C:\Users\...` を TOML へそのまま書くと、`\U` が unicode エスケープとして
+    // 読まれ、`invalid unicode 8-digit hex code` で**接続一覧ごと壊れました。**
+    //
+    // 製品側は `toml::to_string_pretty` を通すので無事でしたが、
+    // **テストが手で組んでいたため、Windows でだけ落ちていました。**
+    //
+    // `\` を含むパス文字列は Unix でも作れるので、**ここで再現できます。**
+    // Windows を待たずに気づけるようにしておきます。
+    let dir = tempfile::tempdir().expect("一時ディレクトリ");
+    let windows_ish = Path::new(r"C:\Users\RUNNER~1\AppData\Local\Temp\id_ed25519");
+    let engine = engine_at(registry_with_key(&dir, windows_ish));
+
+    let Err(error) = engine.connect(Actor::Human, "pending", None).await else {
+        panic!("在りもしない鍵で繋ごうとしている");
+    };
+
+    // **TOML が壊れていないこと。**壊れていれば「接続の一覧を読めません」になる。
+    // 鍵そのものが無いことで断られるのが正しい。
+    let shown = error.to_string();
+    assert!(
+        !shown.contains("TOML") && !shown.contains("一覧を読めません"),
+        "接続一覧が壊れている（パスの `\\` が TOML を壊した）: {shown}"
     );
 }
