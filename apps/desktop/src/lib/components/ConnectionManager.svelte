@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { invoke } from '@tauri-apps/api/core';
 	import { listen } from '@tauri-apps/api/event';
-	import { open as openDialog } from '@tauri-apps/plugin-dialog';
+	import { open as openDialog, save as saveDialog } from '@tauri-apps/plugin-dialog';
 	import { onMount } from 'svelte';
 
 	import Icon from '$lib/components/Icon.svelte';
@@ -37,6 +37,82 @@
 	let dragging = $state(false);
 	/** **いきなり消さない**（product-baseline §13）。押してから、もう一度確かめる。 */
 	let confirmingDelete = $state(false);
+
+	/* --- 書き出し／取り込み（D18） --- */
+
+	/** Rust 側（`sshboard-bundle`）と同じ下限。**強さの物差しではなく、空を弾くため。** */
+	const MIN_PASSPHRASE = 8;
+
+	/** 書き出しに選んだ接続。**既定は空** — 押した覚えのないものを渡さない。 */
+	let ticked = $state<string[]>([]);
+	/** 'export' / 'import' / null。**同時に開かない。** */
+	let transfer = $state<'export' | 'import' | null>(null);
+	let passphrase = $state('');
+	let transferBusy = $state(false);
+	let transferNote = $state('');
+
+	function toggleTicked(id: string) {
+		ticked = ticked.includes(id) ? ticked.filter((held) => held !== id) : [...ticked, id];
+	}
+
+	function openTransfer(kind: 'export' | 'import') {
+		transfer = kind;
+		passphrase = '';
+		transferNote = '';
+	}
+
+	function closeTransfer() {
+		transfer = null;
+		// **パスフレーズを画面に残さない。**閉じた時点で捨てる。
+		passphrase = '';
+	}
+
+	async function runExport() {
+		if (ticked.length === 0 || passphrase.length < MIN_PASSPHRASE) return;
+		transferBusy = true;
+		transferNote = '';
+		try {
+			const destination = await saveDialog({
+				defaultPath: 'sshboard.sshbx',
+				filters: [{ name: 'sshboard', extensions: ['sshbx'] }]
+			});
+			if (!destination) return;
+			const count = await invoke<number>('bundle_export', {
+				ids: ticked,
+				passphrase,
+				destination
+			});
+			transferNote = i18n.t('bundle.exported', { count: String(count) });
+			closeTransfer();
+			ticked = [];
+		} catch (error: unknown) {
+			transferNote = String(error);
+		} finally {
+			transferBusy = false;
+		}
+	}
+
+	async function runImport() {
+		if (passphrase.length === 0) return;
+		transferBusy = true;
+		transferNote = '';
+		try {
+			const source = await openDialog({
+				multiple: false,
+				directory: false,
+				filters: [{ name: 'sshboard', extensions: ['sshbx'] }]
+			});
+			if (!source || Array.isArray(source)) return;
+			const count = await invoke<number>('bundle_import', { source, passphrase });
+			transferNote = i18n.t('bundle.imported', { count: String(count) });
+			closeTransfer();
+			reload();
+		} catch (error: unknown) {
+			transferNote = String(error);
+		} finally {
+			transferBusy = false;
+		}
+	}
 
 	function containerWidth(): number {
 		return manager?.getBoundingClientRect().width ?? 0;
@@ -215,12 +291,83 @@
 			</button>
 		</div>
 
+		<div class="transfer-bar">
+			<button
+				type="button"
+				class="ghost tiny"
+				onclick={() => openTransfer('export')}
+				disabled={ticked.length === 0}
+				title={ticked.length === 0 ? i18n.t('bundle.export.none') : ''}
+			>
+				<Icon name="download" size={11} />
+				{i18n.t('bundle.export', { count: String(ticked.length) })}
+			</button>
+			<button type="button" class="ghost tiny" onclick={() => openTransfer('import')}>
+				<Icon name="upload" size={11} />
+				{i18n.t('bundle.import')}
+			</button>
+		</div>
+
+		{#if transfer !== null}
+			<div class="transfer-panel">
+				<p class="what">
+					{transfer === 'export' ? i18n.t('bundle.export.what') : i18n.t('bundle.import.what')}
+				</p>
+				<!-- **同じ経路で送らない**（D18）。ここに書いておかないと、
+				     ファイルとパスフレーズを同じメールに付けられます。 -->
+				<p class="warn">{i18n.t('bundle.channel')}</p>
+				<input
+					type="password"
+					bind:value={passphrase}
+					placeholder={i18n.t('bundle.passphrase')}
+					aria-label={i18n.t('bundle.passphrase')}
+					autocomplete="off"
+				/>
+				{#if transfer === 'export' && passphrase.length > 0 && passphrase.length < MIN_PASSPHRASE}
+					<p class="warn">{i18n.t('bundle.tooshort', { min: String(MIN_PASSPHRASE) })}</p>
+				{/if}
+				<div class="transfer-actions">
+					<button
+						type="button"
+						class="cta"
+						disabled={transferBusy ||
+							passphrase.length === 0 ||
+							(transfer === 'export' && passphrase.length < MIN_PASSPHRASE)}
+						onclick={() => (transfer === 'export' ? runExport() : runImport())}
+					>
+						{transferBusy
+							? i18n.t('bundle.working')
+							: transfer === 'export'
+								? i18n.t('bundle.export.go')
+								: i18n.t('bundle.import.go')}
+					</button>
+					<button type="button" onclick={closeTransfer}>{i18n.t('conn.delete.no')}</button>
+				</div>
+			</div>
+		{/if}
+
+		{#if transferNote}
+			<p class="transfer-note" role="status">{transferNote}</p>
+		{/if}
+
 		{#if items.length === 0}
 			<p class="empty">{i18n.t('conn.empty')}</p>
 		{:else}
 			<ul>
 				{#each items as item (item.id)}
-					<li>
+					<li class="row-line">
+						<!--
+							**書き出しに選ぶ印。**行そのものは「開く」ままにします
+							（既存の操作を変えない）。チェックは別の当たり判定にして、
+							**押し間違いで接続先が 1 つ余計に渡ることを防ぎます。**
+						-->
+						<input
+							type="checkbox"
+							class="tick"
+							checked={ticked.includes(item.id)}
+							onchange={() => toggleTicked(item.id)}
+							aria-label={i18n.t('bundle.tick', { name: item.name || item.id })}
+						/>
 						<button
 							type="button"
 							class="row"
@@ -465,7 +612,67 @@
 			gap: 0.5rem;
 		}
 
-		.splitter {
+		/* --- 書き出し／取り込み（D18） --- */
+
+	.transfer-bar {
+		display: flex;
+		gap: 0.4rem;
+		padding: 0 0.6rem 0.4rem;
+		flex-wrap: wrap;
+	}
+
+	.transfer-panel {
+		display: flex;
+		flex-direction: column;
+		gap: 0.4rem;
+		margin: 0 0.6rem 0.5rem;
+		padding: 0.5rem;
+		border: 1px solid var(--border);
+		border-radius: 6px;
+	}
+
+	.transfer-panel .what {
+		margin: 0;
+		font-size: 0.75rem;
+	}
+
+	/* **同じ経路で送らない**を目立たせる（D18）。 */
+	.transfer-panel .warn {
+		margin: 0;
+		font-size: 0.7rem;
+		color: var(--fg-muted);
+	}
+
+	.transfer-actions {
+		display: flex;
+		gap: 0.4rem;
+	}
+
+	.transfer-note {
+		margin: 0 0.6rem 0.5rem;
+		font-size: 0.75rem;
+	}
+
+	.row-line {
+		display: flex;
+		align-items: center;
+		gap: 0.4rem;
+	}
+
+	/* **当たり判定を分ける。**行は「開く」、印は「渡す」。
+	   同じ所に重ねると、開いたつもりで渡す物が増えます。 */
+	.tick {
+		flex: 0 0 auto;
+		margin-left: 0.5rem;
+		cursor: pointer;
+	}
+
+	.row-line .row {
+		flex: 1 1 auto;
+		min-width: 0;
+	}
+
+	.splitter {
 			display: none;
 		}
 	}

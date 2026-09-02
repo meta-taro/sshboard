@@ -45,12 +45,12 @@ jobs:
         run: cargo fmt --all -- --check
 
       - name: clippy
-        run: cargo clippy -p sshboard-band -p sshboard-mcp -p sshboard-stream -p sshboard-credentials -p sshboard-ssh -p sshboard-connections -p sshboard-diag -p sshboard-engine -p sshboard-readonly --all-targets -- -D warnings
+        run: cargo clippy -p sshboard-band -p sshboard-mcp -p sshboard-stream -p sshboard-credentials -p sshboard-ssh -p sshboard-connections -p sshboard-diag -p sshboard-engine -p sshboard-readonly -p sshboard-bundle --all-targets -- -D warnings
 
       # **実機を要するテストは、サーバーが無ければ自分で飛ぶ**（`server_is_up()`）。
       # だから CI でもそのまま走らせてよい。飛んだ分は手元でしか確かめられない。
       - name: test
-        run: cargo test -p sshboard-band -p sshboard-mcp -p sshboard-stream -p sshboard-ssh -p sshboard-connections -p sshboard-diag -p sshboard-engine -p sshboard-readonly
+        run: cargo test -p sshboard-band -p sshboard-mcp -p sshboard-stream -p sshboard-ssh -p sshboard-connections -p sshboard-diag -p sshboard-engine -p sshboard-readonly -p sshboard-bundle
 
       # 資格情報は OS のストアを実際に触る。**対象 OS は Windows と macOS**（PRD §7）で、
       # Linux ランナーには当てにできる資格情報ストアが無い。

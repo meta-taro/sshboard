@@ -205,6 +205,24 @@ async fn the_server_advertises_only_the_phase_zero_tools() {
     // **道具の名前で見る。**説明文に部分一致させると、無関係な文章に当たる
     // （`passphrase` で 1 度踏んだ。今度は "operating system" が `system` に当たった）。
     // 名前で見る方が**厳しく、かつ正確**。
+    // **接続情報の受け渡しは AI に渡さない**（D18）。
+    // バンドルは**接続先と鍵のパスフレーズを丸ごと**含みます。
+    // 「AI の書き込みを囲いの外へ出さない」（D22）以前の話として、
+    // **AI が触ってよいものではありません。**
+    // 手元へ落とす口を渡さない（D27）のと同じ理由です。
+    for forbidden in [
+        "bundle_export",
+        "bundle_import",
+        "export_connections",
+        "import_connections",
+    ] {
+        let as_name = format!("\"name\":\"{forbidden}\"");
+        assert!(
+            !listed.contains(&as_name),
+            "接続情報を持ち出す口が生えている（{forbidden}）: {listed}"
+        );
+    }
+
     for forbidden in ["run_command", "shell", "system", "exec", "eval"] {
         let as_name = format!("\"name\":\"{forbidden}\"");
         assert!(

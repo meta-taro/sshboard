@@ -4,6 +4,7 @@
 //! 裏で見えないセッションを 1 本も増やさないための前提（PRD §4-1）。
 
 mod bridge;
+mod bundle_cmd;
 mod capture;
 mod commands;
 mod connections_cmd;
@@ -61,6 +62,8 @@ pub fn run() {
             commands::mcp_url,
             commands::stream_follow,
             commands::stop_stream,
+            bundle_cmd::bundle_export,
+            bundle_cmd::bundle_import,
             connections_cmd::connections_list,
             connections_cmd::connections_path,
             connections_cmd::connection_save,
