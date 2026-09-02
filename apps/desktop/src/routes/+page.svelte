@@ -8,6 +8,7 @@
 	import FileBrowser from '$lib/components/FileBrowser.svelte';
 	import Icon from '$lib/components/Icon.svelte';
 	import { i18n } from '$lib/i18n/i18n.svelte';
+	import { menuLabels } from '$lib/i18n/messages-menu';
 	import { titlebar } from '$lib/window/titlebar.svelte';
 	import { updater } from '$lib/update/updater.svelte';
 	import { LOCALES } from '$lib/i18n/locales';
@@ -37,6 +38,19 @@
 	let mcp = $state<McpAccess | null>(null);
 	/** **立ち上がらなかったこと。**出さないと「起動中」のまま止まって見える。 */
 	let mcpFailure = $state<McpFailure | null>(null);
+
+	/**
+	 * 「表示」を開いているか。
+	 *
+	 * **自前タイトルバー（D17）にしたので、Windows では OS のメニューが消えました。**
+	 * 文字サイズは右上のボタンに残っていましたが、**そこが見つからなかった**という
+	 * 報告が実機から 2 回出ています（MCP のコピーボタンでも同じことが起きた）。
+	 * **失った「表示」メニューを、自分の帯の中に作り直します。**
+	 */
+	let viewMenuOpen = $state(false);
+
+	/** メニューの文言は**既にある**（`messages-menu`）。新しい言い方を増やさない。 */
+	const menu = $derived(menuLabels(i18n.locale));
 	let mcpCopied = $state(false);
 	let failure = $state<string | null>(null);
 	let streaming = $state(false);
@@ -521,57 +535,90 @@
 			</button>
 		</nav>
 
-		<div class="settings">
-			<!-- 文字サイズ。**この道具は小さい字が画面いっぱいに並ぶ。**読めなければ始まらない。
-			     いまどの段かを間に出す。**出さないと、押した結果が分からない。**
-			     OS のメニュー（表示）にも同じものを置いてある。 -->
+		<!--
+			**「表示」。**自前タイトルバー（D17）にした結果、
+			Windows では OS のメニューが消えました。文字サイズは右上に出ていましたが、
+			**「変更できるようにしたい」と実機から言われた** — つまり見つからなかった。
+			**失ったメニューを、自分の帯の中に作り直します。**
+			文言は `messages-menu` に既にあるものを使い、言い方を増やしません。
+		-->
+		<div class="view-menu">
 			<button
 				type="button"
-				class="icon-only text-step"
-				onclick={() => textSize.step(-1)}
-				disabled={textSize.atSmallest}
-				title={`${i18n.t('text.label')}: ${i18n.t('text.smaller')}`}
-				aria-label={`${i18n.t('text.label')}: ${i18n.t('text.smaller')}`}
+				class="view-trigger"
+				aria-haspopup="true"
+				aria-expanded={viewMenuOpen}
+				onclick={() => (viewMenuOpen = !viewMenuOpen)}
 			>
-				<span class="smaller-a">A</span>
-			</button>
-			<span class="text-now" aria-hidden="true">{i18n.t(`text.${textSize.mode}`)}</span>
-			<button
-				type="button"
-				class="icon-only text-step"
-				onclick={() => textSize.step(1)}
-				disabled={textSize.atLargest}
-				title={`${i18n.t('text.label')}: ${i18n.t('text.larger')}`}
-				aria-label={`${i18n.t('text.label')}: ${i18n.t('text.larger')}`}
-			>
-				<span class="larger-a">A</span>
+				{menu['menu.view']}
 			</button>
 
-			<span class="settings-icon"><Icon name="globe" size={13} /></span>
-			{#each ['auto', 'light', 'dark'] as const as mode (mode)}
-				<button
-					type="button"
-					class="icon-only"
-					class:active={theme.mode === mode}
-					title={`${i18n.t('theme.label')}: ${i18n.t(`theme.${mode}`)}`}
-					aria-label={`${i18n.t('theme.label')}: ${i18n.t(`theme.${mode}`)}`}
-					onclick={() => theme.set(mode as ThemeMode)}
-				>
-					<Icon name={mode === 'auto' ? 'contrast' : mode === 'light' ? 'sun' : 'moon'} />
-				</button>
-			{/each}
-			<select
-				value={i18n.locale}
-				aria-label={i18n.t('lang.label')}
-				onchange={(event) => i18n.set((event.currentTarget as HTMLSelectElement).value)}
-			>
-				{#each LOCALES as locale (locale.code)}
-					<option value={locale.code}>{locale.native}</option>
-				{/each}
-			</select>
+			{#if viewMenuOpen}
+				<!-- **外を押したら閉じる。**開きっぱなしは邪魔。 -->
+				<div class="view-backdrop" role="presentation" onclick={() => (viewMenuOpen = false)}></div>
+				<div class="view-panel" role="group" aria-label={menu['menu.view']}>
+					<div class="view-row">
+						<span class="view-label">{i18n.t('text.label')}</span>
+						<div class="view-controls">
+							<button
+								type="button"
+								class="icon-only text-step"
+								onclick={() => textSize.step(-1)}
+								disabled={textSize.atSmallest}
+								title={menu['menu.textSmaller']}
+								aria-label={menu['menu.textSmaller']}
+							>
+								<span class="smaller-a">A</span>
+							</button>
+							<span class="text-now">{i18n.t(`text.${textSize.mode}`)}</span>
+							<button
+								type="button"
+								class="icon-only text-step"
+								onclick={() => textSize.step(1)}
+								disabled={textSize.atLargest}
+								title={menu['menu.textLarger']}
+								aria-label={menu['menu.textLarger']}
+							>
+								<span class="larger-a">A</span>
+							</button>
+						</div>
+					</div>
+
+					<div class="view-row">
+						<span class="view-label">{i18n.t('theme.label')}</span>
+						<div class="view-controls">
+							{#each ['auto', 'light', 'dark'] as const as mode (mode)}
+								<button
+									type="button"
+									class="icon-only"
+									class:active={theme.mode === mode}
+									title={i18n.t(`theme.${mode}`)}
+									aria-label={`${i18n.t('theme.label')}: ${i18n.t(`theme.${mode}`)}`}
+									onclick={() => theme.set(mode as ThemeMode)}
+								>
+									<Icon name={mode === 'auto' ? 'contrast' : mode === 'light' ? 'sun' : 'moon'} />
+								</button>
+							{/each}
+						</div>
+					</div>
+
+					<div class="view-row">
+						<span class="view-label"><Icon name="globe" size={13} /></span>
+						<select
+							value={i18n.locale}
+							onchange={(event) => i18n.set((event.currentTarget as HTMLSelectElement).value)}
+							aria-label="Language"
+						>
+							{#each LOCALES as locale (locale.code)}
+								<option value={locale.code}>{locale.native}</option>
+							{/each}
+						</select>
+					</div>
+				</div>
+			{/if}
 		</div>
 
-		<!-- **合言葉ごと写せる形にする**（D23）。起動ごとに変わるので、書き写させない。 -->
+		<!-- **合言葉ごと写せる形にする**（D23）。 -->
 		<button
 			type="button"
 			class="mcp"
@@ -856,6 +903,72 @@
 		padding: 0.2rem 0.5rem;
 	}
 
+	/* --- 「表示」メニュー（自前タイトルバーで OS のメニューを失った分） --- */
+
+	.view-menu {
+		position: relative;
+		display: flex;
+		align-items: center;
+		margin-left: auto;
+	}
+
+	.view-trigger {
+		font-size: 0.75rem;
+		padding: 0.2rem 0.55rem;
+		background: transparent;
+		border: 1px solid transparent;
+		border-radius: 6px;
+		color: var(--fg);
+		white-space: nowrap;
+	}
+
+	.view-trigger:hover,
+	.view-trigger[aria-expanded='true'] {
+		border-color: var(--border);
+	}
+
+	/* **外を押したら閉じる。**帯より下は全部当たり判定にする。 */
+	.view-backdrop {
+		position: fixed;
+		inset: 0;
+		z-index: 40;
+	}
+
+	.view-panel {
+		position: absolute;
+		top: calc(100% + 6px);
+		right: 0;
+		z-index: 41;
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+		padding: 0.6rem;
+		min-width: 220px;
+		border: 1px solid var(--border);
+		border-radius: 8px;
+		background: var(--surface);
+		box-shadow: 0 8px 24px rgb(0 0 0 / 25%);
+	}
+
+	.view-row {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 0.6rem;
+	}
+
+	.view-label {
+		font-size: 0.75rem;
+		color: var(--fg-muted);
+		white-space: nowrap;
+	}
+
+	.view-controls {
+		display: flex;
+		align-items: center;
+		gap: 0.25rem;
+	}
+
 	/* --- 窓の操作（自前タイトルバー・D17） --- */
 
 	.window-controls {
@@ -1044,7 +1157,7 @@
 	}
 
 	/* 設定と切替は、浮いた 1 本のピルにまとめる。 */
-	.settings,
+	.view-panel,
 	.tabs {
 		display: flex;
 		align-items: center;
@@ -1057,7 +1170,7 @@
 		padding: 3px;
 	}
 
-	.settings-icon {
+	.view-panel-icon {
 		display: inline-flex;
 		align-items: center;
 		padding: 0 0.15rem 0 0.4rem;
@@ -1066,7 +1179,7 @@
 
 	/* **アイコンと文字を横に並べる。**これが無いと、SVG が block なので
 	   文字の上に乗ってしまう（実際に乗った）。 */
-	.settings button,
+	.view-panel button,
 	.tabs button {
 		display: inline-flex;
 		align-items: center;
@@ -1086,30 +1199,30 @@
 			transform var(--fast) var(--ease);
 	}
 
-	.settings button.icon-only {
+	.view-panel button.icon-only {
 		padding: 0.26rem 0.4rem;
 	}
 
-	.settings button:active,
+	.view-panel button:active,
 	.tabs button:active {
 		transform: scale(0.97);
 	}
 
-	.settings button.active,
+	.view-panel button.active,
 	.tabs button.active {
 		color: var(--fg);
 		background: var(--surface);
 		box-shadow: var(--inner-highlight), var(--lift-1);
 	}
 
-	.settings button:focus-visible,
+	.view-panel button:focus-visible,
 	.tabs button:focus-visible,
-	.settings select:focus-visible {
+	.view-panel select:focus-visible {
 		outline: 2px solid var(--accent);
 		outline-offset: 1px;
 	}
 
-	.settings select {
+	.view-panel select {
 		font: inherit;
 		font-size: 0.74rem;
 		color: var(--fg);
