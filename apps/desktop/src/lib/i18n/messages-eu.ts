@@ -86,6 +86,10 @@ export const de: Catalog = {
 	"mcp.copy": "MCP-Befehl kopieren",
 	'mcp.failed': 'MCP konnte nicht starten (Port {port})',
 	'mcp.failed.help': 'Port {port} ist bereits belegt — läuft ein weiteres sshboard? Zum Verschieben SSHBOARD_MCP_PORT setzen. Detail: {detail}',
+	'win.minimize': 'Minimieren',
+	'win.maximize': 'Maximieren',
+	'win.restore': 'Wiederherstellen',
+	'win.close': 'Schließen',
 	"mcp.copied": "Kopiert.",
 	"mcp.token.help": "Das Token ändert sich bei jedem Start von sshboard. Fügen Sie diesen Befehl in Ihren Agenten ein.",
 
@@ -215,6 +219,10 @@ export const fr: Catalog = {
 	"mcp.copy": "Copier la commande MCP",
 	'mcp.failed': 'MCP n\'a pas pu démarrer (port {port})',
 	'mcp.failed.help': 'Le port {port} est déjà utilisé — un autre sshboard est-il lancé ? Définissez SSHBOARD_MCP_PORT pour le déplacer. Détail : {detail}',
+	'win.minimize': 'Réduire',
+	'win.maximize': 'Agrandir',
+	'win.restore': 'Restaurer',
+	'win.close': 'Fermer',
 	"mcp.copied": "Copié.",
 	"mcp.token.help": "Le jeton change à chaque démarrage de sshboard. Collez cette commande dans votre agent.",
 
@@ -344,6 +352,10 @@ export const es: Catalog = {
 	"mcp.copy": "Copiar el comando MCP",
 	'mcp.failed': 'MCP no pudo iniciarse (puerto {port})',
 	'mcp.failed.help': 'El puerto {port} ya está en uso: ¿hay otro sshboard abierto? Defina SSHBOARD_MCP_PORT para cambiarlo. Detalle: {detail}',
+	'win.minimize': 'Minimizar',
+	'win.maximize': 'Maximizar',
+	'win.restore': 'Restaurar',
+	'win.close': 'Cerrar',
 	"mcp.copied": "Copiado.",
 	"mcp.token.help": "El token cambia cada vez que se inicia sshboard. Pegue este comando en su agente.",
 

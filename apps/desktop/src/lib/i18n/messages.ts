@@ -121,6 +121,10 @@ const en = {
 	"mcp.copy": "Copy the MCP command",
 	'mcp.failed': 'MCP could not start (port {port})',
 	'mcp.failed.help': 'Port {port} is already in use — is another sshboard running? Set SSHBOARD_MCP_PORT to move it. Detail: {detail}',
+	'win.minimize': 'Minimise',
+	'win.maximize': 'Maximise',
+	'win.restore': 'Restore',
+	'win.close': 'Close',
 	"mcp.copied": "Copied.",
 	"mcp.token.help": "The token changes every time sshboard starts. Paste this command into your agent.",
 
@@ -290,6 +294,10 @@ const ja: Catalog = {
 	"mcp.copy": "MCP の登録コマンドを写す",
 	'mcp.failed': 'MCP が立ち上がりませんでした（ポート {port}）',
 	'mcp.failed.help': 'ポート {port} が既に使われています。別の sshboard が起動していませんか。移すなら環境変数 SSHBOARD_MCP_PORT を設定してください。詳細: {detail}',
+	'win.minimize': '最小化',
+	'win.maximize': '最大化',
+	'win.restore': '元のサイズに戻す',
+	'win.close': '閉じる',
 	"mcp.copied": "写しました。",
 	"mcp.token.help": "トークンは sshboard を起動するたびに変わります。このコマンドをエージェントへ貼ってください。",
 

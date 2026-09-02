@@ -8,6 +8,7 @@
 	import FileBrowser from '$lib/components/FileBrowser.svelte';
 	import Icon from '$lib/components/Icon.svelte';
 	import { i18n } from '$lib/i18n/i18n.svelte';
+	import { titlebar } from '$lib/window/titlebar.svelte';
 	import { LOCALES } from '$lib/i18n/locales';
 	import { textSize } from '$lib/text-size/text-size.svelte';
 	import { theme, type ThemeMode } from '$lib/theme/theme.svelte';
@@ -359,6 +360,9 @@
 	}
 
 	onMount(() => {
+		// **この帯が OS のタイトルバー**（D17）。最大化の状態を取り込む。
+		titlebar.init();
+
 		const stops: Array<() => void> = [];
 
 		type ConsoleState = { holder: 'human' | 'ai' | null; connection: string | null };
@@ -476,7 +480,14 @@
 
 <main>
 	<!-- **上の帯は 1 行に収める。**6 段積むと、道具として使う面積が消える。 -->
-	<header>
+	<!--
+		**この帯が OS のタイトルバーです**（`decorations: false`・D17）。
+		標準の帯は配色がテーマに追従せず、暗い画面の上に明るい帯が乗ります。
+
+		帯そのものを掴んで動かせるようにし（`data-tauri-drag-region`）、
+		中のボタン類は各自が押せるままにします。
+	-->
+	<header data-tauri-drag-region>
 		<span class="phase" title={i18n.t('app.driven')}>{i18n.t('app.phase0')}</span>
 
 		<nav class="tabs">
@@ -575,6 +586,44 @@
 					'mcp.starting'
 				)}{:else if mcpCopied}{i18n.t('mcp.copied')}{:else}{i18n.t('mcp.copy')}{/if}
 		</button>
+
+		<!--
+			窓の操作。**Windows は右上、macOS も同じ並びに揃えます**（house style・D17）。
+			`decorations: false` にすると macOS の信号機ボタンも消えるため、自前で出します。
+
+			**Windows 11 の Snap Layouts は落ちます**（D17 で了承済み）。
+			Tauri 2 に Electron の `titleBarOverlay` 相当が無く、`WM_NCHITTEST` を
+			書くコストが今の段階では高すぎるため。**製品間で挙動が揃うこと自体は利点。**
+		-->
+		<div class="window-controls">
+			<button
+				type="button"
+				class="wc"
+				onclick={() => titlebar.minimize()}
+				title={i18n.t('win.minimize')}
+				aria-label={i18n.t('win.minimize')}
+			>
+				─
+			</button>
+			<button
+				type="button"
+				class="wc"
+				onclick={() => titlebar.toggleMaximize()}
+				title={titlebar.isMaximized ? i18n.t('win.restore') : i18n.t('win.maximize')}
+				aria-label={titlebar.isMaximized ? i18n.t('win.restore') : i18n.t('win.maximize')}
+			>
+				{titlebar.maximizeGlyph}
+			</button>
+			<button
+				type="button"
+				class="wc close"
+				onclick={() => titlebar.close()}
+				title={i18n.t('win.close')}
+				aria-label={i18n.t('win.close')}
+			>
+				✕
+			</button>
+		</div>
 	</header>
 
 	{#if failure}
@@ -736,6 +785,52 @@
 		gap: 0.5rem;
 		flex-wrap: nowrap;
 		min-width: 0;
+		/* **この帯が OS のタイトルバー**（D17）。掴んで窓を動かせる高さを確保する。 */
+		min-height: 34px;
+		/* 掴む所に文字を選ばせない。**掴んだつもりで選択が始まると、窓が動かない。** */
+		user-select: none;
+	}
+
+	/* --- 窓の操作（自前タイトルバー・D17） --- */
+
+	.window-controls {
+		display: flex;
+		align-items: stretch;
+		gap: 0;
+		margin-left: 0.25rem;
+		/* 帯の端まで届かせる。**Windows の人は右上の角を押しに行く。** */
+		margin-right: calc(-1 * var(--pad, 0.6rem));
+		align-self: stretch;
+	}
+
+	.wc {
+		min-width: 40px;
+		border: 0;
+		background: transparent;
+		color: var(--fg-muted);
+		font-size: 0.8rem;
+		line-height: 1;
+		cursor: default;
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		padding: 0 0.5rem;
+	}
+
+	.wc:hover {
+		background: var(--surface-2, rgba(127, 127, 127, 0.18));
+		color: var(--fg);
+	}
+
+	/* **閉じるだけは赤。**押し間違いの結果が他と違う。 */
+	.wc.close:hover {
+		background: #c42b1c;
+		color: #fff;
+	}
+
+	.wc:focus-visible {
+		outline: 2px solid var(--accent);
+		outline-offset: -2px;
 	}
 
 	/* 長い説明は常時出さない。**ここに置くと本文の面積が消える。**

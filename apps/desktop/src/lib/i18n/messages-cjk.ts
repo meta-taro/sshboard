@@ -86,6 +86,10 @@ export const ko: Catalog = {
 	"mcp.copy": "MCP 등록 명령 복사",
 	'mcp.failed': 'MCP를 시작하지 못했습니다 (포트 {port})',
 	'mcp.failed.help': '포트 {port}가 이미 사용 중입니다. 다른 sshboard가 실행 중인가요? 옮기려면 환경 변수 SSHBOARD_MCP_PORT를 설정하세요. 자세히: {detail}',
+	'win.minimize': '최소화',
+	'win.maximize': '최대화',
+	'win.restore': '이전 크기로',
+	'win.close': '닫기',
 	"mcp.copied": "복사했습니다.",
 	"mcp.token.help": "토큰은 sshboard를 켤 때마다 바뀝니다. 이 명령을 에이전트에 붙여 넣으세요.",
 
@@ -215,6 +219,10 @@ export const zhCN: Catalog = {
 	"mcp.copy": "复制 MCP 注册命令",
 	'mcp.failed': 'MCP 未能启动（端口 {port}）',
 	'mcp.failed.help': '端口 {port} 已被占用。是否有另一个 sshboard 正在运行？如需更换，请设置环境变量 SSHBOARD_MCP_PORT。详情：{detail}',
+	'win.minimize': '最小化',
+	'win.maximize': '最大化',
+	'win.restore': '还原',
+	'win.close': '关闭',
 	"mcp.copied": "已复制。",
 	"mcp.token.help": "每次启动 sshboard 令牌都会变。把这条命令贴给你的代理。",
 
@@ -344,6 +352,10 @@ export const zhTW: Catalog = {
 	"mcp.copy": "複製 MCP 註冊指令",
 	'mcp.failed': 'MCP 無法啟動（連接埠 {port}）',
 	'mcp.failed.help': '連接埠 {port} 已被占用。是否有另一個 sshboard 正在執行？如需更換，請設定環境變數 SSHBOARD_MCP_PORT。詳細：{detail}',
+	'win.minimize': '最小化',
+	'win.maximize': '最大化',
+	'win.restore': '還原',
+	'win.close': '關閉',
 	"mcp.copied": "已複製。",
 	"mcp.token.help": "每次啟動 sshboard 權杖都會改變。把這條指令貼給你的代理程式。",
 

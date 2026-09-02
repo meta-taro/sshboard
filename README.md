@@ -207,12 +207,27 @@ sh tools/test-server/up.sh down   # 片付ける
 
 ### AI（MCP）から繋ぐ
 
-起動すると、画面に MCP の URL と合言葉が出ます。それを `claude mcp add` へ渡します。
+起動すると、画面右上に **「MCP の登録コマンドを写す」ボタン**が出ます。
+**押すと、合言葉ごと 1 行がクリップボードへ入ります。**貼って実行してください。
+
+中身はこの形です（`<合言葉>` は `%APPDATA%\sshboard\sshboard\config\mcp-token` の中身）。
+
+```sh
+claude mcp add --transport http sshboard http://127.0.0.1:22022/mcp \
+  --header "Authorization: Bearer <合言葉>"
+```
+
+**`--transport http` が要ります。**パスは `/mcp` で、合言葉は `Authorization: Bearer` で渡ります。
 
 **ポートは `22022` に固定です**（D33）。合言葉も使い回すので、
 **登録は 1 回で終わります。**立ち上げ直しても同じ URL のままです。
 
-`.mcp.json` に書いても構いません。
+> ⚠️ **`claude mcp add` を使うと、合言葉が `~/.claude.json` に平文で残ります。**
+> loopback の取っ手なので鍵そのものではありませんが、
+> **これを持っている相手は、あなたの繋いでいるサーバーを読めます。**
+> 消すときは `claude mcp remove sshboard` を忘れずに。
+
+`.mcp.json` に書いても構いません（**こちらもファイルに平文で残ります**）。
 
 ```json
 {
@@ -232,7 +247,11 @@ sh tools/test-server/up.sh down   # 片付ける
 
 ### α で知っておいてほしいこと
 
-- **署名していません。**macOS は Gatekeeper が、Windows は SmartScreen が止めます
+- **署名していません。**ただし **Windows で止まるかどうかは、取り方で変わります**（Issue #3・実測）
+  - **ブラウザで取ってダブルクリック** → SmartScreen が止まります
+  - **`gh run download` / CI / スクリプトで取る** → **止まりません。**
+    Mark of the Web が付かず、SmartScreen のアプリ評価チェックが起点を失うため
+  - macOS の Gatekeeper は未検証です
 - **AI が書けるのは、接続ごとに人が列挙したディレクトリの下だけ**です。**既定は空 ＝ 1 バイトも書けません**
 - **`run_readonly` の許可リストも既定は空**です。`readonly.toml` に人が書くまで 1 本も走りません。
   用途別のツール（`disk_usage` など）は、書かなくても動きます

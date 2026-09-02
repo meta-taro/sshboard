@@ -86,6 +86,10 @@ export const ptBR: Catalog = {
 	"mcp.copy": "Copiar o comando MCP",
 	'mcp.failed': 'O MCP não conseguiu iniciar (porta {port})',
 	'mcp.failed.help': 'A porta {port} já está em uso — há outro sshboard aberto? Defina SSHBOARD_MCP_PORT para a mudar. Detalhe: {detail}',
+	'win.minimize': 'Minimizar',
+	'win.maximize': 'Maximizar',
+	'win.restore': 'Restaurar',
+	'win.close': 'Fechar',
 	"mcp.copied": "Copiado.",
 	"mcp.token.help": "O token muda a cada início do sshboard. Cole este comando no seu agente.",
 
@@ -215,6 +219,10 @@ export const ru: Catalog = {
 	"mcp.copy": "Скопировать команду MCP",
 	'mcp.failed': 'MCP не запустился (порт {port})',
 	'mcp.failed.help': 'Порт {port} уже занят — не запущен ли другой sshboard? Чтобы сменить, задайте SSHBOARD_MCP_PORT. Подробности: {detail}',
+	'win.minimize': 'Свернуть',
+	'win.maximize': 'Развернуть',
+	'win.restore': 'Восстановить',
+	'win.close': 'Закрыть',
 	"mcp.copied": "Скопировано.",
 	"mcp.token.help": "Токен меняется при каждом запуске sshboard. Вставьте эту команду в своего агента.",
 
@@ -344,6 +352,10 @@ export const it: Catalog = {
 	"mcp.copy": "Copia il comando MCP",
 	'mcp.failed': 'MCP non è riuscito ad avviarsi (porta {port})',
 	'mcp.failed.help': 'La porta {port} è già in uso: c\'è un altro sshboard aperto? Imposta SSHBOARD_MCP_PORT per spostarla. Dettaglio: {detail}',
+	'win.minimize': 'Riduci a icona',
+	'win.maximize': 'Ingrandisci',
+	'win.restore': 'Ripristina',
+	'win.close': 'Chiudi',
 	"mcp.copied": "Copiato.",
 	"mcp.token.help": "Il token cambia a ogni avvio di sshboard. Incolla questo comando nel tuo agente.",
 
