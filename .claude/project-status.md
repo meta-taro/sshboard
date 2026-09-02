@@ -94,6 +94,13 @@ pnpm --filter desktop test                             →   75 passed
 | `sshboard-desktop` | 9 | |
 | **フロント（vitest）** | **75** | |
 
+**CI が触るのは、いままで 10 クレート中 6 つだけでした**（2026-09-02 に修正）。
+`sshboard-engine`（61 本）・`sshboard-readonly`（16 本）・`sshboard-connections`（20 本）・
+`sshboard-diag`（8 本）が **clippy にも test にも入っていませんでした。**
+**engine は GUI と MCP の共有点で全操作が通る所、readonly は D3 の境界そのもの**です。
+そこが CI で 1 度も走らないまま緑になっていました。
+実機を要するテストは `server_is_up()` で自分から飛ぶので、CI でもそのまま走らせられます。
+
 **実機の通し 4 本が要です。**MCP（HTTP・合言葉つき）→ Engine → SSH → sftp を、
 **外部クライアントと同じ生の JSON-RPC** で叩き、囲いの外を断ったあと
 **サーバー側の一覧を見て本当に届いていないこと**まで確かめています。
