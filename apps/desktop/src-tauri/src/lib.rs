@@ -12,6 +12,7 @@ mod menu;
 mod pending;
 mod session_cmd;
 mod stream_host;
+mod version;
 
 use std::sync::Arc;
 
