@@ -97,6 +97,35 @@ pub fn connection_save(
     Ok(())
 }
 
+/// 並べ替える。**識別子で指して、行き先の位置へ移す。**
+///
+/// 位置ではなく識別子で受けるのは、**画面とファイルがずれていても壊れないため**
+/// （`Connections::reordered` に理由と試験があります）。
+///
+/// **動かないとき（知らない識別子・範囲の外・すでにそこ）は書きません。**
+/// 同じ内容でファイルを触ると、`ConnectionsWatch` が意味の無い再読込を配ります。
+#[tauri::command]
+pub fn connection_move(
+    id: String,
+    to: usize,
+    path: State<'_, ConnectionsPath>,
+    band: State<'_, Band>,
+    watch: State<'_, Arc<ConnectionsWatch>>,
+) -> Result<(), String> {
+    let connections = load(&path)?;
+
+    let Some(moved) = connections.reordered(&id, to) else {
+        // 動かないことは異常ではありません。**書かずに、静かに終わります。**
+        return Ok(());
+    };
+
+    moved.save(&path.0).map_err(|error| error.to_string())?;
+
+    record(&band, format!("並べ替えた接続: {id} → {to}"));
+    watch.notify();
+    Ok(())
+}
+
 #[tauri::command]
 pub fn connection_delete(
     id: String,

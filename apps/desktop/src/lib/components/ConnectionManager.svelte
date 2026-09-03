@@ -26,6 +26,7 @@
 		type Connection,
 		type KeyReport
 	} from '$lib/connections';
+	import { dropTarget, gapForPointer, moveTarget } from '$lib/connection-order';
 
 	let items = $state<Connection[]>([]);
 	let draft = $state<Connection>(emptyConnection());
@@ -38,6 +39,84 @@
 	let manager: HTMLElement | undefined = $state();
 	let dragging = $state(false);
 	/** **いきなり消さない**（product-baseline §13）。押してから、もう一度確かめる。 */
+	// ---- 並べ替え（dbboard から移植）----
+	//
+	// **HTML5 の drag-and-drop は使いません。**Tauri は OS の drag-drop を
+	// webview より先に窓が取るので、`dragDropEnabled: false` にしない限り
+	// 画面へ届きません。**それは後で「窓へ .sshbx を落とす」に要る切り替え**なので、
+	// ここを楽にするために使い切らない。pointer events で書きます。
+	//
+	// 位置ではなく識別子を Rust へ渡します（`connection_move`）。
+	let rowDragFrom = $state<number | null>(null);
+	let rowDragGap = $state<number | null>(null);
+	let listEl: HTMLElement | undefined = $state();
+	let moving = $state(false);
+
+	// **掴んでいる間、行は動きません。**動く線は挿入位置の線だけ。
+	// 行が動くと、ここで読む中点も動いて、境目で行き先が震えます。
+	function rowMidpoints(): number[] {
+		if (!listEl) return [];
+		return [...listEl.querySelectorAll('li.row-line')].map((element) => {
+			const box = element.getBoundingClientRect();
+			return box.top + box.height / 2;
+		});
+	}
+
+	function beginRowDrag(event: PointerEvent, index: number) {
+		if (moving) return;
+		// **掴んだ指が取っ手から外れても続くように。**取っ手は数ピクセルしかありません。
+		(event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+		event.preventDefault();
+		rowDragFrom = index;
+		rowDragGap = index;
+	}
+
+	function trackRowDrag(event: PointerEvent) {
+		if (rowDragFrom === null) return;
+		rowDragGap = gapForPointer(event.clientY, rowMidpoints());
+	}
+
+	async function finishRowDrag() {
+		const from = rowDragFrom;
+		const gap = rowDragGap;
+		rowDragFrom = null;
+		rowDragGap = null;
+		if (from === null || gap === null) return;
+		const target = dropTarget(from, gap, items.length);
+		if (target === null) return;
+		await moveTo(items[from].id, target);
+	}
+
+	function cancelRowDrag() {
+		rowDragFrom = null;
+		rowDragGap = null;
+	}
+
+	// **取っ手はキーボードの口でもあります。**取っ手へ tab して ↑ ↓。
+	// つかめない人にも同じことができないと、並べ替えは無いのと同じです。
+	function onGripKey(event: KeyboardEvent, index: number) {
+		if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
+		event.preventDefault();
+		const target = moveTarget(index, event.key === 'ArrowUp' ? -1 : 1, items.length);
+		if (target === null) return;
+		void moveTo(items[index].id, target);
+	}
+
+	async function moveTo(id: string, to: number) {
+		moving = true;
+		failure = null;
+		try {
+			await invoke('connection_move', { id, to });
+			await reload();
+			notice = i18n.t('conn.moved');
+		} catch (error: unknown) {
+			// **握り潰さない。**並べ替えたつもりで並んでいない、が一番困ります。
+			failure = String(error);
+		} finally {
+			moving = false;
+		}
+	}
+
 	let confirmingDelete = $state(false);
 
 	/* --- 書き出し／取り込み（D18） --- */
@@ -341,9 +420,35 @@
 		{#if items.length === 0}
 			<p class="empty">{i18n.t('conn.empty')}</p>
 		{:else}
-			<ul>
-				{#each items as item (item.id)}
-					<li class="row-line">
+			<ul bind:this={listEl}>
+				{#each items as item, index (item.id)}
+					<li
+						class="row-line"
+						class:row-dragging={rowDragFrom === index}
+						class:drop-before={rowDragGap === index && rowDragFrom !== null}
+						class:drop-after={rowDragGap === items.length &&
+							index === items.length - 1 &&
+							rowDragFrom !== null}
+					>
+						<!--
+							**並べ替えの取っ手**（D5: dbboard に実装があるので引き上げる）。
+							行そのものは「開く」のままです — 掴む所を分けないと、
+							**開こうとして並びが変わる**という一番いやな取り違えが起きます。
+						-->
+						<button
+							type="button"
+							class="grip"
+							disabled={moving}
+							title={i18n.t('conn.grip')}
+							aria-label={i18n.t('conn.grip')}
+							onpointerdown={(event) => beginRowDrag(event, index)}
+							onpointermove={trackRowDrag}
+							onpointerup={finishRowDrag}
+							onpointercancel={cancelRowDrag}
+							onkeydown={(event) => onGripKey(event, index)}
+						>
+							⠿
+						</button>
 						<!--
 							**書き出しに選ぶ印。**行そのものは「開く」ままにします
 							（既存の操作を変えない）。チェックは別の当たり判定にして、
@@ -707,6 +812,71 @@
 		outline: 2px solid var(--accent);
 		outline-offset: 2px;
 		border-radius: 4px;
+	}
+
+	/*
+	 * **並べ替えの取っ手。**普段は薄く、行に触れると出ます。
+	 *
+	 * 常に濃く出すと、**押す物ではなく状態の印**に見えます。
+	 * ただし完全に消すと「並べ替えられない」と読まれる — 実際そう言われました。
+	 * だから 0 ではなく薄く残します。
+	 *
+	 * focus でも出すこと。**▲▼ を置かない代わりに、ここがキーボードの口**で、
+	 * tab で来られるのに見えない控えは、無い控えより悪い。
+	 */
+	.grip {
+		flex: 0 0 auto;
+		border: 0;
+		background: none;
+		padding: 0 2px;
+		color: var(--fg-muted);
+		cursor: grab;
+		line-height: 1;
+		opacity: 0.35;
+		/* 掴んだ指で画面が動かないように。**触る機械で要ります。** */
+		touch-action: none;
+	}
+
+	.row-line:hover .grip:not(:disabled),
+	.grip:focus-visible:not(:disabled) {
+		opacity: 1;
+	}
+
+	.grip:focus-visible {
+		outline: 2px solid var(--accent);
+		outline-offset: 2px;
+		border-radius: 4px;
+	}
+
+	.grip:disabled {
+		cursor: default;
+		opacity: 0.15;
+	}
+
+	.grip:not(:disabled):active {
+		cursor: grabbing;
+	}
+
+	.row-line.row-dragging {
+		background: var(--accent-soft);
+		border-radius: 6px;
+	}
+
+	.row-line.row-dragging .grip {
+		opacity: 1;
+	}
+
+	/*
+	 * **隙間を開けずに、行の内側へ線を引きます。**
+	 * 隙間を開けるとそれより下の行が全部ずれ、
+	 * **落とす位置はその行の位置から読んでいる**ので、答えが揺れます。
+	 */
+	.row-line.drop-before {
+		box-shadow: inset 0 2px 0 0 var(--accent);
+	}
+
+	.row-line.drop-after {
+		box-shadow: inset 0 -2px 0 0 var(--accent);
 	}
 
 	.row-line .row {

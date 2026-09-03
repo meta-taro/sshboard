@@ -116,6 +116,36 @@ impl Connections {
         write_private(path, &self.to_toml()?)
     }
 
+    /// 並べ替える。**識別子で指して、行き先の位置へ移す。**
+    ///
+    /// **並び順 ＝ このファイルの `[[connections]]` の順**です。
+    /// 別の項目で持っていないので、**並べ替えとはファイルを書き換えること**になります。
+    ///
+    /// 位置ではなく識別子で受けるのは、**画面とファイルがずれていても壊れないため**。
+    /// 画面が数えた位置をそのまま信じると、間に 1 件増えていたときに別の行が動きます。
+    ///
+    /// 元は書き換えません（新しい `Connections` を返す）。
+    /// 知らない識別子・範囲の外は `None` — **黙って何もしないのではなく、断ります。**
+    pub fn reordered(&self, id: &str, to: usize) -> Option<Self> {
+        let from = self.connections.iter().position(|held| held.id == id)?;
+        if to >= self.connections.len() {
+            return None;
+        }
+        if to == from {
+            // 同じ内容でファイルを書き直さない。
+            return None;
+        }
+
+        let mut next = self.connections.clone();
+        let moved = next.remove(from);
+        next.insert(to, moved);
+
+        Some(Self {
+            version: self.version,
+            connections: next,
+        })
+    }
+
     /// **版・空の識別子・重複をここで弾く。**黙って落とすと、
     /// 人は「登録したはずなのに無い」に遭う。
     fn validate(&self) -> Result<(), ConnectionsError> {

@@ -414,3 +414,120 @@ write_roots = ["/srv/app/releases"]
     );
     assert!(!json.contains("deployuser"), "利用者名が漏れている: {json}");
 }
+
+// ---- 並べ替え ----
+//
+// **並び順 ＝ ファイルの順**なので、並べ替えは書き換えになります。
+// 位置ではなく識別子で受ける形の意味が、ここで試験されます。
+
+const THREE: &str = r#"
+version = 1
+
+[[connections]]
+id = "one"
+name = "1"
+host = "a.example.invalid"
+user = "u"
+
+[[connections]]
+id = "two"
+name = "2"
+host = "b.example.invalid"
+user = "u"
+
+[[connections]]
+id = "three"
+name = "3"
+host = "c.example.invalid"
+user = "u"
+"#;
+
+fn ids(connections: &Connections) -> Vec<&str> {
+    connections
+        .connections
+        .iter()
+        .map(|held| held.id.as_str())
+        .collect()
+}
+
+#[test]
+fn moving_an_entry_up_puts_it_at_the_named_position() {
+    // Arrange
+    let connections = Connections::parse(THREE).expect("読めない");
+
+    // Act
+    let moved = connections.reordered("three", 0).expect("動かせない");
+
+    // Assert
+    assert_eq!(ids(&moved), vec!["three", "one", "two"]);
+}
+
+#[test]
+fn moving_an_entry_down_puts_it_at_the_named_position() {
+    // Arrange
+    let connections = Connections::parse(THREE).expect("読めない");
+
+    // Act
+    let moved = connections.reordered("one", 2).expect("動かせない");
+
+    // Assert
+    assert_eq!(ids(&moved), vec!["two", "three", "one"]);
+}
+
+#[test]
+fn reordering_leaves_the_original_untouched() {
+    // Arrange
+    let connections = Connections::parse(THREE).expect("読めない");
+
+    // Act
+    let _ = connections.reordered("three", 0).expect("動かせない");
+
+    // Assert — **元を書き換えない**（coding-style: immutability）
+    assert_eq!(ids(&connections), vec!["one", "two", "three"]);
+}
+
+#[test]
+fn moving_an_entry_where_it_already_is_changes_nothing() {
+    // Arrange
+    let connections = Connections::parse(THREE).expect("読めない");
+
+    // Act & Assert — **同じ内容でファイルを書き直さない。**
+    assert!(connections.reordered("two", 1).is_none());
+}
+
+#[test]
+fn an_unknown_id_is_refused_rather_than_silently_ignored() {
+    // Arrange
+    let connections = Connections::parse(THREE).expect("読めない");
+
+    // Act & Assert
+    // 黙って何もしないと、画面は「動いた」と思ったまま食い違います。
+    assert!(connections.reordered("nope", 0).is_none());
+}
+
+#[test]
+fn a_position_past_the_end_is_refused() {
+    // Arrange
+    let connections = Connections::parse(THREE).expect("読めない");
+
+    // Act & Assert
+    assert!(connections.reordered("one", 3).is_none());
+}
+
+#[test]
+fn a_reordered_list_still_saves_and_reads_back_in_the_new_order() {
+    // Arrange — **書いて読み直して、初めて「並び順が残った」と言えます。**
+    let connections = Connections::parse(THREE).expect("読めない");
+    let moved = connections.reordered("three", 0).expect("動かせない");
+    let directory = std::env::temp_dir().join(format!("sshboard-reorder-{}", std::process::id()));
+    let path = directory.join("connections.toml");
+
+    // Act
+    moved.save(&path).expect("書けない");
+    let read_back = Connections::load_or_empty(&path).expect("読み直せない");
+
+    // Assert
+    assert_eq!(ids(&read_back), vec!["three", "one", "two"]);
+
+    let _ = std::fs::remove_dir_all(&directory);
+}
