@@ -612,7 +612,14 @@
 			gap: 0.5rem;
 		}
 
-		/* --- 書き出し／取り込み（D18） --- */
+		.splitter {
+			display: none;
+		}
+	}
+
+
+
+	/* --- 書き出し／取り込み（D18） --- */
 
 	.transfer-bar {
 		display: flex;
@@ -627,7 +634,7 @@
 		gap: 0.4rem;
 		margin: 0 0.6rem 0.5rem;
 		padding: 0.5rem;
-		border: 1px solid var(--border);
+		border: 1px solid var(--hairline);
 		border-radius: 6px;
 	}
 
@@ -656,25 +663,39 @@
 	.row-line {
 		display: flex;
 		align-items: center;
-		gap: 0.4rem;
+		gap: 0.5rem;
 	}
 
-	/* **当たり判定を分ける。**行は「開く」、印は「渡す」。
-	   同じ所に重ねると、開いたつもりで渡す物が増えます。 */
+	/*
+	 * **当たり判定を分ける。**行は「開く」、印は「渡す」。
+	 * 同じ所に重ねると、開いたつもりで渡す物が増えます。
+	 *
+	 * **既定の大きさ（13px 前後）では小さすぎました**（実機の指摘）。
+	 * ここで押し間違えると、**渡すつもりのないサーバーが 1 台混ざります。**
+	 * 押せる範囲は見た目より広く取ります。
+	 */
 	.tick {
 		flex: 0 0 auto;
-		margin-left: 0.5rem;
+		width: 18px;
+		height: 18px;
+		/* 見た目より広い当たり判定。**枠を広げずに押しやすくする。**
+		   padding で当たり判定を広げ、同じ分の負のマージンで見た目の位置を戻す。 */
+		padding: 8px;
+		box-sizing: content-box;
+		margin: -8px -4px -8px 0;
+		accent-color: var(--accent);
 		cursor: pointer;
+	}
+
+	.tick:focus-visible {
+		outline: 2px solid var(--accent);
+		outline-offset: 2px;
+		border-radius: 4px;
 	}
 
 	.row-line .row {
 		flex: 1 1 auto;
 		min-width: 0;
-	}
-
-	.splitter {
-			display: none;
-		}
 	}
 
 	.list-head {

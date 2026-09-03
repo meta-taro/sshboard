@@ -889,13 +889,13 @@
 		margin: 0;
 		padding: 0.4rem 0.6rem;
 		font-size: 0.8rem;
-		border: 1px solid var(--border);
+		border: 1px solid var(--hairline);
 		border-radius: 6px;
 		background: var(--surface-2, transparent);
 	}
 
 	.update.failed {
-		border-color: var(--warning, var(--border));
+		border-color: var(--warning);
 	}
 
 	.update button {
@@ -924,7 +924,7 @@
 
 	.view-trigger:hover,
 	.view-trigger[aria-expanded='true'] {
-		border-color: var(--border);
+		border-color: var(--hairline);
 	}
 
 	/* **外を押したら閉じる。**帯より下は全部当たり判定にする。 */
@@ -944,7 +944,7 @@
 		gap: 0.5rem;
 		padding: 0.6rem;
 		min-width: 220px;
-		border: 1px solid var(--border);
+		border: 1px solid var(--hairline);
 		border-radius: 8px;
 		background: var(--surface);
 		box-shadow: 0 8px 24px rgb(0 0 0 / 25%);
@@ -977,7 +977,7 @@
 		gap: 0;
 		margin-left: 0.25rem;
 		/* 帯の端まで届かせる。**Windows の人は右上の角を押しに行く。** */
-		margin-right: calc(-1 * var(--pad, 0.6rem));
+		margin-right: calc(-1 * var(--shell-pad, 0.6rem));
 		align-self: stretch;
 	}
 

@@ -1306,6 +1306,46 @@
 		color: var(--fg-muted);
 	}
 
+	/*
+	 * **中身より小さくならないこと。**
+	 *
+	 * `.shell` は `min-height: 0` を持っており、**縮んでも中身を隠しません。**
+	 * 縦の flex で場所が足りなくなると、はみ出した中身が
+	 * 下の要素の上に重なって出ます（**接続ボタンとこの行が実際に重なりました**）。
+	 * 縮んでよいのは、中で巻き取れるファイル一覧（`.panes`）だけです。
+	 */
+	.bar,
+	.trust,
+	.sync {
+		flex: 0 0 auto;
+	}
+
+	/*
+	 * **縮むのは中の一覧だけ。**枠ごと縮むと、中身がはみ出して
+	 * 下の要素の上に重なって出ます（`.shell` は `min-height: 0` を持っていて、
+	 * **縮んでも中身を隠しません**）。実際に接続ボタンと重なりました。
+	 *
+	 * かといって縮ませないと、窓が低いときに**下のファイル 2 ペインが潰れます。**
+	 * 縦に並べ直して、**足りない分は一覧が巻き取る**形にします。
+	 */
+	.picker {
+		display: flex;
+		flex-direction: column;
+		flex: 0 1 auto;
+		min-height: 0;
+	}
+
+	.picker .core {
+		flex: 0 1 auto;
+		/* 1 行だけでも残す。**0 まで潰れると、何を選ぶ所か分からなくなる。** */
+		min-height: 2.4rem;
+	}
+
+	.picker-foot,
+	.steps {
+		flex: 0 0 auto;
+	}
+
 	.sync {
 		display: flex;
 		align-items: center;
@@ -1345,7 +1385,7 @@
 		width: 2px;
 		transform: translateX(-50%);
 		border-radius: 999px;
-		background: var(--border);
+		background: var(--hairline-strong);
 	}
 
 	.pane-splitter:hover::after,
