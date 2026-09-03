@@ -1,12 +1,12 @@
 <script lang="ts">
 	import { invoke } from '@tauri-apps/api/core';
 	import { listen } from '@tauri-apps/api/event';
-	import { open as openDialog, save as saveDialog } from '@tauri-apps/plugin-dialog';
+	import { open as openDialog } from '@tauri-apps/plugin-dialog';
 	import { onMount } from 'svelte';
 
 	import Icon from '$lib/components/Icon.svelte';
 	import { i18n } from '$lib/i18n/i18n.svelte';
-	import { defaultBundleName } from '$lib/bundle-name';
+	import BundleDialog from '$lib/components/BundleDialog.svelte';
 
 	import {
 		clampListWidth,
@@ -41,100 +41,19 @@
 
 	/* --- 書き出し／取り込み（D18） --- */
 
-	/** Rust 側（`sshboard-bundle`）と同じ下限。**強さの物差しではなく、空を弾くため。** */
-	const MIN_PASSPHRASE = 8;
-
 	/** 書き出しに選んだ接続。**既定は空** — 押した覚えのないものを渡さない。 */
 	let ticked = $state<string[]>([]);
-	/** 'export' / 'import' / null。**同時に開かない。** */
-	let transfer = $state<'export' | 'import' | null>(null);
-	let passphrase = $state('');
-	let transferBusy = $state(false);
-	let transferNote = $state('');
 	/**
-	 * 取り込むファイル。**先に選んでもらいます。**
+	 * 開いているダイアログ。**中身はすべて `BundleDialog` が持ちます。**
 	 *
-	 * 以前はパスフレーズを入れるまで「ファイルを選ぶ」が押せませんでした。
-	 * **順序が逆**で、実機では「押しても何も起きない」と見えます（Windows で指摘）。
+	 * 幅 250px の柱に説明文・ファイル選び・パスフレーズ・ボタン 2 つを詰め込んでおり、
+	 * **文字が折り返して読めない**と実機で言われました（Windows・2026-09-03）。
+	 * dbboard もこの種の機能はダイアログにしています（`BackupDialog`）。
 	 */
-	let importFile = $state<string | null>(null);
+	let transfer = $state<'export' | 'import' | null>(null);
 
 	function toggleTicked(id: string) {
 		ticked = ticked.includes(id) ? ticked.filter((held) => held !== id) : [...ticked, id];
-	}
-
-	function openTransfer(kind: 'export' | 'import') {
-		transfer = kind;
-		passphrase = '';
-		transferNote = '';
-	}
-
-	function closeTransfer() {
-		transfer = null;
-		importFile = null;
-		// **パスフレーズを画面に残さない。**閉じた時点で捨てる。
-		passphrase = '';
-	}
-
-	/** 取り込むファイルを選ぶ。**パスフレーズより先。** */
-	async function pickImportFile() {
-		transferNote = '';
-		try {
-			const source = await openDialog({
-				multiple: false,
-				directory: false,
-				filters: [{ name: 'sshboard', extensions: ['sshbx'] }]
-			});
-			if (!source || Array.isArray(source)) return;
-			importFile = source;
-		} catch (error: unknown) {
-			transferNote = String(error);
-		}
-	}
-
-	async function runExport() {
-		if (ticked.length === 0 || passphrase.length < MIN_PASSPHRASE) return;
-		transferBusy = true;
-		transferNote = '';
-		try {
-			const destination = await saveDialog({
-				// **日時を入れる。**同じ名前だと 2 回目から上書きになります。
-				defaultPath: defaultBundleName(),
-				filters: [{ name: 'sshboard', extensions: ['sshbx'] }]
-			});
-			if (!destination) return;
-			const count = await invoke<number>('bundle_export', {
-				ids: ticked,
-				passphrase,
-				destination
-			});
-			transferNote = i18n.t('bundle.exported', { count: String(count) });
-			closeTransfer();
-			ticked = [];
-		} catch (error: unknown) {
-			transferNote = String(error);
-		} finally {
-			transferBusy = false;
-		}
-	}
-
-	async function runImport() {
-		if (importFile === null || passphrase.length === 0) return;
-		transferBusy = true;
-		transferNote = '';
-		try {
-			const count = await invoke<number>('bundle_import', {
-				source: importFile,
-				passphrase
-			});
-			transferNote = i18n.t('bundle.imported', { count: String(count) });
-			closeTransfer();
-			reload();
-		} catch (error: unknown) {
-			transferNote = String(error);
-		} finally {
-			transferBusy = false;
-		}
 	}
 
 	function containerWidth(): number {
@@ -318,79 +237,18 @@
 			<button
 				type="button"
 				class="ghost tiny"
-				onclick={() => openTransfer('export')}
+				onclick={() => (transfer = 'export')}
 				disabled={ticked.length === 0}
 				title={ticked.length === 0 ? i18n.t('bundle.export.none') : ''}
 			>
 				<Icon name="download" size={11} />
 				{i18n.t('bundle.export', { count: String(ticked.length) })}
 			</button>
-			<button type="button" class="ghost tiny" onclick={() => openTransfer('import')}>
+			<button type="button" class="ghost tiny" onclick={() => (transfer = 'import')}>
 				<Icon name="upload" size={11} />
 				{i18n.t('bundle.import')}
 			</button>
 		</div>
-
-		{#if transfer !== null}
-			<div class="transfer-panel">
-				<p class="what">
-					{transfer === 'export' ? i18n.t('bundle.export.what') : i18n.t('bundle.import.what')}
-				</p>
-				<!-- **同じ経路で送らない**（D18）。ここに書いておかないと、
-				     ファイルとパスフレーズを同じメールに付けられます。 -->
-				<p class="warn">{i18n.t('bundle.channel')}</p>
-				<!--
-					**取り込みは、先にファイルを選ぶ。**
-					パスフレーズを入れるまで選べない作りにしていたら、
-					実機で「押しても何も起きない」と見えました（Windows）。
-				-->
-				{#if transfer === 'import'}
-					<button type="button" class="ghost tiny" onclick={pickImportFile}>
-						<Icon name="file" size={11} />
-						{importFile === null ? i18n.t('bundle.import.pick') : i18n.t('bundle.import.again')}
-					</button>
-					{#if importFile !== null}
-						<!-- **選べていることを見せる。**見せないと、選んだのか分からない。 -->
-						<p class="chosen-file" data-secret title={importFile}>{importFile}</p>
-					{/if}
-				{/if}
-
-				{#if transfer === 'export' || importFile !== null}
-					<input
-						type="password"
-						bind:value={passphrase}
-						placeholder={i18n.t('bundle.passphrase')}
-						aria-label={i18n.t('bundle.passphrase')}
-						autocomplete="off"
-					/>
-				{/if}
-				{#if transfer === 'export' && passphrase.length > 0 && passphrase.length < MIN_PASSPHRASE}
-					<p class="warn">{i18n.t('bundle.tooshort', { min: String(MIN_PASSPHRASE) })}</p>
-				{/if}
-				<div class="transfer-actions">
-					<button
-						type="button"
-						class="cta"
-						disabled={transferBusy ||
-							passphrase.length === 0 ||
-							(transfer === 'import' && importFile === null) ||
-							(transfer === 'export' && passphrase.length < MIN_PASSPHRASE)}
-						onclick={() => (transfer === 'export' ? runExport() : runImport())}
-					>
-						{transferBusy
-							? i18n.t('bundle.working')
-							: transfer === 'export'
-								? i18n.t('bundle.export.go')
-								: i18n.t('bundle.import.go')}
-					</button>
-					<button type="button" onclick={closeTransfer}>{i18n.t('conn.delete.no')}</button>
-				</div>
-			</div>
-		{/if}
-
-		{#if transferNote}
-			<p class="transfer-note" role="status">{transferNote}</p>
-		{/if}
 
 		{#if items.length === 0}
 			<p class="empty">{i18n.t('conn.empty')}</p>
@@ -610,6 +468,18 @@
 	</div>
 </section>
 
+{#if transfer !== null}
+	<BundleDialog
+		mode={transfer}
+		ids={ticked}
+		onClose={() => (transfer = null)}
+		onImported={() => {
+			ticked = [];
+			reload();
+		}}
+	/>
+{/if}
+
 <style>
 	/* 面は入れ子（外殻 → 芯）。**背景に直接置かない。**
 	   色は tokens.css の変数だけ。**ここに 16 進数を書かない。** */
@@ -669,50 +539,6 @@
 		padding: 0 0.6rem 0.4rem;
 		flex-wrap: wrap;
 	}
-
-	.transfer-panel {
-		display: flex;
-		flex-direction: column;
-		gap: 0.4rem;
-		margin: 0 0.6rem 0.5rem;
-		padding: 0.5rem;
-		border: 1px solid var(--hairline);
-		border-radius: 6px;
-	}
-
-	.transfer-panel .what {
-		margin: 0;
-		font-size: 0.75rem;
-	}
-
-	/* **同じ経路で送らない**を目立たせる（D18）。 */
-	.transfer-panel .warn {
-		margin: 0;
-		font-size: 0.7rem;
-		color: var(--fg-muted);
-	}
-
-	.chosen-file {
-		margin: 0;
-		font-size: 0.7rem;
-		color: var(--fg-muted);
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
-		direction: rtl; /* 長いパスは**末尾（ファイル名）**を見せる */
-		text-align: left;
-	}
-
-	.transfer-actions {
-		display: flex;
-		gap: 0.4rem;
-	}
-
-	.transfer-note {
-		margin: 0 0.6rem 0.5rem;
-		font-size: 0.75rem;
-	}
-
 	.row-line {
 		display: flex;
 		align-items: center;
