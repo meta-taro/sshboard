@@ -6,6 +6,7 @@
 
 	import Icon from '$lib/components/Icon.svelte';
 	import { i18n } from '$lib/i18n/i18n.svelte';
+	import { defaultBundleName } from '$lib/bundle-name';
 
 	import {
 		clampListWidth,
@@ -50,6 +51,13 @@
 	let passphrase = $state('');
 	let transferBusy = $state(false);
 	let transferNote = $state('');
+	/**
+	 * 取り込むファイル。**先に選んでもらいます。**
+	 *
+	 * 以前はパスフレーズを入れるまで「ファイルを選ぶ」が押せませんでした。
+	 * **順序が逆**で、実機では「押しても何も起きない」と見えます（Windows で指摘）。
+	 */
+	let importFile = $state<string | null>(null);
 
 	function toggleTicked(id: string) {
 		ticked = ticked.includes(id) ? ticked.filter((held) => held !== id) : [...ticked, id];
@@ -63,8 +71,25 @@
 
 	function closeTransfer() {
 		transfer = null;
+		importFile = null;
 		// **パスフレーズを画面に残さない。**閉じた時点で捨てる。
 		passphrase = '';
+	}
+
+	/** 取り込むファイルを選ぶ。**パスフレーズより先。** */
+	async function pickImportFile() {
+		transferNote = '';
+		try {
+			const source = await openDialog({
+				multiple: false,
+				directory: false,
+				filters: [{ name: 'sshboard', extensions: ['sshbx'] }]
+			});
+			if (!source || Array.isArray(source)) return;
+			importFile = source;
+		} catch (error: unknown) {
+			transferNote = String(error);
+		}
 	}
 
 	async function runExport() {
@@ -73,7 +98,8 @@
 		transferNote = '';
 		try {
 			const destination = await saveDialog({
-				defaultPath: 'sshboard.sshbx',
+				// **日時を入れる。**同じ名前だと 2 回目から上書きになります。
+				defaultPath: defaultBundleName(),
 				filters: [{ name: 'sshboard', extensions: ['sshbx'] }]
 			});
 			if (!destination) return;
@@ -93,17 +119,14 @@
 	}
 
 	async function runImport() {
-		if (passphrase.length === 0) return;
+		if (importFile === null || passphrase.length === 0) return;
 		transferBusy = true;
 		transferNote = '';
 		try {
-			const source = await openDialog({
-				multiple: false,
-				directory: false,
-				filters: [{ name: 'sshboard', extensions: ['sshbx'] }]
+			const count = await invoke<number>('bundle_import', {
+				source: importFile,
+				passphrase
 			});
-			if (!source || Array.isArray(source)) return;
-			const count = await invoke<number>('bundle_import', { source, passphrase });
 			transferNote = i18n.t('bundle.imported', { count: String(count) });
 			closeTransfer();
 			reload();
@@ -316,13 +339,31 @@
 				<!-- **同じ経路で送らない**（D18）。ここに書いておかないと、
 				     ファイルとパスフレーズを同じメールに付けられます。 -->
 				<p class="warn">{i18n.t('bundle.channel')}</p>
-				<input
-					type="password"
-					bind:value={passphrase}
-					placeholder={i18n.t('bundle.passphrase')}
-					aria-label={i18n.t('bundle.passphrase')}
-					autocomplete="off"
-				/>
+				<!--
+					**取り込みは、先にファイルを選ぶ。**
+					パスフレーズを入れるまで選べない作りにしていたら、
+					実機で「押しても何も起きない」と見えました（Windows）。
+				-->
+				{#if transfer === 'import'}
+					<button type="button" class="ghost tiny" onclick={pickImportFile}>
+						<Icon name="file" size={11} />
+						{importFile === null ? i18n.t('bundle.import.pick') : i18n.t('bundle.import.again')}
+					</button>
+					{#if importFile !== null}
+						<!-- **選べていることを見せる。**見せないと、選んだのか分からない。 -->
+						<p class="chosen-file" data-secret title={importFile}>{importFile}</p>
+					{/if}
+				{/if}
+
+				{#if transfer === 'export' || importFile !== null}
+					<input
+						type="password"
+						bind:value={passphrase}
+						placeholder={i18n.t('bundle.passphrase')}
+						aria-label={i18n.t('bundle.passphrase')}
+						autocomplete="off"
+					/>
+				{/if}
 				{#if transfer === 'export' && passphrase.length > 0 && passphrase.length < MIN_PASSPHRASE}
 					<p class="warn">{i18n.t('bundle.tooshort', { min: String(MIN_PASSPHRASE) })}</p>
 				{/if}
@@ -332,6 +373,7 @@
 						class="cta"
 						disabled={transferBusy ||
 							passphrase.length === 0 ||
+							(transfer === 'import' && importFile === null) ||
 							(transfer === 'export' && passphrase.length < MIN_PASSPHRASE)}
 						onclick={() => (transfer === 'export' ? runExport() : runImport())}
 					>
@@ -648,6 +690,17 @@
 		margin: 0;
 		font-size: 0.7rem;
 		color: var(--fg-muted);
+	}
+
+	.chosen-file {
+		margin: 0;
+		font-size: 0.7rem;
+		color: var(--fg-muted);
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+		direction: rtl; /* 長いパスは**末尾（ファイル名）**を見せる */
+		text-align: left;
 	}
 
 	.transfer-actions {
