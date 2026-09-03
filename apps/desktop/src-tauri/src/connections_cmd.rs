@@ -12,10 +12,14 @@ use std::sync::Arc;
 
 use sshboard_band::{Actor, Band};
 use sshboard_connections::{ConnectionEntry, Connections, ConnectionsWatch};
+use sshboard_credentials::SecretStore;
 use tauri::State;
 
 /// 接続一覧の置き場所。起動時に決めて持っておく。
 pub struct ConnectionsPath(pub PathBuf);
+
+/// OS の資格情報ストアでの区分名。**`sshboard-engine` と揃えること。**
+const KEYRING_SERVICE: &str = "sshboard";
 
 fn load(path: &ConnectionsPath) -> Result<Connections, String> {
     Connections::load_or_empty(&path.0).map_err(|error| error.to_string())
@@ -193,3 +197,77 @@ pub fn spawn_bridge(app: tauri::AppHandle, watch: Arc<ConnectionsWatch>) {
 
 /// 画面が待ち受けるイベント名。
 pub const CONNECTIONS_CHANGED_EVENT: &str = "connections://changed";
+
+/// ログインのパスワードを OS の資格情報ストアへ預ける。
+///
+/// **接続に入るのは参照名だけ**で、パスワードそのものは入りません（D11）。
+/// **投入するのは人だけ**です — MCP にこの口はありません（§14）。
+///
+/// 空文字を渡すと**預けたものを消します**。「もう使わない」を言う手段が要るためです。
+#[tauri::command]
+pub fn connection_password_save(
+    id: String,
+    password: String,
+    path: State<'_, ConnectionsPath>,
+    band: State<'_, Band>,
+    watch: State<'_, Arc<ConnectionsWatch>>,
+) -> Result<(), String> {
+    let store = SecretStore::new(KEYRING_SERVICE);
+    let reference = format!("password:{id}");
+
+    let mut connections = load(&path)?;
+    let found = connections
+        .connections
+        .iter()
+        .any(|held| held.id == id)
+        .then_some(())
+        .ok_or_else(|| format!("そんな接続はありません: {id}"))?;
+    let _ = found;
+
+    if password.is_empty() {
+        // 消せなくても進みます。**参照を外す方が大事**です
+        // （残すと「あるはず」で繋ぎに行って失敗します）。
+        let _ = store.delete(&reference);
+    } else {
+        store
+            .put(&reference, &password)
+            .map_err(|error| format!("OS の資格情報ストアへ預けられません: {error}"))?;
+    }
+
+    let next: Vec<ConnectionEntry> = connections
+        .connections
+        .into_iter()
+        .map(|mut held| {
+            if held.id == id {
+                held.keyring_password_ref =
+                    (!password.is_empty()).then(|| reference.clone());
+            }
+            held
+        })
+        .collect();
+    connections.connections = next;
+    connections
+        .save(&path.0)
+        .map_err(|error| error.to_string())?;
+
+    // **識別子だけを載せる。**パスワードも接続先も帯へ出しません（PRD §8）。
+    record(
+        &band,
+        if password.is_empty() {
+            format!("接続 `{id}` のパスワードを消しました")
+        } else {
+            format!("接続 `{id}` のパスワードを預かりました")
+        },
+    );
+    watch.notify();
+    Ok(())
+}
+
+/// パスワードを預けてあるか。**中身は返しません**（あるか無いかだけ）。
+#[tauri::command]
+pub fn connection_has_password(id: String, path: State<'_, ConnectionsPath>) -> Result<bool, String> {
+    Ok(load(&path)?
+        .connections
+        .iter()
+        .any(|held| held.id == id && held.keyring_password_ref.is_some()))
+}

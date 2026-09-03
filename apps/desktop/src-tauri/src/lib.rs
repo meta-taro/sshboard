@@ -65,6 +65,8 @@ pub fn run() {
             commands::stop_stream,
             bundle_cmd::bundle_export,
             bundle_cmd::bundle_import,
+            connections_cmd::connection_password_save,
+            connections_cmd::connection_has_password,
             connections_cmd::connections_list,
             connections_cmd::connections_path,
             connections_cmd::connection_save,

@@ -133,6 +133,40 @@
 	});
 
 	/** 鍵をファイル選択で選ぶ。**パスを手で打たせない。** */
+	/* --- ログインのパスワード（鍵を使わないとき） --- */
+
+	/**
+	 * 入力中のパスワード。**保存したら捨てます。**
+	 *
+	 * 置き場所は OS の資格情報ストアで、接続に入るのは参照名だけです（D11）。
+	 * **画面がパスワードを持ち続けません。**
+	 */
+	let passwordDraft = $state('');
+	/** 既に預けてあるか。**中身は取り出しません**（あるか無いかだけ）。 */
+	let hasPassword = $state(false);
+
+	async function loadHasPassword(id: string) {
+		hasPassword = false;
+		if (!id) return;
+		try {
+			hasPassword = await invoke<boolean>('connection_has_password', { id });
+		} catch {
+			/* 分からなければ「無い」として扱う。**あると偽らない。** */
+		}
+	}
+
+	async function savePassword() {
+		if (!selectedId) return;
+		try {
+			await invoke('connection_password_save', { id: selectedId, password: passwordDraft });
+			// **入力欄から消す。**画面に残す理由がありません。
+			passwordDraft = '';
+			await loadHasPassword(selectedId);
+		} catch (error: unknown) {
+			failure = String(error);
+		}
+	}
+
 	async function pickKey() {
 		try {
 			const picked = await openDialog({ multiple: false, directory: false });
@@ -155,6 +189,8 @@
 		selectedId = null;
 		notice = null;
 		confirmingDelete = false;
+		passwordDraft = '';
+		hasPassword = false;
 	}
 
 	function edit(item: Connection) {
@@ -162,6 +198,9 @@
 		selectedId = item.id;
 		notice = null;
 		confirmingDelete = false;
+		// **前の接続のパスワードを持ち越さない。**
+		passwordDraft = '';
+		void loadHasPassword(item.id);
 	}
 
 	async function save() {
@@ -382,6 +421,52 @@
 				</small>
 			{:else}
 				<small>{i18n.t('conn.key.help')}</small>
+			{/if}
+		</label>
+
+		<!--
+			**パスワードで繋ぐ道**（Issue #4）。
+			鍵が既定ですが、**素の Windows では ssh-agent が動いていません**し、
+			この製品が置き換える相手（WinSCP / Tera Term）の利用者の多くは
+			パスワードで繋いでいます（PRD §0-4）。
+
+			**接続に入るのは参照名だけ**で、パスワードは OS の資格情報ストアです（D11）。
+		-->
+		<label class="field">
+			<span><Icon name="lock" size={12} />{i18n.t('conn.password')}</span>
+			{#if selectedId === null}
+				<small>{i18n.t('conn.password.saveFirst')}</small>
+			{:else}
+				<div class="row">
+					<input
+						type="password"
+						bind:value={passwordDraft}
+						placeholder={hasPassword
+							? i18n.t('conn.password.stored')
+							: i18n.t('conn.password.placeholder')}
+						autocomplete="off"
+					/>
+					<button type="button" onclick={savePassword} disabled={passwordDraft.length === 0}>
+						{i18n.t('conn.password.keep')}
+					</button>
+					{#if hasPassword}
+						<!-- **消す手段を必ず置く。**「もう使わない」を言えないと、
+						     消したつもりで残ります。 -->
+						<button
+							type="button"
+							class="ghost tiny"
+							onclick={() => {
+								passwordDraft = '';
+								savePassword();
+							}}
+						>
+							{i18n.t('conn.password.forget')}
+						</button>
+					{/if}
+				</div>
+				<small>
+					{hasPassword ? i18n.t('conn.password.have') : i18n.t('conn.password.help')}
+				</small>
 			{/if}
 		</label>
 
