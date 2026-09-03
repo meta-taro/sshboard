@@ -859,3 +859,46 @@ async fn a_console_says_which_connection_it_belongs_to() {
     assert_eq!(engine.console_connection().await.as_deref(), Some("second"));
     engine.console_stop().await;
 }
+
+/// 移動しても宛先が落ちないこと（Issue #8）。
+///
+/// > ファイル画面で移動すると接続先の表示が消え、繋がっているのに
+/// > 「まだ繋がっていません」と出続ける
+///
+/// **`list_dir` は `active` が要ります。**移動のたびに呼ぶので、
+/// ここが落ちると画面が「繋がっていない」に見えます。
+#[tokio::test]
+async fn moving_around_does_not_lose_the_active_session() {
+    if !server_is_up().await {
+        println!("テスト用サーバーが建っていません（想定内・飛ばします）");
+        return;
+    }
+    let dir = tempfile::tempdir().expect("一時ディレクトリ");
+    // `up.sh` が作る使い捨ての鍵。**実機の鍵とは無関係。**
+    let key = std::path::PathBuf::from(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../tools/test-server/.key"
+    ));
+    if !key.exists() {
+        println!("使い捨ての鍵がありません（想定内・飛ばします）");
+        return;
+    }
+    let engine = engine_at(registry_with_key(&dir, &key).await);
+
+    engine
+        .connect(Actor::Human, "local", None)
+        .await
+        .expect("繋がらない");
+
+    // **何度も移動する。**1 回目は通って 2 回目で落ちる、を捕まえるため。
+    for path in [".", "app", "app/logs", ".", "app"] {
+        engine
+            .list_dir(Actor::Human, path)
+            .await
+            .unwrap_or_else(|error| panic!("{path} を読めない: {error}"));
+        assert!(
+            engine.active().await.is_some(),
+            "{path} を読んだあと、宛先が落ちている"
+        );
+    }
+}

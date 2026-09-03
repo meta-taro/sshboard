@@ -363,7 +363,15 @@
 	}
 
 	async function refresh() {
-		if (!connected) return;
+		// **繋がっていないなら、古い警告も古い一覧も残さない**（Issue #8）。
+		//
+		// 以前はここで素通りしており、**前に出た警告が消えないまま残りました。**
+		// 「繋がっているのに『繋がっていません』と出続ける」の片側がこれです。
+		if (!connected) {
+			failure = null;
+			entries = [];
+			return;
+		}
 		loading = true;
 		failure = null;
 		// **一覧を読み直したら選択は捨てる。**名前で持っているので、
@@ -373,7 +381,17 @@
 			entries = await invoke<Listed[]>('remote_list_dir', { path: remotePath });
 			if (!navigating) remoteHist = visit(remoteHist, remotePath);
 		} catch (error: unknown) {
+			// **古い一覧を残さない**（Issue #8）。
+			//
+			// 残すと、**読めなかった場所に、前の場所の中身が出たまま**になります。
+			// 「エラーは出ているのに一覧は正常に見える」という、
+			// **画面が実態とずれる一番悪い形**でした。
+			entries = [];
 			failure = String(error);
+			// **画面の思い込みではなく、本当の状態を取り直す。**
+			// 繋がっていないと言われたなら、まず事実を確かめます
+			// （AI 側が切っていた、という筋も含めて）。
+			await session.refresh();
 		} finally {
 			loading = false;
 		}
