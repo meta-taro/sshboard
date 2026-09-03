@@ -366,6 +366,30 @@ async fn authenticate(
     }
 }
 
+/// agent へ繋げないときに出す案内。
+///
+/// **`ssh-add -l` を打たせて終わりにしない**（Issue #4）。
+/// Windows で打つと `No such file or directory` としか出ず、
+/// **サービスが無効であることには辿り着けません。**そこで人は止まります。
+#[cfg(unix)]
+const AGENT_HINT: &str = "ssh-agent が動いていないか、SSH_AUTH_SOCK が渡っていません。\
+     端末で `ssh-add -l` が通るか確かめてください。\
+     通らないなら、接続の設定で**鍵のパスを直接指定**してください";
+
+/// Windows 向け。**素の Windows 11 では ssh-agent は動いていません。**
+///
+/// `ssh-agent` サービスがスタートアップ Disabled で出荷され、
+/// `ssh-add.exe` は同梱されているのに繋ぐ先がない、という状態が既定です
+/// （Windows 11 Home 26200 で実測・Issue #4）。
+#[cfg(windows)]
+const AGENT_HINT: &str = "**Windows では ssh-agent が既定で無効です。**\
+     `ssh-agent` サービスがスタートアップ Disabled で出荷されるためで、\
+     `ssh-add -l` は `No such file or directory` としか返しません。\
+     **接続の設定で鍵のパスを直接指定する**のが早い解決です。\
+     agent を使いたいなら、管理者権限の PowerShell で\
+     `Set-Service ssh-agent -StartupType Automatic; Start-Service ssh-agent` \
+     のあと `ssh-add <鍵>` を実行してください";
+
 /// ssh-agent へ委譲して認証する。**製品は鍵にもパスフレーズにも触りません**（D11）。
 ///
 /// **agent への繋ぎ方は OS で違います。**
@@ -387,8 +411,7 @@ async fn authenticate_with_agent(
                 Stage::Auth,
                 id,
                 format!("ssh-agent に繋げません: {error}"),
-                "ssh-agent が動いていないか、SSH_AUTH_SOCK が渡っていません。\
-                 端末で `ssh-add -l` が通るか確かめてください",
+                AGENT_HINT,
             );
             SshError::Authenticate(format!("ssh-agent: {error}"))
         })?;
@@ -423,7 +446,7 @@ async fn authenticate_with_agent(
                 format!(
                     "ssh-agent に繋げません（OpenSSH: {openssh_error} / Pageant: {pageant_error}）"
                 ),
-                "Windows の OpenSSH エージェントを起動するか、Pageant に鍵を入れてください",
+                AGENT_HINT,
             );
             Err(SshError::Authenticate(format!(
                 "ssh-agent に繋げません（OpenSSH: {openssh_error} / Pageant: {pageant_error}）"
@@ -451,10 +474,26 @@ where
             Stage::Auth,
             id,
             format!("ssh-agent から鍵の一覧を取れません: {error}"),
-            "`ssh-add -l` が通るか確かめてください",
+            // **ここが Issue #4 で実際に出た所。**`early eof` は
+            // 「繋がったが相手が居ない」形で返ってきます。
+            AGENT_HINT,
         );
         SshError::Authenticate(format!("ssh-agent: {error}"))
     })?;
+
+    // **1 本も入っていないのと、入っているが合わないのは別**です。
+    // 前者は「鍵を足す」、後者は「別の鍵を使う」。次の一手が違います。
+    if identities.is_empty() {
+        diag.error(
+            Stage::Auth,
+            id,
+            "ssh-agent に鍵が 1 本も入っていません".to_string(),
+            AGENT_HINT,
+        );
+        return Err(SshError::Authenticate(
+            "ssh-agent に鍵が 1 本も入っていません".into(),
+        ));
+    }
 
     let mut tried = Vec::new();
     for identity in identities {

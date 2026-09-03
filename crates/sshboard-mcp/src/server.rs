@@ -454,7 +454,14 @@ pub struct RegisterConnection {
     #[serde(default = "default_ssh_port")]
     pub port: u16,
     pub user: String,
-    /// 秘密鍵のパス。**省略すると ssh-agent を使う**（推奨）。
+    /// 秘密鍵のパス。
+    ///
+    /// 省略すると ssh-agent を使います。**ただし Windows では既定で使えません** —
+    /// `ssh-agent` サービスがスタートアップ **Disabled** で出荷されるためです
+    /// （Windows 11 Home 26200 で実測・Issue #4）。
+    /// **Windows では、鍵のパスを指定してください。**
+    /// パスワードで繋ぐ場合は、画面（GUI）から登録します
+    /// — **AI に秘密は預けさせません**（D11 / §14）。
     #[serde(default)]
     pub key_path: Option<String>,
     /// 印のタグ。`prod` / `本番` / `開発2` など。**12 文字まで。**
