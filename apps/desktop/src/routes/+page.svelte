@@ -513,9 +513,16 @@
 		中のボタン類は各自が押せるままにします。
 	-->
 	<header data-tauri-drag-region>
-		<span class="phase" title={i18n.t('app.driven')}>{i18n.t('app.phase0')}</span>
+		<!-- **文字の上でも掴めるように**、この要素自体を掴める領域にします。
+		     `pointer-events: none` で下へ落とす手もありますが、
+		     **それだと説明の吹き出し（`title`）が出なくなります。** -->
+		<span class="phase" data-tauri-drag-region title={i18n.t('app.driven')}>
+			{i18n.t('app.phase0')}
+		</span>
 
-		<nav class="tabs">
+		<!-- **ボタンとボタンの隙間でも掴める。**
+		     付けないと、並びの余白は「掴めない帯」になります。 -->
+		<nav class="tabs" data-tauri-drag-region>
 			<!-- **既定はファイル**（PRD §1）。副ユーザーに端末を覚えさせない。 -->
 			<button type="button" class:active={view === 'files'} onclick={() => (view = 'files')}>
 				<Icon name="folder" />
@@ -550,7 +557,7 @@
 			**失ったメニューを、自分の帯の中に作り直します。**
 			文言は `messages-menu` に既にあるものを使い、言い方を増やしません。
 		-->
-		<div class="view-menu">
+		<div class="view-menu" data-tauri-drag-region>
 			<button
 				type="button"
 				class="view-trigger"
@@ -882,8 +889,13 @@
 		gap: 0.5rem;
 		flex-wrap: nowrap;
 		min-width: 0;
-		/* **この帯が OS のタイトルバー**（D17）。掴んで窓を動かせる高さを確保する。 */
-		min-height: 34px;
+		/*
+		 * **この帯が OS のタイトルバー**（D17）。
+		 *
+		 * 掴める高さを確保します。34px では**掴める隙間がほとんど無く、
+		 * 窓を動かせない**と言われました（実機）。
+		 */
+		min-height: 40px;
 		/* 掴む所に文字を選ばせない。**掴んだつもりで選択が始まると、窓が動かない。** */
 		user-select: none;
 	}

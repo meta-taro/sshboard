@@ -6,6 +6,19 @@ edition.workspace = true
 license.workspace = true
 repository.workspace = true
 
+# **人が目にする名前は `sshboard`。**
+#
+# 書かないと、package 名（`sshboard-desktop`）がそのままバイナリ名になります。
+# 配布物は `tauri.conf.json` の `mainBinaryName` で `sshboard` になりますが、
+# **開発中に走るのは cargo が付けた名前**で、
+# macOS の「画面収録」の一覧にもそれが出ていました（実機で指摘）。
+#
+# package 名は `sshboard-desktop` のままにします — CI が `-p sshboard-desktop` で
+# 名指ししており、**人の目に触れない所を変えても得がありません。**
+[[bin]]
+name = "sshboard"
+path = "src/main.rs"
+
 [lib]
 name = "sshboard_desktop_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
