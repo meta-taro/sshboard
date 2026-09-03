@@ -1603,8 +1603,21 @@
 		transition: background 220ms var(--ease);
 	}
 
-	button:hover:not(:disabled) {
+	/*
+	 * **`.primary` を巻き込まないこと。**
+	 *
+	 * `button:hover:not(:disabled)` は `button.primary` より詳細度が高く、
+	 * ホバーすると地だけが暗い面に置き換わり、**文字色は濃いまま**残ります。
+	 * 暗いテーマでは `#06251C` の字が `#1C222A` の地に乗り、
+	 * **ほぼ黒同士で読めなくなっていました**（実機で指摘・2026-09-03）。
+	 */
+	button:hover:not(:disabled):not(.primary) {
 		background: var(--surface-2);
+	}
+
+	/* 主ボタンは**同じ色相のまま**明るくする。地と文字の関係を崩さない。 */
+	button.primary:hover:not(:disabled) {
+		filter: brightness(1.08);
 	}
 
 	button:disabled {
