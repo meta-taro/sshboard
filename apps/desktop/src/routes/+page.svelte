@@ -847,10 +847,26 @@
 							: i18n.t('console.held.none')}
 				</span>
 				{#if !holder}
-					<button type="button" class="primary" onclick={openConsole}>
+					<!--
+						**繋いでいなければ押させない。**
+						押せてしまうのに `NotConnected` で失敗するのは、
+						「どうやって繋ぐの？」を生みます（実機で聞かれた）。
+					-->
+					<button
+						type="button"
+						class="primary"
+						onclick={openConsole}
+						disabled={session.open === null}
+					>
 						<Icon name="terminal" />
 						{i18n.t('console.open')}
 					</button>
+					{#if session.open === null}
+						<!-- **次の一手を書く。**「繋がっていません」だけでは足りません。 -->
+						<button type="button" class="ghost tiny" onclick={() => (view = 'connections')}>
+							{i18n.t('console.connect.first')}
+						</button>
+					{/if}
 				{:else if !iHold}
 					<!-- **人はいつでも取り返せる**（D29）。 -->
 					<button type="button" class="primary" onclick={takeConsole}>
