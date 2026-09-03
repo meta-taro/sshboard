@@ -58,6 +58,7 @@ pub fn run() {
         // **押しても何も起きない項目を残さない。**受け手はここ 1 か所。
         .on_menu_event(menu::handle_event)
         .invoke_handler(tauri::generate_handler![
+            commands::app_version,
             commands::band_ack,
             commands::mcp_url,
             commands::stream_follow,

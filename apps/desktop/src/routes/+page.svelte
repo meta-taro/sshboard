@@ -10,6 +10,7 @@
 	import { i18n } from '$lib/i18n/i18n.svelte';
 	import { menuLabels } from '$lib/i18n/messages-menu';
 	import { titlebar } from '$lib/window/titlebar.svelte';
+	import AboutDialog from '$lib/components/AboutDialog.svelte';
 	import { updater } from '$lib/update/updater.svelte';
 	import { listenForPageShot } from '$lib/capture/page-shot';
 	import { LOCALES } from '$lib/i18n/locales';
@@ -49,6 +50,16 @@
 	 * **失った「表示」メニューを、自分の帯の中に作り直します。**
 	 */
 	let viewMenuOpen = $state(false);
+
+	/**
+	 * 「sshboard について」を開いているか。
+	 *
+	 * **版を確かめる場所はここ 1 つ**です。自前タイトルバー（D17）で
+	 * Windows から OS のメニューが消え、確かめる場所が無くなっていました。
+	 * **「表示」や「診断」へ散らしたのは誤り**で、普通に探すのは
+	 * 「〜について」／ヘルプです（dbboard も同じ形）。
+	 */
+	let aboutOpen = $state(false);
 
 	/** メニューの文言は**既にある**（`messages-menu`）。新しい言い方を増やさない。 */
 	const menu = $derived(menuLabels(i18n.locale));
@@ -557,6 +568,17 @@
 			**失ったメニューを、自分の帯の中に作り直します。**
 			文言は `messages-menu` に既にあるものを使い、言い方を増やしません。
 		-->
+		<!-- **「〜について」はここ。**版を確かめる場所を 1 つに決めます（dbboard と同じ形）。 -->
+		<button
+			type="button"
+			class="about-open"
+			onclick={() => (aboutOpen = true)}
+			title={i18n.t('about.title')}
+			aria-label={i18n.t('about.title')}
+		>
+			?
+		</button>
+
 		<div class="view-menu" data-tauri-drag-region>
 			<button
 				type="button"
@@ -629,6 +651,7 @@
 							{/each}
 						</select>
 					</div>
+
 				</div>
 			{/if}
 		</div>
@@ -694,40 +717,77 @@
 	<!--
 		更新の知らせ（D34）。**黙って入れ替えません。**押すのは人。
 		「何も無い」「調べている」は出しません — **静かなときは静かでいる。**
+
+		**本文の流れに埋めない。**細い帯として並べていたら、
+		**そこにあると気づかれませんでした**（実機・2026-09-03）。
+		画面の隅へ浮かせ、影を付けて、他と違う面として見せます。
+		ただし**画面を塞ぐ窓にはしません** — 作業中に手を止めさせる話ではないので。
 	-->
-	{#if updater.state.kind === 'found'}
-		<p class="update" role="status">
-			<Icon name="download" size={12} />
-			<span>{i18n.t('update.found', { version: updater.state.version })}</span>
-			<button type="button" class="cta" onclick={() => updater.install()}>
-				{i18n.t('update.install')}
-			</button>
-			<button type="button" onclick={() => updater.dismiss()}>{i18n.t('update.later')}</button>
-		</p>
-	{:else if updater.state.kind === 'downloading'}
-		<p class="update" role="status">
-			<Icon name="download" size={12} />
-			<span>
-				{i18n.t('update.downloading', { version: updater.state.version })}
-				{#if updater.state.percent !== null}&nbsp;{updater.state.percent}%{/if}
-			</span>
-		</p>
-	{:else if updater.state.kind === 'ready'}
-		<p class="update" role="status">
-			<Icon name="check" size={12} />
-			<span>{i18n.t('update.ready', { version: updater.state.version })}</span>
-			<button type="button" class="cta" onclick={() => updater.restart()}>
-				{i18n.t('update.restart')}
-			</button>
-			<button type="button" onclick={() => updater.dismiss()}>{i18n.t('update.later')}</button>
-		</p>
-	{:else if updater.state.kind === 'failed'}
-		<!-- **黙らない。**繋がらないのか署名が合わないのかで、人の次の一手が違う。 -->
-		<p class="update failed" role="status">
-			<Icon name="warning" size={12} />
-			<span>{i18n.t('update.failed', { detail: updater.state.detail })}</span>
-			<button type="button" onclick={() => updater.dismiss()}>{i18n.t('update.later')}</button>
-		</p>
+	{#if updater.state.kind !== 'idle' && updater.state.kind !== 'checking' && updater.state.kind !== 'none'}
+		<aside class="update-toast" role="status" aria-live="polite">
+			{#if updater.state.kind === 'found'}
+				<span class="toast-icon"><Icon name="download" size={16} /></span>
+				<div class="toast-body">
+					<strong>{i18n.t('update.found', { version: updater.state.version })}</strong>
+					<div class="toast-actions">
+						<button type="button" class="cta" onclick={() => updater.install()}>
+							{i18n.t('update.install')}
+						</button>
+						<button type="button" onclick={() => updater.dismiss()}>
+							{i18n.t('update.later')}
+						</button>
+					</div>
+				</div>
+			{:else if updater.state.kind === 'downloading'}
+				<span class="toast-icon"><Icon name="download" size={16} /></span>
+				<div class="toast-body">
+					<strong>
+						{i18n.t('update.downloading', { version: updater.state.version })}
+						{#if updater.state.percent !== null}&nbsp;{updater.state.percent}%{/if}
+					</strong>
+					{#if updater.state.percent !== null}
+						<!-- **進み具合を出す。**落としている間、止まって見えないように。 -->
+						<div
+							class="toast-bar"
+							role="progressbar"
+							aria-valuenow={updater.state.percent}
+							aria-valuemin="0"
+							aria-valuemax="100"
+						>
+							<span style:width="{updater.state.percent}%"></span>
+						</div>
+					{/if}
+				</div>
+			{:else if updater.state.kind === 'ready'}
+				<span class="toast-icon"><Icon name="check" size={16} /></span>
+				<div class="toast-body">
+					<strong>{i18n.t('update.ready', { version: updater.state.version })}</strong>
+					<div class="toast-actions">
+						<button type="button" class="cta" onclick={() => updater.restart()}>
+							{i18n.t('update.restart')}
+						</button>
+						<button type="button" onclick={() => updater.dismiss()}>
+							{i18n.t('update.later')}
+						</button>
+					</div>
+				</div>
+			{:else if updater.state.kind === 'failed'}
+				<!-- **黙らない。**繋がらないのか署名が合わないのかで、人の次の一手が違う。 -->
+				<span class="toast-icon warn"><Icon name="warning" size={16} /></span>
+				<div class="toast-body">
+					<strong>{i18n.t('update.failed', { detail: updater.state.detail })}</strong>
+					<div class="toast-actions">
+						<button type="button" onclick={() => updater.dismiss()}>
+							{i18n.t('update.later')}
+						</button>
+					</div>
+				</div>
+			{/if}
+		</aside>
+	{/if}
+
+	{#if aboutOpen}
+		<AboutDialog onClose={() => (aboutOpen = false)} />
 	{/if}
 
 	{#if failure}
@@ -902,34 +962,99 @@
 
 	/* --- 更新の知らせ（D34） --- */
 
-	.update {
+	.update-toast {
+		position: fixed;
+		right: 1rem;
+		bottom: 1rem;
+		z-index: 60;
 		display: flex;
-		align-items: center;
-		gap: 0.5rem;
-		margin: 0;
-		padding: 0.4rem 0.6rem;
+		gap: 0.6rem;
+		max-width: min(24rem, calc(100vw - 2rem));
+		padding: 0.75rem 0.85rem;
+		border: 1px solid var(--hairline-strong);
+		border-radius: var(--r-shell);
+		background: var(--surface);
+		/* **他と違う面に見せる。**本文と同じ平面に置くと、見落とされます。 */
+		box-shadow: var(--lift-3);
+	}
+
+	.toast-icon {
+		flex: 0 0 auto;
+		display: grid;
+		place-items: center;
+		width: 26px;
+		height: 26px;
+		border-radius: 999px;
+		background: var(--accent-soft);
+		color: var(--accent);
+	}
+
+	.toast-icon.warn {
+		background: var(--warning-soft);
+		color: var(--warning);
+	}
+
+	.toast-body {
+		display: flex;
+		flex-direction: column;
+		gap: 0.45rem;
+		min-width: 0;
+	}
+
+	.toast-body strong {
 		font-size: 0.8rem;
-		border: 1px solid var(--hairline);
-		border-radius: 6px;
-		background: var(--surface-2, transparent);
+		font-weight: 600;
+		line-height: 1.45;
 	}
 
-	.update.failed {
-		border-color: var(--warning);
+	.toast-actions {
+		display: flex;
+		gap: 0.4rem;
 	}
 
-	.update button {
+	.toast-actions button {
 		font-size: 0.75rem;
-		padding: 0.2rem 0.5rem;
+		padding: 0.25rem 0.6rem;
+	}
+
+	.toast-bar {
+		height: 4px;
+		border-radius: 999px;
+		background: var(--surface-2);
+		overflow: hidden;
+	}
+
+	.toast-bar span {
+		display: block;
+		height: 100%;
+		background: var(--accent);
 	}
 
 	/* --- 「表示」メニュー（自前タイトルバーで OS のメニューを失った分） --- */
+
+	.about-open {
+		flex: 0 0 auto;
+		width: 24px;
+		height: 24px;
+		padding: 0;
+		border-radius: 999px;
+		background: transparent;
+		border: 1px solid var(--hairline);
+		color: var(--fg-muted);
+		font-size: 0.75rem;
+		line-height: 1;
+		margin-left: auto;
+	}
+
+	.about-open:hover {
+		color: var(--fg);
+		border-color: var(--hairline-strong);
+	}
 
 	.view-menu {
 		position: relative;
 		display: flex;
 		align-items: center;
-		margin-left: auto;
 	}
 
 	.view-trigger {

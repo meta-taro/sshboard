@@ -82,3 +82,15 @@ const DEFAULT_TAIL_LINES: u32 = 200;
 pub fn stop_stream(stream: State<'_, Arc<OutputStream>>) {
     stream.stop();
 }
+
+/// この版。**Windows には「〜について」がありません。**
+///
+/// 自前タイトルバー（D17）にした結果、Windows では OS のメニューごと消えました。
+/// **版を確かめる場所がどこにも無い**と実機から言われた分です。
+///
+/// `CARGO_PKG_VERSION` は 3 か所で揃えており（`src/version.rs` が見張っています）、
+/// **配布物の名前・更新の判定と同じ番号**です。
+#[tauri::command]
+pub fn app_version() -> String {
+    env!("CARGO_PKG_VERSION").to_string()
+}
