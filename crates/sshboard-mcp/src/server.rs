@@ -256,6 +256,84 @@ impl SshboardMcp {
         Ok(format!("registered `{}`", request.id))
     }
 
+    #[tool(
+        description = "Change name, key path, tag or colour of a connection already in sshboard's local list. Never touches the pinned host key, the login user, the host or the port - those decide *which machine* this is, so they stay with the person at the screen. Accepts no passwords or passphrases."
+    )]
+    pub async fn update_connection(
+        &self,
+        Parameters(request): Parameters<UpdateConnection>,
+    ) -> Result<String, ErrorData> {
+        check_id(&request.id)?;
+        self.show(&format!("update_connection {}", request.id))
+            .await?;
+
+        let path = self.connections_file()?;
+        let held = Connections::load_or_empty(&path).map_err(|error| {
+            ErrorData::internal_error(format!("cannot read connections: {error}"), None)
+        })?;
+
+        let Some(current) = held.get(&request.id).cloned() else {
+            return Err(ErrorData::invalid_params(
+                format!("connection `{}` does not exist", request.id),
+                None,
+            ));
+        };
+
+        // タグの長さと色の名前は、**保存する側（`sshboard-connections`）が見ます。**
+        // ここで重ねると、片方だけ直したときに食い違います。
+
+        // **触れないものは、触らない。**
+        //
+        // `fingerprint` は「この相手で間違いない」という記録です（D6）。
+        // ここで消せる口を作ると、**AI が「更新」した瞬間にピン留めが黙って消えます。**
+        // `host` / `user` / `port` はそもそも受け取りません —
+        // **どの機械かを決める値**なので、画面を見ている人の手に残します（Issue #5）。
+        let updated = ConnectionEntry {
+            name: request.name.unwrap_or(current.name),
+            // 空文字は「指定を外す」。ssh-agent へ戻ります。
+            key_path: match request.key_path {
+                Some(path) if path.trim().is_empty() => None,
+                Some(path) => Some(path),
+                None => current.key_path,
+            },
+            tag: match request.tag {
+                Some(tag) if tag.trim().is_empty() => None,
+                Some(tag) => Some(tag),
+                None => current.tag,
+            },
+            color: match request.color {
+                Some(color) if color.trim().is_empty() => None,
+                Some(color) => Some(color),
+                None => current.color,
+            },
+            ..current
+        };
+
+        let next = Connections {
+            version: held.version,
+            connections: held
+                .connections
+                .into_iter()
+                .map(|entry| {
+                    if entry.id == updated.id {
+                        updated.clone()
+                    } else {
+                        entry
+                    }
+                })
+                .collect(),
+        };
+        next.save(&path).map_err(|error| {
+            ErrorData::internal_error(format!("cannot save connections: {error}"), None)
+        })?;
+
+        if let Some(watch) = &self.connections_watch {
+            watch.notify();
+        }
+
+        Ok(format!("updated `{}`", request.id))
+    }
+
     /// 既にある接続に**印（タグと色）だけ**を付ける。
     ///
     /// **ホストも利用者名も鍵も変えられません**（D21）。
@@ -435,6 +513,30 @@ pub struct MarkConnection {
     pub tag: Option<String>,
     /// 色。`red` `orange` `yellow` `green` `teal` `blue` `purple` `pink` のどれか。
     /// **16 進数は受け付けません。**空文字で外す。
+    #[serde(default)]
+    pub color: Option<String>,
+}
+
+/// 登録済みの接続を直す（Issue #5）。
+///
+/// **`register_connection` は衝突したら断ります。**それは正しい挙動で、
+/// upsert にすると **AI が「更新」した瞬間にホスト鍵のピン留めが黙って消えます。**
+/// 直す口を別に置き、**触れないものを型で示します。**
+#[derive(Debug, Deserialize, rmcp::schemars::JsonSchema)]
+#[schemars(crate = "rmcp::schemars")]
+pub struct UpdateConnection {
+    /// 直す接続の識別子。**これ自体は変えられません。**
+    pub id: String,
+    /// 人が読む名前。
+    #[serde(default)]
+    pub name: Option<String>,
+    /// 秘密鍵のパス。空文字を渡すと**指定を外します**（ssh-agent へ戻す）。
+    #[serde(default)]
+    pub key_path: Option<String>,
+    /// 印のタグ。**12 文字まで。**
+    #[serde(default)]
+    pub tag: Option<String>,
+    /// 印の色。
     #[serde(default)]
     pub color: Option<String>,
 }

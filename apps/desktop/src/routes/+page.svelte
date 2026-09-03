@@ -8,6 +8,7 @@
 	import FileBrowser from '$lib/components/FileBrowser.svelte';
 	import Icon from '$lib/components/Icon.svelte';
 	import { i18n } from '$lib/i18n/i18n.svelte';
+	import { session } from '$lib/session.svelte';
 	import { menuLabels } from '$lib/i18n/messages-menu';
 	import { titlebar } from '$lib/window/titlebar.svelte';
 	import AboutDialog from '$lib/components/AboutDialog.svelte';
@@ -66,7 +67,8 @@
 	let mcpCopied = $state(false);
 	let failure = $state<string | null>(null);
 	let streaming = $state(false);
-	let view = $state<'files' | 'console' | 'connections' | 'band' | 'diag'>('files');
+	/** **既定は接続。**繋がないとファイルも端末も空です。 */
+	let view = $state<'connections' | 'files' | 'console' | 'band' | 'diag'>('connections');
 
 	// --- 端末（D29）------------------------------------------------------------
 	// **同時に触れるのは 1 人。**AI が握っている間、人の入力は締まる。
@@ -524,21 +526,26 @@
 		中のボタン類は各自が押せるままにします。
 	-->
 	<header data-tauri-drag-region>
-		<!-- **文字の上でも掴めるように**、この要素自体を掴める領域にします。
-		     `pointer-events: none` で下へ落とす手もありますが、
-		     **それだと説明の吹き出し（`title`）が出なくなります。** -->
-		<span class="phase" data-tauri-drag-region title={i18n.t('app.driven')}>
-			{i18n.t('app.phase0')}
-		</span>
+		<!--
+			**製品名だけ。**説明文は外しました。
+
+			「1 本の SSH を、人と AI で共有します。」は、**毎日 8 時間見る画面**に
+			常時出しておく文ではありません（実機で「要る？」と言われた）。
+			同じ説明は「〜について」と README にあります。
+
+			**この要素自体を掴める領域にします。**`pointer-events: none` で
+			下へ落とす手もありますが、それだと吹き出しが出なくなります。
+		-->
+		<span class="phase" data-tauri-drag-region title={i18n.t('app.driven')}>sshboard</span>
 
 		<!-- **ボタンとボタンの隙間でも掴める。**
 		     付けないと、並びの余白は「掴めない帯」になります。 -->
 		<nav class="tabs" data-tauri-drag-region>
-			<!-- **既定はファイル**（PRD §1）。副ユーザーに端末を覚えさせない。 -->
-			<button type="button" class:active={view === 'files'} onclick={() => (view = 'files')}>
-				<Icon name="folder" />
-				{i18n.t('tab.files')}
-			</button>
+			<!--
+				**接続が 1 番目。**繋がないとファイルも端末も空です。
+				以前はファイルが先頭で、**「接続マネージャーが 2 番目なのはおかしい」**
+				と実機で言われました（2026-09-03）。そのとおりです。
+			-->
 			<button
 				type="button"
 				class:active={view === 'connections'}
@@ -546,6 +553,10 @@
 			>
 				<Icon name="server" />
 				{i18n.t('tab.connections')}
+			</button>
+			<button type="button" class:active={view === 'files'} onclick={() => (view = 'files')}>
+				<Icon name="folder" />
+				{i18n.t('tab.files')}
 			</button>
 			<button type="button" class:active={view === 'console'} onclick={() => (view = 'console')}>
 				<Icon name="terminal" />
@@ -797,6 +808,29 @@
 	{#if view === 'console'}
 		<section class="console" aria-label={i18n.t('tab.console')}>
 			<p class="what">{i18n.t('console.what')}</p>
+			<!--
+				**端末にも接続先を選べるように**（実機の指摘・2026-09-03）。
+				ファイルの面には接続タブがあるのに端末に無いのは、筋が通りません。
+				**選ぶ先はファイルの面と同じ 1 つ**です（`session.focus`）。
+			-->
+			{#if session.all.length > 1}
+				<div class="console-conns" role="tablist" aria-label={i18n.t('tab.connections')}>
+					{#each session.all as held (held.id)}
+						<button
+							type="button"
+							role="tab"
+							class="console-conn"
+							class:active={held.id === session.activeId}
+							aria-selected={held.id === session.activeId}
+							onclick={() => session.focus(held.id)}
+						>
+							<span data-secret>{held.name}</span>
+							{#if held.tag}<span class="tag" data-secret>{held.tag}</span>{/if}
+						</button>
+					{/each}
+				</div>
+			{/if}
+
 			<div class="console-head">
 				<!-- **誰が握っているかを、常に出す。**見えない所で AI が打っている、を作らない。 -->
 				<!-- **どの接続の端末かを常に出す**（D25）。
@@ -1031,6 +1065,29 @@
 	}
 
 	/* --- 「表示」メニュー（自前タイトルバーで OS のメニューを失った分） --- */
+
+	.console-conns {
+		display: flex;
+		gap: 0.3rem;
+		flex-wrap: wrap;
+		padding-bottom: 0.35rem;
+	}
+
+	.console-conn {
+		font-size: 0.75rem;
+		padding: 0.2rem 0.55rem;
+		border: 1px solid var(--hairline);
+		border-radius: var(--r-control);
+		background: transparent;
+		display: inline-flex;
+		align-items: center;
+		gap: 0.3rem;
+	}
+
+	.console-conn.active {
+		border-color: var(--accent);
+		color: var(--accent);
+	}
 
 	.about-open {
 		flex: 0 0 auto;

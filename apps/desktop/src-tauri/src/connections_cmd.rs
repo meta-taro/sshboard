@@ -216,13 +216,9 @@ pub fn connection_password_save(
     let reference = format!("password:{id}");
 
     let mut connections = load(&path)?;
-    let found = connections
-        .connections
-        .iter()
-        .any(|held| held.id == id)
-        .then_some(())
-        .ok_or_else(|| format!("そんな接続はありません: {id}"))?;
-    let _ = found;
+    if !connections.connections.iter().any(|held| held.id == id) {
+        return Err(format!("そんな接続はありません: {id}"));
+    }
 
     if password.is_empty() {
         // 消せなくても進みます。**参照を外す方が大事**です

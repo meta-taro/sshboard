@@ -168,6 +168,9 @@ async fn the_server_advertises_only_the_phase_zero_tools() {
         "diagnostics",
         // **複数の接続をタブで持つ**（D25）。宛先を変える口。
         "focus_connection",
+        // **直す口**（Issue #5）。`register_connection` は衝突したら断るので、
+        // 直すのは別の口。**指紋・ホスト・利用者・ポートには触れない。**
+        "update_connection",
         // **AI が自分で画面を見る口**（D26）。型検査は崩れを 1 件も止められなかった。
         "capture_window",
         // **人と AI が共有する端末**（D29 が D3 を条件つきで覆した）。
