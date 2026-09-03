@@ -247,7 +247,7 @@ const ja: Catalog = {
 	'conn.user': 'ログイン名',
 	'conn.key': '秘密鍵のパス（空なら ssh-agent）',
 	'conn.key.placeholder': '秘密鍵のパス',
-	'conn.key.help': '空のままなら ssh-agent を使います。ただし **Windows は agent が既定で無効**なので、鍵のパスを入れるか、下でパスワードを預けてください。',
+	'conn.key.help': '空のままなら ssh-agent を使います。ただし Windows は agent が既定で無効なので、鍵のパスを入れるか、下でパスワードを預けてください。',
 	'conn.key.pick': '選ぶ…',
 	'conn.key.ok': '{format} の鍵として読めました。そのまま使えます。',
 	'conn.key.passphrase': '{format} の鍵です。パスフレーズは繋ぐときに聞きます。',
