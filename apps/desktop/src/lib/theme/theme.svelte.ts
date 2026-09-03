@@ -63,6 +63,13 @@ class ThemeController {
 		} else {
 			root.setAttribute('data-theme', this.mode);
 		}
+
+		// **`app.html` が最初の描画前に入れたインラインの `colorScheme` を外す。**
+		//
+		// 残したままだと、そこが CSS より強いので**切り替えても付いてこない**
+		// （暗い → 明るいにしてもスクロールバーが暗いまま）。
+		// 以後は `tokens.css` の 3 か所が決めます。
+		root.style.removeProperty('color-scheme');
 	}
 }
 

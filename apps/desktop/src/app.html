@@ -4,6 +4,12 @@
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
 		<meta name="text-scale" content="scale" />
+		<!--
+			**ネイティブ部品（スクロールバー・セレクト・入力欄）はここを見ます。**
+			両方に対応していると宣言しておくと、CSS が届く前でも
+			OS の設定に沿った側で描かれます。
+		-->
+		<meta name="color-scheme" content="light dark" />
 		<script>
 			// **最初の描画より前に当てる。**あとから当てると、一瞬だけ違う見た目が見える。
 			// 鍵は theme.svelte.ts / text-size.svelte.ts の定数と揃えること。
@@ -11,6 +17,9 @@
 				const mode = localStorage.getItem('sshboard-theme');
 				if (mode === 'light' || mode === 'dark') {
 					document.documentElement.setAttribute('data-theme', mode);
+					// **スタイルシートが届く前に、ネイティブ部品の側も決めておく。**
+					// これが無いと、暗いテーマでも**最初の一瞬だけスクロールバーが白く**光る。
+					document.documentElement.style.colorScheme = mode;
 				}
 				// 文字サイズも同じ理由でここ。鍵は text-size.svelte.ts と揃えること。
 				const size = localStorage.getItem('sshboard-text-size');

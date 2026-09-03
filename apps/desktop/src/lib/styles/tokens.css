@@ -33,6 +33,17 @@
 }
 
 :root {
+	/*
+	 * **ネイティブ部品にテーマを伝える。**
+	 *
+	 * 色のトークンをいくら定義しても、スクロールバー・セレクト・入力欄の枠は
+	 * **ブラウザが描きます。**その判断材料はこの 1 行だけです。
+	 * 書いていなかったので、**Windows の暗いテーマでスクロールバーが白いまま**でした
+	 * （実機で確認・2026-09-03）。
+	 *
+	 * `data-theme` を付けない「自動」でも効くよう、**3 か所すべてに書きます。**
+	 */
+	color-scheme: light;
 	/* 面 — 奥から手前へ */
 	--ground: #eef0f3;
 	--shell: #e4e7ec;
@@ -103,6 +114,8 @@
 
 @media (prefers-color-scheme: dark) {
 	:root:not([data-theme='light']) {
+		color-scheme: dark;
+
 		--ground: #0b0e11;
 		--shell: #12161b;
 		--surface: #171c22;
@@ -151,6 +164,8 @@
 }
 
 :root[data-theme='dark'] {
+	color-scheme: dark;
+
 	--ground: #0b0e11;
 	--shell: #12161b;
 	--surface: #171c22;
