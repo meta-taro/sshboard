@@ -235,8 +235,7 @@ pub fn connection_password_save(
         .into_iter()
         .map(|mut held| {
             if held.id == id {
-                held.keyring_password_ref =
-                    (!password.is_empty()).then(|| reference.clone());
+                held.keyring_password_ref = (!password.is_empty()).then(|| reference.clone());
             }
             held
         })
@@ -261,7 +260,10 @@ pub fn connection_password_save(
 
 /// パスワードを預けてあるか。**中身は返しません**（あるか無いかだけ）。
 #[tauri::command]
-pub fn connection_has_password(id: String, path: State<'_, ConnectionsPath>) -> Result<bool, String> {
+pub fn connection_has_password(
+    id: String,
+    path: State<'_, ConnectionsPath>,
+) -> Result<bool, String> {
     Ok(load(&path)?
         .connections
         .iter()
