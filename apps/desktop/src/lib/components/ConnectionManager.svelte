@@ -133,6 +133,51 @@
 	});
 
 	/** 鍵をファイル選択で選ぶ。**パスを手で打たせない。** */
+	/* --- 認証のやり方（Issue #7） --- */
+
+	type AuthMode = 'agent' | 'key' | 'password';
+
+	/**
+	 * いま選ばれている認証のやり方。
+	 *
+	 * **保存されるのは「鍵のパス」と「パスワードの参照名」だけ**で、
+	 * どちらを使うかという項目は持ちません（内部の分岐は
+	 * 鍵 → パスワード → agent の順）。ここはその分岐を**画面に映しているだけ**です。
+	 */
+	let authMode = $state<AuthMode>('agent');
+
+	/** いまの中身から、選ばれているはずのやり方を決める。 */
+	function authModeOf(entry: Connection, storedPassword: boolean): AuthMode {
+		if (entry.key_path && entry.key_path.trim() !== '') return 'key';
+		if (storedPassword) return 'password';
+		return 'agent';
+	}
+
+	/**
+	 * やり方を選び直す。**使わなくなる方は、その場で片付けます**（Issue #7）。
+	 *
+	 * 使う予定のない秘密が OS の資格情報ストアに残り続けるのは、
+	 * **こちらが開けた口の落とし前**です。選び直した時点で消します。
+	 */
+	async function chooseAuth(mode: AuthMode) {
+		authMode = mode;
+		if (mode !== 'key') {
+			draft = { ...draft, key_path: null };
+		}
+		if (mode !== 'password') {
+			passwordDraft = '';
+			// **預けたままにしない。**使われないと分かった時点で消します。
+			if (hasPassword && selectedId) {
+				try {
+					await invoke('connection_password_save', { id: selectedId, password: '' });
+					hasPassword = false;
+				} catch (error: unknown) {
+					failure = String(error);
+				}
+			}
+		}
+	}
+
 	/* --- ログインのパスワード（鍵を使わないとき） --- */
 
 	/**
@@ -191,6 +236,7 @@
 		confirmingDelete = false;
 		passwordDraft = '';
 		hasPassword = false;
+		authMode = 'agent';
 	}
 
 	function edit(item: Connection) {
@@ -200,7 +246,9 @@
 		confirmingDelete = false;
 		// **前の接続のパスワードを持ち越さない。**
 		passwordDraft = '';
-		void loadHasPassword(item.id);
+		void loadHasPassword(item.id).then(() => {
+			authMode = authModeOf(item, hasPassword);
+		});
 	}
 
 	async function save() {
@@ -403,38 +451,53 @@
 			<input bind:value={draft.user} spellcheck="false" />
 		</label>
 
-		<label>
-			<span><Icon name="key" size={12} />{i18n.t('conn.key')}</span>
-			<div class="key-row">
-				<input
-					bind:value={draft.key_path}
-					placeholder={i18n.t('conn.key.placeholder')}
-					spellcheck="false"
-				/>
-				<button type="button" onclick={pickKey}>{i18n.t('conn.key.pick')}</button>
-			</div>
-			<!-- **形式は製品が見分けます**（D28）。人が拡張子を気にする必要はありません。 -->
-			{#if keyLine.tone !== 'none'}
-				<small class="key-note" class:bad={keyLine.tone === 'error'}>
-					<Icon name={keyLine.tone === 'error' ? 'warning' : 'check'} size={11} />
-					{i18n.t(keyLine.key, { format: keyLine.format })}
-				</small>
-			{:else}
-				<small>{i18n.t('conn.key.help')}</small>
-			{/if}
-		</label>
-
 		<!--
-			**パスワードで繋ぐ道**（Issue #4）。
-			鍵が既定ですが、**素の Windows では ssh-agent が動いていません**し、
-			この製品が置き換える相手（WinSCP / Tera Term）の利用者の多くは
-			パスワードで繋いでいます（PRD §0-4）。
+			**認証のやり方は 1 つだけ選ばせる**（Issue #7）。
 
-			**接続に入るのは参照名だけ**で、パスワードは OS の資格情報ストアです（D11）。
+			以前は鍵の欄とパスワードの欄が同時に出ており、
+			**鍵で繋ぐ人が、使われないパスワードを資格情報ストアへ預けてしまいました。**
+			「鍵を使うのか、パスワードを使うのか」は排他なので、UI も排他にします。
+
+			内部の分岐（鍵 → パスワード → agent）も、これで画面から読めるようになります。
 		-->
-		<label class="field">
-			<span><Icon name="lock" size={12} />{i18n.t('conn.password')}</span>
-			{#if selectedId === null}
+		<fieldset class="auth">
+			<legend>{i18n.t('conn.auth')}</legend>
+			<div class="auth-choices">
+				{#each ['agent', 'key', 'password'] as const as mode (mode)}
+					<label class="auth-choice" class:on={authMode === mode}>
+						<input
+							type="radio"
+							name="auth-mode"
+							value={mode}
+							checked={authMode === mode}
+							onchange={() => chooseAuth(mode)}
+						/>
+						{i18n.t(`conn.auth.${mode}`)}
+					</label>
+				{/each}
+			</div>
+
+			{#if authMode === 'agent'}
+				<small>{i18n.t('conn.auth.agent.help')}</small>
+			{:else if authMode === 'key'}
+				<div class="key-row">
+					<input
+						bind:value={draft.key_path}
+						placeholder={i18n.t('conn.key.placeholder')}
+						spellcheck="false"
+					/>
+					<button type="button" onclick={pickKey}>{i18n.t('conn.key.pick')}</button>
+				</div>
+				<!-- **形式は製品が見分けます**（D28）。人が拡張子を気にする必要はありません。 -->
+				{#if keyLine.tone !== 'none'}
+					<small class="key-note" class:bad={keyLine.tone === 'error'}>
+						<Icon name={keyLine.tone === 'error' ? 'warning' : 'check'} size={11} />
+						{i18n.t(keyLine.key, { format: keyLine.format })}
+					</small>
+				{:else}
+					<small>{i18n.t('conn.auth.key.help')}</small>
+				{/if}
+			{:else if selectedId === null}
 				<small>{i18n.t('conn.password.saveFirst')}</small>
 			{:else}
 				<div class="row">
@@ -449,26 +512,10 @@
 					<button type="button" onclick={savePassword} disabled={passwordDraft.length === 0}>
 						{i18n.t('conn.password.keep')}
 					</button>
-					{#if hasPassword}
-						<!-- **消す手段を必ず置く。**「もう使わない」を言えないと、
-						     消したつもりで残ります。 -->
-						<button
-							type="button"
-							class="ghost tiny"
-							onclick={() => {
-								passwordDraft = '';
-								savePassword();
-							}}
-						>
-							{i18n.t('conn.password.forget')}
-						</button>
-					{/if}
 				</div>
-				<small>
-					{hasPassword ? i18n.t('conn.password.have') : i18n.t('conn.password.help')}
-				</small>
+				<small>{hasPassword ? i18n.t('conn.password.have') : i18n.t('conn.password.help')}</small>
 			{/if}
-		</label>
+		</fieldset>
 
 		<div class="mark-row">
 			<label class="tag">
@@ -850,6 +897,49 @@
 		display: grid;
 		grid-template-columns: 1fr 96px;
 		gap: 0.65rem;
+	}
+
+	/* --- 繋ぎ方の選択（Issue #7） --- */
+
+	.auth {
+		display: flex;
+		flex-direction: column;
+		gap: 0.4rem;
+		margin: 0;
+		padding: 0.6rem 0.7rem 0.7rem;
+		border: 1px solid var(--hairline);
+		border-radius: var(--r-core);
+	}
+
+	.auth legend {
+		font-size: 0.7rem;
+		color: var(--fg-muted);
+		padding: 0 0.3rem;
+	}
+
+	.auth-choices {
+		display: flex;
+		gap: 0.4rem;
+		flex-wrap: wrap;
+	}
+
+	/* **選んだものが見て分かること。**色だけに頼らず、枠も変えます
+	   （指針 §9「色を唯一の手がかりにしない」）。 */
+	.auth-choice {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.3rem;
+		font-size: 0.78rem;
+		padding: 0.25rem 0.6rem;
+		border: 1px solid var(--hairline);
+		border-radius: var(--r-control);
+		cursor: pointer;
+	}
+
+	.auth-choice.on {
+		border-color: var(--accent);
+		color: var(--accent);
+		font-weight: 600;
 	}
 
 	.mark-row {
