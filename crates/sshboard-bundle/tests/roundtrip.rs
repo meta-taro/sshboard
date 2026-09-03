@@ -19,6 +19,7 @@ fn sample() -> BundlePayload {
         user: "deploy".into(),
         key_path: Some("/home/me/.ssh/id_ed25519".into()),
         keyring_passphrase_ref: Some("prod-key".into()),
+        keyring_password_ref: None,
         fingerprint: Some("SHA256:xxxx".into()),
         known_hosts: None,
         color: Some("red".into()),

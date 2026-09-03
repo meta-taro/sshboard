@@ -78,7 +78,14 @@ pub fn build_payload(
             .find(|e| &e.id == id)
             .ok_or_else(|| TransferError::UnknownConnection { id: id.clone() })?;
 
-        if let Some(reference) = &entry.keyring_passphrase_ref {
+        // **鍵のパスフレーズと、ログインのパスワードの両方。**
+        //
+        // 片方だけ運ぶと、渡した相手はそこで繋げません。
+        // **バンドルの目的（1 ファイルで渡す・D18）が壊れます。**
+        for reference in [&entry.keyring_passphrase_ref, &entry.keyring_password_ref]
+            .into_iter()
+            .flatten()
+        {
             // **黙って穴の開いたファイルを作らない。**
             // 相手は「入っているはず」で受け取り、繋げないところで初めて気づきます。
             let secret = vault

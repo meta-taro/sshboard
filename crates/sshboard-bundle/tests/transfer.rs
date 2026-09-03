@@ -72,6 +72,7 @@ fn entry(id: &str, keyring_ref: Option<&str>) -> ConnectionEntry {
         user: "someone".into(),
         key_path: Some("/home/me/.ssh/id_ed25519".into()),
         keyring_passphrase_ref: keyring_ref.map(str::to_string),
+        keyring_password_ref: None,
         fingerprint: None,
         known_hosts: None,
         color: None,
@@ -200,4 +201,36 @@ fn if_putting_a_secret_fails_the_ones_already_put_are_taken_back_out() {
         "入れた分が残っている: {:?}",
         vault.names()
     );
+}
+
+#[test]
+fn the_login_password_travels_too() {
+    // **鍵のパスフレーズだけ運んで、ログインのパスワードを置いていくと、
+    // 渡した相手は繋げません。**バンドルの目的（1 ファイルで渡す・D18）が壊れます。
+    let mut with_password = entry("a", None);
+    with_password.keyring_password_ref = Some("a-login".into());
+
+    let all = store(vec![with_password]);
+    let vault = FakeVault::with(&[("a-login", "hunter2")]);
+    let payload = build_payload(&all, &["a".into()], &vault).expect("組めない");
+
+    assert_eq!(
+        payload.secrets.get("a-login").map(String::as_str),
+        Some("hunter2"),
+        "ログインのパスワードが入っていない"
+    );
+}
+
+#[test]
+fn a_missing_login_password_stops_the_export_too() {
+    // 鍵のパスフレーズと同じ扱い。**黙って穴の開いたファイルを作らない。**
+    let mut with_password = entry("a", None);
+    with_password.keyring_password_ref = Some("missing".into());
+
+    let all = store(vec![with_password]);
+    let vault = FakeVault::default();
+    assert!(matches!(
+        build_payload(&all, &["a".into()], &vault),
+        Err(TransferError::SecretMissing { .. })
+    ));
 }
