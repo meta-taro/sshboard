@@ -53,6 +53,35 @@ jobs:
       - name: 依存を入れる
         run: pnpm install --frozen-lockfile
 
+      # **タグとアプリの番号が合っているか、いちばん先に見る**（D34 追記）。
+      #
+      # この照合は `release` ジョブ（`latest.json` を組む所）にもありますが、
+      # **そこは 10 分ビルドしたあと**です。署名検査で直したのと同じ問題が
+      # ここに残っていて、**版を上げ忘れたタグで実際に 10 分待たされました。**
+      #
+      # 合っていないと「更新が来ない」「更新し続ける」のどちらかになります。
+      - name: タグとアプリの番号が合っているか確かめる
+        env:
+          TAG: ${{ github.ref_name }}
+        shell: bash
+        run: |
+          set -eu
+          # 手動実行（workflow_dispatch）ではタグが無いので飛ばします。
+          case "${TAG}" in
+            v*) ;;
+            *) echo "タグではないので照合しません（${TAG}）"; exit 0 ;;
+          esac
+          VERSION="$(sed -n 's/.*"version": "\([0-9.]*\)".*/\1/p' \
+            apps/desktop/src-tauri/tauri.conf.json | head -1)"
+          TAG_VERSION="${TAG#v}"
+          TAG_VERSION="${TAG_VERSION%%-*}"
+          if [ "$TAG_VERSION" != "$VERSION" ]; then
+            echo "::error::タグ ${TAG} とアプリの番号 ${VERSION} が違います。" \
+                 "先に 'sh tools/bump-version.sh ${TAG_VERSION}' を流して commit してください（D34）。"
+            exit 1
+          fi
+          echo "タグ ${TAG} とアプリの番号 ${VERSION} は一致しています"
+
       # **鍵で実際に署名してみる**（D34）。
       #
       # 「設定されているか」だけを見ていた頃、**3 回とも 10 分ビルドしたあとで

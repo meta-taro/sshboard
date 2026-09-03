@@ -6174,14 +6174,14 @@ dependencies = [
 
 [[package]]
 name = "sshboard-band"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "tokio",
 ]
 
 [[package]]
 name = "sshboard-bundle"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "age",
  "serde",
@@ -6193,7 +6193,7 @@ dependencies = [
 
 [[package]]
 name = "sshboard-connections"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "directories",
  "serde",
@@ -6205,7 +6205,7 @@ dependencies = [
 
 [[package]]
 name = "sshboard-credentials"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "base64 0.22.1",
  "keyring",
@@ -6214,7 +6214,7 @@ dependencies = [
 
 [[package]]
 name = "sshboard-desktop"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "image",
  "muda",
@@ -6240,7 +6240,7 @@ dependencies = [
 
 [[package]]
 name = "sshboard-diag"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "serde",
  "serde_json",
@@ -6248,7 +6248,7 @@ dependencies = [
 
 [[package]]
 name = "sshboard-engine"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "serde",
  "sshboard-band",
@@ -6264,7 +6264,7 @@ dependencies = [
 
 [[package]]
 name = "sshboard-mcp"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "axum",
  "base64 0.22.1",
@@ -6286,7 +6286,7 @@ dependencies = [
 
 [[package]]
 name = "sshboard-readonly"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "chrono",
  "serde",
@@ -6297,7 +6297,7 @@ dependencies = [
 
 [[package]]
 name = "sshboard-ssh"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "base64 0.22.1",
  "russh",
@@ -6313,7 +6313,7 @@ dependencies = [
 
 [[package]]
 name = "sshboard-stream"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "tokio",
 ]
