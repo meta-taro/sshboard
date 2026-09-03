@@ -44,3 +44,8 @@ connections.local.json
 *.jpg
 *.gif
 !apps/desktop/src/lib/assets/*
+
+# `tauri icon` が作るが、この製品では使わないもの。
+# 対象は Windows と macOS だけ（PRD §7）。`tools/make-icons.sh` が片付けています。
+apps/desktop/src-tauri/icons/android/
+apps/desktop/src-tauri/icons/ios/
