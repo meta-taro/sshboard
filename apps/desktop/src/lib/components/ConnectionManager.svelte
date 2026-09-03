@@ -7,6 +7,7 @@
 	import Icon from '$lib/components/Icon.svelte';
 	import { i18n } from '$lib/i18n/i18n.svelte';
 	import BundleDialog from '$lib/components/BundleDialog.svelte';
+	import Toast from '$lib/components/Toast.svelte';
 
 	import {
 		clampListWidth,
@@ -418,10 +419,10 @@
 
 	<div class="form shell">
 		<div class="core form-core">
+		<!-- **失敗はここに残す。**直すべきことは消えてはいけません。
+		     済んだことはトーストへ（見切れて気づけない、と実機で言われた）。 -->
 		{#if failure}
 			<p class="failure" role="alert">{failure}</p>
-		{:else if notice}
-			<p class="notice">{notice}</p>
 		{/if}
 
 		<label>
@@ -599,6 +600,10 @@
 		</div>
 	</div>
 </section>
+
+{#if notice}
+	<Toast text={notice} onDone={() => (notice = null)} />
+{/if}
 
 {#if transfer !== null}
 	<BundleDialog
@@ -928,12 +933,20 @@
 	.auth-choice {
 		display: inline-flex;
 		align-items: center;
-		gap: 0.3rem;
+		gap: 0.35rem;
 		font-size: 0.78rem;
-		padding: 0.25rem 0.6rem;
+		padding: 0.3rem 0.7rem;
 		border: 1px solid var(--hairline);
 		border-radius: var(--r-control);
 		cursor: pointer;
+		/* **折り返させない。**`ssh-agent` が 2 行に割れて読めませんでした（実機）。 */
+		white-space: nowrap;
+	}
+
+	.auth-choice input {
+		/* 既定の丸を小さく。**言葉の方を読ませる。** */
+		margin: 0;
+		flex: 0 0 auto;
 	}
 
 	.auth-choice.on {
@@ -1096,12 +1109,6 @@
 
 	.empty {
 		padding: 0.5rem 0.35rem;
-	}
-
-	.notice {
-		margin: 0;
-		font-size: 0.78rem;
-		color: var(--ok);
 	}
 
 	.failure,

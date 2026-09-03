@@ -12,6 +12,7 @@
 
 	import Icon from './Icon.svelte';
 	import PassphraseDialog from './PassphraseDialog.svelte';
+	import Toast from './Toast.svelte';
 	import type { Connection } from '$lib/connections';
 	import { i18n } from '$lib/i18n/i18n.svelte';
 	import {
@@ -747,9 +748,7 @@
 	{#if failure}
 		<p class="failure" role="alert">{failure}</p>
 	{/if}
-	{#if notice}
-		<p class="notice" role="status">{notice}</p>
-	{/if}
+	
 
 	<!--
 		**左右を連れて歩く**（同期移動）。既定は切 — 勝手に付いてくると驚きます。
@@ -1038,6 +1037,10 @@
 		</div>
 	</div>
 </section>
+
+{#if notice}
+	<Toast text={notice} onDone={() => (notice = null)} />
+{/if}
 
 <!--
 	**パスフレーズは正面から聞く**（Issue #7 の提案 2）。
@@ -1603,8 +1606,7 @@
 		flex: 1 1 auto;
 	}
 
-	.failure,
-	.notice {
+	.failure {
 		margin: 0;
 		font-size: 0.72rem;
 		padding: 0.3rem 0.5rem;
@@ -1614,11 +1616,6 @@
 	.failure {
 		color: var(--danger);
 		background: var(--danger-soft);
-	}
-
-	.notice {
-		color: var(--fg-muted);
-		background: var(--shell);
 	}
 
 	button {
