@@ -39,6 +39,8 @@ tokio = { workspace = true, features = ["rt-multi-thread"] }
 serde = { version = "1", features = ["derive"] }
 # `tauri.conf.json` に `plugins` を書くと、生成されるコンテキストがこれを要求します。
 serde_json = "1"
+# 画面側が描いた PNG を受け取るため（D36）。**画像は base64 で渡ってきます。**
+base64 = "0.22"
 
 [dev-dependencies]
 # メニューの割り当てを**本物のパーサ**で検査するため（tauri 経由で既に依存木にある）。

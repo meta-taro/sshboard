@@ -1332,7 +1332,15 @@
 		display: flex;
 		flex-direction: column;
 		flex: 0 1 auto;
-		min-height: 0;
+		/*
+		 * **`.shell` の `min-height: 0` をここだけ打ち消す。**
+		 *
+		 * 0 のままだと、場所が足りないときに枠が中身より小さくなり、
+		 * **はみ出した中身が下の要素の上に重なって出ます**（実際に 2 回起きました）。
+		 * `min-content` なら「これ以上は縮めない」を中身が決めます。
+		 * 一覧は下で 1 行分まで縮むので、**最小はかなり小さい**まま保てます。
+		 */
+		min-height: min-content;
 	}
 
 	.picker .core {

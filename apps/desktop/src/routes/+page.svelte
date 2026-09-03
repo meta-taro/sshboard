@@ -11,6 +11,7 @@
 	import { menuLabels } from '$lib/i18n/messages-menu';
 	import { titlebar } from '$lib/window/titlebar.svelte';
 	import { updater } from '$lib/update/updater.svelte';
+	import { listenForPageShot } from '$lib/capture/page-shot';
 	import { LOCALES } from '$lib/i18n/locales';
 	import { textSize } from '$lib/text-size/text-size.svelte';
 	import { theme, type ThemeMode } from '$lib/theme/theme.svelte';
@@ -377,6 +378,13 @@
 	onMount(() => {
 		// **この帯が OS のタイトルバー**（D17）。最大化の状態を取り込む。
 		titlebar.init();
+
+		// **画面を撮る受け口**（D36）。OS の画面収録の許可が要らない方の道。
+		listenForPageShot()
+			.then((stop) => stops.push(stop))
+			.catch(() => {
+				/* 受け口が開けなくても、OS のキャプチャへ落ちる */
+			});
 		// **起動時に 1 回だけ。**定期的に叩きません（D34）。
 		updater.check();
 
