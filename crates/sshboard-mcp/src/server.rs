@@ -223,6 +223,9 @@ impl SshboardMcp {
             // 空文字は「指定なし」として扱う。ssh-agent を使う（D11）。
             key_path: request.key_path.filter(|path| !path.trim().is_empty()),
             keyring_passphrase_ref: None,
+            // **AI にパスワードを預けさせない**（D11 / §14）。
+            // 秘密を投入するのは人だけです。
+            keyring_password_ref: None,
             fingerprint: None,
             known_hosts: None,
             color: request.color.filter(|value| !value.trim().is_empty()),

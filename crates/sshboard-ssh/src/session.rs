@@ -82,6 +82,15 @@ pub enum Auth {
         path: String,
         passphrase: Option<String>,
     },
+    /// 利用者名とパスワード。
+    ///
+    /// **鍵より弱い。**それでも入れるのは、**この製品が置き換える相手
+    /// （WinSCP / Tera Term）の利用者の多くがこれで繋いでいる**ためです（PRD §0-4）。
+    /// 無ければ、狙っている層は 1 人も使えません。
+    ///
+    /// **製品はパスワードを持ちません。**人がその場で入れたものを渡すか、
+    /// OS の資格情報ストアから引きます（D11）。
+    Password { password: String },
 }
 
 /// 繋ぐときに要るもの。**接続先はここにしか無い。**
@@ -320,6 +329,13 @@ async fn authenticate(
             diag.info(Stage::Auth, id, "ssh-agent の鍵で試します");
             return authenticate_with_agent(handle, user, diag, id).await;
         }
+        Auth::Password { password } => {
+            diag.info(Stage::Auth, id, "パスワードで試します");
+            handle
+                .authenticate_password(user, password)
+                .await
+                .map_err(|error| SshError::Authenticate(error.to_string()))?
+        }
         Auth::Key { path, passphrase } => {
             let key = load_secret_key(path, passphrase.as_deref())
                 .map_err(|error| SshError::Authenticate(format!("鍵を読めません: {error}")))?;
@@ -338,9 +354,15 @@ async fn authenticate(
     if result.success() {
         Ok(())
     } else {
-        Err(SshError::Authenticate(
-            "鍵が受け付けられませんでした".into(),
-        ))
+        // **何で試したかを言う。**「受け付けられません」だけでは、
+        // 鍵を直すのかパスワードを直すのか分かりません。
+        Err(SshError::Authenticate(match auth {
+            Auth::Password { .. } => {
+                "パスワードが受け付けられませんでした。利用者名とパスワードを確かめてください"
+                    .into()
+            }
+            _ => "鍵が受け付けられませんでした".to_string(),
+        }))
     }
 }
 

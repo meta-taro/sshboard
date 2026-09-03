@@ -40,6 +40,14 @@ pub struct ConnectionEntry {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub keyring_passphrase_ref: Option<String>,
 
+    /// ログインのパスワードが入っている **OS ストアの参照名**。
+    /// **パスワードそのものではありません**（D11）。
+    ///
+    /// **鍵より弱い方法ですが、外せません。**この製品が置き換える相手
+    /// （WinSCP / Tera Term）の利用者の多くがパスワードで繋いでいます（PRD §0-4）。
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub keyring_password_ref: Option<String>,
+
     /// ホスト鍵の指紋。**固定するとホスト鍵のすり替えを検出できる。**
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub fingerprint: Option<String>,

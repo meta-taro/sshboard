@@ -15,7 +15,13 @@ RUN dnf -y install openssh-server acl glibc-langpack-ja glibc-gconv-extra \
     && ssh-keygen -A
 
 # 実機と同じく、鍵だけで入る
-RUN sed -i 's/^#\?PasswordAuthentication.*/PasswordAuthentication no/' /etc/ssh/sshd_config \
+# **パスワード認証を有効にする。**
+#
+# 置き換える相手（WinSCP / Tera Term）の利用者の多くはこれで繋ぎます（PRD §0-4）。
+# **有効にしないと、その経路を通しで確かめられません。**
+#
+# **使い捨てのコンテナです。**外へは出しません（`up.sh` が 127.0.0.1 に縛る）。
+RUN sed -i 's/^#\?PasswordAuthentication.*/PasswordAuthentication yes/' /etc/ssh/sshd_config \
     && sed -i 's/^#\?PubkeyAuthentication.*/PubkeyAuthentication yes/' /etc/ssh/sshd_config \
     && sed -i 's/^#\?PermitRootLogin.*/PermitRootLogin no/' /etc/ssh/sshd_config \
     # テストが並列に走ると既定の 10 を超える。**実際に弾かれた。**
@@ -28,6 +34,11 @@ RUN sed -i 's/^#\?PasswordAuthentication.*/PasswordAuthentication no/' /etc/ssh/
 
 # ログインする利用者。**root ではない。**
 RUN useradd -m -s /bin/bash probe
+
+# **パスワードでしか入れない利用者。**鍵の経路と混ざらないよう分けます。
+# パスワードは試験用の固定文字列で、**製品にも実機にも一切関係しません。**
+RUN useradd -m -s /bin/bash pw \
+    && echo 'pw:sshboard-test-password' | chpasswd
 
 # --- ここから「再現したい状態」 ---
 

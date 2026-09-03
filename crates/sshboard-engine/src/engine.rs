@@ -667,6 +667,20 @@ impl Engine {
             .ok_or_else(|| EngineError::UnknownConnection(id.to_owned()))
     }
 
+    /// ログインのパスワードを、その場の入力か OS ストアから引く。
+    ///
+    /// **人がその場で入れたものが最優先。**鍵のパスフレーズと同じ扱いです。
+    /// **製品はパスワードを持ちません**（D11）。ここは通り抜けるだけです。
+    fn password_for(entry: &ConnectionEntry, typed: Option<&str>) -> Option<String> {
+        if let Some(typed) = typed {
+            if !typed.is_empty() {
+                return Some(typed.to_string());
+            }
+        }
+        let reference = entry.keyring_password_ref.as_ref()?;
+        SecretStore::new(KEYRING_SERVICE).get(reference).ok()
+    }
+
     /// 認証のやり方を決める。**秘密はここでしか触りません**（D11 / D14）。
     fn auth_for(
         &self,
@@ -674,7 +688,15 @@ impl Engine {
         passphrase: Option<String>,
     ) -> Result<Auth, EngineError> {
         let Some(path) = entry.key_path.clone() else {
-            // 鍵の指定が無ければ ssh-agent。**製品がパスフレーズを持たない一番良い形**（D11）。
+            // 鍵の指定が無い。**パスワードを預けているなら、そちらで繋ぐ。**
+            //
+            // 以前はここで無条件に ssh-agent へ落としており、
+            // **agent に該当の鍵が無いと、そこで行き止まり**でした（実機で踏んだ）。
+            // 鍵より弱くても、**この製品が置き換える相手（WinSCP / Tera Term）の
+            // 利用者の多くはパスワードで繋いでいます**（PRD §0-4）。
+            if let Some(password) = Self::password_for(entry, passphrase.as_deref()) {
+                return Ok(Auth::Password { password });
+            }
             return Ok(Auth::Agent);
         };
 

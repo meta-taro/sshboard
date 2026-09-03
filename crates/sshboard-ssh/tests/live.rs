@@ -29,6 +29,14 @@ fn target(pinned: Option<&str>) -> Target {
     }
 }
 
+/// その道具があるか。**無ければ飛ばす**（product-baseline §4）。
+fn have(tool: &str) -> bool {
+    std::process::Command::new(tool)
+        .arg("--help")
+        .output()
+        .is_ok()
+}
+
 /// テスト用サーバーが建っていなければ、そのテストは飛ばす。
 async fn server_is_up() -> bool {
     tokio::net::TcpStream::connect((HOST, PORT)).await.is_ok()
@@ -711,4 +719,158 @@ async fn closing_a_console_stops_it_answering() {
         "閉じたのに返事が来ている:\n{}",
         stream.plain_tail()
     );
+}
+
+/// パスワードで繋がること。
+///
+/// **`Auth::Key` も `Auth::Password` も、通しで一度も走っていませんでした。**
+/// 実機テストは 11 か所すべて `Auth::Agent` で、
+/// **鍵ファイルとパスワードの経路は未検証のまま配っていました**（2026-09-03 に指摘）。
+///
+/// 置き換える相手（WinSCP / Tera Term）の利用者の多くはパスワードで繋ぎます（PRD §0-4）。
+/// **ここが通らなければ、狙った層は 1 人も使えません。**
+#[tokio::test]
+async fn a_password_gets_us_in() {
+    if !server_is_up().await {
+        println!("テスト用サーバーが建っていません（想定内・飛ばします）");
+        return;
+    }
+
+    let fingerprint = known_fingerprint().await.clone();
+    let mut target = target(Some(&fingerprint));
+    // パスワードでしか入れない利用者（`tools/test-server/Dockerfile`）。
+    target.user = "pw".into();
+
+    let session = SshSession::connect(
+        &target,
+        &Auth::Password {
+            password: "sshboard-test-password".into(),
+        },
+        Band::new(),
+        &Diagnostics::new(),
+    )
+    .await
+    .expect("パスワードで繋がらない");
+
+    let ran = session
+        .exec(Actor::Human, "id -un")
+        .await
+        .expect("コマンドが通らない");
+    assert_eq!(ran.out.trim(), "pw", "別の利用者で入っている");
+}
+
+/// **違うパスワードは通らないこと。**
+///
+/// 通ってしまったら、認証が効いていません。
+#[tokio::test]
+async fn a_wrong_password_is_refused() {
+    if !server_is_up().await {
+        println!("テスト用サーバーが建っていません（想定内・飛ばします）");
+        return;
+    }
+
+    let fingerprint = known_fingerprint().await.clone();
+    let mut target = target(Some(&fingerprint));
+    target.user = "pw".into();
+
+    let result = SshSession::connect(
+        &target,
+        &Auth::Password {
+            password: "まちがったパスワード".into(),
+        },
+        Band::new(),
+        &Diagnostics::new(),
+    )
+    .await;
+
+    assert!(
+        matches!(result, Err(SshError::Authenticate(_))),
+        "違うパスワードが通っている"
+    );
+}
+
+/// **鍵ファイルで繋がること。**
+///
+/// `Auth::Key` も通しで一度も走っていませんでした。
+/// 鍵の形式判定（D28 / D31）は単体で厚く見ているのに、
+/// **その判定を使って実際に繋ぐ経路は未検証**でした。
+#[tokio::test]
+async fn a_key_file_gets_us_in() {
+    if !server_is_up().await {
+        println!("テスト用サーバーが建っていません（想定内・飛ばします）");
+        return;
+    }
+    // `up.sh` が作る使い捨ての鍵。**実機の鍵とは無関係。**
+    let key = concat!(env!("CARGO_MANIFEST_DIR"), "/../../tools/test-server/.key");
+    if !std::path::Path::new(key).exists() {
+        println!("使い捨ての鍵がありません（想定内・飛ばします）");
+        return;
+    }
+
+    let fingerprint = known_fingerprint().await.clone();
+    let session = SshSession::connect(
+        &target(Some(&fingerprint)),
+        &Auth::Key {
+            path: key.to_string(),
+            // `up.sh` の鍵はパスフレーズ無し。
+            passphrase: None,
+        },
+        Band::new(),
+        &Diagnostics::new(),
+    )
+    .await
+    .expect("鍵ファイルで繋がらない");
+
+    let ran = session
+        .exec(Actor::Human, "id -un")
+        .await
+        .expect("コマンドが通らない");
+    assert_eq!(ran.out.trim(), "probe");
+}
+
+/// **パスフレーズ付きの鍵で繋がること。**
+///
+/// 分岐は書いてありましたが、**動かしたことがありませんでした。**
+/// パスフレーズを付けた複製をその場で作って試します。
+#[tokio::test]
+async fn a_key_with_a_passphrase_gets_us_in() {
+    if !server_is_up().await || !have("ssh-keygen") {
+        println!("サーバーか ssh-keygen がありません（想定内・飛ばします）");
+        return;
+    }
+    let source = concat!(env!("CARGO_MANIFEST_DIR"), "/../../tools/test-server/.key");
+    if !std::path::Path::new(source).exists() {
+        println!("使い捨ての鍵がありません（想定内・飛ばします）");
+        return;
+    }
+
+    // **元の鍵を書き換えない。**複製にパスフレーズを掛けます。
+    let dir = tempfile::tempdir().expect("一時ディレクトリ");
+    let copy = dir.path().join("with-pass");
+    std::fs::copy(source, &copy).expect("複製できない");
+    let done = std::process::Command::new("ssh-keygen")
+        .args(["-p", "-P", "", "-N", "sshboard-pass", "-f"])
+        .arg(&copy)
+        .output()
+        .expect("ssh-keygen が走らない");
+    assert!(done.status.success(), "パスフレーズを掛けられない");
+
+    let fingerprint = known_fingerprint().await.clone();
+    let session = SshSession::connect(
+        &target(Some(&fingerprint)),
+        &Auth::Key {
+            path: copy.to_string_lossy().into_owned(),
+            passphrase: Some("sshboard-pass".into()),
+        },
+        Band::new(),
+        &Diagnostics::new(),
+    )
+    .await
+    .expect("パスフレーズ付きの鍵で繋がらない");
+
+    let ran = session
+        .exec(Actor::Human, "id -un")
+        .await
+        .expect("コマンドが通らない");
+    assert_eq!(ran.out.trim(), "probe");
 }
