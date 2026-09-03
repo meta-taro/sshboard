@@ -20,7 +20,7 @@ members = [
 # **α であることはタグ（`v0.1.0-alpha.1`）と Release の印で表す。**
 # バージョン文字列そのものに prerelease を入れない — 3 か所（ここ・tauri.conf.json・
 # package.json）で揃わなくなるのが、いちばん静かに壊れる。
-version = "0.1.4"
+version = "0.1.5"
 edition = "2021"
 license = "MIT"
 repository = "https://github.com/meta-taro/sshboard"
