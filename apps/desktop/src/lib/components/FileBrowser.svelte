@@ -11,6 +11,7 @@
 	import { onMount } from 'svelte';
 
 	import Icon from './Icon.svelte';
+	import PassphraseDialog from './PassphraseDialog.svelte';
 	import type { Connection } from '$lib/connections';
 	import { i18n } from '$lib/i18n/i18n.svelte';
 	import {
@@ -635,14 +636,7 @@
 					<span class="hint">{i18n.t('files.none')}</span>
 				{/if}
 			{/if}
-			{#if needsPassphrase}
-				<input
-					type="password"
-					bind:value={passphrase}
-					placeholder={i18n.t('files.passphrase')}
-					aria-label={i18n.t('files.passphrase')}
-				/>
-			{/if}
+
 			{#if session.all.length > 0}
 				<button
 					type="button"
@@ -1044,6 +1038,28 @@
 		</div>
 	</div>
 </section>
+
+<!--
+	**パスフレーズは正面から聞く**（Issue #7 の提案 2）。
+	バーの中の小さな入力欄では、**［接続］を押して失敗するまで存在せず**、
+	接続タブから押した人には見えませんでした。
+	**保存しない方針は変えていません**（D11）。聞き方だけです。
+-->
+{#if needsPassphrase && chosenId}
+	<PassphraseDialog
+		id={chosenId}
+		busy={session.busy}
+		onSubmit={(value) => {
+			passphrase = value;
+			void connect();
+		}}
+		onCancel={() => {
+			needsPassphrase = false;
+			passphrase = '';
+			failure = null;
+		}}
+	/>
+{/if}
 
 <style>
 	/* 色は tokens.css の変数だけ。**ここに 16 進数を書かない。** */
