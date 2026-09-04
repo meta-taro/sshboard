@@ -5,6 +5,7 @@
 
 	import { appendLine, type BandLine } from '$lib/band';
 	import ConnectionManager from '$lib/components/ConnectionManager.svelte';
+	import ConnectPanel from '$lib/components/ConnectPanel.svelte';
 	import FileBrowser from '$lib/components/FileBrowser.svelte';
 	import Icon from '$lib/components/Icon.svelte';
 	import { i18n } from '$lib/i18n/i18n.svelte';
@@ -813,7 +814,18 @@
 				ファイルの面には接続タブがあるのに端末に無いのは、筋が通りません。
 				**選ぶ先はファイルの面と同じ 1 つ**です（`session.focus`）。
 			-->
-			{#if session.all.length > 1}
+			<!--
+				**繋いでいないなら、繋ぐ所をここに出す**（実機の指摘・2026-09-04）。
+				前は押せない［端末を開く］と、いちばん小さい字の「先にサーバーへ繋ぐ →」が
+				並んでいて、しかもその行き先は *接続*（登録の画面）でした。
+				**そこに繋ぐボタンはありません。**「どのように接続しますか？」と
+				聞かれたのは、この行き止まりです。
+
+				`ConnectPanel` はファイルの面と**同じ 1 つの部品**です。
+			-->
+			{#if session.open === null}
+				<ConnectPanel onregister={() => (view = 'connections')} />
+			{:else if session.all.length > 1}
 				<div class="console-conns" role="tablist" aria-label={i18n.t('tab.connections')}>
 					{#each session.all as held (held.id)}
 						<button
@@ -846,28 +858,18 @@
 							? i18n.t('console.held.me')
 							: i18n.t('console.held.none')}
 				</span>
-				{#if !holder}
+				{#if !holder && session.open !== null}
 					<!--
-						**繋いでいなければ押させない。**
-						押せてしまうのに `NotConnected` で失敗するのは、
-						「どうやって繋ぐの？」を生みます（実機で聞かれた）。
+						**繋いでいないときは、そもそも出しません。**
+						押せない釦を置いても、何をすればいいかは伝わりません
+						（実機で「意味が分からない」と言われた並びです）。
+						繋ぐ所は上の `ConnectPanel` に出ています。
 					-->
-					<button
-						type="button"
-						class="primary"
-						onclick={openConsole}
-						disabled={session.open === null}
-					>
+					<button type="button" class="primary" onclick={openConsole}>
 						<Icon name="terminal" />
 						{i18n.t('console.open')}
 					</button>
-					{#if session.open === null}
-						<!-- **次の一手を書く。**「繋がっていません」だけでは足りません。 -->
-						<button type="button" class="ghost tiny" onclick={() => (view = 'connections')}>
-							{i18n.t('console.connect.first')}
-						</button>
-					{/if}
-				{:else if !iHold}
+				{:else if holder && !iHold}
 					<!-- **人はいつでも取り返せる**（D29）。 -->
 					<button type="button" class="primary" onclick={takeConsole}>
 						<Icon name="lock" />
@@ -881,10 +883,16 @@
 						{i18n.t('console.stop')}
 					</button>
 				{/if}
-				<!-- **押せる所にも置く。**ショートカットだけだと、知らない人には無いのと同じ。 -->
-				<button type="button" onclick={() => openSearch('console')}>
-					{i18n.t('search.label')}
-				</button>
+				<!--
+					**押せる所にも置く。**ショートカットだけだと、知らない人には無いのと同じ。
+					ただし**端末が開いていないときは出しません** — 繋ぎ方を探している人の前に、
+					無関係な釦を同じ重さで並べていました（実機の指摘）。
+				-->
+				{#if holder}
+					<button type="button" onclick={() => openSearch('console')}>
+						{i18n.t('search.label')}
+					</button>
+				{/if}
 			</div>
 			{@render searchBar('console')}
 			<div class="terminal shell" class:locked={holder === 'ai'}>
