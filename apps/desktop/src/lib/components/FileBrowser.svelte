@@ -485,12 +485,11 @@
 		const stops: Array<() => void> = [];
 		loadRegistered();
 		loadLocal();
-		session
-			.watch()
-			.then((stop) => stops.push(stop))
-			.catch((error: unknown) => {
-				failure = String(error);
-			});
+		// **接続状態の購読はここに置きません**（Issue #8）。
+		//
+		// この部品はファイルのタブでしか描かれないので、ここが持つと
+		// **別のタブへ移った瞬間に更新が止まり、画面が実態とずれます。**
+		// 持ち主は `+layout.svelte` — 窓が開いている間ずっと生きている所です。
 
 		// **ウィンドウへ放り込むのが、この層の慣れた操作**（WinSCP / FFFTP）。
 		// ここで取れるのは実体のパスで、ブラウザの `File` とは違う。

@@ -12,6 +12,7 @@
 	import '$lib/styles/tokens.css';
 	import { i18n } from '$lib/i18n/i18n.svelte';
 	import { redaction } from '$lib/redaction/redaction.svelte';
+	import { session } from '$lib/session.svelte';
 	import { textSize } from '$lib/text-size/text-size.svelte';
 	import { theme } from '$lib/theme/theme.svelte';
 
@@ -24,9 +25,21 @@
 		textSize.init();
 		i18n.init();
 
+		const stops: Array<() => void> = [];
+
+		// **接続状態の購読は、窓が開いている間ずっと生きているここが持ちます**（Issue #8）。
+		//
+		// 以前はファイルの面（`FileBrowser`）が持っていました。あの部品は
+		// ファイルのタブでしか描かれないので、**別のタブへ移った瞬間に購読が止まり、
+		// AI が繋いだ／切ったことが画面へ届かなくなっていました**（PRD §4-2）。
+		// 端末の面は同じ状態を見て入力を締めるので、そこが古いままになります。
+		session.watch().catch(() => {
+			/* 購読できないだけ。**画面は出す**（`session_status` で取り直せます）。 */
+		});
+		stops.push(() => session.unwatch());
+
 		// **撮る前に伏せる**（D26）。ここを繋がないと、伏せる仕組みが在っても働かない
 		// （実際に、書いたまま誰も呼んでいない状態が続いた）。
-		const stops: Array<() => void> = [];
 		redaction
 			.watch()
 			.then((stop) => stops.push(stop))
