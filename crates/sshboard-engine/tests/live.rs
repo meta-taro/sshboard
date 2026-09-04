@@ -442,6 +442,15 @@ async fn a_remote_file_is_downloaded_byte_for_byte() {
         .await
         .expect("繋がらない");
 
+    // **自分で足りるようにする。**以前はここが無く、`/home/probe/upload` を
+    // 作る別のテストが先に走ったときだけ通っていました。
+    // **建てたばかりのサーバーでは落ちます** — 実際に落ちました（Issue #10 の検証中）。
+    // 並列で走るので、順番は保証されません。
+    engine
+        .ensure_dir(Actor::Human, "/home/probe/upload")
+        .await
+        .expect("置き場を作れない");
+
     // **文字コードを決めない**（`read_file` と同じ立場）。
     // EUC-JP のログは実在するので、落とした先で化けていては使えない。
     let payload: Vec<u8> = b"\x00\xff\r\n\xa4\xa2\xa4\xa4".to_vec();
@@ -479,6 +488,12 @@ async fn a_second_download_is_refused_unless_overwriting_was_chosen() {
         .connect(Actor::Human, "local", None)
         .await
         .expect("繋がらない");
+
+    // **自分で足りるようにする**（上と同じ理由）。
+    engine
+        .ensure_dir(Actor::Human, "/home/probe/upload")
+        .await
+        .expect("置き場を作れない");
 
     let remote = "/home/probe/upload/twice.txt";
     engine
