@@ -83,13 +83,24 @@ cargo clippy --workspace --all-targets -- -D warnings  →  2026-09-02 の結果
 （別ワークスペース）tools/ssh-probe: cargo test        →   10 passed（2026-09-02）
 ```
 
-> **320 のうち、実機を要する分は 1 本も走っていません。**
-> Docker（colima）が動いておらず、`server_is_up()` が false になるので
-> **自分から飛びます**（飛んだ分も `ok` と数えられます）。
-> 立てれば実際に繋ぎに行きます — `sh tools/test-server/up.sh`。
-> **走らせていないものを「通っている」と書かない**ため、ここで分けています。
-> Rust 側はこのセッションで 1 行も触っていないので、CI を最終ゲートにします
-> （product-baseline §5）。
+> **実機の分も走らせました**（2026-09-04 夜）。Docker を立て、`sh tools/test-server/up.sh`
+> で建てたサーバーへ**実際に SSH を張って**います。
+>
+> | 実機テスト | 結果 | 飛んだ数 |
+> |---|---|---|
+> | `sshboard-engine/tests/live.rs` | **25 passed** | 0 |
+> | `sshboard-ssh/tests/live.rs` | **26 passed** | 0 |
+> | `sshboard-mcp/tests/mcp_ssh.rs` | **4 passed** | 0 |
+> | `sshboard-credentials/tests/agent_live.rs` | passed | 0 |
+>
+> 「飛んだ数」は `--nocapture` で「テスト用サーバーが建っていません」の出現数を
+> 数えたものです。**0 なので、1 本残らず本当に繋いでいます。**
+>
+> **その過程で、実機テストの欠陥が 1 つ出ました。**落とす 2 本が
+> `/home/probe/upload` を別のテスト（`ensure_dir`）に作ってもらっており、
+> **建てたばかりのサーバーでは落ちていました**（並列なので順番は保証されません）。
+> CI はサーバーを立てないので自分から飛び、**一度も出ていませんでした。**
+> 落ちる 2 本を自分で足りるようにし、**建て直した 1 回目から 320 passed**。
 
 | どこ | 本数 | うち実機 |
 |---|---|---|
