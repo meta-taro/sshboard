@@ -18,7 +18,7 @@ Phase 0 の 5 本は、実機と Windows 目視を除いてすべて通りまし
 
 **残っているのは、人にしかできない工程です。**（product-baseline §29）
 **とくに、この製品はまだ一度も実運用で起動されていません。**
-**478 本**（Rust 317 ＋ フロント 161）のテストが通っていることと、道具として動くことは別です
+**483 本**（Rust 320 ＋ フロント 163）のテストが通っていることと、道具として動くことは別です
 （型検査を通ったまま画面が 3 か所崩れていた実例があります）。
 
 ## 出来ているもの
@@ -76,14 +76,14 @@ Phase 0 の 5 本は、実機と Windows 目視を除いてすべて通りまし
 
 ```
 cargo fmt --all -- --check                             →  差分なし（2026-09-04）
-cargo test --workspace                                 →  317 passed; 0 failed（2026-09-04）
-pnpm --filter desktop check                            →  283 files, 0 errors, 0 warnings（2026-09-04）
-pnpm --filter desktop test                             →  161 passed（2026-09-04）
+cargo test --workspace                                 →  320 passed; 0 failed（2026-09-04）
+pnpm --filter desktop check                            →  284 files, 0 errors, 0 warnings（2026-09-04）
+pnpm --filter desktop test                             →  163 passed（2026-09-04）
 cargo clippy --workspace --all-targets -- -D warnings  →  2026-09-02 の結果（このセッションでは未実行）
 （別ワークスペース）tools/ssh-probe: cargo test        →   10 passed（2026-09-02）
 ```
 
-> **317 のうち、実機を要する分は 1 本も走っていません。**
+> **320 のうち、実機を要する分は 1 本も走っていません。**
 > Docker（colima）が動いておらず、`server_is_up()` が false になるので
 > **自分から飛びます**（飛んだ分も `ok` と数えられます）。
 > 立てれば実際に繋ぎに行きます — `sh tools/test-server/up.sh`。
@@ -100,12 +100,12 @@ cargo clippy --workspace --all-targets -- -D warnings  →  2026-09-02 の結果
 | `sshboard-connections` | 27 | |
 | `sshboard-diag` | 8 | |
 | `sshboard-ssh` | 73 | 26 |
-| `sshboard-engine` | 63 | 22 |
+| `sshboard-engine` | 66 | 22 |
 | `sshboard-mcp` | 35 | 4 |
 | `sshboard-readonly` | 16 | |
 | `sshboard-desktop` | 28 | |
-| **Rust 合計** | **317** | **52** |
-| **フロント（vitest）** | **161** | |
+| **Rust 合計** | **320** | **52** |
+| **フロント（vitest）** | **163** | |
 
 > **数え直しました**（2026-09-04）。`sshboard-bundle`（18 本）が表から抜けており、
 > `sshboard-desktop` は 9 ではなく 28、フロントは 75 ではなく 161 でした。
@@ -192,6 +192,65 @@ cargo clippy --workspace --all-targets -- -D warnings  →  2026-09-02 の結果
 > **札が出る条件はこれで揃いました。**ただし**札が出るのは 0.1.5 が入っている端末だけ**です。
 > 0.1.6 を新規で入れた人には一度も出ません。
 > **通ったのはテストと配布であって、画面ではありません。**
+
+## 2026-09-04（深夜）— Issue #10。**端末は 3 日間、1 バイトも表示していませんでした**
+
+**人が初めて端末を打ちました。動きませんでした。**
+CLAUDE.md に「実装済・D29。まだ打たれていない」と書いていた所です。
+
+### 症状 A — 原因が確定しました
+
+`apps/desktop/src/routes/+page.svelte:482`
+
+```js
+listen('stream://raw', (event) => {
+    if (terminal) writeChunk(terminal, event.payload);   // ← consoleTerm が無い
+});
+```
+
+端末の面は `consoleTerm` という**別の xterm** ですが、
+**そこへ書く行がリポジトリのどこにもありませんでした。**
+
+```
+$ git log -S "writeChunk(consoleTerm" -- apps/desktop/src/routes/+page.svelte
+（空）
+```
+
+**`e8a485c`（2026-09-01）で入って以来、3 日間 1 バイトも表示していません。**
+しかも `terminal` は *出力* の面が開かれるまで作られないので、
+端末タブだけを開いている間は `if (terminal)` が毎回素通りします。
+
+**実体（シェル）は正常で、`read_stream` を持つ AI 側からは全部見えていました。**
+**人だけが見えていない** — 「人と AI が同じ画面を見る」の真逆です。
+
+### なぜ止まらなかったか
+
+端末のテストは**すべて Rust 側**（エンジンは正しく動いています）。
+**画面の側は、部品を描いて確かめるテストが 1 本もありません。**
+`svelte-check` は 283 files, 0 errors のままでした。**型検査は 1 件も止めません。**
+
+### 症状 B（途中から入力が届かない）— **説明できていません**
+
+`consoleTerm.onData` は握っていないと**黙って捨てます**が、
+`iHold` が false へ倒れた記録がどこにも無く、断定できません。
+
+**報告者の 3 つ目の指摘が正しかったからです** — 端末層が診断へ書いていたのは
+`console_stop` の 1 行だけでした。新しいテストで見ると、記録は**文字どおり空**です。
+
+### 入れたもの（commit 済・**未 push**）
+
+| | 中身 |
+|---|---|
+| `005b11e` | **端末の診断**。開けた／断った（3 通り）／握りが移った／打鍵を断った。**通った打鍵は残さない**（溢れる・中身が残る）。新規 3 本 |
+| `1166932` | **`consoleTerm` へ出力を書く。**同じ穴を止める見張り 2 本（作った端末に `writeChunk` が無ければ落ちる。外して実際に落ちることを確認済み）。**依存は増やしていない**（Vite の `?raw`） |
+
+**部品を描いて確かめるテストは、まだ 1 本もありません。**そこは塞げていません。
+
+### 未決 — D41（**人待ち**）
+
+出力は MCP と共有する 1 本なので（PRD §4-1）、**`tail -f` の出力が端末の面に
+混ざります。**「まず映すこと」を採りました — **混ざるより、何も出ない方が悪い。**
+出どころで振り分ける案は D41 に置きました。**PRD §4-1 に触るので AI では決めません**（§15）。
 
 ## 2026-09-04（夜）— Issue #9。**説明文が 7 日間、実装と逆のことを言っていました**
 
@@ -368,8 +427,8 @@ product-baseline §10「古い文書は、無い文書より悪い」と自分�
 
 ## 技術的決定
 
-`.claude/decisions.md`（D1〜D40）＋ `DESIGN.md`。
-**未決は D10（実装体制）だけになりました。**
+`.claude/decisions.md`（D1〜D41）＋ `DESIGN.md`。
+**未決は D10（実装体制）と D41（出力に出どころを持たせるか・Issue #10）の 2 つです。**
 
 **D15（MCP のポート）は D33 で閉じました**（2026-09-02・決めたのは人）。
 `22022` 固定 ＋ `SSHBOARD_MCP_PORT` で移せる。**登録は 1 回で済みます。**
