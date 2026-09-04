@@ -13,6 +13,8 @@
 	import { menuLabels } from '$lib/i18n/messages-menu';
 	import { titlebar } from '$lib/window/titlebar.svelte';
 	import AboutDialog from '$lib/components/AboutDialog.svelte';
+	import { summarise } from '$lib/update/notes';
+	import { cutMessageKey, cutSummary } from '$lib/update/restart-cost';
 	import { updater } from '$lib/update/updater.svelte';
 	import { listenForPageShot } from '$lib/capture/page-shot';
 	import { LOCALES } from '$lib/i18n/locales';
@@ -389,6 +391,57 @@
 		});
 	}
 
+	// --- 更新の札（D34 の追記 3）------------------------------------------------
+
+	/**
+	 * 変更内容の全文を開いている版。**版そのものを持ちます。**
+	 *
+	 * 真偽値だと、次の版の札が出たときに**前の版で開いた状態が残ります。**
+	 */
+	let notesOpenFor = $state('');
+
+	/** 札に出す変更内容。**先頭 3 行と、残りの件数。** */
+	const notes = $derived(updater.state.kind === 'found' ? summarise(updater.state.notes) : null);
+
+	const notesOpen = $derived(
+		updater.state.kind === 'found' && notesOpenFor === updater.state.version
+	);
+
+	/**
+	 * 再起動で切れるもの。**繋がっている本数と、端末が開いているか。**
+	 *
+	 * エディタや DB クライアントの再起動と違い、ここで落ちるのは
+	 * 生きている SSH と端末、そして **MCP が共有している同じ 1 本**です。
+	 * **止めはしません。**止めるかどうかは人が決めることで、
+	 * こちらの仕事は「知らないまま押させない」ことです。
+	 */
+	const cost = $derived(
+		cutSummary({ sessions: session.all.length, terminalOpen: consoleOn !== null })
+	);
+
+	/** 札を出すか。**静かなときは静かでいる。** */
+	const showUpdate = $derived.by(() => {
+		if (updater.folded) return false;
+		const kind = updater.state.kind;
+		if (kind === 'idle') return false;
+		// 「調べています」と「最新です」は、**人が押したときだけ**出します。
+		if (kind === 'checking' || kind === 'none') return updater.manual;
+		return true;
+	});
+
+	$effect(() => {
+		// **入れ終わった時点で数え直す。**古い数のまま「3 本が切れます」と言わない
+		// （Issue #8 で session が実態からずれた実績があります）。
+		if (updater.state.kind !== 'ready') return;
+		session.refresh().catch(() => {
+			/* 取り直せなくても、いま持っている数で言う。黙るよりまし。 */
+		});
+	});
+
+	function toggleNotes(version: string): void {
+		notesOpenFor = notesOpenFor === version ? '' : version;
+	}
+
 	onMount(() => {
 		// **この帯が OS のタイトルバー**（D17）。最大化の状態を取り込む。
 		titlebar.init();
@@ -727,26 +780,75 @@
 	</header>
 
 	<!--
-		更新の知らせ（D34）。**黙って入れ替えません。**押すのは人。
-		「何も無い」「調べている」は出しません — **静かなときは静かでいる。**
+		更新の知らせ（D34 ＋ 追記 3）。**黙って入れ替えません。**押すのは人。
 
 		**本文の流れに埋めない。**細い帯として並べていたら、
 		**そこにあると気づかれませんでした**（実機・2026-09-03）。
 		画面の隅へ浮かせ、影を付けて、他と違う面として見せます。
 		ただし**画面を塞ぐ窓にはしません** — 作業中に手を止めさせる話ではないので。
+
+		「調べている」「最新です」は、**人が『更新を確認』を押したときだけ**出します。
+		起動時の 1 回は、何も無ければ静かなまま — **静かなときは静かでいる。**
+		押されたのに何も返さない、も作りません（`showUpdate`）。
 	-->
-	{#if updater.state.kind !== 'idle' && updater.state.kind !== 'checking' && updater.state.kind !== 'none'}
+	{#if showUpdate}
 		<aside class="update-toast" role="status" aria-live="polite">
-			{#if updater.state.kind === 'found'}
+			{#if updater.state.kind === 'checking'}
+				<span class="toast-icon"><Icon name="download" size={16} /></span>
+				<div class="toast-body">
+					<strong>{i18n.t('update.checking')}</strong>
+				</div>
+			{:else if updater.state.kind === 'none'}
+				<!-- **押したのに何も起きない、を作らない。**最新なら最新と返す。 -->
+				<span class="toast-icon"><Icon name="check" size={16} /></span>
+				<div class="toast-body">
+					<strong>{i18n.t('update.uptodate', { version: updater.state.version })}</strong>
+					<div class="toast-actions">
+						<button type="button" onclick={() => updater.dismiss()}>
+							{i18n.t('about.close')}
+						</button>
+					</div>
+				</div>
+			{:else if updater.state.kind === 'found'}
 				<span class="toast-icon"><Icon name="download" size={16} /></span>
 				<div class="toast-body">
 					<strong>{i18n.t('update.found', { version: updater.state.version })}</strong>
+					{#if notes && notes.head.length > 0}
+						<!--
+							**押す材料を渡す。**版番号だけを見せて「はい」を押させるのは判断ではない。
+							記号は `notes.ts` で剥がし、長さも行数もそこで切っています。
+							**既定の 3 行はスクロールしません。**中で切れると、切れたことに気づけない。
+						-->
+						<ul class="toast-notes" class:open={notesOpen}>
+							{#each notesOpen ? notes.lines : notes.head as line}
+								<li>{line}</li>
+							{/each}
+						</ul>
+						{#if notes.rest > 0}
+							<div class="toast-actions">
+								<button
+									type="button"
+									class="quiet"
+									aria-expanded={notesOpen}
+									onclick={() => toggleNotes(updater.state.kind === 'found' ? updater.state.version : '')}
+								>
+									{notesOpen
+										? i18n.t('update.notes.less')
+										: i18n.t('update.notes.more', { count: String(notes.rest) })}
+								</button>
+							</div>
+						{/if}
+					{/if}
 					<div class="toast-actions">
 						<button type="button" class="cta" onclick={() => updater.install()}>
 							{i18n.t('update.install')}
 						</button>
 						<button type="button" onclick={() => updater.dismiss()}>
 							{i18n.t('update.later')}
+						</button>
+						<!-- **同じ札を毎日出さない。**読まれない警告になる（D30 で毎日上げる）。 -->
+						<button type="button" onclick={() => updater.skip()}>
+							{i18n.t('update.skip')}
 						</button>
 					</div>
 				</div>
@@ -769,11 +871,33 @@
 							<span style:width="{updater.state.percent}%"></span>
 						</div>
 					{/if}
+					<!--
+						**逃げ道を残す。**ここにボタンが 1 つも無いと、止まったときに手が無い。
+						「中止」とは名乗りません — 中断できるか確かめていないので、
+						**押しても止まらないボタンを作らない。**裏では落ち続け、
+						入れ終われば自分から出直します。
+					-->
+					<div class="toast-actions">
+						<button type="button" onclick={() => updater.fold()}>
+							{i18n.t('update.fold')}
+						</button>
+					</div>
 				</div>
 			{:else if updater.state.kind === 'ready'}
 				<span class="toast-icon"><Icon name="check" size={16} /></span>
 				<div class="toast-body">
 					<strong>{i18n.t('update.ready', { version: updater.state.version })}</strong>
+					{#if cost}
+						<!--
+							**この製品の再起動は、他のアプリの再起動と重さが違う。**
+							生きている SSH・開いている端末・転送中のファイル、
+							そして MCP が共有している同じ 1 本（CLAUDE.md 禁止事項 3）が落ちます。
+							**止めはしません。知らないまま押させないだけです。**
+						-->
+						<p class="toast-cut">
+							{i18n.t(cutMessageKey(cost), { count: String(cost.sessions) })}
+						</p>
+					{/if}
 					<div class="toast-actions">
 						<button type="button" class="cta" onclick={() => updater.restart()}>
 							{i18n.t('update.restart')}
@@ -784,11 +908,18 @@
 					</div>
 				</div>
 			{:else if updater.state.kind === 'failed'}
-				<!-- **黙らない。**繋がらないのか署名が合わないのかで、人の次の一手が違う。 -->
+				<!--
+					**黙らない。**繋がらないのか署名が合わないのかで、人の次の一手が違う。
+					**生の文字列は出しません**（URL やパスが入りうる・D26）。
+					中身は開発者コンソールへ落としています。
+				-->
 				<span class="toast-icon warn"><Icon name="warning" size={16} /></span>
 				<div class="toast-body">
-					<strong>{i18n.t('update.failed', { detail: updater.state.detail })}</strong>
+					<strong>{i18n.t(updater.state.messageKey)}</strong>
 					<div class="toast-actions">
+						<button type="button" class="cta" onclick={() => updater.check(true)}>
+							{i18n.t('update.retry')}
+						</button>
 						<button type="button" onclick={() => updater.dismiss()}>
 							{i18n.t('update.later')}
 						</button>
@@ -1073,6 +1204,45 @@
 	.toast-actions button {
 		font-size: 0.75rem;
 		padding: 0.25rem 0.6rem;
+	}
+
+	/* 「全文」のような、押せるが主役ではないもの。**主ボタンと見た目で分ける。** */
+	.toast-actions button.quiet {
+		border-color: transparent;
+		background: none;
+		padding: 0.1rem 0;
+		color: var(--accent);
+		text-decoration: underline;
+	}
+
+	/*
+	 * 変更内容。**押す材料。**
+	 *
+	 * 閉じている 3 行は**スクロールしません** — 既定で中が切れると、
+	 * 切れていること自体に気づけないからです（比べた 2 つがそうでした）。
+	 * 開いたときだけ高さで止めます。**人が自分で開いた状態**なので、
+	 * そこに続きがあることは分かっています。
+	 */
+	.toast-notes {
+		margin: 0;
+		padding-left: 1.05rem;
+		font-size: 0.74rem;
+		line-height: 1.65;
+		color: var(--fg-muted);
+	}
+
+	.toast-notes.open {
+		max-height: min(40vh, 16rem);
+		overflow-y: auto;
+	}
+
+	/* 再起動で切れるもの。**危険側の色で、本文と区別する。** */
+	.toast-cut {
+		margin: 0;
+		font-size: 0.74rem;
+		line-height: 1.6;
+		font-weight: 500;
+		color: var(--warning);
 	}
 
 	.toast-bar {

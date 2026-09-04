@@ -15,6 +15,7 @@
 	import { onMount } from 'svelte';
 
 	import { i18n } from '$lib/i18n/i18n.svelte';
+	import { updater } from '$lib/update/updater.svelte';
 
 	interface Props {
 		onClose: () => void;
@@ -32,6 +33,20 @@
 			// Tauri の外では取れません。**「—」のままにして、誤りを出しません。**
 		}
 	});
+
+	/**
+	 * 手で更新を確かめる。
+	 *
+	 * 調べるのは起動時の 1 回だけ（D34）でした。**この道具は繋ぎっぱなしで使う**ので、
+	 * 起動の間隔がいちばん長く、**何日も気づけません。**取りに来られる口を 1 つ置きます。
+	 *
+	 * **押したらこの窓は閉じます。**知らせは画面の隅に出るので、
+	 * 開いたままだと自分で隠してしまいます。
+	 */
+	function checkForUpdate() {
+		updater.check(true);
+		onClose();
+	}
 
 	function onKeydown(event: KeyboardEvent) {
 		if (event.key === 'Escape') onClose();
@@ -62,6 +77,7 @@
 		<p class="note">{i18n.t('about.alpha')}</p>
 
 		<div class="actions">
+			<button type="button" onclick={checkForUpdate}>{i18n.t('update.check')}</button>
 			<button type="button" class="cta" onclick={onClose}>{i18n.t('about.close')}</button>
 		</div>
 	</div>
@@ -133,5 +149,6 @@
 	.actions {
 		display: flex;
 		justify-content: flex-end;
+		gap: 0.4rem;
 	}
 </style>
