@@ -48,7 +48,7 @@ fn refuse(error: EngineError) -> ErrorData {
 impl SshboardMcp {
     /// 登録済みの接続を開く。**画面に出ます。**
     #[tool(
-        description = "Open the SSH connection registered under this id. sshboard holds exactly one connection at a time and the human sees it on screen. Takes no password or passphrase - if the key needs one, a human must enter it in sshboard."
+        description = "Open the SSH connection registered under this id. sshboard can hold several connections open at once - opening one does not close the others, and every one of them appears on screen for the human. The connection just opened becomes the target of subsequent file and command operations; use focus_connection to point them at a different open one, and session_status to see every connection currently held open. Takes no password or passphrase - if the key needs one, a human must enter it in sshboard."
     )]
     pub async fn connect(
         &self,

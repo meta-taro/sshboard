@@ -254,6 +254,116 @@ async fn the_server_advertises_only_the_phase_zero_tools() {
     endpoint.shutdown();
 }
 
+/// SSE で包まれて返るので、`data:` の行から JSON を取り出す。
+fn payload(body: &str) -> serde_json::Value {
+    for line in body.lines() {
+        let raw = line.strip_prefix("data:").unwrap_or(line).trim();
+        if raw.starts_with('{') {
+            if let Ok(value) = serde_json::from_str::<serde_json::Value>(raw) {
+                return value;
+            }
+        }
+    }
+    panic!("JSON が見つからない: {body}");
+}
+
+/// 一覧から道具を 1 本、名前で引く。
+fn tool<'a>(listed: &'a serde_json::Value, name: &str) -> &'a serde_json::Value {
+    listed["result"]["tools"]
+        .as_array()
+        .unwrap_or_else(|| panic!("tools が配列でない: {listed}"))
+        .iter()
+        .find(|held| held["name"] == name)
+        .unwrap_or_else(|| panic!("{name} が一覧に無い: {listed}"))
+}
+
+/// 道具の説明文。
+fn described<'a>(listed: &'a serde_json::Value, name: &str) -> &'a str {
+    tool(listed, name)["description"]
+        .as_str()
+        .unwrap_or_else(|| panic!("{name} に説明が無い"))
+}
+
+#[tokio::test]
+async fn no_tool_description_claims_only_one_connection_can_be_open() {
+    // **説明文は、MCP を呼ぶ側にとって世界の全て**（Issue #9）。
+    //
+    // 実装は 2026-08-29 に複数対応へ変わったのに（D25 / `55288f2`）、
+    // `connect` の説明だけが「1 本だけ」のまま **7 日間**残りました。
+    // その間、説明を読んだエージェントは **2 本目を試さずに諦めます。**
+    // 人は画面を触って気づけますが、**呼ぶ側は説明文しか持ちません。**
+    //
+    // 上の見張りは**名前だけ**を見ています（無関係な文章に当たるため、
+    // それ自体は正しい判断です）。**説明文を見張らない理由にはなりません。**
+    // Arrange
+    let endpoint = serve(ServeParts {
+        band: Band::new(),
+        stream: Arc::new(OutputStream::new()),
+        connections_watch: Arc::new(ConnectionsWatch::new()),
+        engine: None,
+        capture: None,
+        token: None,
+        port: 0,
+        ack_timeout: Duration::from_secs(5),
+    })
+    .await
+    .expect("MCP が立ち上がらない");
+    let client = reqwest::Client::new();
+
+    // Act
+    let init = post(&client, &endpoint, None, INIT_BODY).await;
+    let session = init
+        .headers()
+        .get("mcp-session-id")
+        .map(|v| v.to_str().unwrap().to_owned());
+    let _ = init.text().await;
+    post(&client, &endpoint, session.as_deref(), INITIALIZED_BODY).await;
+    let body = post(&client, &endpoint, session.as_deref(), LIST_BODY)
+        .await
+        .text()
+        .await
+        .unwrap();
+    let listed = payload(&body);
+
+    // Assert
+    let connect = described(&listed, "connect").to_lowercase();
+    for lie in [
+        "exactly one connection",
+        "one connection at a time",
+        "only one connection",
+        "a single connection",
+        "one connection only",
+    ] {
+        assert!(
+            !connect.contains(lie),
+            "`connect` の説明が「1 本だけ」と言っている（{lie}）: {connect}"
+        );
+    }
+
+    // **言い落としも防ぐ。**否定だけだと、複数持てることが 1 行も書かれていない
+    // 説明でも通ります。**書いていないものは、呼ぶ側には無いのと同じ**です。
+    assert!(
+        connect.contains("several") || connect.contains("multiple"),
+        "`connect` の説明に、複数持てることが書かれていない: {connect}"
+    );
+
+    // **宛先を変える口へ繋がっていること。**繋げると分かっても、
+    // 切り替え方が書いていなければ 2 本目は使われません。
+    assert!(
+        connect.contains("focus_connection"),
+        "`connect` の説明に、宛先の変え方（focus_connection）が無い: {connect}"
+    );
+
+    // **2 つの説明が食い違わないこと。**食い違いこそが Issue #9 の中身です。
+    let focus = described(&listed, "focus_connection").to_lowercase();
+    assert!(
+        focus.contains("several") || focus.contains("multiple"),
+        "`focus_connection` の説明から、複数持てることが消えている: {focus}"
+    );
+
+    endpoint.shutdown();
+}
+
 #[tokio::test]
 async fn the_mcp_port_is_bound_to_loopback_only() {
     // 外から叩ける口を開けていないこと（PRD §8 / 21）。
