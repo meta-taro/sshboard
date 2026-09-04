@@ -480,7 +480,20 @@
 
 		// **ANSI を落とさずに渡す。**色は人の側にだけ残す（Issue 005）。
 		listen<number[]>('stream://raw', (event) => {
+			// **端末の面へも書く**（Issue #10）。
+			//
+			// ここは長らく `terminal`（*出力* の面）にしか書いていませんでした。
+			// **端末の面は別の xterm（`consoleTerm`）で、書く行がどこにもなく、
+			// 入って以来 1 バイトも表示していません**（`e8a485c` / 2026-09-01）。
+			// しかも `terminal` は *出力* の面が開かれるまで作られないので、
+			// 端末タブだけを開いている間は `if (terminal)` が毎回素通りします。
+			//
+			// **出力は MCP と共有する 1 本**なので（PRD §4-1）、`tail -f` を
+			// 走らせている間はその出力も端末の面に混ざります。**まず映すこと**を
+			// 採りました — 混ざるより、何も出ない方が悪い。
+			// 出どころで振り分ける案は `decisions.md` に出してあります。
 			if (terminal) writeChunk(terminal, event.payload);
+			if (consoleTerm) writeChunk(consoleTerm, event.payload);
 		})
 			.then((stop) => stops.push(stop))
 			.catch((error: unknown) => {
