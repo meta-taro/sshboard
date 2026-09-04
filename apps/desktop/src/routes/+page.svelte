@@ -956,7 +956,14 @@
 			-->
 			{#if session.open === null}
 				<ConnectPanel onregister={() => (view = 'connections')} />
-			{:else if session.all.length > 1}
+				<!--
+					**1 本のときも出す**（Issue #9）。以前は `> 1` で、
+					**2 本目が開いて初めて現れました。**
+					つまり「2 台目に繋げるのか」を探している人には絶対に見えず、
+					**できるようになった後にだけ現れる案内**になっていました。
+					1 本でも出せば、どのサーバーの端末なのかが常に見えます。
+				-->
+			{:else if session.all.length > 0}
 				<div class="console-conns" role="tablist" aria-label={i18n.t('tab.connections')}>
 					{#each session.all as held (held.id)}
 						<button

@@ -566,14 +566,21 @@
 			{/if}
 
 			{#if session.all.length > 0}
+				<!--
+					**言葉を出す**（Issue #9）。以前はアイコンだけで、説明が
+					`title` と `aria-label` にしかありませんでした。
+					**ツールチップは、触れる前の人には存在しないのと同じ**です
+					（「2 台目に繋げるのかどうか分からず手が止まった」）。
+					文言は既にある鍵をそのまま使います（11 言語ぶん訳が揃っている）。
+				-->
 				<button
 					type="button"
 					class="ghost add"
 					onclick={() => (addingAnother = !addingAnother)}
 					title={i18n.t('files.another')}
-					aria-label={i18n.t('files.another')}
 				>
 					<Icon name="plus" size={13} />
+					{i18n.t('files.another')}
 				</button>
 			{/if}
 		</div>
