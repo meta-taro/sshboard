@@ -320,16 +320,30 @@ impl Engine {
         cols: u32,
         rows: u32,
     ) -> Result<(), EngineError> {
-        let target = self
-            .active()
-            .await
-            .map(|open| open.id)
-            .ok_or(EngineError::NotConnected)?;
+        // **開けなかったことを残す**（Issue #10）。
+        //
+        // 実機で端末が繋がらなかったとき、記録に残っていたのは接続の 4 行だけで、
+        // **端末の行は 1 本もありませんでした。追えない失敗は、直せない失敗**です。
+        let Some(target) = self.active().await.map(|open| open.id) else {
+            self.diag.error(
+                Stage::Exec,
+                None,
+                "端末を開けません（繋がっていません）",
+                "先に接続を開いてください",
+            );
+            return Err(EngineError::NotConnected);
+        };
         {
             let slot = self.console.lock().await;
             if let Some(holder) = slot.holder {
                 // 同じ側が開き直すのは、握り直しとして通す。
                 if holder != actor {
+                    self.diag.error(
+                        Stage::Exec,
+                        Some(&target),
+                        format!("端末を開けません（{}が握っています）", who(holder)),
+                        "人は画面の［取り返す］でいつでも取り返せます",
+                    );
                     return Err(held_by(holder));
                 }
             }
@@ -337,6 +351,12 @@ impl Engine {
             // 黙って乗り換えると、打鍵がどちらへ行くのか分からなくなる。
             if let Some(open_on) = slot.connection.as_deref() {
                 if open_on != target {
+                    self.diag.error(
+                        Stage::Exec,
+                        Some(&target),
+                        format!("端末を開けません（{open_on} で開いています）"),
+                        "先に［止める］を押してください",
+                    );
                     return Err(EngineError::ConsoleOnOtherConnection {
                         id: open_on.to_owned(),
                     });
@@ -363,19 +383,52 @@ impl Engine {
         }
         slot.console = Some(console);
         slot.holder = Some(actor);
-        slot.connection = Some(target);
+        slot.connection = Some(target.clone());
         drop(slot);
 
+        // **開けたことも残す。**失敗だけ残すと、「開いたのに映らない」を追えません
+        // （実機がまさにその形でした・Issue #10）。
+        self.diag.info(
+            Stage::Exec,
+            Some(&target),
+            format!("端末を開きました（{}・{cols}×{rows}）", who(actor)),
+        );
         let _ = self.console_changed.send(Some(actor));
         Ok(())
     }
 
     /// 打ち込む。**握っている側だけ**（D29）。
+    ///
+    /// **通った打鍵は記録しません。**1 キーずつ残すと記録が溢れ、
+    /// **打った中身がそのまま残る**ことにもなります（パスワードを打つ人が居ます）。
+    /// 残すのは**断った事実だけ**です — Issue #10 の「入力が届かない」を追う材料。
     pub async fn console_type(&self, actor: Actor, bytes: &[u8]) -> Result<(), EngineError> {
         let slot = self.console.lock().await;
         match slot.holder {
-            None => Err(EngineError::ConsoleNotOpen),
-            Some(holder) if holder != actor => Err(held_by(holder)),
+            None => {
+                drop(slot);
+                self.diag.error(
+                    Stage::Exec,
+                    None,
+                    "打鍵を断りました（端末が開いていません）",
+                    "先に端末を開いてください",
+                );
+                Err(EngineError::ConsoleNotOpen)
+            }
+            Some(holder) if holder != actor => {
+                drop(slot);
+                self.diag.error(
+                    Stage::Exec,
+                    None,
+                    format!(
+                        "打鍵を断りました（{}が打ち、{}が握っています）",
+                        who(actor),
+                        who(holder)
+                    ),
+                    "同時に触れるのは 1 人です。人は［取り返す］で取り返せます",
+                );
+                Err(held_by(holder))
+            }
             Some(_) => {
                 let console = slot.console.as_ref().ok_or(EngineError::ConsoleNotOpen)?;
                 Ok(console.type_in(bytes).await?)
@@ -397,10 +450,31 @@ impl Engine {
     pub async fn console_take(&self, actor: Actor) -> Result<(), EngineError> {
         let mut slot = self.console.lock().await;
         match slot.holder {
-            Some(holder) if holder != actor && actor != Actor::Human => Err(held_by(holder)),
-            _ => {
+            Some(holder) if holder != actor && actor != Actor::Human => {
+                drop(slot);
+                self.diag.error(
+                    Stage::Exec,
+                    None,
+                    format!("握りを渡しませんでした（{}が握っています）", who(holder)),
+                    "AI は人から奪えません（D29）",
+                );
+                Err(held_by(holder))
+            }
+            previous => {
                 slot.holder = Some(actor);
                 drop(slot);
+                // **握りが移ったことを残す。**誰が打っていたのかが後から読めないと、
+                // 「打てなくなった」の切り分けができません（Issue #10）。
+                self.diag.info(
+                    Stage::Exec,
+                    None,
+                    match previous {
+                        Some(holder) => {
+                            format!("握りが{}から{}へ移りました", who(holder), who(actor))
+                        }
+                        None => format!("{}が握りました", who(actor)),
+                    },
+                );
                 let _ = self.console_changed.send(Some(actor));
                 Ok(())
             }
@@ -420,7 +494,9 @@ impl Engine {
 
         if let Some(console) = console {
             console.close().await;
-            self.diag.info(Stage::Reach, None, "端末を止めました");
+            // **段階は `Exec`。**端末は「繋がったあとのコマンド」で、到達ではありません
+            // （他の端末の記録と並べて読めるように揃えました・Issue #10）。
+            self.diag.info(Stage::Exec, None, "端末を止めました");
         }
         let _ = self.console_changed.send(None);
     }
@@ -731,6 +807,14 @@ impl Engine {
 }
 
 /// 「別の側が握っています」を組み立てる。**誰が握っているかを名前で返す。**
+/// 記録に出す側の名前。**「人」か「AI」だけ**（PRD §8 — 宛先は入れない）。
+fn who(actor: Actor) -> &'static str {
+    match actor {
+        Actor::Human => "人",
+        Actor::Ai => "AI",
+    }
+}
+
 fn held_by(holder: Actor) -> EngineError {
     EngineError::ConsoleHeldByOther {
         holder: match holder {
