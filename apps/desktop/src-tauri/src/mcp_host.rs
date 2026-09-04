@@ -26,10 +26,10 @@ pub const MCP_READY_EVENT: &str = "mcp://ready";
 pub const MCP_FAILED_EVENT: &str = "mcp://failed";
 
 /// 合言葉を人が固定したいときの環境変数。**設定ファイルより優先する。**
-const TOKEN_ENV: &str = "SSHBOARD_MCP_TOKEN";
+pub const TOKEN_ENV: &str = "SSHBOARD_MCP_TOKEN";
 
 /// 合言葉を置くファイル名。接続一覧の隣。
-const TOKEN_FILE: &str = "mcp-token";
+pub const TOKEN_FILE: &str = "mcp-token";
 
 /// MCP の合言葉を決める（D23）。
 ///
@@ -148,6 +148,20 @@ fn resolve_port(raw: Option<&str>) -> Result<u16, String> {
         .map_err(|_| format!("{PORT_ENV} の値を番号として読めません: {trimmed}"))
 }
 
+/// 環境変数を見てポートを決める。**本体と中継（`stdio_proxy`）が同じ答えを出すため、
+/// ここ 1 か所に置きます。**片方だけ環境変数を見ると、繋がらない組み合わせが生まれます。
+///
+/// **読めない指定は黙って倒さず、理由を出してから既定へ戻します。**
+pub fn port_from_env() -> u16 {
+    match resolve_port(std::env::var(PORT_ENV).ok().as_deref()) {
+        Ok(port) => port,
+        Err(reason) => {
+            eprintln!("[sshboard] {reason}（既定の {DEFAULT_MCP_PORT} を使います）");
+            DEFAULT_MCP_PORT
+        }
+    }
+}
+
 pub fn spawn(
     app: AppHandle,
     band: Band,
@@ -160,14 +174,7 @@ pub fn spawn(
         // 伏せるのは画面側で、**伏せ終わってから撮る**（capture.rs）。
         let capture = crate::capture::TauriCapture::new(app.clone());
 
-        // **読めない指定を黙って倒さない。**理由を出したうえで既定へ戻す。
-        let port = match resolve_port(std::env::var(PORT_ENV).ok().as_deref()) {
-            Ok(port) => port,
-            Err(reason) => {
-                eprintln!("[sshboard] {reason}（既定の {DEFAULT_MCP_PORT} を使います）");
-                DEFAULT_MCP_PORT
-            }
-        };
+        let port = port_from_env();
 
         let endpoint = match sshboard_mcp::serve(ServeParts {
             band,

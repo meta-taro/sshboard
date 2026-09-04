@@ -54,6 +54,10 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 # 画面側が描いた PNG を受け取るため（D36）。**画像は base64 で渡ってきます。**
 base64 = "0.22"
+# stdio 中継が本体の HTTP を叩くため（Issue #2）。
+# **TLS を入れません**（`default-features = false`）。宛先は 127.0.0.1 固定で、
+# **暗号化された外向き接続を張る手段をこのバイナリに持たせない。**
+reqwest = { version = "0.12", default-features = false }
 
 [dev-dependencies]
 # メニューの割り当てを**本物のパーサ**で検査するため（tauri 経由で既に依存木にある）。

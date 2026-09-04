@@ -12,6 +12,7 @@ mod mcp_host;
 mod menu;
 mod pending;
 mod session_cmd;
+mod stdio_proxy;
 mod stream_host;
 mod version;
 
@@ -27,6 +28,21 @@ use crate::commands::McpUrl;
 use crate::pending::PendingLines;
 
 pub fn run() {
+    // **GUI を出す前に見ます**（Issue #2）。
+    //
+    // `--mcp-stdio-proxy` で起動されたら、窓を作らずに中継として走ります。
+    // これがあると `claude mcp add sshboard -- <実行ファイル> --mcp-stdio-proxy` と
+    // 書けて、**合言葉が `~/.claude.json` にもコマンド履歴にも残りません。**
+    //
+    // Windows の release ビルドは `windows_subsystem = "windows"` です。
+    // **コンソールは付きませんが、親が繋いだ pipe は生きています** —
+    // MCP クライアントは必ず stdio を pipe で渡すので、ここは動きます。
+    let args: Vec<String> = std::env::args().skip(1).collect();
+    if stdio_proxy::requested(&args) {
+        stdio_proxy::run();
+        return;
+    }
+
     tauri::Builder::default()
         // **いちばん先に登録する**（Tauri の作法）。
         //

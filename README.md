@@ -207,10 +207,31 @@ sh tools/test-server/up.sh down   # 片付ける
 
 ### AI（MCP）から繋ぐ
 
-起動すると、画面右上に **「MCP の登録コマンドを写す」ボタン**が出ます。
-**押すと、合言葉ごと 1 行がクリップボードへ入ります。**貼って実行してください。
+#### すすめる形 — 合言葉をどこにも書かない
 
-中身はこの形です（`<合言葉>` は `%APPDATA%\sshboard\sshboard\config\mcp-token` の中身）。
+```sh
+# macOS
+claude mcp add sshboard -- /Applications/sshboard.app/Contents/MacOS/sshboard --mcp-stdio-proxy
+
+# Windows
+claude mcp add sshboard -- "%LOCALAPPDATA%\\sshboard\\sshboard.exe" --mcp-stdio-proxy
+```
+
+**この形なら、合言葉はどこにも残りません**（Issue #2）。
+`--mcp-stdio-proxy` で起動された sshboard は、**窓を作らず中継として走ります。**
+合言葉は自分で読み、動いている本体へ流すだけです。
+
+- **`~/.claude.json` にもコマンド履歴にも合言葉が載りません**
+- ポートを移しても（`SSHBOARD_MCP_PORT`）**登録し直しは要りません**
+- 本体が動いていなければ「**sshboard が動いていません。アプリを起動してから、
+  もう一度お試しください。**」と返ります
+
+**SSH を張るのは本体だけです。**中継は Engine も帯も持ちません。
+**見えない SSH セッションは 1 本も増えません**（禁止事項 3）。
+
+#### 直に HTTP で繋ぐ形
+
+画面右上の **「MCP の登録コマンドを写す」ボタン**から、合言葉ごと 1 行を写せます。
 
 ```sh
 claude mcp add --transport http sshboard http://127.0.0.1:22022/mcp \
