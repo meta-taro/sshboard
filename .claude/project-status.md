@@ -1,7 +1,7 @@
 # プロジェクトステータス — sshboard
 
 - **現在フェーズ**: **Phase 1 の AI 側は書き終えました。**残りは人の工程です
-- **最終更新**: 2026-09-04（午後 — sshboard のコード変更は無し）
+- **最終更新**: 2026-09-04（夕 — Issue #8 の一部を直した。**根本原因はまだ未特定**）
 
 ## いまの状態を一言で
 
@@ -12,13 +12,13 @@ Phase 0 の 5 本は、実機と Windows 目視を除いてすべて通りまし
 そのうえで **D2（読み取り専用）を D22 で覆し、囲いつきの書き込みを入れています。**
 運用者の実際の用途が「VPS へプロダクトを上げる」で、読み取りだけでは成立しないためです。
 
-**2026-09-02 現在、PRD の読み取りツールが全部 ✅ になりました**（MCP 29 本）。
+**2026-09-02 現在、PRD の読み取りツールが全部 ✅ になりました**（MCP は **30 本**）。
 端末も、なぞってコピー・検索・窓への追従まで入っています。
 **α を出せる形（タグ → ビルド確認 → prerelease）も組みました**（D30）。
 
 **残っているのは、人にしかできない工程です。**（product-baseline §29）
 **とくに、この製品はまだ一度も実運用で起動されていません。**
-341 本のテストが通っていることと、道具として動くことは別です
+**477 本**（Rust 316 ＋ フロント 161）のテストが通っていることと、道具として動くことは別です
 （型検査を通ったまま画面が 3 か所崩れていた実例があります）。
 
 ## 出来ているもの
@@ -33,25 +33,28 @@ Phase 0 の 5 本は、実機と Windows 目視を除いてすべて通りまし
 | `crates/sshboard-engine` | **GUI と MCP が共有する実行体**（PRD §4-1）。接続を複数持ち、**1 本残らずタブに出す**（D25）。手元へ落とす側は**黙って上書きしない**（D27） |
 | `crates/sshboard-diag` | 何が起きたかの記録。**人にも AI にも同じものを見せる**。接続先を入れない |
 | `crates/sshboard-readonly` | **AI が呼べるコマンドの許可リスト**（D3）。**既定は空**・断った分を追記で残す |
-| `crates/sshboard-mcp` | 同居 MCP・**合言葉必須**（D23）。29 本のツール（下記） |
+| `crates/sshboard-mcp` | 同居 MCP・**合言葉必須**（D23）。**30 本**のツール（下記） |
 | `apps/desktop` | SvelteKit + Tauri 2。**ファイル 2 ペイン（上げ下ろし両方）**・**端末タブ（D29・ロックと停止つき・なぞってコピー・検索・窓に追従）**・接続タブ・接続管理・帯・診断・11 言語・テーマ・**文字サイズ 4 段** |
 | `tools/test-server` | 手元の AlmaLinux 9 sshd。`/var/log` の権限・EUC-JP のログ・色付きの成長ログを再現 |
 | `tools/ssh-probe` | 002 / 003 の確認コマンド（**製品ではない**。D6 が決まったので役目は終わり） |
 | `tools/check-005.sh` | 005 の確認スクリプト |
 | `.github/workflows/ci.yml` | format / clippy / test |
 
-## MCP のツール（29 本）
+## MCP のツール（30 本）
 
-> **数え直しました**（2026-08-30）。`capture_window` を足す前は **15 本**で、
+> **数え直しました**（2026-09-04）。**29 本と書いていたのは誤りで、実物は 30 本**です。
+> Issue #5 で足した `update_connection` が表から抜けていました。
+> 実物は `grep -rh '#\[tool(' crates/sshboard-mcp/src/ | wc -l` で数えられます。
+>
+> （2026-08-30 の記録）`capture_window` を足す前は **15 本**で、
 > それまで「16 本」と書いていたのは**元から 1 つ多い**誤りでした。
-> 実物は `grep -c '#\[tool('` で数えられます。
 
 | 何もしない側 | サーバーへ触る側 |
 |---|---|
 | `ping` / `read_stream` | `connect` / `disconnect` / `focus_connection` |
 | `session_status` / **`diagnostics`** | `list_directory` / `read_file` |
 | **`capture_window`**（画面を撮る・既定で伏せる・D26） | **`console_open` / `console_type` / `console_stop`**（人と AI が共有する端末・D29） |
-| `list_connections` / `register_connection` / `mark_connection` | **`make_directory` / `upload_file` / `write_file`**（囲いの中だけ・D22） |
+| `list_connections` / `register_connection` / **`update_connection`** / `mark_connection` | **`make_directory` / `upload_file` / `write_file`**（囲いの中だけ・D22） |
 | **`list_readonly_commands`**（人が許した一覧・**既定は空**） | **`run_readonly`**（許可リストの識別子だけ・D3） |
 | | **`disk_usage` / `process_list` / `network_listen`**（引数なし） |
 | | **`service_status` / `read_log` / `search`**（**引数は必ず囲う**・D3） |
@@ -69,33 +72,45 @@ Phase 0 の 5 本は、実機と Windows 目視を除いてすべて通りまし
 
 ## テスト状況
 
-**フロントは 158 本。2026-09-04 に走らせて全部通っています。**
+**2026-09-04（夕）に、フロントと Rust の両方を走らせました。**
 
-> **Rust 側はこのセッションで走らせていません。**下の 267 は 2026-09-02 の数字です。
+```
+cargo fmt --all -- --check                             →  差分なし（2026-09-04）
+cargo test --workspace                                 →  316 passed; 0 failed（2026-09-04）
+pnpm --filter desktop check                            →  283 files, 0 errors, 0 warnings（2026-09-04）
+pnpm --filter desktop test                             →  161 passed（2026-09-04）
+cargo clippy --workspace --all-targets -- -D warnings  →  2026-09-02 の結果（このセッションでは未実行）
+（別ワークスペース）tools/ssh-probe: cargo test        →   10 passed（2026-09-02）
+```
+
+> **316 のうち、実機を要する分は 1 本も走っていません。**
+> Docker（colima）が動いておらず、`server_is_up()` が false になるので
+> **自分から飛びます**（飛んだ分も `ok` と数えられます）。
+> 立てれば実際に繋ぎに行きます — `sh tools/test-server/up.sh`。
 > **走らせていないものを「通っている」と書かない**ため、ここで分けています。
-
-```
-cargo test --workspace                                 →  267 passed; 0 failed
-cargo fmt --all -- --check                             →  差分なし
-cargo clippy --workspace --all-targets -- -D warnings  →  警告なし
-pnpm --filter desktop check                            →  282 files, 0 errors, 0 warnings（2026-09-04）
-pnpm --filter desktop test                             →  158 passed（2026-09-04）
-（別ワークスペース）tools/ssh-probe: cargo test        →   10 passed
-```
+> Rust 側はこのセッションで 1 行も触っていないので、CI を最終ゲートにします
+> （product-baseline §5）。
 
 | どこ | 本数 | うち実機 |
 |---|---|---|
 | `sshboard-band` | 9 | |
+| `sshboard-bundle` | 18 | |
 | `sshboard-stream` | 24 | |
 | `sshboard-credentials` | 16 | 2 |
-| `sshboard-connections` | 20 | |
+| `sshboard-connections` | 27 | |
 | `sshboard-diag` | 8 | |
-| `sshboard-ssh` | 69 | 22 |
-| `sshboard-engine` | 62 | 24 |
+| `sshboard-ssh` | 73 | 26 |
+| `sshboard-engine` | 63 | 22 |
 | `sshboard-mcp` | 34 | 4 |
 | `sshboard-readonly` | 16 | |
-| `sshboard-desktop` | 9 | |
-| **フロント（vitest）** | **75** | |
+| `sshboard-desktop` | 28 | |
+| **Rust 合計** | **316** | **52** |
+| **フロント（vitest）** | **161** | |
+
+> **数え直しました**（2026-09-04）。`sshboard-bundle`（18 本）が表から抜けており、
+> `sshboard-desktop` は 9 ではなく 28、フロントは 75 ではなく 161 でした。
+> 実物は `cargo test --workspace` と `pnpm --filter desktop test` で数えられます。
+> 「うち実機」は `grep -c 'server_is_up()'` の呼び出し箇所（定義行を除く）です。
 
 **CI が触るのは、いままで 10 クレート中 6 つだけでした**（2026-09-02 に修正）。
 `sshboard-engine`（61 本）・`sshboard-readonly`（16 本）・`sshboard-connections`（20 本）・
@@ -177,6 +192,45 @@ pnpm --filter desktop test                             →  158 passed（2026-09
 > **札が出る条件はこれで揃いました。**ただし**札が出るのは 0.1.5 が入っている端末だけ**です。
 > 0.1.6 を新規で入れた人には一度も出ません。
 > **通ったのはテストと配布であって、画面ではありません。**
+
+## 2026-09-04（夕）— Issue #8 の**一部**を直した。根本原因は**まだ未特定**
+
+**先に書きます。「なぜ繋がっていない状態になったか」は、まだ分かっていません。**
+2026-09-03 のコメントから、そこは動いていません。
+
+分かったのは、**同じ病気の別の口**です。**これは実物で示せます。**
+
+| 見た所 | 実際の値 |
+|---|---|
+| `session://changed` の購読箇所 | **1 か所だけ** — `FileBrowser.svelte:489`（`onMount` の中） |
+| `FileBrowser` が描かれる条件 | `+page.svelte:1033` の `{:else if view === 'files'}` |
+| 起動直後のタブ | `+page.svelte:74` は `'connections'`。**ファイルを開くまで購読は 1 本も無い** |
+| その間 `session.all` を読んでいる所 | `+page.svelte:960`（端末タブの接続一覧）・`:957`（入力の締め判定） |
+
+**ファイル以外のタブに居る間、共有している接続状態は 1 度も更新されません。**
+「AI が繋いだ／切ったことを人へ伝える」（PRD §4-2）が、そこでは働いていませんでした。
+**端末の面は同じ状態を見て人の入力を締めます** — そこが古いままになります。
+
+もう 1 つ。`onMount` の後始末は**同期で**走るのに `session.watch()` は非同期なので、
+**タブを素早く切り替えると購読が止められないまま残ります**（remount のたびに増える）。
+
+### 直したもの
+
+| | 中身 |
+|---|---|
+| `session.svelte.ts` | `watch()` を**何度呼んでも購読は 1 つ**に。`unwatch()` を足し、**張り終わる前に止められた分も取り返す** |
+| `+layout.svelte` | **購読の持ち主をここへ移した。**窓が開いている間ずっと生きている所 |
+| `FileBrowser.svelte` | 購読を**手放した**。理由をコメントに残した |
+| `session-watch.test.ts` | **新規 3 本。**落ちるのを見てから実装しています（RED → GREEN） |
+
+**フロントで初めて `vi.mock` を使ったテストです。**これまで純関数しか試せていませんでした。
+ただし**まだ「部品を描いて確かめるテスト」ではありません** — そこは空のままです。
+
+### これで #8 が直ったとは書きません
+
+報告された再現手順（**ファイルの面に居たまま**ディレクトリを移動する）では、
+`FileBrowser` は外れないので、**上の欠陥は踏みません。**別の口です。
+**#8 は開けたままにします。**
 
 ## 2026-09-04（午後）— **sshboard のコードは触っていません**
 
@@ -267,7 +321,7 @@ pnpm --filter desktop test                             →  158 passed（2026-09
 
 ## 技術的決定
 
-`.claude/decisions.md`（D1〜D33）＋ `DESIGN.md`。
+`.claude/decisions.md`（D1〜D40）＋ `DESIGN.md`。
 **未決は D10（実装体制）だけになりました。**
 
 **D15（MCP のポート）は D33 で閉じました**（2026-09-02・決めたのは人）。

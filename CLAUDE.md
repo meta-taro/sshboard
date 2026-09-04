@@ -8,7 +8,7 @@
 - **`.claude/rules/product-baseline.md`** — 開発のベースルール。**最優先で従うこと**。
 - **`PRD.md`** — このプロダクトの方向性・仕様。
 - **`.claude/roadmap.md`** — フェーズと進め方。**Phase 0 は技術項目を抜け、Phase 1 に入っています**。
-- **`.claude/decisions.md`** — 決定と、その理由（D1〜D29）。**未決は D10 のみ**。
+- **`.claude/decisions.md`** — 決定と、その理由（D1〜D40）。**未決は D10 のみ**。
 - **`.claude/issues/`** — 着手すべきローカル Issue。
 
 ## この製品に固有の禁止事項（最優先）
@@ -55,8 +55,13 @@
 | **ダウンロードを 1 回押してみる**（実装済・D27。まだ押されていない） | 人 |
 | **端末を画面で 1 回打ってみる**（実装済・D29。まだ打たれていない） | 人 |
 | **`readonly.toml` を書いてみる**（実装済・D3。**既定は空なので、書くまで AI は 1 本も走らせられません**） | 人 |
-| 用途別の読み取りツール（`stat` / `search` / `disk_usage` / `process_list` ほか） | AI |
 | Windows 実機（001 / 004） | 人 |
+| **Issue #8 の根本原因**（画面が実態とずれる）。**まだ分かっていません** | AI |
+| 画面そのもののテスト（部品を描いて確かめるもの）。**まだ 1 本もありません** | AI |
+
+> **用途別の読み取りツールは書き終わりました**（`stat` / `search` / `disk_usage` /
+> `process_list` / `service_status` / `read_log` / `network_listen` / `runtime_versions`）。
+> MCP は **30 本**です（`grep -rc '#\[tool(' crates/sshboard-mcp/src/` で数えられます）。
 
 **手元のテスト用サーバー**を先に建てること。実機に触らずに全部確かめられます。
 
