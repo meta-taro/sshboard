@@ -18,7 +18,7 @@ Phase 0 の 5 本は、実機と Windows 目視を除いてすべて通りまし
 
 **残っているのは、人にしかできない工程です。**（product-baseline §29）
 **とくに、この製品はまだ一度も実運用で起動されていません。**
-**483 本**（Rust 320 ＋ フロント 163）のテストが通っていることと、道具として動くことは別です
+**499 本**（Rust 331 ＋ フロント 168）のテストが通っていることと、道具として動くことは別です
 （型検査を通ったまま画面が 3 か所崩れていた実例があります）。
 
 ## 出来ているもの
@@ -76,9 +76,9 @@ Phase 0 の 5 本は、実機と Windows 目視を除いてすべて通りまし
 
 ```
 cargo fmt --all -- --check                             →  差分なし（2026-09-04）
-cargo test --workspace                                 →  320 passed; 0 failed（2026-09-04）
-pnpm --filter desktop check                            →  284 files, 0 errors, 0 warnings（2026-09-04）
-pnpm --filter desktop test                             →  163 passed（2026-09-04）
+cargo test --workspace                                 →  331 passed; 0 failed（2026-09-06・実機込み）
+pnpm --filter desktop check                            →  286 files, 0 errors, 0 warnings（2026-09-06）
+pnpm --filter desktop test                             →  168 passed（2026-09-06）
 cargo clippy --workspace --all-targets -- -D warnings  →  2026-09-02 の結果（このセッションでは未実行）
 （別ワークスペース）tools/ssh-probe: cargo test        →   10 passed（2026-09-02）
 ```
@@ -111,12 +111,12 @@ cargo clippy --workspace --all-targets -- -D warnings  →  2026-09-02 の結果
 | `sshboard-connections` | 27 | |
 | `sshboard-diag` | 8 | |
 | `sshboard-ssh` | 73 | 26 |
-| `sshboard-engine` | 66 | 22 |
+| `sshboard-engine` | 77 | 25 |
 | `sshboard-mcp` | 35 | 4 |
 | `sshboard-readonly` | 16 | |
 | `sshboard-desktop` | 28 | |
-| **Rust 合計** | **320** | **52** |
-| **フロント（vitest）** | **163** | |
+| **Rust 合計** | **331** | **55** |
+| **フロント（vitest）** | **168** | |
 
 > **数え直しました**（2026-09-04）。`sshboard-bundle`（18 本）が表から抜けており、
 > `sshboard-desktop` は 9 ではなく 28、フロントは 75 ではなく 161 でした。
@@ -203,6 +203,54 @@ cargo clippy --workspace --all-targets -- -D warnings  →  2026-09-02 の結果
 > **札が出る条件はこれで揃いました。**ただし**札が出るのは 0.1.5 が入っている端末だけ**です。
 > 0.1.6 を新規で入れた人には一度も出ません。
 > **通ったのはテストと配布であって、画面ではありません。**
+
+## 2026-09-06 — **AI は人から端末を奪えていました**（D42）
+
+**端末が映るようになった**あと、実機からこう来ました。
+
+> AI に端末を渡すときに「止める」を押さないといけません。
+> これだと **AI からのアクションが分からない**ので、
+> 「AI が操作をするために許可しますか」みたいなアラートで人に気づかせないと。
+
+追ってみたら、**気づかせる以前に、止められませんでした。**
+
+```rust
+pub async fn console_stop(&self) {   // ← 誰が呼んだかを見ていない
+    slot.holder = None;              // ← 人の握りも外れる
+}
+```
+
+`console_open` は「他が握っていたら断る」と正しく書いてあるのに、
+**`console_stop` が裏口**でした。MCP はこれを AI に開いています。
+**2 手で取れます**（`console_stop` → `console_open`）。
+
+D29 は「人の解除が常に勝つ」と書いていますが、**守っていたのは片側だけ**でした。
+
+### 入れたもの（commit 済・**未 push**）
+
+| | 中身 |
+|---|---|
+| `585f241` | **裏口を塞いだ。**`console_stop` に `actor`。人は常に勝ち、AI は自分の分だけ |
+| （D42・engine） | **AI が握るには人の許可が要る。**握り手が居なくても頼ませる。催促は積み上げない |
+| （D42・画面） | `ConsoleRequestDialog`。**既定の焦点は「断る」**。Escape も「断る」。背景を押しても閉じない。**4 鍵 × 11 言語** |
+| （右クリック） | **右クリックで貼り付け。**`contextmenu` はフロント全体に 1 行も無かった |
+| （自動オープン） | 端末の面を開いたら端末も開く。**押させる根拠は D29 に無かった** |
+| （#12） | `pnpm/action-setup` を v4 → v6（`using: node20` → `node24`） |
+
+### 見張りを 2 つ足しました
+
+**「作ったのに繋いでいない」を止めます**（Issue #10 そのもの）。
+
+- `terminal-wiring.test.ts` — 作った端末に `writeChunk` が無ければ落ちる
+- `component-wiring.test.ts` — 作った部品がどこからも描かれていなければ落ちる
+
+**どちらも、外して実際に落ちることを確かめています。**
+依存は増やしていません（Vite の `?raw` / `import.meta.glob`）。
+
+### まだ塞げていないこと
+
+**部品を描いて確かめるテストは、いまも 1 本もありません。**
+上の 2 つはソースの形を見ているだけで、**中身の正しさは見ていません。**
 
 ## 2026-09-04 — **`v0.1.7-alpha.8` を配りました**（実務で使う予定が入ったため）
 
@@ -481,8 +529,9 @@ product-baseline §10「古い文書は、無い文書より悪い」と自分�
 
 ## 技術的決定
 
-`.claude/decisions.md`（D1〜D41）＋ `DESIGN.md`。
-**未決は D10（実装体制）と D41（出力に出どころを持たせるか・Issue #10）の 2 つです。**
+`.claude/decisions.md`（D1〜D42）＋ `DESIGN.md`。
+**未決は D10（実装体制）と D41（出力に出どころを持たせるか）の 2 つです。**
+**D42（AI が端末を握るには人の許可が要る）は決めて入れました。**
 
 **D15（MCP のポート）は D33 で閉じました**（2026-09-02・決めたのは人）。
 `22022` 固定 ＋ `SSHBOARD_MCP_PORT` で移せる。**登録は 1 回で済みます。**
