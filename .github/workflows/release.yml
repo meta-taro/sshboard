@@ -38,7 +38,11 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - uses: pnpm/action-setup@v4
+      # **v4 は `using: node20`**。GitHub が Node 24 で強制実行していますが、
+      # **それが打ち切られた日に、こちらは何も変えていないのに落ちます。**
+      # v5 以降が `using: node24`。pnpm の版は `package.json` の
+      # `packageManager` から解決されるので、`with:` は要りません（v4 と同じ）。
+      - uses: pnpm/action-setup@v6
 
       - uses: actions/setup-node@v6
         with:
