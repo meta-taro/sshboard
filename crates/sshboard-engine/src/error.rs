@@ -21,6 +21,11 @@ pub enum EngineError {
     ConsoleHeldByOther { holder: String },
     /// 端末がまだ開いていない。
     ConsoleNotOpen,
+    /// **AI が端末を握るには、人の許可が要る**（D42）。
+    ///
+    /// 頼んだことは記録に残り、画面へ出ます。**人が答えるまで握れません。**
+    /// これは故障ではなく、**人に気づかせるための一手**です。
+    ConsoleApprovalNeeded,
     /// 端末は**別の接続**で開いている（D29 ＋ D25）。
     ///
     /// **黙って乗り換えない。**タブを移したつもりで、打鍵が前のサーバーへ
@@ -91,6 +96,12 @@ impl fmt::Display for EngineError {
                 f,
                 "端末は{holder}が握っています。**同時に触れるのは 1 人です**（D29）。\
                  人は画面の［取り返す］でいつでも取り返せます"
+            ),
+            EngineError::ConsoleApprovalNeeded => write!(
+                f,
+                "端末を使ってよいか、いま人に尋ねています。\
+                 **人が画面で許可するまで握れません**（D42）。\
+                 少し待ってから開き直してください"
             ),
             EngineError::ConsoleNotOpen => write!(
                 f,

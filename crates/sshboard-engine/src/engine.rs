@@ -41,6 +41,11 @@ struct ConsoleSlot {
     /// 画面は別の接続を向いたままになります。**識別子だけ**を持ちます
     /// （ホスト名は持たない・CLAUDE.md 禁止事項 4）。
     connection: Option<String>,
+    /// **AI が「使いたい」と言っている**（D42）。人が答えるまで残ります。
+    ///
+    /// 積み上げません。**何度頼まれても、人に出る問いは 1 つ**です
+    /// （催促で人を疲れさせると、いずれ中身を見ずに許すようになります）。
+    request: Option<Actor>,
 }
 
 /// 開いているもの全部と、いま操作の宛先になっているもの。
@@ -67,6 +72,9 @@ pub struct Engine {
     console: Mutex<ConsoleSlot>,
     /// 誰が握っているかを配る。**画面が知らないまま AI が打っている、を作らない。**
     console_changed: watch::Sender<Option<Actor>>,
+    /// **AI からの頼みを画面へ押し出す**（D42）。
+    /// 出せない問いは、無いのと同じです。
+    console_request_changed: watch::Sender<Option<Actor>>,
     /// 開いているものが変わったことを配る。**画面が知らないまま繋がっている、を作らない。**
     changed: watch::Sender<Vec<Opened>>,
 }
@@ -84,6 +92,7 @@ impl Engine {
     ) -> Self {
         let (changed, _) = watch::channel(Vec::new());
         let (console_changed, _) = watch::channel(None);
+        let (console_request_changed, _) = watch::channel(None);
         Self {
             band,
             diag,
@@ -92,6 +101,7 @@ impl Engine {
             held: Mutex::new(Held::default()),
             console: Mutex::new(ConsoleSlot::default()),
             console_changed,
+            console_request_changed,
             changed,
         }
     }
@@ -320,6 +330,9 @@ impl Engine {
         cols: u32,
         rows: u32,
     ) -> Result<(), EngineError> {
+        // **AI が握るには、人の許可が要る**（D42）。**サーバーへ行く前に**尋ねます。
+        self.ask_first(actor).await?;
+
         // **開けなかったことを残す**（Issue #10）。
         //
         // 実機で端末が繋がらなかったとき、記録に残っていたのは接続の 4 行だけで、
@@ -448,6 +461,8 @@ impl Engine {
     /// AI は、誰も握っていないか自分が握っているときだけ取れます。
     /// **AI が人から奪える形にしない。**
     pub async fn console_take(&self, actor: Actor) -> Result<(), EngineError> {
+        // **AI が握るには、人の許可が要る**（D42）。
+        self.ask_first(actor).await?;
         let mut slot = self.console.lock().await;
         match slot.holder {
             Some(holder) if holder != actor && actor != Actor::Human => {
@@ -479,6 +494,93 @@ impl Engine {
                 Ok(())
             }
         }
+    }
+
+    /// **AI が端末を使いたいと言っているか**（D42）。画面はこれを見て問いを出します。
+    pub async fn console_request(&self) -> Option<Actor> {
+        self.console.lock().await.request
+    }
+
+    /// 頼みの変化を受け取る口。**押し出さないと、人は気づけません。**
+    pub fn subscribe_console_request(&self) -> watch::Receiver<Option<Actor>> {
+        self.console_request_changed.subscribe()
+    }
+
+    /// 人が答える（D42）。**答えられるのは人だけ。**
+    ///
+    /// 自分で自分を許可できたら、許可の意味がありません。
+    /// 許したら、その場で握りが移ります。**もう［止める］を押させません。**
+    pub async fn console_answer(&self, actor: Actor, allow: bool) -> Result<(), EngineError> {
+        if actor != Actor::Human {
+            return Err(EngineError::ConsoleApprovalNeeded);
+        }
+        let mut slot = self.console.lock().await;
+        let Some(asked_by) = slot.request.take() else {
+            // 問いが無いのに答えた。**同じ状態へ向かうので失敗にしません。**
+            drop(slot);
+            let _ = self.console_request_changed.send(None);
+            return Ok(());
+        };
+        let moved = if allow {
+            slot.holder = Some(asked_by);
+            true
+        } else {
+            false
+        };
+        drop(slot);
+
+        self.diag.info(
+            Stage::Exec,
+            None,
+            if moved {
+                format!("人が許可しました。握りが{}へ移りました", who(asked_by))
+            } else {
+                format!("人が断りました。{}は握れません", who(asked_by))
+            },
+        );
+        let _ = self.console_request_changed.send(None);
+        if moved {
+            let _ = self.console_changed.send(Some(asked_by));
+        }
+        Ok(())
+    }
+
+    /// **AI は、握る前に人へ頼む**（D42）。人はそのまま通ります。
+    ///
+    /// 実機の指摘（2026-09-06）から入れました。
+    ///
+    /// > AI に端末を渡すときに「止める」を押さないといけません。
+    /// > これだと **AI からのアクションが分からない**ので、
+    /// > 「AI が操作をするために許可しますか」みたいなアラートで人に気づかせないと。
+    ///
+    /// **握り手が居なくても頼ませます。**「居ないなら黙って取れる」だと、
+    /// **人は AI が触ったことに気づけません。**
+    async fn ask_first(&self, actor: Actor) -> Result<(), EngineError> {
+        if actor == Actor::Human {
+            return Ok(());
+        }
+        let mut slot = self.console.lock().await;
+        // すでに握っているなら、頼み直させません（打鍵のたびに問いが出ます）。
+        if slot.holder == Some(actor) {
+            return Ok(());
+        }
+        // **催促を積み上げない。**何度呼ばれても、人に出る問いは 1 つ。
+        let is_new = slot.request != Some(actor);
+        slot.request = Some(actor);
+        drop(slot);
+
+        if is_new {
+            self.diag.info(
+                Stage::Exec,
+                None,
+                format!(
+                    "{}が端末を使いたいと言っています。人の答え待ちです",
+                    who(actor)
+                ),
+            );
+            let _ = self.console_request_changed.send(Some(actor));
+        }
+        Err(EngineError::ConsoleApprovalNeeded)
     }
 
     /// 止める（D29 の停止ボタン）。**握っている側と、人だけ。**

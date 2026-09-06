@@ -92,6 +92,24 @@ fn engine_at(path: PathBuf) -> Engine {
     Engine::new(Band::new(), Arc::new(OutputStream::new()), path)
 }
 
+/// AI に端末を開かせる。**D42 が入ったので、頼んで人が許すまで開けません。**
+async fn ai_console_open(engine: &Engine) {
+    let asked = engine.console_open(Actor::Ai, 80, 24).await;
+    assert!(
+        matches!(asked, Err(EngineError::ConsoleApprovalNeeded)),
+        "AI が許可なく端末を開けてしまう: {asked:?}"
+    );
+    engine
+        .console_answer(Actor::Human, true)
+        .await
+        .expect("人が許せない");
+    engine
+        .console_open(Actor::Ai, 80, 24)
+        .await
+        .expect("許可したのに開けない");
+    assert_eq!(engine.console_holder().await, Some(Actor::Ai));
+}
+
 #[tokio::test]
 async fn nothing_can_be_done_before_a_connection_is_open() {
     // **繋がっていないのに動く経路があってはいけない**（裏で張ってしまうから）。
@@ -762,11 +780,7 @@ async fn a_person_can_always_take_the_console_back() {
     let dir = tempfile::tempdir().expect("一時ディレクトリ");
     let engine = engine_connected(&dir).await;
 
-    engine
-        .console_open(Actor::Ai, 80, 24)
-        .await
-        .expect("開けない");
-    assert_eq!(engine.console_holder().await, Some(Actor::Ai));
+    ai_console_open(&engine).await;
 
     // AI が握っていても、人は取り返せる。
     engine
@@ -780,10 +794,16 @@ async fn a_person_can_always_take_the_console_back() {
         .expect("取り返したのに打てない");
 
     // **逆は勝たない。**AI は人から奪えない。
+    // **D42 以降、AI にできるのは「頼む」ことだけ**です（人が答えるまで握れません）。
     let refused = engine.console_take(Actor::Ai).await;
     assert!(
-        matches!(refused, Err(EngineError::ConsoleHeldByOther { .. })),
+        matches!(refused, Err(EngineError::ConsoleApprovalNeeded)),
         "**AI が人から奪えてしまう**: {refused:?}"
+    );
+    assert_eq!(
+        engine.console_holder().await,
+        Some(Actor::Human),
+        "頼んだだけで握りが動いている"
     );
 }
 
@@ -797,10 +817,7 @@ async fn stopping_the_console_always_works_and_frees_it() {
     let dir = tempfile::tempdir().expect("一時ディレクトリ");
     let engine = engine_connected(&dir).await;
 
-    engine
-        .console_open(Actor::Ai, 80, 24)
-        .await
-        .expect("開けない");
+    ai_console_open(&engine).await;
     let _ = engine.console_stop(Actor::Human).await;
     assert_eq!(
         engine.console_holder().await,
