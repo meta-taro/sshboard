@@ -527,7 +527,11 @@ pub async fn console_take(engine: State<'_, Arc<Engine>>) -> Result<(), String> 
 /// 止める。**失敗しません**（D29 の停止ボタン）。
 #[tauri::command]
 pub async fn console_stop(engine: State<'_, Arc<Engine>>) -> Result<(), String> {
-    engine.console_stop().await;
+    // **人は常に勝つ**（D29）。握っているのが AI でも止められます。
+    engine
+        .console_stop(Actor::Human)
+        .await
+        .map_err(|error| error.to_string())?;
     Ok(())
 }
 

@@ -481,12 +481,45 @@ impl Engine {
         }
     }
 
-    /// 止める（D29 の停止ボタン）。**失敗しません。**
+    /// 止める（D29 の停止ボタン）。**握っている側と、人だけ。**
     ///
     /// 帯の受け取りを待ちません。切断と同じ扱いです — **止まらない停止は、
     /// 無い方がまし。**握りも外すので、次の側が開き直せます。
-    pub async fn console_stop(&self) {
+    ///
+    /// **`actor` を取るようになりました**（2026-09-06・実機の指摘）。
+    /// 以前は誰が呼んだかを見ておらず、**AI が 2 手で人の端末を奪えました。**
+    ///
+    /// ```text
+    /// AI: console_stop   → 人のシェルが落ち、握りが外れる
+    /// AI: console_open   → AI が握る
+    /// ```
+    ///
+    /// `console_open` は「他が握っていたら断る」と正しく書いてあったのに、
+    /// **ここが裏口**でした。D29 は「人の解除が常に勝つ」と書いていますが、
+    /// **守っていたのは片側だけ**です。
+    ///
+    /// **人は常に勝ちます。**AI が止められるのは、自分が握っている分だけです。
+    pub async fn console_stop(&self, actor: Actor) -> Result<(), EngineError> {
         let mut slot = self.console.lock().await;
+        // **人は常に勝つ**（D29）。ここは 1 ミリも緩めない。
+        if actor != Actor::Human {
+            if let Some(holder) = slot.holder {
+                if holder != actor {
+                    drop(slot);
+                    self.diag.error(
+                        Stage::Exec,
+                        None,
+                        format!(
+                            "端末を止めさせませんでした（{}が止めようとし、{}が握っています）",
+                            who(actor),
+                            who(holder)
+                        ),
+                        "止められるのは、握っている側と人だけです（D29）",
+                    );
+                    return Err(held_by(holder));
+                }
+            }
+        }
         let console = slot.console.take();
         slot.holder = None;
         slot.connection = None;
@@ -496,9 +529,14 @@ impl Engine {
             console.close().await;
             // **段階は `Exec`。**端末は「繋がったあとのコマンド」で、到達ではありません
             // （他の端末の記録と並べて読めるように揃えました・Issue #10）。
-            self.diag.info(Stage::Exec, None, "端末を止めました");
+            self.diag.info(
+                Stage::Exec,
+                None,
+                format!("端末を止めました（{}）", who(actor)),
+            );
         }
         let _ = self.console_changed.send(None);
+        Ok(())
     }
 
     // --- 読み取り -----------------------------------------------------------

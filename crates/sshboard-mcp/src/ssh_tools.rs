@@ -737,7 +737,11 @@ impl SshboardMcp {
                        the person is not left locked out. Never fails."
     )]
     pub async fn console_stop(&self) -> Result<String, ErrorData> {
-        self.engine()?.console_stop().await;
+        // **自分が握っている分だけ**（D29）。人の端末は止められません。
+        self.engine()?
+            .console_stop(Actor::Ai)
+            .await
+            .map_err(refuse)?;
         Ok("console released".to_string())
     }
 }

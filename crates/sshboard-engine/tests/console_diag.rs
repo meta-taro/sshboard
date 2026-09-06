@@ -116,7 +116,7 @@ async fn the_console_record_never_carries_the_destination() {
     // Act
     let _ = engine.console_open(Actor::Human, 80, 24).await;
     let _ = engine.console_type(Actor::Human, b"whoami\n").await;
-    engine.console_stop().await;
+    let _ = engine.console_stop(Actor::Human).await;
 
     // Assert
     let written = rendered(&engine);

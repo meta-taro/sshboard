@@ -801,7 +801,7 @@ async fn stopping_the_console_always_works_and_frees_it() {
         .console_open(Actor::Ai, 80, 24)
         .await
         .expect("開けない");
-    engine.console_stop().await;
+    let _ = engine.console_stop(Actor::Human).await;
     assert_eq!(
         engine.console_holder().await,
         None,
@@ -814,7 +814,7 @@ async fn stopping_the_console_always_works_and_frees_it() {
         .await
         .expect("止めたあとに開けない");
     assert_eq!(engine.console_holder().await, Some(Actor::Human));
-    engine.console_stop().await;
+    let _ = engine.console_stop(Actor::Human).await;
 }
 
 #[tokio::test]
@@ -865,14 +865,14 @@ async fn a_console_says_which_connection_it_belongs_to() {
         "別の接続へ黙って乗り換えた: {refused:?}"
     );
 
-    engine.console_stop().await;
+    let _ = engine.console_stop(Actor::Human).await;
     // 止めたあとは、いまの宛先で開ける。
     engine
         .console_open(Actor::Human, 80, 24)
         .await
         .expect("止めたあとに開けない");
     assert_eq!(engine.console_connection().await.as_deref(), Some("second"));
-    engine.console_stop().await;
+    let _ = engine.console_stop(Actor::Human).await;
 }
 
 /// 移動しても宛先が落ちないこと（Issue #8）。
