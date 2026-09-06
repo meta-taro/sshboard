@@ -43,6 +43,12 @@ export const ko: Catalog = {
 	'console.held.none': '아무도 쥐고 있지 않습니다',
 	'console.held.me': '당신이 쥐고 있습니다',
 	'console.held.ai': 'AI가 쥐고 있습니다 — 입력이 잠겼습니다',
+	// **AI が端末を使いたいと言っている**（D42）。
+	// 出せない問いは、無いのと同じ。
+	'console.request.title': 'AI가 콘솔을 사용하려고 합니다',
+	'console.request.body': '허용하면 AI가 이 터미널에 입력할 수 있습니다. 입력 내용은 화면에 그대로 표시되며, 언제든지 다시 가져올 수 있습니다.',
+	'console.request.allow': '허용',
+	'console.request.deny': '거절',
 	'stream.stop': '멈추기',
 	'stream.path': '서버의 로그 경로',
 	'band.what': '사람과 AI의 조작이 한 줄씩 모두 여기에 나옵니다. AI가 무엇을 했는지 묻지 않고 볼 수 있는 곳입니다.',
@@ -243,6 +249,12 @@ export const zhCN: Catalog = {
 	'console.held.none': '无人占用',
 	'console.held.me': '你正在占用',
 	'console.held.ai': 'AI 正在占用 — 你的输入已锁定',
+	// **AI が端末を使いたいと言っている**（D42）。
+	// 出せない問いは、無いのと同じ。
+	'console.request.title': 'AI 想要使用终端',
+	'console.request.body': '允许后，AI 就能在这个终端里输入。它敲的每一个键都会显示在屏幕上，你随时可以收回。',
+	'console.request.allow': '允许',
+	'console.request.deny': '拒绝',
 	'stream.stop': '停止',
 	'stream.path': '服务器上的日志路径',
 	'band.what': '你和 AI 的每一次操作，各占一行，全部显示在这里。不用问也能看到 AI 做了什么。',
@@ -443,6 +455,12 @@ export const zhTW: Catalog = {
 	'console.held.none': '無人占用',
 	'console.held.me': '你正在占用',
 	'console.held.ai': 'AI 正在占用 — 你的輸入已鎖定',
+	// **AI が端末を使いたいと言っている**（D42）。
+	// 出せない問いは、無いのと同じ。
+	'console.request.title': 'AI 想要使用終端機',
+	'console.request.body': '允許後，AI 就能在這個終端機裡輸入。它敲的每一個鍵都會顯示在畫面上，你隨時可以收回。',
+	'console.request.allow': '允許',
+	'console.request.deny': '拒絕',
 	'stream.stop': '停止',
 	'stream.path': '伺服器上的日誌路徑',
 	'band.what': '你和 AI 的每一次操作，各佔一行，全部顯示在這裡。不用問也能看到 AI 做了什麼。',

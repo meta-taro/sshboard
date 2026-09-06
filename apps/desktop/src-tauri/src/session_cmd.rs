@@ -478,6 +478,42 @@ pub fn spawn_console_bridge(app: AppHandle, engine: Arc<Engine>) {
     });
 }
 
+// --- AI からの頼み（D42） ------------------------------------------------
+
+/// **AI が端末を使いたいと言っていること**を画面へ配るイベント。
+pub const CONSOLE_REQUEST_EVENT: &str = "console://request";
+
+/// 頼みの変化を画面へ押し出す。
+///
+/// **出せない問いは、無いのと同じ**です。実機の指摘（2026-09-06）:
+/// 「AI からのアクションが分からないので、アラートで人に気づかせないと」。
+pub fn spawn_console_request_bridge(app: AppHandle, engine: Arc<Engine>) {
+    tauri::async_runtime::spawn(async move {
+        let mut watching = engine.subscribe_console_request();
+        while watching.changed().await.is_ok() {
+            let asked_by = holder_name(*watching.borrow()).map(|name| name.to_string());
+            if let Err(error) = app.emit(CONSOLE_REQUEST_EVENT, asked_by) {
+                eprintln!("[sshboard] 端末の頼みを画面へ渡せません: {error}");
+            }
+        }
+    });
+}
+
+/// いま誰かが端末を使いたいと言っているか。**起動直後の取りこぼし対策。**
+#[tauri::command]
+pub async fn console_request(engine: State<'_, Arc<Engine>>) -> Result<Option<String>, String> {
+    Ok(holder_name(engine.console_request().await).map(|name| name.to_string()))
+}
+
+/// 人が答える（D42）。**答えられるのは人だけ。**
+#[tauri::command]
+pub async fn console_answer(allow: bool, engine: State<'_, Arc<Engine>>) -> Result<(), String> {
+    engine
+        .console_answer(Actor::Human, allow)
+        .await
+        .map_err(|error| error.to_string())
+}
+
 /// 端末を開いて握る。**人の操作。**
 #[tauri::command]
 pub async fn console_open(

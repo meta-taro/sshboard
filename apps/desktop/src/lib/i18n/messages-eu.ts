@@ -43,6 +43,12 @@ export const de: Catalog = {
 	'console.held.none': 'Niemand hält sie',
 	'console.held.me': 'Sie halten sie',
 	'console.held.ai': 'Die KI hält sie – Ihre Eingabe ist gesperrt',
+	// **AI が端末を使いたいと言っている**（D42）。
+	// 出せない問いは、無いのと同じ。
+	'console.request.title': 'Die KI möchte die Konsole benutzen',
+	'console.request.body': 'Wenn Sie es erlauben, kann die KI in dieses Terminal tippen. Jeder Tastendruck erscheint auf dem Bildschirm, und Sie können es jederzeit zurückholen.',
+	'console.request.allow': 'Erlauben',
+	'console.request.deny': 'Ablehnen',
 	'stream.stop': 'Stoppen',
 	'stream.path': 'Pfad zu einem Log auf dem Server',
 	'band.what': 'Jede Aktion – Ihre und die der KI – eine Zeile pro Aktion. So sehen Sie, was die KI getan hat, ohne zu fragen.',
@@ -242,6 +248,12 @@ export const fr: Catalog = {
 	'console.held.none': 'Personne ne le tient',
 	'console.held.me': 'Vous le tenez',
 	'console.held.ai': "L'IA le tient — votre saisie est verrouillée",
+	// **AI が端末を使いたいと言っている**（D42）。
+	// 出せない問いは、無いのと同じ。
+	'console.request.title': "L'IA souhaite utiliser la console",
+	'console.request.body': "Si vous l'autorisez, l'IA pourra taper dans ce terminal. Chaque frappe s'affiche à l'écran et vous pouvez reprendre la main à tout moment.",
+	'console.request.allow': 'Autoriser',
+	'console.request.deny': 'Refuser',
 	'stream.stop': 'Arrêter',
 	'stream.label': "Sortie (en couleur pour vous, en texte brut pour l'IA)",
 	'stream.path': "chemin d'un journal sur le serveur",
@@ -443,6 +455,12 @@ export const es: Catalog = {
 	'console.held.none': 'Nadie lo tiene',
 	'console.held.me': 'Usted lo tiene',
 	'console.held.ai': 'La IA lo tiene: su escritura está bloqueada',
+	// **AI が端末を使いたいと言っている**（D42）。
+	// 出せない問いは、無いのと同じ。
+	'console.request.title': 'La IA quiere usar la consola',
+	'console.request.body': 'Si lo permites, la IA podrá escribir en esta terminal. Cada pulsación aparece en pantalla y puedes recuperarla en cualquier momento.',
+	'console.request.allow': 'Permitir',
+	'console.request.deny': 'Rechazar',
 	'stream.stop': 'Detener',
 	'stream.path': 'ruta de un registro en el servidor',
 	'band.what': 'Cada operación, la suya y la de la IA, una línea cada una. Así ve lo que hizo la IA sin preguntar.',

@@ -105,6 +105,8 @@ pub fn run() {
             session_cmd::console_take,
             session_cmd::console_stop,
             session_cmd::console_holder,
+            session_cmd::console_request,
+            session_cmd::console_answer,
             session_cmd::diagnostics_recent,
             menu::set_menu_labels
         ])
@@ -161,6 +163,8 @@ pub fn run() {
             session_cmd::spawn_bridge(app.handle().clone(), Arc::clone(&engine));
             // **AI が握った瞬間に、人の側の入力が締まる**必要がある（D29）。
             session_cmd::spawn_console_bridge(app.handle().clone(), Arc::clone(&engine));
+            // **AI からの頼みを画面へ**（D42）。出せない問いは無いのと同じ。
+            session_cmd::spawn_console_request_bridge(app.handle().clone(), Arc::clone(&engine));
 
             mcp_host::spawn(
                 app.handle().clone(),

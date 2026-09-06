@@ -43,6 +43,12 @@ export const ptBR: Catalog = {
 	'console.held.none': 'Ninguém está com ele',
 	'console.held.me': 'Você está com ele',
 	'console.held.ai': 'A IA está com ele — sua digitação está bloqueada',
+	// **AI が端末を使いたいと言っている**（D42）。
+	// 出せない問いは、無いのと同じ。
+	'console.request.title': 'A IA quer usar o console',
+	'console.request.body': 'Se você permitir, a IA poderá digitar neste terminal. Cada tecla aparece na tela e você pode retomar a qualquer momento.',
+	'console.request.allow': 'Permitir',
+	'console.request.deny': 'Recusar',
 	'stream.stop': 'Parar',
 	'stream.path': 'caminho de um log no servidor',
 	'band.what': 'Cada operação, sua e da IA, uma linha por vez. É assim que você vê o que a IA fez sem precisar perguntar.',
@@ -243,6 +249,12 @@ export const ru: Catalog = {
 	'console.held.none': 'Никто не занимает',
 	'console.held.me': 'Занимаете вы',
 	'console.held.ai': 'Занимает ИИ — ваш ввод заблокирован',
+	// **AI が端末を使いたいと言っている**（D42）。
+	// 出せない問いは、無いのと同じ。
+	'console.request.title': 'ИИ хочет использовать консоль',
+	'console.request.body': 'Если разрешить, ИИ сможет печатать в этом терминале. Каждое нажатие видно на экране, и вы в любой момент можете забрать управление.',
+	'console.request.allow': 'Разрешить',
+	'console.request.deny': 'Отказать',
 	'stream.stop': 'Остановить',
 	'stream.path': 'путь к журналу на сервере',
 	'band.what': 'Каждое действие — ваше и ИИ — по одной строке. Так вы видите, что сделал ИИ, не спрашивая.',
@@ -442,6 +454,12 @@ export const it: Catalog = {
 	'console.held.none': 'Nessuno la tiene',
 	'console.held.me': 'La tieni tu',
 	'console.held.ai': "La tiene l'IA — il tuo input è bloccato",
+	// **AI が端末を使いたいと言っている**（D42）。
+	// 出せない問いは、無いのと同じ。
+	'console.request.title': "L'IA vuole usare la console",
+	'console.request.body': "Se lo consenti, l'IA potrà scrivere in questo terminale. Ogni tasto premuto appare sullo schermo e puoi riprenderne il controllo in qualsiasi momento.",
+	'console.request.allow': 'Consenti',
+	'console.request.deny': 'Rifiuta',
 	'stream.stop': 'Ferma',
 	'stream.label': "Output (a colori per te, testo semplice per l'IA)",
 	'stream.path': 'percorso di un log sul server',

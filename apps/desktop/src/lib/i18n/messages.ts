@@ -72,6 +72,12 @@ const en = {
 	'console.held.none': 'Nobody is holding it',
 	'console.held.me': 'You are holding it',
 	'console.held.ai': 'The AI is holding it — your typing is locked',
+	// **AI が端末を使いたいと言っている**（D42）。
+	// 出せない問いは、無いのと同じ。
+	'console.request.title': 'The AI wants to use the console',
+	'console.request.body': 'If you allow it, the AI can type into this terminal. You will see every keystroke on screen, and you can take it back at any time.',
+	'console.request.allow': 'Allow',
+	'console.request.deny': 'Refuse',
 	'stream.path': 'path to a log on the server',
 	'band.what': "Every operation, yours and the AI's, one line each. This is how you see what the AI did without being asked.",
 	'stream.start': 'Follow',
@@ -313,6 +319,12 @@ const ja: Catalog = {
 	'console.held.none': '誰も握っていません',
 	'console.held.me': 'あなたが握っています',
 	'console.held.ai': 'AI が握っています — あなたの入力は締まっています',
+	// **AI が端末を使いたいと言っている**（D42）。
+	// 出せない問いは、無いのと同じ。
+	'console.request.title': 'AI が端末を使いたいと言っています',
+	'console.request.body': '許可すると、AI はこの端末に打てるようになります。打った内容は画面にそのまま出ますし、あなたはいつでも取り返せます。',
+	'console.request.allow': '許可する',
+	'console.request.deny': '断る',
 	'stream.path': 'サーバー上のログのパス',
 	'band.what': '人と AI の操作が、1 行ずつ全部ここに出ます。AI が何をしたかを、聞かずに見られる場所です。',
 	'stream.start': '追う',

@@ -673,13 +673,17 @@ pub struct TypeIntoConsole {
 impl SshboardMcp {
     /// 端末を握る（D29）。
     #[tool(
-        description = "Take hold of the interactive console on the connected server and open a \
-                       shell. sshboard shares one console between you and the person at the \
-                       screen, and only one side may type at a time - while you hold it, their \
-                       typing is locked, and they see on screen that you are holding it. \
-                       They can take it back at any moment, and their Stop always works. If they \
-                       do, your next keystroke is refused: that is them intervening, not a fault. \
-                       Say so and ask, rather than trying to take it back."
+        description = "Ask the person at the screen for the interactive console on the connected \
+                       server. **They must allow it before you get it.** The first call refuses \
+                       with \"approval needed\" and puts the question in front of them; call it \
+                       again once they have allowed it. Do not treat that refusal as a fault, and \
+                       do not call it in a loop - one request is already showing on their screen. \
+                       sshboard shares one console between you and them, and only one side may \
+                       type at a time - while you hold it, their typing is locked, and they see \
+                       on screen that you are holding it. They can take it back at any moment, \
+                       and their Stop always works. If they do, your next keystroke is refused: \
+                       that is them intervening, not a fault. Say so and ask, rather than trying \
+                       to take it back."
     )]
     pub async fn console_open(
         &self,

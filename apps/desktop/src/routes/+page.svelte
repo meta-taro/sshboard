@@ -5,6 +5,7 @@
 
 	import { appendLine, type BandLine } from '$lib/band';
 	import ConnectionManager from '$lib/components/ConnectionManager.svelte';
+	import ConsoleRequestDialog from '$lib/components/ConsoleRequestDialog.svelte';
 	import ConnectPanel from '$lib/components/ConnectPanel.svelte';
 	import FileBrowser from '$lib/components/FileBrowser.svelte';
 	import Icon from '$lib/components/Icon.svelte';
@@ -83,6 +84,23 @@
 	let holder = $state<'human' | 'ai' | null>(null);
 	/** **どの接続の端末か。**タブを移しても端末は付いてこない（D25）。 */
 	let consoleOn = $state<string | null>(null);
+	/**
+	 * **AI が端末を使いたいと言っている**（D42）。`'ai'` なら問いを出します。
+	 *
+	 * 実機の指摘（2026-09-06）— 「AI からのアクションが分からない」。
+	 * 気づかせる口がここです。
+	 */
+	let consoleAsk = $state<string | null>(null);
+
+	async function answerConsole(allow: boolean) {
+		// **先に画面から消す。**押したのに残っていると、二重に押します。
+		consoleAsk = null;
+		try {
+			await invoke('console_answer', { allow });
+		} catch (error: unknown) {
+			failure = String(error);
+		}
+	}
 	const iHold = $derived(holder === 'human');
 	let diag = $state<DiagEvent[]>([]);
 
@@ -468,6 +486,22 @@
 			});
 
 		// **AI が握った瞬間に、人の側の入力が締まる**（D29）。
+		// **AI からの頼みを受ける**（D42）。**起動直後の取りこぼしも拾う。**
+		invoke<string | null>('console_request')
+			.then((asked) => {
+				consoleAsk = asked;
+			})
+			.catch(() => {
+				/* 取れなくても画面は出す */
+			});
+		listen<string | null>('console://request', (event) => {
+			consoleAsk = event.payload;
+		})
+			.then((stop) => stops.push(stop))
+			.catch(() => {
+				/* 購読できないだけ。**画面は出す。** */
+			});
+
 		listen<ConsoleState>('console://holder', (event) => {
 			holder = event.payload.holder;
 			consoleOn = event.payload.connection;
@@ -940,6 +974,18 @@
 				</div>
 			{/if}
 		</aside>
+	{/if}
+
+	<!--
+		**AI が端末を使いたいと言っている**（D42）。
+		人が答えるまで、AI は握れません。**部品を作って繋がない、をやらない**
+		（Issue #10 がまさにそれでした）。
+	-->
+	{#if consoleAsk === 'ai'}
+		<ConsoleRequestDialog
+			onAllow={() => answerConsole(true)}
+			onDeny={() => answerConsole(false)}
+		/>
 	{/if}
 
 	{#if aboutOpen}
