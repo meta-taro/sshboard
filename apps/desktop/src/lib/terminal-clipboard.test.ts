@@ -12,7 +12,9 @@ import {
 	detectPlatform,
 	isCopyShortcut,
 	isPasteShortcut,
+	type ClipboardHost,
 	type ClipboardTerminal,
+	type ContextMenuish,
 	type ShortcutEvent
 } from './terminal-clipboard';
 
@@ -107,6 +109,82 @@ function fakeTerminal(selection = ''): ClipboardTerminal & {
 		pasted
 	};
 }
+
+/** 右クリックを拾う相手のふり。**画面を開かずに確かめる。** */
+function fakeHost(): ClipboardHost & { rightClick: () => void; defaultPrevented: boolean } {
+	let listener: ((event: ContextMenuish) => void) | null = null;
+	const state = {
+		addEventListener: (_type: 'contextmenu', next: (event: ContextMenuish) => void) => {
+			listener = next;
+		},
+		removeEventListener: () => {
+			listener = null;
+		},
+		defaultPrevented: false,
+		rightClick: () => {
+			listener?.({
+				preventDefault: () => {
+					state.defaultPrevented = true;
+				}
+			});
+		}
+	};
+	return state;
+}
+
+describe('右クリックで貼り付け', () => {
+	test('pastes what is on the clipboard when the terminal is right-clicked', async () => {
+		// **実機の指摘**（2026-09-06）— 「右クリックで貼り付けできない」。
+		// PuTTY / TeraTerm がこの形なので、手が覚えている操作です。
+		const terminal = fakeTerminal('');
+		const host = fakeHost();
+		const ports = {
+			writeText: vi.fn(async () => {}),
+			readText: vi.fn(async () => '貼り付けたい文字列'),
+			onError: vi.fn()
+		};
+
+		attachClipboard(terminal, ports, 'other', { host });
+		host.rightClick();
+		await vi.waitFor(() => expect(terminal.pasted).toEqual(['貼り付けたい文字列']));
+
+		// **OS のメニューを出さない。**出すと貼り付けたい人が二度手間になります。
+		expect(host.defaultPrevented).toBe(true);
+	});
+
+	test('leaves the read-only pane alone', async () => {
+		// **見るだけの面から文字が出たら、画面が嘘をつきます。**
+		const terminal = fakeTerminal('');
+		const host = fakeHost();
+		const ports = {
+			writeText: vi.fn(async () => {}),
+			readText: vi.fn(async () => 'x'),
+			onError: vi.fn()
+		};
+
+		attachClipboard(terminal, ports, 'other', { host, allowPaste: false });
+		host.rightClick();
+
+		expect(terminal.pasted).toEqual([]);
+		expect(ports.readText).not.toHaveBeenCalled();
+	});
+
+	test('lets go of the listener when detached', () => {
+		const terminal = fakeTerminal('');
+		const host = fakeHost();
+		const ports = {
+			writeText: vi.fn(async () => {}),
+			readText: vi.fn(async () => 'x'),
+			onError: vi.fn()
+		};
+
+		const detach = attachClipboard(terminal, ports, 'other', { host });
+		detach();
+		host.rightClick();
+
+		expect(terminal.pasted).toEqual([]);
+	});
+});
 
 describe('attachClipboard', () => {
 	test('copies what the mouse selected, without any key press', async () => {

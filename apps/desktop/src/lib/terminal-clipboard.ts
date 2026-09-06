@@ -36,6 +36,22 @@ export interface ClipboardTerminal {
 	paste(text: string): void;
 }
 
+/**
+ * 右クリックを拾う相手。**xterm が描いた要素**です。
+ *
+ * `HTMLElement` そのものを要求しないのは、**画面を開かずに確かめるため**です
+ * （このファイルのテストは jsdom を使っていません）。
+ */
+export interface ClipboardHost {
+	addEventListener(type: 'contextmenu', listener: (event: ContextMenuish) => void): void;
+	removeEventListener(type: 'contextmenu', listener: (event: ContextMenuish) => void): void;
+}
+
+/** 右クリックの最低限。 */
+export interface ContextMenuish {
+	preventDefault(): void;
+}
+
 /** クリップボードの口。**失敗を握り潰さないため `onError` を必ず持ちます。** */
 export interface ClipboardPorts {
 	readonly writeText: (text: string) => Promise<void>;
@@ -78,6 +94,8 @@ export function isPasteShortcut(event: ShortcutEvent): boolean {
 
 /** 面ごとの違い。**出力を見るだけの面には貼り付けを付けません。** */
 export interface ClipboardOptions {
+	/** 右クリックを拾う相手。**渡さなければ、右クリックの口は付きません。** */
+	host?: ClipboardHost;
 	/** 打てない面（`disableStdin`）では `false`。**既定は打てる面。** */
 	readonly allowPaste?: boolean;
 	/**
@@ -99,6 +117,29 @@ export function attachClipboard(
 	options: ClipboardOptions = {}
 ): () => void {
 	const allowPaste = options.allowPaste ?? true;
+
+	// **右クリックで貼り付け**（実機の指摘・2026-09-06）。
+	//
+	// > ターミナルは、なぞっただけでコピーになったり、右クリックで貼り付け
+	// > できたりしますが、これはできないです
+	//
+	// **そのとおりでした。**`contextmenu` を拾う所がどこにもありませんでした。
+	// PuTTY / TeraTerm がこの形なので、手が覚えている操作です。
+	// **貼り付けを許していない面（*出力*）では付けません** — 見るだけの面から
+	// 文字が出ると、画面が嘘をつきます。
+	const onContextMenu = (event: ContextMenuish) => {
+		// **OS のメニューを出さない。**出すと、貼り付けたい人が二度手間になります。
+		event.preventDefault();
+		ports
+			.readText()
+			.then((text) => {
+				if (text) terminal.paste(text);
+			})
+			.catch(ports.onError);
+	};
+	if (allowPaste && options.host) {
+		options.host.addEventListener('contextmenu', onContextMenu);
+	}
 	// **なぞり終えた時点でコピー。**キーを押させない。
 	const selection = terminal.onSelectionChange(() => {
 		const selected = terminal.getSelection();
@@ -133,7 +174,12 @@ export function attachClipboard(
 		return true;
 	});
 
-	return () => selection.dispose();
+	return () => {
+		selection.dispose();
+		if (allowPaste && options.host) {
+			options.host.removeEventListener('contextmenu', onContextMenu);
+		}
+	};
 }
 
 /**

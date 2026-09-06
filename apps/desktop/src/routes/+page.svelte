@@ -260,7 +260,10 @@
 			});
 			detachConsole.push(
 				attachClipboard(consoleTerm, clipboard, platform, {
-					handledElsewhere: findFrom('console')
+					handledElsewhere: findFrom('console'),
+					// **右クリックで貼り付け**（実機の指摘・2026-09-06）。
+					// PuTTY / TeraTerm がこの形で、手が覚えている操作です。
+					host
 				})
 			);
 		} else if (!host.contains(consoleTerm.element ?? null)) {
@@ -296,6 +299,32 @@
 			terminal.dispose();
 			terminal = undefined;
 		}
+	});
+
+	/**
+	 * **端末の面を開いたら、端末も開く**（実機の指摘・2026-09-06）。
+	 *
+	 * > 接続のあと［端末を開く］を押さんといけないのはなぜ？
+	 *
+	 * **押させる必然性は D29 のどこにも書いていませんでした。**
+	 * 「開く → 握る → 打つ」と作って、最初の一歩を誰も疑わなかっただけです。
+	 *
+	 * **AI が握っているときは奪いません**（そこは［取り返す］のまま）。
+	 * 一度失敗したら繰り返しません — **押せない釦を自動で押し続けない。**
+	 */
+	let autoOpenTried = $state(false);
+	$effect(() => {
+		if (view !== 'console') return;
+		if (!consoleTerm || session.open === null) return;
+		if (holder !== null || autoOpenTried || session.busy) return;
+		autoOpenTried = true;
+		void openConsole();
+	});
+
+	// **繋ぎ直したら、また自動で開ける。**1 回きりにすると、
+	// 切って繋いだ人が押す所を探すことになります。
+	$effect(() => {
+		if (session.open === null) autoOpenTried = false;
 	});
 
 	$effect(() => {
