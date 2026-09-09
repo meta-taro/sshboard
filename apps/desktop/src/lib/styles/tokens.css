@@ -108,8 +108,16 @@
 	--mark-pink: #e83a6d;
 
 	/* 端末は暗いまま。ANSI の既定色は暗い背景に載る前提で作られている。 */
-	--terminal-bg: #0d1013;
-	--terminal-fg: #d7dae0;
+	/*
+	 * **端末の色はここに置きません**（Issue #14 の周辺で気づいた分）。
+	 *
+	 * 以前は `--terminal-bg` / `--terminal-fg` をここに置いていましたが、
+	 * **`--terminal-fg` はどこからも読まれず**、xterm は別の値を直書きしていて、
+	 * **容器と端末で背景が違って**いました。**出どころを 2 つ持つと、片方だけ直ります。**
+	 *
+	 * いまは `$lib/terminal-theme.ts` の `TERMINAL_PALETTE` が唯一の出どころです。
+	 * **ANSI の 16 色を含めて、読めるかどうかがテストで見張られています。**
+	 */
 }
 
 @media (prefers-color-scheme: dark) {

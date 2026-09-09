@@ -1993,7 +1993,7 @@
 	}
 
 	.terminal-core {
-		background: var(--terminal-bg);
+		background: var(--terminal-bg, #0d1013);
 		overflow: hidden;
 		padding: 6px 8px;
 	}

@@ -13,12 +13,18 @@
 	import { i18n } from '$lib/i18n/i18n.svelte';
 	import { redaction } from '$lib/redaction/redaction.svelte';
 	import { session } from '$lib/session.svelte';
+	import { TERMINAL_PALETTE } from '$lib/terminal-theme';
 	import { textSize } from '$lib/text-size/text-size.svelte';
 	import { theme } from '$lib/theme/theme.svelte';
 
 	let { children } = $props();
 
 	onMount(() => {
+		// **端末の背景を、色の出どころから CSS へ渡す**（Issue #14 の周辺）。
+		// 以前は `tokens.css` と xterm の両方に色があり、**別々の値**でした。
+		// **1 か所から配れば、片方だけ直る事故が起きません。**
+		document.documentElement.style.setProperty('--terminal-bg', TERMINAL_PALETTE.background);
+
 		theme.init();
 		// **`app.html` が既に当てている。**ここは状態を読み戻すためで、
 		// 片方だけにすると「保存はされるが次の起動で標準に戻る」になる。

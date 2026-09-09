@@ -9,12 +9,7 @@ import { SearchAddon } from '@xterm/addon-search';
 import { Terminal } from '@xterm/xterm';
 
 import { createSearch, type TerminalSearch } from './terminal-search';
-
-/** Phase 0 の確認用。配色・字送りは DESIGN.md で人が決める。 */
-const PLACEHOLDER_THEME = {
-	background: '#16181d',
-	foreground: '#d7dae0'
-};
+import { terminalTheme } from './terminal-theme';
 
 /**
  * 端末を作る。`fontSize` は**画面側の文字サイズと揃えた px**（`text-size.svelte.ts`）。
@@ -36,7 +31,10 @@ export function createTerminal(host: HTMLElement, fontSize = 12, typable = false
 		fontFamily:
 			'ui-monospace, SFMono-Regular, Menlo, Consolas, "Osaka-Mono", "BIZ UDGothic", "MS Gothic", "Noto Sans Mono CJK JP", monospace',
 		scrollback: 5000,
-		theme: PLACEHOLDER_THEME
+		// **配色は 1 か所から**（`terminal-theme.ts`）。
+		// 以前はここに 2 色を直書きしており、`tokens.css` の `--terminal-fg` は
+		// **どこからも読まれず**、容器と端末で背景が違っていました。
+		theme: terminalTheme()
 	});
 	terminal.open(host);
 	return terminal;
