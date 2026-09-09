@@ -514,6 +514,39 @@ pub async fn console_answer(allow: bool, engine: State<'_, Arc<Engine>>) -> Resu
         .map_err(|error| error.to_string())
 }
 
+// --- 画面を「こちらを見て」と動かす（D44 / Issue #15） ----------------------
+
+/// 見てほしい画面を配るイベント。
+pub const SHOW_VIEW_EVENT: &str = "view://show";
+
+/// MCP から「こちらを見てください」を受ける口。
+///
+/// **届けるだけ**です。実際に切り替えるかは画面が決めます —— 人が問いに答えている
+/// 最中・入力欄に打っている最中・直前に自分で切り替えた直後は動きません
+/// （`view-request.ts` の `canFollow`）。**AI に画面を奪わせません。**
+pub struct TauriShowView {
+    app: AppHandle,
+}
+
+impl TauriShowView {
+    pub fn new(app: AppHandle) -> std::sync::Arc<Self> {
+        std::sync::Arc::new(Self { app })
+    }
+}
+
+impl sshboard_mcp::ShowView for TauriShowView {
+    fn show<'a>(
+        &'a self,
+        view: &'a str,
+    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<(), String>> + Send + 'a>> {
+        Box::pin(async move {
+            self.app
+                .emit(SHOW_VIEW_EVENT, view.to_owned())
+                .map_err(|error| format!("画面へ渡せません: {error}"))
+        })
+    }
+}
+
 // --- パスフレーズの頼み（Issue #13） --------------------------------------
 
 /// **どの接続がパスフレーズ待ちか**を画面へ配るイベント。

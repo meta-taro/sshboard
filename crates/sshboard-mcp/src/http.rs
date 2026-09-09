@@ -83,6 +83,8 @@ pub struct ServeParts {
     pub engine: Option<Arc<Engine>>,
     /// 画面を撮る口（D26）。**無ければ `capture_window` が正直に断るだけ。**
     pub capture: Option<Arc<dyn crate::WindowCapture>>,
+    /// 人の画面を動かす口（D44）。**無ければ `show_view` が正直に断るだけ。**
+    pub view: Option<Arc<dyn crate::ShowView>>,
     /// 合言葉（D23）。省略すると起動ごとに作る。
     pub token: Option<String>,
     pub port: u16,
@@ -96,6 +98,7 @@ pub async fn serve(parts: ServeParts) -> std::io::Result<McpEndpoint> {
         connections_watch,
         engine,
         capture,
+        view,
         token,
         port,
         ack_timeout,
@@ -121,6 +124,9 @@ pub async fn serve(parts: ServeParts) -> std::io::Result<McpEndpoint> {
                 }
                 if let Some(capture) = capture.clone() {
                     server = server.with_capture(capture);
+                }
+                if let Some(view) = view.clone() {
+                    server = server.with_view(view);
                 }
                 Ok(server)
             },

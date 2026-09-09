@@ -6,6 +6,7 @@ mod capture;
 mod http;
 mod server;
 mod ssh_tools;
+mod view;
 
 pub use capture::{WindowCapture, WindowShot};
 pub use http::{new_token, serve, McpEndpoint, ServeParts, MCP_PATH};
@@ -16,3 +17,4 @@ pub use ssh_tools::{
     ConnectionId, HowMany, MaybeConnectionId, OpenConsole, ReadLog, ReadonlyCommandId, RemotePath,
     Search, ServiceName, TypeIntoConsole, UploadFile, WriteFile,
 };
+pub use view::{ShowView, VIEWS};

@@ -45,6 +45,9 @@ pub struct SshboardMcp {
     /// 画面を撮る口（D26）。**無ければ「画面がありません」と正直に断る。**
     /// ヘッドレスのテストは、これが無いまま走る。
     capture: Option<Arc<dyn crate::capture::WindowCapture>>,
+    /// 人の画面を動かす口（D44）。**無ければ「画面がありません」と正直に断る。**
+    /// ヘッドレスのテストは、これが無いまま走る。
+    view: Option<Arc<dyn crate::view::ShowView>>,
     ack_timeout: Duration,
     tool_router: ToolRouter<Self>,
 }
@@ -62,6 +65,7 @@ impl SshboardMcp {
             connections_watch: None,
             engine: None,
             capture: None,
+            view: None,
             ack_timeout,
             // 帯・出力・接続一覧の口と、サーバーへ触る口。**同じ 1 つのサーバーに載る。**
             tool_router: Self::tool_router()
@@ -99,6 +103,17 @@ impl SshboardMcp {
     pub fn with_capture(mut self, capture: Arc<dyn crate::capture::WindowCapture>) -> Self {
         self.capture = Some(capture);
         self
+    }
+
+    /// 人の画面を動かす口を差す（D44）。**無ければ断るだけ。**
+    pub fn with_view(mut self, view: Arc<dyn crate::view::ShowView>) -> Self {
+        self.view = Some(view);
+        self
+    }
+
+    /// 画面を動かす口。**無ければ、そう言う。**
+    pub(crate) fn viewer(&self) -> Option<&Arc<dyn crate::view::ShowView>> {
+        self.view.as_ref()
     }
 
     pub fn with_connections(mut self, path: PathBuf) -> Self {

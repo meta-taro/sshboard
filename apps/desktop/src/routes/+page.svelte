@@ -24,6 +24,8 @@
 	import { theme, type ThemeMode } from '$lib/theme/theme.svelte';
 	import { attachFit, attachSearch, createTerminal, writeChunk } from '$lib/terminal.svelte';
 	import { emptyBacklog, remember, replay, type Backlog } from '$lib/stream-backlog';
+	import { applyEdit, editIntent, type EditableField } from '$lib/edit-keys';
+	import { canFollow, isView, type View } from '$lib/view-request';
 	import { attachClipboard, browserClipboard, detectPlatform } from '$lib/terminal-clipboard';
 	import { isFindShortcut, type TerminalSearch } from '$lib/terminal-search';
 	import '@xterm/xterm/css/xterm.css';
@@ -75,6 +77,20 @@
 	let streaming = $state(false);
 	/** **既定は接続。**繋がないとファイルも端末も空です。 */
 	let view = $state<'connections' | 'files' | 'console' | 'band' | 'diag'>('connections');
+
+	/**
+	 * **人が自分でタブを切り替えた時刻**（D44）。
+	 *
+	 * AI に画面を奪わせないための材料です。**選んだ端から戻されるのは、
+	 * 奪われたのと同じ**なので、しばらくは頼まれても動きません。
+	 */
+	let humanSwitchedAt = $state(0);
+
+	/** 人がタブを押した。**AI の頼みより、こちらが優先。** */
+	function humanShows(next: typeof view) {
+		humanSwitchedAt = Date.now();
+		view = next;
+	}
 
 	// --- 端末（D29）------------------------------------------------------------
 	// **同時に触れるのは 1 人。**AI が握っている間、人の入力は締まる。
@@ -396,6 +412,45 @@
 	 */
 	function onKeydown(event: KeyboardEvent) {
 		if (!(event.metaKey || event.ctrlKey)) return;
+
+		/*
+		 * **入力欄の切り取り・コピー・貼り付け・全選択を、自前で受ける**（実機の指摘）。
+		 *
+		 * > パスを win で Ctrl+V で打ててなかったように思う
+		 *
+		 * 自前タイトルバー（D17）で `decorations: false` にすると、
+		 * **Windows ではメニューバーごと消えます。**メニューに載せていた
+		 * 貼り付けの割り当ても一緒に消えるので、**Ctrl+V が効きませんでした。**
+		 * D17 の記録には「WebView が標準で持っている」と書きましたが、
+		 * **実機で確かめずに書いた一文**でした。
+		 *
+		 * **パスフレーズが入れられない ＝ 繋げない**ので、ここは一番手前の詰まりです。
+		 * **端末の上では手を出しません**（素の Ctrl+C は「走っているものを止める」）。
+		 */
+		const target = event.target;
+		const inField =
+			target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement;
+		const intent = editIntent(
+			{
+				key: event.key,
+				ctrlKey: event.ctrlKey,
+				metaKey: event.metaKey,
+				shiftKey: event.shiftKey,
+				inField
+			},
+			platform
+		);
+		if (intent && inField) {
+			event.preventDefault();
+			void applyEdit(intent, target as unknown as EditableField, clipboard).catch(
+				(error: unknown) => {
+					// **握り潰さない。**押したのに何も起きない、を作らない。
+					failure = String(error);
+				}
+			);
+			return;
+		}
+
 		// `+` は Shift 付きだったり `=` だったりする。**両方受ける。**
 		if (event.key === '+' || event.key === '=' || event.key === ';') {
 			textSize.step(1);
@@ -584,6 +639,25 @@
 			.catch(() => {
 				/* 取れなくても画面は出す */
 			});
+		// **AI が「こちらを見てください」と言ってきた**（D44 / Issue #15）。
+		// **奪わせません。**人が何かしている最中は、頼まれても動きません。
+		listen<string>('view://show', (event) => {
+			const wanted = event.payload;
+			if (!isView(wanted)) return;
+			// **問いが出ている間は動かさない。**動かすと、人は何に答えたのか分からなくなります。
+			const askOpen = passphraseFor !== null || consoleAsk === 'ai' || aboutOpen || showUpdate;
+			const active = document.activeElement;
+			const focusInField =
+				active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement;
+			if (!canFollow({ askOpen, focusInField, sinceHumanSwitchMs: Date.now() - humanSwitchedAt }))
+				return;
+			view = wanted as View;
+		})
+			.then((stop) => stops.push(stop))
+			.catch(() => {
+				/* 購読できないだけ。**画面は出す。** */
+			});
+
 		listen<string | null>('passphrase://request', (event) => {
 			passphraseFor = event.payload;
 		})
@@ -751,24 +825,24 @@
 			<button
 				type="button"
 				class:active={view === 'connections'}
-				onclick={() => (view = 'connections')}
+				onclick={() => humanShows('connections')}
 			>
 				<Icon name="server" />
 				{i18n.t('tab.connections')}
 			</button>
-			<button type="button" class:active={view === 'files'} onclick={() => (view = 'files')}>
+			<button type="button" class:active={view === 'files'} onclick={() => humanShows('files')}>
 				<Icon name="folder" />
 				{i18n.t('tab.files')}
 			</button>
-			<button type="button" class:active={view === 'console'} onclick={() => (view = 'console')}>
+			<button type="button" class:active={view === 'console'} onclick={() => humanShows('console')}>
 				<Icon name="terminal" />
 				{i18n.t('tab.console')}
 			</button>
-			<button type="button" class:active={view === 'band'} onclick={() => (view = 'band')}>
+			<button type="button" class:active={view === 'band'} onclick={() => humanShows('band')}>
 				<Icon name="activity" />
 				{i18n.t('tab.band')}
 			</button>
-			<button type="button" class:active={view === 'diag'} onclick={() => (view = 'diag')}>
+			<button type="button" class:active={view === 'diag'} onclick={() => humanShows('diag')}>
 				<Icon name="warning" />
 				{i18n.t('tab.diag')}
 			</button>

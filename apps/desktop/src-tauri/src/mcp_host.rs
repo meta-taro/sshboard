@@ -173,6 +173,8 @@ pub fn spawn(
         // **画面を撮る口を差す**（D26）。AI が自分で崩れを見つけられるように。
         // 伏せるのは画面側で、**伏せ終わってから撮る**（capture.rs）。
         let capture = crate::capture::TauriCapture::new(app.clone());
+        // **AI が「こちらを見て」と言える口**（D44）。奪えはしません。
+        let view = crate::session_cmd::TauriShowView::new(app.clone());
 
         let port = port_from_env();
 
@@ -181,6 +183,7 @@ pub fn spawn(
             stream,
             connections_watch,
             engine: Some(engine),
+            view: Some(view),
             capture: Some(capture),
             token: resolve_token(),
             port,

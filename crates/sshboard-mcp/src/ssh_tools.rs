@@ -97,6 +97,52 @@ impl SshboardMcp {
         render(&opened)
     }
 
+    /// 人の画面を「こちらを見て」と動かす（D44）。**サーバーへは触りません。**
+    #[tool(
+        description = "Ask the person at the screen to look at one of sshboard's tabs: \
+                       connections, files, console, band or diag. **This only asks.** \
+                       It grants you nothing and runs nothing, and the screen refuses to move \
+                       while they are answering a question, typing in a field, or have just \
+                       switched tabs themselves - that is them working, not a fault. \
+                       Use it after opening the console so they can watch what you type, \
+                       instead of writing 'please open the terminal tab' in chat."
+    )]
+    pub async fn show_view(
+        &self,
+        Parameters(request): Parameters<ShowViewRequest>,
+    ) -> Result<String, ErrorData> {
+        let wanted = request.view.trim().to_lowercase();
+        if !crate::view::VIEWS.contains(&wanted.as_str()) {
+            return Err(ErrorData::invalid_params(
+                format!(
+                    "{wanted} という画面はありません。使えるのは {} です",
+                    crate::view::VIEWS.join(" / ")
+                ),
+                None,
+            ));
+        }
+
+        let Some(viewer) = self.viewer() else {
+            return Err(ErrorData::internal_error(
+                "画面がありません（ヘッドレスで動いています）".to_string(),
+                None,
+            ));
+        };
+
+        // **帯に載せる**（D44）。載らないと、人は自分が触っていないのに
+        // **画面が動いた理由を知れません。**
+        self.show(&format!("show_view {wanted}")).await?;
+
+        viewer
+            .show(&wanted)
+            .await
+            .map_err(|why| ErrorData::internal_error(why, None))?;
+        Ok(format!(
+            "asked the person to look at `{wanted}`. \
+             They may be busy - the screen does not move while they are working."
+        ))
+    }
+
     /// いま何が開いているか。**サーバーへは触りません。**
     #[tool(
         description = "List every connection sshboard currently holds open, where the AI may write on each, and which one file and command operations currently go to. Touches no remote server."
@@ -650,6 +696,14 @@ pub struct WriteFile {
 
 /// 一度に打てる上限。**貼り付け事故を小さくする。**
 const MAX_TYPED: usize = 4096;
+
+/// `show_view` の引数。**画面のタブ名だけ**（接続先も何も通りません）。
+#[derive(Debug, Deserialize, rmcp::schemars::JsonSchema)]
+#[schemars(crate = "rmcp::schemars")]
+pub struct ShowViewRequest {
+    /// `connections` / `files` / `console` / `band` / `diag` のどれか。
+    pub view: String,
+}
 
 /// `console_open` の引数。
 #[derive(Debug, Deserialize, rmcp::schemars::JsonSchema)]

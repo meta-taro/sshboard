@@ -146,6 +146,7 @@ async fn harness(band: Band, write_roots: &[&str]) -> Harness {
         stream: Arc::new(OutputStream::new()),
         connections_watch: Arc::new(ConnectionsWatch::new()),
         engine: Some(engine),
+        view: None,
         capture: // 画面は無い（ヘッドレス）。**`capture_window` は正直に断るだけ。**
         None,
         token: Some(TOKEN.to_string()),
