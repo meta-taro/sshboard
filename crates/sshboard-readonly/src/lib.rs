@@ -22,8 +22,10 @@
 
 mod allowlist;
 mod command;
+mod operations;
 mod refusals;
 
 pub use allowlist::{Allowlist, AllowlistError, CURRENT_VERSION};
 pub use command::ReadonlyCommand;
+pub use operations::{Operation, Operations, OperationsError};
 pub use refusals::{Refusals, MAX_ID_CHARS};
