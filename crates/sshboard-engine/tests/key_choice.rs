@@ -153,3 +153,130 @@ async fn a_windows_style_path_does_not_corrupt_the_connection_list() {
         "接続一覧が壊れている（パスの `\\` が TOML を壊した）: {shown}"
     );
 }
+
+// --- 繋ぐ前に落ちたことが記録に残るか（Issue #13） ------------------------
+//
+// 実機の指摘（2026-09-09・実作業の最中）:
+//
+// > `diagnostics(limit=20)` を呼びました。`{"events":[],"kept":0}` **空です。**
+// > `diagnostics` は AI が自分で状況を掴むための唯一の窓口ですが、
+// > そこが空だと、AI は人に画面を見てもらうしかありません。
+//
+// **そのとおりでした。**`auth_for` には `self.diag` の呼び出しが 1 つも
+// ありませんでした。しかも `connect` はこの判定を **SSH を張るより前**に
+// 行うので、`reach` / `host-key` / `auth` の行も 1 本も出ません。
+//
+// **書く場所が無かった**というのが正確な言い方です。
+
+/// 記録の全文。**失敗メッセージにそのまま出す。**
+fn rendered(engine: &Engine) -> String {
+    engine
+        .diagnostics()
+        .recent(50)
+        .iter()
+        .map(|event| event.render())
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+#[tokio::test]
+async fn stopping_for_a_passphrase_is_written_down() {
+    // Arrange
+    let dir = tempfile::tempdir().expect("一時ディレクトリ");
+    let key = key_file(
+        &dir,
+        "needs-a-passphrase.ppk",
+        "PuTTY-User-Key-File-3: ssh-ed25519\r\nEncryption: aes256-cbc\r\n",
+    );
+    let engine = engine_at(registry_with_key(&dir, &key));
+
+    // Act
+    let refused = engine.connect(Actor::Ai, "pending", None).await;
+
+    // Assert
+    assert!(
+        matches!(refused, Err(EngineError::PassphraseNeeded { .. })),
+        "断り方が違う: {refused:?}"
+    );
+
+    let events = engine.diagnostics().recent(50);
+    assert!(
+        !events.is_empty(),
+        "**繋ぐ前に落ちたのに、記録が 1 行も無い。**\
+         `diagnostics` は「まずこれを呼べ」と説明しているのに空を返す"
+    );
+
+    let stopped = events
+        .iter()
+        .find(|event| event.level == sshboard_diag::Level::Error)
+        .unwrap_or_else(|| panic!("失敗として残っていない:\n{}", rendered(&engine)));
+
+    // **どの段階まで進んだかが分かること**（ご要望どおり）。
+    // 鍵は読めています — 止まったのはパスフレーズ待ちです。
+    assert_eq!(stopped.stage, sshboard_diag::Stage::Auth);
+    assert_eq!(stopped.connection.as_deref(), Some("pending"));
+    // **「駄目でした」で終わらせない**（product-baseline §17）。
+    assert!(
+        stopped.hint.is_some(),
+        "次の一手が付いていない:\n{}",
+        rendered(&engine)
+    );
+}
+
+#[tokio::test]
+async fn an_unusable_key_is_written_down_too() {
+    // 公開鍵を指した、という一番多い取り違え。**これも残らなければ追えません。**
+    // Arrange
+    let dir = tempfile::tempdir().expect("一時ディレクトリ");
+    let key = key_file(
+        &dir,
+        "id_ed25519.pub",
+        "ssh-ed25519 AAAAC3Nz nobody@example\n",
+    );
+    let engine = engine_at(registry_with_key(&dir, &key));
+
+    // Act
+    let refused = engine.connect(Actor::Ai, "pending", None).await;
+
+    // Assert
+    assert!(
+        matches!(refused, Err(EngineError::UnusableKey { .. })),
+        "断り方が違う: {refused:?}"
+    );
+    assert!(
+        engine
+            .diagnostics()
+            .recent(50)
+            .iter()
+            .any(|event| event.level == sshboard_diag::Level::Error),
+        "使えない鍵を断った記録が無い:\n{}",
+        rendered(&engine)
+    );
+}
+
+#[tokio::test]
+async fn the_record_never_carries_the_host_or_the_user() {
+    // **識別子までは出してよい。ホスト・利用者・パスは出さない**（PRD §8）。
+    // Issue #13 の補足で、この線引きを確かめられた所です。
+    // Arrange
+    let dir = tempfile::tempdir().expect("一時ディレクトリ");
+    let key = key_file(
+        &dir,
+        "needs-a-passphrase.ppk",
+        "PuTTY-User-Key-File-3: ssh-ed25519\r\nEncryption: aes256-cbc\r\n",
+    );
+    let engine = engine_at(registry_with_key(&dir, &key));
+
+    // Act
+    let _ = engine.connect(Actor::Ai, "pending", None).await;
+
+    // Assert
+    let written = rendered(&engine);
+    assert!(written.contains("pending"), "識別子まで消してしまっている");
+    for leak in ["127.0.0.1", "nobody", "65000"] {
+        assert!(
+            !written.contains(leak),
+            "記録に接続先が入っている（{leak}）:\n{written}"
+        );
+    }
+}

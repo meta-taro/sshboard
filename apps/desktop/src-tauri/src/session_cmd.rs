@@ -514,6 +514,41 @@ pub async fn console_answer(allow: bool, engine: State<'_, Arc<Engine>>) -> Resu
         .map_err(|error| error.to_string())
 }
 
+// --- パスフレーズの頼み（Issue #13） --------------------------------------
+
+/// **どの接続がパスフレーズ待ちか**を画面へ配るイベント。
+pub const PASSPHRASE_REQUEST_EVENT: &str = "passphrase://request";
+
+/// 頼みの変化を画面へ押し出す。
+///
+/// **出せない画面を案内しない**（Issue #13）。実機で、AI から繋ぐと
+/// 「画面で人が入れてください」と返るのに**問いがどこにも出ず**、
+/// 人が「何も出ていない」と返す往復が起きました。
+pub fn spawn_passphrase_bridge(app: AppHandle, engine: Arc<Engine>) {
+    tauri::async_runtime::spawn(async move {
+        let mut watching = engine.subscribe_passphrase_request();
+        while watching.changed().await.is_ok() {
+            let waiting: Option<String> = watching.borrow().clone();
+            if let Err(error) = app.emit(PASSPHRASE_REQUEST_EVENT, waiting) {
+                eprintln!("[sshboard] パスフレーズの頼みを画面へ渡せません: {error}");
+            }
+        }
+    });
+}
+
+/// いまパスフレーズ待ちの接続。**起動直後の取りこぼし対策。**
+#[tauri::command]
+pub async fn passphrase_request(engine: State<'_, Arc<Engine>>) -> Result<Option<String>, String> {
+    Ok(engine.passphrase_request())
+}
+
+/// 人が問いを閉じた。**断るのも答えのうち。**
+#[tauri::command]
+pub async fn passphrase_dismiss(engine: State<'_, Arc<Engine>>) -> Result<(), String> {
+    engine.clear_passphrase_request();
+    Ok(())
+}
+
 /// 端末を開いて握る。**人の操作。**
 #[tauri::command]
 pub async fn console_open(

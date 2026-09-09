@@ -90,7 +90,9 @@ impl fmt::Display for EngineError {
             EngineError::PassphraseNeeded { id } => write!(
                 f,
                 "{id} の鍵にはパスフレーズが要ります。\
-                 sshboard の画面で人が入れてください（AI はパスフレーズを扱いません）"
+                 **sshboard の画面に問いを出しました。**人が入れたら、もう一度繋いでください。\
+                 画面が見当たらないときは、人に sshboard を前面へ出して\
+                 ［接続］を押してもらってください（AI はパスフレーズを扱いません・D14）"
             ),
             EngineError::ConsoleHeldByOther { holder } => write!(
                 f,

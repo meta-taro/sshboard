@@ -6,6 +6,7 @@
 	import { appendLine, type BandLine } from '$lib/band';
 	import ConnectionManager from '$lib/components/ConnectionManager.svelte';
 	import ConsoleRequestDialog from '$lib/components/ConsoleRequestDialog.svelte';
+	import PassphraseDialog from '$lib/components/PassphraseDialog.svelte';
 	import ConnectPanel from '$lib/components/ConnectPanel.svelte';
 	import FileBrowser from '$lib/components/FileBrowser.svelte';
 	import Icon from '$lib/components/Icon.svelte';
@@ -91,6 +92,41 @@
 	 * 気づかせる口がここです。
 	 */
 	let consoleAsk = $state<string | null>(null);
+
+	/**
+	 * **AI が繋ごうとして、パスフレーズで止まった接続**（Issue #13）。
+	 *
+	 * 実機の指摘 —— AI から繋ぐと「画面で人が入れてください」と返るのに、
+	 * **問いがどこにも出ませんでした。**問いは人の経路にしか無かったためです。
+	 * 案内された側は詰みます。**存在しない操作を指していました。**
+	 */
+	let passphraseFor = $state<string | null>(null);
+	let passphraseBusy = $state(false);
+
+	async function answerPassphrase(passphrase: string) {
+		const id = passphraseFor;
+		if (!id) return;
+		passphraseBusy = true;
+		try {
+			// **人の経路をそのまま通す。**AI 側へ秘密を渡す道は作りません（D14）。
+			await invoke('session_connect', { id, passphrase });
+			passphraseFor = null;
+			await session.refresh();
+		} catch (error: unknown) {
+			failure = String(error);
+		} finally {
+			passphraseBusy = false;
+		}
+	}
+
+	async function dismissPassphrase() {
+		passphraseFor = null;
+		try {
+			await invoke('passphrase_dismiss');
+		} catch {
+			/* 畳めなくても画面からは消えている */
+		}
+	}
 
 	async function answerConsole(allow: boolean) {
 		// **先に画面から消す。**押したのに残っていると、二重に押します。
@@ -523,6 +559,22 @@
 			.catch(() => {
 				/* 取れなくても画面は出す */
 			});
+		// **パスフレーズの頼み**（Issue #13）。起動直後の取りこぼしも拾う。
+		invoke<string | null>('passphrase_request')
+			.then((waiting) => {
+				passphraseFor = waiting;
+			})
+			.catch(() => {
+				/* 取れなくても画面は出す */
+			});
+		listen<string | null>('passphrase://request', (event) => {
+			passphraseFor = event.payload;
+		})
+			.then((stop) => stops.push(stop))
+			.catch(() => {
+				/* 購読できないだけ。**画面は出す。** */
+			});
+
 		listen<string | null>('console://request', (event) => {
 			consoleAsk = event.payload;
 		})
@@ -1010,6 +1062,21 @@
 		人が答えるまで、AI は握れません。**部品を作って繋がない、をやらない**
 		（Issue #10 がまさにそれでした）。
 	-->
+	<!--
+		**AI が繋ごうとして、パスフレーズで止まった**（Issue #13）。
+		問いは `ConnectPanel` の中にしか無く、**MCP の経路から出す口が
+		ありませんでした。**部品はそのまま使います —— 問いを 2 か所に作ると、
+		片方だけ直る日が来ます（D39 と同じ理由）。
+	-->
+	{#if passphraseFor}
+		<PassphraseDialog
+			id={passphraseFor}
+			busy={passphraseBusy}
+			onSubmit={answerPassphrase}
+			onCancel={dismissPassphrase}
+		/>
+	{/if}
+
 	{#if consoleAsk === 'ai'}
 		<ConsoleRequestDialog
 			onAllow={() => answerConsole(true)}

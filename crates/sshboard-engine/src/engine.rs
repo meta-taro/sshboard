@@ -75,6 +75,11 @@ pub struct Engine {
     /// **AI からの頼みを画面へ押し出す**（D42）。
     /// 出せない問いは、無いのと同じです。
     console_request_changed: watch::Sender<Option<Actor>>,
+    /// **AI が繋ごうとして、パスフレーズで止まった接続**（Issue #13）。
+    ///
+    /// 識別子だけを持ちます。**パスフレーズ本体はここへ来ません**（D14）——
+    /// 人が入れた値は、人の経路（`connect`）へ直接渡ります。
+    passphrase_request: watch::Sender<Option<String>>,
     /// 開いているものが変わったことを配る。**画面が知らないまま繋がっている、を作らない。**
     changed: watch::Sender<Vec<Opened>>,
 }
@@ -93,6 +98,7 @@ impl Engine {
         let (changed, _) = watch::channel(Vec::new());
         let (console_changed, _) = watch::channel(None);
         let (console_request_changed, _) = watch::channel(None);
+        let (passphrase_request, _) = watch::channel(None);
         Self {
             band,
             diag,
@@ -102,6 +108,7 @@ impl Engine {
             console: Mutex::new(ConsoleSlot::default()),
             console_changed,
             console_request_changed,
+            passphrase_request,
             changed,
         }
     }
@@ -138,6 +145,23 @@ impl Engine {
         drop(held);
         let _ = self.changed.send(all);
         Ok(opened)
+    }
+
+    /// **いま、どの接続がパスフレーズ待ちか**（Issue #13）。
+    ///
+    /// 画面はこれを見て問いを出します。**識別子だけ**です（PRD §8）。
+    pub fn passphrase_request(&self) -> Option<String> {
+        self.passphrase_request.borrow().clone()
+    }
+
+    /// 頼みの変化を受け取る口。**押し出さないと、人は気づけません。**
+    pub fn subscribe_passphrase_request(&self) -> watch::Receiver<Option<String>> {
+        self.passphrase_request.subscribe()
+    }
+
+    /// 問いを畳む。**人が入れたときも、断ったときも通ります。**
+    pub fn clear_passphrase_request(&self) {
+        let _ = self.passphrase_request.send(None);
     }
 
     /// 共有している出力（`tail -f` の行き先）。
@@ -201,7 +225,23 @@ impl Engine {
             known_hosts: read_known_hosts(entry.known_hosts.as_deref()),
             write_scope: scope,
         };
-        let auth = self.auth_for(&entry, passphrase)?;
+        let auth = match self.auth_for(&entry, passphrase) {
+            Ok(auth) => auth,
+            // **出せない画面を案内しない**（Issue #13）。
+            //
+            // 実機の指摘: 「AI から `connect` を呼ぶと『画面で人が入れてください』と
+            // 返るが、**アプリ側にプロンプトが一切出ない**。案内された側は詰みます」。
+            //
+            // パスフレーズの問いは人の経路にしか無かったので、**AI が頼めば
+            // 人の画面に出る**ようにします（D42 と同じ形）。
+            Err(EngineError::PassphraseNeeded { id }) => {
+                if actor != Actor::Human {
+                    let _ = self.passphrase_request.send(Some(id.clone()));
+                }
+                return Err(EngineError::PassphraseNeeded { id });
+            }
+            Err(other) => return Err(other),
+        };
 
         // **繋ぐ前に帯へ出し、画面が受け取るまで待つ**（D16）。
         // 誰がいつ開いたかが残らないなら、同じ 1 本を共有している意味がない。
@@ -252,6 +292,9 @@ impl Engine {
         drop(held);
 
         let _ = self.changed.send(all);
+        // **繋がったら問いを畳む**（Issue #13）。
+        // 人が入れて繋がったのに問いが残ると、**もう一度入れさせる**ことになります。
+        self.clear_passphrase_request();
         Ok(opened)
     }
 
@@ -927,6 +970,24 @@ impl Engine {
         // `*.tera.ppk` の中身が OpenSSH 秘密鍵だった、が実際に在った。
         let facts = inspect_key_at(&path);
         if !facts.usable() {
+            // **繋ぐ前に落ちたことを残す**（Issue #13）。
+            //
+            // ここには `self.diag` の呼び出しが 1 つもありませんでした。
+            // しかも `connect` はこの判定を **SSH を張るより前**に行うので、
+            // `reach` / `host-key` / `auth` の行も 1 本も出ません。
+            // 実機で `diagnostics` が `{"events":[],"kept":0}` を返したのは、
+            // **書く場所が無かった**からです。
+            //
+            // **鍵のパスは入れません**（PRD §8）。出すのは識別子と、読めた形式まで。
+            self.diag.error(
+                Stage::Auth,
+                Some(&entry.id),
+                format!(
+                    "鍵として使えません（{} と読めました）",
+                    facts.format.label()
+                ),
+                "秘密鍵のファイルを指してください（`.pub` は公開鍵で、認証には使えません）",
+            );
             return Err(EngineError::UnusableKey {
                 id: entry.id.clone(),
                 format: facts.format.label().to_owned(),
@@ -935,10 +996,28 @@ impl Engine {
 
         let secret = passphrase.or(stored);
         if secret.is_none() && facts.needs_passphrase {
+            // **どの段階まで進んだかを書く**（実機の要望・Issue #13）。
+            // **鍵は読めています。**止まったのはパスフレーズ待ちです。
+            self.diag.error(
+                Stage::Auth,
+                Some(&entry.id),
+                format!(
+                    "鍵は読めました（{}）。パスフレーズ待ちで止まっています",
+                    facts.format.label()
+                ),
+                "sshboard の画面で人が入れてください（AI はパスフレーズを扱いません・D14）",
+            );
             return Err(EngineError::PassphraseNeeded {
                 id: entry.id.clone(),
             });
         }
+        // **通った分も残す。**失敗だけ残すと、
+        // 「どの繋ぎ方を選んだのか」が後から読めません。
+        self.diag.info(
+            Stage::Auth,
+            Some(&entry.id),
+            format!("鍵で繋ぎます（{}）", facts.format.label()),
+        );
         Ok(Auth::Key {
             path,
             passphrase: secret,
