@@ -16,7 +16,9 @@ use rmcp::model::{CallToolResult, ContentBlock, ServerCapabilities, ServerInfo};
 use rmcp::{tool, tool_handler, tool_router, ErrorData, ServerHandler};
 use serde::Deserialize;
 use sshboard_band::{Actor, Band, DeliveryOutcome};
-use sshboard_connections::{ConnectionEntry, ConnectionSummary, Connections, ConnectionsWatch};
+use sshboard_connections::{
+    ConnectionEntry, ConnectionSummary, Connections, ConnectionsWatch, Elevation,
+};
 use sshboard_engine::Engine;
 use sshboard_stream::OutputStream;
 
@@ -249,6 +251,9 @@ impl SshboardMcp {
             // 自分で登録して自分に許可を出せるなら、囲いは意味を持たない。
             // 書き込み許可を出すのは、画面を見ている人だけ。
             write_roots: Vec::new(),
+            // **AI が自分の権限を上げる道を、自分で開けない**（D48）。
+            // `write_roots` と同じ理由です。決めるのは、画面を見ている人だけ。
+            elevation: Elevation::None,
         };
 
         let next = Connections {

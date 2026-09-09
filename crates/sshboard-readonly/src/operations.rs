@@ -31,7 +31,7 @@ use serde::Deserialize;
 /// dbboard が `GRANT` / `DROP` を恒久的に断っているのと同じ形です。
 ///
 /// **AI が自分の檻を広げられない**ことが、この一覧の芯です。
-const NEVER: [&str; 18] = [
+const NEVER: [&str; 20] = [
     // 檻そのものを書き換える
     "sudoers",
     "visudo",
@@ -46,6 +46,11 @@ const NEVER: [&str; 18] = [
     "connections.toml",
     "readonly.toml",
     "operations.toml",
+    // **パスワードの入れ物。**`become = "ask"`（D48）を入れるまで、
+    // root しか読めないものは**そもそも読めませんでした。**
+    // 届くようになった以上、ここも塞ぎます。
+    "/etc/shadow",
+    "/etc/gshadow",
     // 利用者とロール
     "useradd",
     "usermod",
@@ -94,8 +99,8 @@ impl std::fmt::Display for OperationsError {
             OperationsError::NeverAllowed { id, matched } => write!(
                 f,
                 "{id} は入れられません（{matched} を含みます）。\
-                 **これは設定で有効にできません** —— 檻を広げる操作・利用者や鍵の\
-                 書き換え・壊す操作は、書いても弾きます"
+                 **これは設定で有効にできません** —— 檻を広げる操作・利用者や鍵と\
+                 パスワードの読み書き・壊す操作は、書いても弾きます"
             ),
             OperationsError::Unreadable(detail) => {
                 write!(f, "operations.toml が読めません: {detail}")

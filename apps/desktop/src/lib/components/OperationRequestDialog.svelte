@@ -17,6 +17,19 @@
 	 * - **1 回の許可で 1 回だけ。**釦の文言にもそう書きます
 	 * - **接続先は出しません**（PRD §8）。出すのは操作の id と、打つ文字列だけ
 	 * - **背景を押しても閉じません。**人が始めていない問いを、誤操作で消させない
+	 *
+	 * ## パスワード欄（D48 / Issue #19）
+	 *
+	 * `become = "ask"` の接続では、**ここが root へ届く唯一の道**です。
+	 *
+	 * > **AI 側から root 領域を読む道が、現時点でゼロです。**
+	 *
+	 * **保存しません。**この 1 回のために持ち、走った瞬間に捨てます。
+	 * 画面から出て行くのは `operation_answer` の 1 回だけで、
+	 * **記録にも帯にも端末の面にも流れません**（`Engine::answer_operation`）。
+	 *
+	 * **`needsSecret` が false のときは欄ごと出しません。**
+	 * 要らないのに毎回パスワードを聞かれたら、人は使うのをやめます。
 	 */
 	import Icon from '$lib/components/Icon.svelte';
 	import { i18n } from '$lib/i18n/i18n.svelte';
@@ -26,22 +39,47 @@
 		id: string;
 		/** 実際にサーバーで走る文字列。 */
 		runs: string;
-		onAllow: () => void;
+		/**
+		 * **この 1 回のためのパスワードが要るか**（D48）。
+		 * `become = "ask"` の接続で `sudo` を打つときだけ true になります。
+		 */
+		needsSecret?: boolean;
+		/** 入れたものは**そのまま engine へ渡り、走った瞬間に捨てられます。** */
+		onAllow: (secret?: string) => void;
 		onDeny: () => void;
 	}
-	let { id, runs, onAllow, onDeny }: Props = $props();
+	let { id, runs, needsSecret = false, onAllow, onDeny }: Props = $props();
 
 	let denyButton: HTMLButtonElement | undefined = $state();
+	let secretField: HTMLInputElement | undefined = $state();
+	let secret = $state('');
 
 	// **焦点は「断る」に置く。**開いた勢いで Enter を打っても、許可になりません。
+	//
+	// **パスワードを聞くときも同じです。**入力欄へ先に飛ばすと、
+	// 人は**何を許すのかを読む前に打ち始めます。**読ませてから打たせます。
 	$effect(() => {
 		denyButton?.focus();
 	});
+
+	function allow() {
+		// **空欄で許可させない。**空のまま渡すと、サーバー側で
+		// 「パスワードがありません」に落ちるだけで、**人には何が起きたか分かりません。**
+		if (needsSecret && secret.length === 0) {
+			secretField?.focus();
+			return;
+		}
+		const typed = needsSecret ? secret : undefined;
+		// **画面からも消す。**渡したあとに残しておく理由がありません。
+		secret = '';
+		onAllow(typed);
+	}
 
 	function onKeydown(event: KeyboardEvent) {
 		// **Escape は「断る」。**黙って消さず、答えとして扱います。
 		if (event.key === 'Escape') {
 			event.preventDefault();
+			secret = '';
 			onDeny();
 		}
 	}
@@ -72,11 +110,36 @@
 
 		<p class="note">{i18n.t('operation.request.note')}</p>
 
+		{#if needsSecret}
+			<!--
+				**`become = "ask"` のときだけ出します**（D48 / Issue #19）。
+				**保存しません。**この 1 回のためだけに持ちます。
+			-->
+			<label class="secret">
+				<span>{i18n.t('operation.request.secret')}</span>
+				<input
+					bind:this={secretField}
+					bind:value={secret}
+					type="password"
+					autocomplete="off"
+					spellcheck="false"
+					onkeydown={(event) => {
+						// **Enter で許可します。**打ち終えた指がそのまま進めるように。
+						if (event.key === 'Enter') {
+							event.preventDefault();
+							allow();
+						}
+					}}
+				/>
+			</label>
+			<p class="note">{i18n.t('operation.request.secret.note')}</p>
+		{/if}
+
 		<div class="actions">
 			<button type="button" bind:this={denyButton} onclick={onDeny}>
 				{i18n.t('operation.request.deny')}
 			</button>
-			<button type="button" class="cta" onclick={onAllow}>
+			<button type="button" class="cta" onclick={allow}>
 				{i18n.t('operation.request.allow')}
 			</button>
 		</div>
@@ -147,6 +210,24 @@
 		line-height: 1.5;
 		white-space: pre-wrap;
 		word-break: break-all;
+	}
+
+	/* **欄は広く取る。**打ったものが見えない入力なので、狭いと不安になります。 */
+	.secret {
+		display: flex;
+		flex-direction: column;
+		gap: 0.3rem;
+		font-size: 0.78rem;
+	}
+
+	.secret input {
+		padding: 0.45rem 0.55rem;
+		background: var(--surface-2);
+		color: var(--fg);
+		border: 1px solid var(--hairline-strong);
+		border-radius: var(--r-item, 6px);
+		font-family: var(--font-mono);
+		font-size: 0.85rem;
 	}
 
 	.actions {

@@ -1,7 +1,7 @@
 # プロジェクトステータス — sshboard
 
 - **現在フェーズ**: **Phase 1 の AI 側は書き終えました。**残りは人の工程です
-- **最終更新**: 2026-09-04（夕 — Issue #8 の一部を直した。**根本原因はまだ未特定**）
+- **最終更新**: 2026-09-09（**`become = "ask"` を実装した** — Issue #19）
 
 ## いまの状態を一言で
 
@@ -75,11 +75,11 @@ Phase 0 の 5 本は、実機と Windows 目視を除いてすべて通りまし
 **2026-09-04（夕）に、フロントと Rust の両方を走らせました。**
 
 ```
-cargo fmt --all -- --check                             →  差分なし（2026-09-04）
-cargo test --workspace                                 →  331 passed; 0 failed（2026-09-06・実機込み）
-pnpm --filter desktop check                            →  326 files, 0 errors, 0 warnings（2026-09-06）
-pnpm --filter desktop test                             →  180 passed（2026-09-06・**部品を描く 12 本を含む**）
-cargo clippy --workspace --all-targets -- -D warnings  →  2026-09-02 の結果（このセッションでは未実行）
+cargo fmt --all                                        →  差分なし（2026-09-09）
+cargo test --workspace                                 →  366 passed; 0 failed（2026-09-09・実機込み）
+pnpm --filter desktop check                            →  336 files, 0 errors, 0 warnings（2026-09-09）
+pnpm --filter desktop test                             →  218 passed（2026-09-09・**部品を描く 21 本を含む**）
+cargo clippy --workspace --all-targets -- -D warnings  →  0 warnings（2026-09-09）
 （別ワークスペース）tools/ssh-probe: cargo test        →   10 passed（2026-09-02）
 ```
 
@@ -485,6 +485,91 @@ product-baseline §10「古い文書は、無い文書より悪い」と自分�
 - Windows 版（`launch-claude.ps1`）は `--tabColor` で**タブ帯だけ**を塗るので、この問題は起きない
 
 **この 2 件は commit 済み・未 push（別リポ）。push は人。**
+
+## 2026-09-09 — **`become = "ask"` を実装した**（Issue #19 / D48）
+
+### 何を間違えていたか
+
+D46 を書き直して「root になる手段は接続ごとに選ぶ」へ倒し、`v0.1.11-alpha.12` を配り、
+**Issue #19 へ「撤回しました」と書きました。**実機からの返答:
+
+> **v0.1.11-alpha.12 で確認しました。D46 の撤回は入っていますが、繋がる手段はまだありません。**
+>
+> `operations.toml` は「**どのコマンドを走らせてよいか**」を解きますが、
+> 「**どうやって権限を得るか**」は解いていません。**#19 が問うているのは後者です。**
+>
+> **AI 側から root 領域を読む道が、現時点でゼロです。**
+
+**そのとおりでした。**変わったのは `.claude/decisions.md` の中だけで、
+**利用者から見える挙動は 1 つも変わっていません。**
+**方針を変えることと、道を開くことは別**なのに、混ぜて「対応した」と書きました。
+
+さらに、実機が切り分けてくれたこの 1 行が決定的でした。
+
+```
+$ sudo -n true
+sudo: パスワードが必要です
+```
+
+**D46 が「推奨」と書いた `sudoers` の道が、そのサーバーでは最初から閉じています。**
+推奨できる状態ですらありませんでした。
+
+### 入れたもの
+
+```toml
+[[connections]]
+become = "ask"       # 人がその場で入れる。**保存しない**
+# become = "sudoers" # sudoers.d が持っている（推奨）
+# 書かなければ「上げない」（既定）
+```
+
+| `become` | 打つもの |
+|---|---|
+| 書かない | 人が書いたまま |
+| `sudoers` | `sudo -n …` |
+| `ask` | `sudo -S -p '' …` ＋ **標準入力からパスワード** |
+
+**`exec` に標準入力が無かった**ので足しました（`SshSession::exec_with_stdin`）。
+**他に、パスワードをコマンド行へ置かずに渡す道がありません** ——
+コマンド行に置くと `ps` で他人に見えます。
+
+### 手元で確かめられるようにした
+
+`tools/test-server` に **`sudo` とパスワードを聞かれる利用者**を足しました。
+**実機と同じ詰まり方が手元で出ます。**`sh tools/test-server/up.sh` で建ちます。
+
+その上で、`root:root 600` の `/var/log/maillog` を root でない利用者から読む所まで
+通してあります（`sshboard-engine/tests/live.rs`・**実サーバー**）。
+
+| 見張っているもの | テスト |
+|---|---|
+| 素では読めない → 人が入れると読める | `a_root_only_log_can_be_read_once_the_person_types_the_password` |
+| **打ったものが端末の面へ出ない** | `the_password_never_reaches_the_screen` |
+| **入れずに許可しても固まらない** | `without_the_password_it_fails_instead_of_hanging` |
+| **帯へも出ない** | `sshboard-ssh`: `what_was_fed_in_never_reaches_the_band` |
+| 許可と一緒に使い切られる | `sshboard-engine`: `a_secret_the_person_typed_is_spent_with_the_approval` |
+| 画面（欄・焦点・空欄・消去） | `OperationRequestDialog.svelte.test.ts`（**9 本**） |
+
+**D41 で用途別ツールの出力を画面へ流すようにした直後**だったので、
+ここは実サーバーで確かめました。**手を抜けば即座に漏れる所**です。
+
+### ついでに塞いだもの
+
+`become = "ask"` を入れるまで、**root しか読めないものは、そもそも読めませんでした。**
+届くようになった以上、`operations.toml` に書いても弾く一覧へ
+**`/etc/shadow` / `/etc/gshadow`** を足しました（18 → 20 語）。
+
+### 入れていないもの
+
+- **`become = "sudo-keyring"` / `"su-keyring"`。**D46 の書き直しで「逃げ道として残す」と
+  書きましたが、**まだ作っていません**（預ける画面が別途要ります）
+- **`su -` しか無いサーバー向けの道。**`ask` が通ってから実測して足します
+
+### 人にしか分からないこと
+
+**`become = "ask"` を実際に押してみること。**
+承認の画面にパスワードの欄が出るか。打ったものが**どこにも出ていない**か。
+**ここは人が押すまで分かりません。**
 
 ## 次にやること
 

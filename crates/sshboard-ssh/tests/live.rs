@@ -183,6 +183,64 @@ async fn every_command_reaches_the_band_before_it_answers() {
         .expect("コマンドが通らない");
 }
 
+#[tokio::test]
+async fn a_command_can_be_fed_from_standard_input() {
+    // **`exec` に標準入力が無いと、`sudo -S` へパスワードを渡せません**
+    // （D48 / Issue #19）。渡す道はここしかありません ——
+    // **コマンド行へ置くと `ps` で他人に見えます。**
+    if !server_is_up().await {
+        println!("テスト用サーバーが建っていません（想定内・飛ばします）");
+        return;
+    }
+
+    let session = trusted_session(Band::new()).await;
+
+    let ran = session
+        .exec_with_stdin(Actor::Human, "cat", Some("fed-from-stdin\n"))
+        .await
+        .expect("標準入力を渡せない");
+
+    assert_eq!(ran.out.trim(), "fed-from-stdin");
+    assert!(ran.succeeded(), "{ran:?}");
+}
+
+#[tokio::test]
+async fn what_was_fed_in_never_reaches_the_band() {
+    // **これが芯です**（D48）。帯は画面に出ます。
+    // **入れたものが帯へ出たら、パスワードが画面と巻き戻しに残ります。**
+    if !server_is_up().await {
+        println!("テスト用サーバーが建っていません（想定内・飛ばします）");
+        return;
+    }
+
+    let band = Band::new();
+    let mut subscriber = band.subscribe();
+    let session = trusted_session(band).await;
+
+    // **本物と同じ形。**`cat` は入れたものをそのまま返すので、
+    // 「帯に出ない」ことと「確かに渡っている」ことを同時に見られます。
+    let running = tokio::spawn(async move {
+        session
+            .exec_with_stdin(Actor::Ai, "cat > /dev/null", Some("hunter2-not-real\n"))
+            .await
+    });
+
+    let event = subscriber.recv().await.expect("帯へ出ていない");
+    let shown = event.line().text().to_owned();
+    event.ack();
+
+    assert_eq!(shown, "$ cat > /dev/null", "帯に出たもの: {shown}");
+    assert!(
+        !shown.contains("hunter2-not-real"),
+        "**渡したものが帯へ出ている**: {shown}"
+    );
+
+    running
+        .await
+        .expect("パニック")
+        .expect("コマンドが通らない");
+}
+
 /// テスト用サーバーの指紋。**1 回だけ調べて使い回す。**
 ///
 /// 毎回調べると、テストの本数 × 2 本の接続が同時に飛び、

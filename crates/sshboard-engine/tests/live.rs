@@ -730,6 +730,212 @@ async fn a_command_runs_through_the_engine_and_comes_back_whole() {
     }
 }
 
+// --- 権限を上げて root 領域を読む（D48 / Issue #19） ---------------------------
+
+/// **パスワードを聞かれる `sudo` を持った利用者**で登録する。
+///
+/// 実機の状態がこれでした ——
+///
+/// ```text
+/// $ sudo -n true
+/// sudo: パスワードが必要です
+/// ```
+///
+/// **`sudoers` の道が閉じているサーバー**です。テスト用サーバーの `pw` に
+/// `NOPASSWD` **無し**の sudo を与えて、同じ状態を作ってあります。
+async fn registry_that_asks(dir: &tempfile::TempDir) -> PathBuf {
+    let path = dir.path().join("connections.toml");
+    let toml = format!(
+        "version = 1\n\n[[connections]]\nid = \"sudoer\"\nname = \"Asks for a password\"\n\
+         host = \"{HOST}\"\nport = {PORT}\nuser = \"pw\"\n\
+         fingerprint = \"{}\"\nbecome = \"ask\"\n",
+        known_fingerprint().await
+    );
+    std::fs::write(&path, toml).expect("接続一覧を書けない");
+    path
+}
+
+/// **root しか読めないログ**を読む操作を、人が書いておく。
+fn operations_reading_a_root_only_log(dir: &tempfile::TempDir) {
+    std::fs::write(
+        dir.path().join("operations.toml"),
+        "version = 1\n\n[[operation]]\nid = \"read-maillog\"\n\
+         run = \"sudo cat /var/log/maillog\"\n\
+         description = \"root しか読めないログを読む\"\nmax_per_hour = 5\n",
+    )
+    .expect("一覧を書けない");
+}
+
+/// テスト用サーバーの `pw` のパスワード。**使い捨てのコンテナのものです。**
+/// 製品にも実機にも一切関係しません（`tools/test-server/Dockerfile` に在ります）。
+const PW_PASSWORD: &str = "sshboard-test-password";
+
+#[tokio::test]
+async fn a_root_only_log_can_be_read_once_the_person_types_the_password() {
+    // **#19 が問うているのはこれです。**
+    //
+    // > `operations.toml` は「**どのコマンドを走らせてよいか**」を解きますが、
+    // > 「**どうやって権限を得るか**」は解いていません
+    //
+    // > **AI 側から root 領域を読む道が、現時点でゼロです。**
+    //
+    // `/var/log/maillog` は `root:root 600`。**実機の `/var/log/maillog` と同じ状態**で、
+    // ログインした利用者では 1 バイトも読めません。
+    if !server_is_up().await {
+        println!("テスト用サーバーが建っていません（想定内・飛ばします）");
+        return;
+    }
+
+    let dir = tempfile::tempdir().expect("一時ディレクトリ");
+    operations_reading_a_root_only_log(&dir);
+    let engine = engine_at(registry_that_asks(&dir).await);
+    engine
+        .connect(Actor::Human, "sudoer", Some(PW_PASSWORD.into()))
+        .await
+        .expect("繋がらない");
+
+    // **まず読めないことを確かめる。**これが直したい状態です。
+    let blind = engine
+        .exec(Actor::Ai, "cat /var/log/maillog")
+        .await
+        .expect("コマンドが打てない");
+    assert!(
+        !blind.succeeded(),
+        "**root しか読めないはずのログが素で読めている**: {blind:?}"
+    );
+
+    // 1. AI が呼ぶ。**人に尋ねて、そこで止まる。**
+    let stopped = engine.run_operation(Actor::Ai, "read-maillog").await;
+    assert!(
+        matches!(stopped, Err(EngineError::ConsoleApprovalNeeded)),
+        "承認なしで走ろうとしている: {stopped:?}"
+    );
+
+    // 2. 画面へ出る問い。**打つものがそのまま載り、パスワードを聞くと分かる。**
+    let asked = engine.operation_request().expect("問いが立っていない");
+    assert_eq!(asked.id, "read-maillog");
+    assert_eq!(
+        asked.runs, "sudo -S -p '' cat /var/log/maillog",
+        "**当てはめる前を見せている**（人は `-S` が付くことを知らないまま聞かれる）"
+    );
+    assert!(asked.needs_secret, "パスワードを聞くと分かっていない");
+
+    // 3. 人がその場で入れる。**保存しません。**
+    engine
+        .answer_operation(Actor::Human, true, Some(PW_PASSWORD.into()))
+        .await
+        .expect("人が許せない");
+
+    // 4. **読めます。**
+    let ran = engine
+        .run_operation(Actor::Ai, "read-maillog")
+        .await
+        .expect("走らない");
+    assert!(
+        ran.succeeded(),
+        "**root 領域へ届いていない**: {ran:?}（stderr: {})",
+        ran.err
+    );
+    assert!(
+        ran.out.contains("postfix/smtpd"),
+        "中身が返っていない: {ran:?}"
+    );
+
+    // 5. **使い切り。**もう一度呼んだら、また尋ねる。
+    let again = engine.run_operation(Actor::Ai, "read-maillog").await;
+    assert!(
+        matches!(again, Err(EngineError::ConsoleApprovalNeeded)),
+        "**秘密が残っている**: {again:?}"
+    );
+}
+
+#[tokio::test]
+async fn without_the_password_it_fails_instead_of_hanging() {
+    // **`sudo -S` に標準入力を渡さないと、返ってきません**（exec に端末はありません）。
+    // 空で閉じれば、その場で落ちて人に伝わります。
+    // **返ってこない**のがいちばん困る壊れ方なので、ここを見張ります。
+    if !server_is_up().await {
+        println!("テスト用サーバーが建っていません（想定内・飛ばします）");
+        return;
+    }
+
+    let dir = tempfile::tempdir().expect("一時ディレクトリ");
+    operations_reading_a_root_only_log(&dir);
+    let engine = engine_at(registry_that_asks(&dir).await);
+    engine
+        .connect(Actor::Human, "sudoer", Some(PW_PASSWORD.into()))
+        .await
+        .expect("繋がらない");
+
+    let _ = engine.run_operation(Actor::Ai, "read-maillog").await;
+    // **許すが、何も入れない。**人が空のまま［許可］を押した状態です。
+    engine
+        .answer_operation(Actor::Human, true, None)
+        .await
+        .expect("人が許せない");
+
+    let ran = tokio::time::timeout(
+        std::time::Duration::from_secs(10),
+        engine.run_operation(Actor::Ai, "read-maillog"),
+    )
+    .await
+    .expect("**返ってきません**（標準入力を閉じていない）")
+    .expect("コマンドが打てない");
+
+    assert!(!ran.succeeded(), "パスワード無しで通っている: {ran:?}");
+    assert!(
+        !ran.out.contains("postfix/smtpd"),
+        "**読めてしまっている**: {ran:?}"
+    );
+}
+
+#[tokio::test]
+async fn the_password_never_reaches_the_screen() {
+    // **端末の面（D41）へ流れたら、画面にも巻き戻しにも残ります。**
+    // 出てよいのは `$ sudo -S -p '' …` までです。
+    if !server_is_up().await {
+        println!("テスト用サーバーが建っていません（想定内・飛ばします）");
+        return;
+    }
+
+    let dir = tempfile::tempdir().expect("一時ディレクトリ");
+    operations_reading_a_root_only_log(&dir);
+    let engine = engine_at(registry_that_asks(&dir).await);
+    engine
+        .connect(Actor::Human, "sudoer", Some(PW_PASSWORD.into()))
+        .await
+        .expect("繋がらない");
+
+    let mut watching = engine.stream().subscribe_raw();
+
+    let _ = engine.run_operation(Actor::Ai, "read-maillog").await;
+    engine
+        .answer_operation(Actor::Human, true, Some(PW_PASSWORD.into()))
+        .await
+        .expect("人が許せない");
+    engine
+        .run_operation(Actor::Ai, "read-maillog")
+        .await
+        .expect("走らない");
+
+    // 流れてきたものを全部集める。
+    let mut shown = String::new();
+    while let Ok(Ok(chunk)) =
+        tokio::time::timeout(std::time::Duration::from_millis(300), watching.recv()).await
+    {
+        shown.push_str(&String::from_utf8_lossy(&chunk));
+    }
+
+    assert!(
+        shown.contains("sudo -S -p ''"),
+        "打ったものが画面に出ていない: {shown:?}"
+    );
+    assert!(
+        !shown.contains(PW_PASSWORD),
+        "**パスワードが画面へ出ている**: {shown:?}"
+    );
+}
+
 // --- 端末のロックと停止（D29） -------------------------------------------------
 
 async fn engine_connected(dir: &tempfile::TempDir) -> Engine {

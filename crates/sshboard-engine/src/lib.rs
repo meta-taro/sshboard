@@ -20,7 +20,7 @@ mod open;
 /// 引数は例外なく囲われます（`tests/probes.rs` が見張っています）。
 pub mod probes;
 
-pub use engine::{ConsoleOpened, Engine, OnConflict};
+pub use engine::{ConsoleOpened, Engine, OnConflict, OperationAsk};
 pub use error::EngineError;
 pub use open::{Opened, WriteAccess};
 

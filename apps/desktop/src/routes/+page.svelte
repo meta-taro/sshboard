@@ -129,17 +129,27 @@
 	 * 案内された側は詰みます。**存在しない操作を指していました。**
 	 */
 	/**
-	 * **AI が走らせたい操作**（D45 / D47）。**何が走るのかも一緒に持ちます** ——
+	 * **AI が走らせたい操作**（D45 / D47 / D48）。**何が走るのかも一緒に持ちます** ——
 	 * id だけでは、人は何を許したのか分かりません。
+	 *
+	 * `needsSecret` は **その場でパスワードを聞く必要があるか**（Issue #19）。
 	 */
-	let operationAsk = $state<{ id: string; runs: string } | null>(null);
+	type OperationAsk = { id: string; runs: string; needsSecret: boolean };
+	let operationAsk = $state<OperationAsk | null>(null);
 
-	async function answerOperation(allow: boolean) {
+	/**
+	 * `secret` は **人がその場で入れたものだけ**（D48）。
+	 *
+	 * **どこにも残しません。**ここでは変数にすら置かず、そのまま渡します ——
+	 * 画面側に持つと、**次の問いまで居座ります。**
+	 */
+	async function answerOperation(allow: boolean, secret?: string) {
 		// **先に画面から消す。**残っていると二重に押します。
 		operationAsk = null;
 		try {
-			await invoke('operation_answer', { allow });
+			await invoke('operation_answer', { allow, secret: secret ?? null });
 		} catch (error: unknown) {
+			// **失敗の文言に入れたものは載りません**（engine 側は識別子しか返しません）。
 			failure = String(error);
 		}
 	}
@@ -649,14 +659,14 @@
 				/* 取れなくても画面は出す */
 			});
 		// **走らせてよいかの問い**（D45 / D47）。起動直後の取りこぼしも拾う。
-		invoke<{ id: string; runs: string } | null>('operation_request')
+		invoke<OperationAsk | null>('operation_request')
 			.then((asked) => {
 				operationAsk = asked;
 			})
 			.catch(() => {
 				/* 取れなくても画面は出す */
 			});
-		listen<{ id: string; runs: string } | null>('operation://request', (event) => {
+		listen<OperationAsk | null>('operation://request', (event) => {
 			operationAsk = event.payload;
 		})
 			.then((stop) => stops.push(stop))
@@ -1208,7 +1218,8 @@
 		<OperationRequestDialog
 			id={operationAsk.id}
 			runs={operationAsk.runs}
-			onAllow={() => answerOperation(true)}
+			needsSecret={operationAsk.needsSecret}
+			onAllow={(secret) => answerOperation(true, secret)}
 			onDeny={() => answerOperation(false)}
 		/>
 	{/if}

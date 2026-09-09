@@ -79,8 +79,89 @@ async fn the_question_carries_what_would_actually_run() {
     let _ = engine.run_operation(Actor::Ai, "reload-httpd").await;
 
     let asked = engine.operation_request().expect("問いが立っていない");
-    assert_eq!(asked.0, "reload-httpd");
-    assert_eq!(asked.1, "systemctl reload httpd");
+    assert_eq!(asked.id, "reload-httpd");
+    assert_eq!(asked.runs, "systemctl reload httpd");
+    // **繋がっていないので、上げ方も分かりません。**聞かないのが正しい。
+    assert!(!asked.needs_secret, "秘密を求めている");
+}
+
+#[tokio::test]
+async fn a_secret_is_never_carried_in_the_question() {
+    // **問いは画面に出ます。**秘密が載ったら、画面と巻き戻しの両方に残ります。
+    let dir = tempfile::tempdir().expect("一時ディレクトリ");
+    allow(&dir);
+    let engine = engine_in(&dir);
+    let _ = engine.run_operation(Actor::Ai, "reload-httpd").await;
+
+    let asked = engine.operation_request().expect("問いが立っていない");
+
+    // 型として持っていません。**入れる場所がありません。**
+    assert_eq!(asked.runs, "systemctl reload httpd");
+}
+
+#[tokio::test]
+async fn a_secret_the_person_typed_is_spent_with_the_approval() {
+    // **1 回の許可で 1 回だけ**（D48）。使ったら消えます。
+    // 残ると、**人が見ていない間に何度でも上がれます。**
+    let dir = tempfile::tempdir().expect("一時ディレクトリ");
+    allow(&dir);
+    let engine = engine_in(&dir);
+    let _ = engine.run_operation(Actor::Ai, "reload-httpd").await;
+
+    engine
+        .answer_operation(Actor::Human, true, Some("not-a-real-password".into()))
+        .await
+        .expect("人が許せない");
+
+    // 1 回目は許可を使う（繋がっていないので、そこで止まるのが正しい）。
+    let used = engine.run_operation(Actor::Ai, "reload-httpd").await;
+    assert!(
+        matches!(used, Err(EngineError::NotConnected)),
+        "許可が使われていない: {used:?}"
+    );
+
+    // 2 回目は、また尋ねる。**秘密も一緒に消えています。**
+    let again = engine.run_operation(Actor::Ai, "reload-httpd").await;
+    assert!(
+        matches!(again, Err(EngineError::ConsoleApprovalNeeded)),
+        "**秘密が残っている**: {again:?}"
+    );
+}
+
+#[tokio::test]
+async fn refusing_throws_the_secret_away_too() {
+    // 断ったのに秘密だけ残る、を作らない。
+    let dir = tempfile::tempdir().expect("一時ディレクトリ");
+    allow(&dir);
+    let engine = engine_in(&dir);
+    let _ = engine.run_operation(Actor::Ai, "reload-httpd").await;
+
+    engine
+        .answer_operation(Actor::Human, false, Some("not-a-real-password".into()))
+        .await
+        .expect("人が断れない");
+
+    let again = engine.run_operation(Actor::Ai, "reload-httpd").await;
+    assert!(
+        matches!(again, Err(EngineError::ConsoleApprovalNeeded)),
+        "断ったのに走ろうとしている: {again:?}"
+    );
+}
+
+#[tokio::test]
+async fn the_ai_cannot_hand_itself_a_secret() {
+    // **自分で自分に権限を渡せたら、承認の意味がありません。**
+    let dir = tempfile::tempdir().expect("一時ディレクトリ");
+    allow(&dir);
+    let engine = engine_in(&dir);
+    let _ = engine.run_operation(Actor::Ai, "reload-httpd").await;
+
+    let refused = engine
+        .answer_operation(Actor::Ai, true, Some("not-a-real-password".into()))
+        .await;
+
+    assert!(refused.is_err(), "AI が自分へ秘密を渡せる: {refused:?}");
+    assert!(engine.operation_request().is_some(), "問いが消えている");
 }
 
 #[tokio::test]
@@ -91,7 +172,7 @@ async fn the_ai_cannot_answer_its_own_request() {
     let engine = engine_in(&dir);
     let _ = engine.run_operation(Actor::Ai, "reload-httpd").await;
 
-    let refused = engine.answer_operation(Actor::Ai, true).await;
+    let refused = engine.answer_operation(Actor::Ai, true, None).await;
 
     assert!(refused.is_err(), "AI が自分で許可できてしまう: {refused:?}");
     assert!(engine.operation_request().is_some(), "問いが消えている");
@@ -105,7 +186,7 @@ async fn refusing_leaves_the_operation_unrunnable() {
     let _ = engine.run_operation(Actor::Ai, "reload-httpd").await;
 
     engine
-        .answer_operation(Actor::Human, false)
+        .answer_operation(Actor::Human, false, None)
         .await
         .expect("人が断れない");
 
@@ -127,7 +208,7 @@ async fn an_approval_is_spent_once() {
     let engine = engine_in(&dir);
     let _ = engine.run_operation(Actor::Ai, "reload-httpd").await;
     engine
-        .answer_operation(Actor::Human, true)
+        .answer_operation(Actor::Human, true, None)
         .await
         .expect("人が許せない");
 

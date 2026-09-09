@@ -267,6 +267,26 @@ impl SshSession {
     /// 捨てていた頃は、入っていないコマンドを打つと**空の成功**に見えました
     /// （テスト用サーバーに `uptime` が無く、実際にそう見えた・2026-08-30）。
     pub async fn exec(&self, actor: Actor, command: &str) -> Result<Ran, SshError> {
+        self.exec_with_stdin(actor, command, None).await
+    }
+
+    /// 同じものを、**標準入力を渡して**打つ（D48 / Issue #19）。
+    ///
+    /// `sudo -S` へパスワードを渡す道はここしかありません ——
+    /// **コマンド行へ置くと `ps` で他人に見えます。**
+    ///
+    /// **`stdin` は帯へ出しません。**帯は画面に出るので、出したら
+    /// **パスワードが画面と巻き戻しの両方に残ります。**
+    /// 帯へ出るのは `$ {command}` だけで、これは今までと同じです。
+    ///
+    /// 渡し終えたら **`eof` を送ります。**送らないと `cat` のように
+    /// 入力の終わりを待つものが**返ってきません**（実際に返らなくなる）。
+    pub async fn exec_with_stdin(
+        &self,
+        actor: Actor,
+        command: &str,
+        stdin: Option<&str>,
+    ) -> Result<Ran, SshError> {
         self.show(actor, &format!("$ {command}")).await?;
 
         let mut channel = self
@@ -278,6 +298,18 @@ impl SshSession {
             .exec(true, command)
             .await
             .map_err(|error| SshError::Command(error.to_string()))?;
+
+        if let Some(fed) = stdin {
+            channel
+                .data(fed.as_bytes())
+                .await
+                // **中身をエラーに載せません。**載せると記録へ流れます。
+                .map_err(|_| SshError::Command("標準入力を渡せませんでした".into()))?;
+            channel
+                .eof()
+                .await
+                .map_err(|_| SshError::Command("標準入力を閉じられませんでした".into()))?;
+        }
 
         let mut out = Vec::new();
         let mut err = Vec::new();

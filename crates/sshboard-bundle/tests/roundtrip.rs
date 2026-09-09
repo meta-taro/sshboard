@@ -6,7 +6,7 @@
 use sshboard_bundle::{
     decrypt_bundle, encrypt_bundle, BundleError, BundlePayload, MIN_PASSPHRASE_LEN,
 };
-use sshboard_connections::{ConnectionEntry, Connections};
+use sshboard_connections::{ConnectionEntry, Connections, Elevation};
 
 const PASS: &str = "sshboard-test-pass";
 
@@ -25,6 +25,7 @@ fn sample() -> BundlePayload {
         color: Some("red".into()),
         tag: Some("本番".into()),
         write_roots: vec!["/srv/app".into()],
+        elevation: Elevation::Ask,
     };
     let mut secrets = std::collections::BTreeMap::new();
     secrets.insert("prod-key".to_string(), "鍵のパスフレーズ".to_string());
@@ -47,6 +48,18 @@ fn what_goes_in_comes_back_out() {
         back.secrets.get("prod-key").map(String::as_str),
         Some("鍵のパスフレーズ")
     );
+}
+
+#[test]
+fn the_way_of_getting_root_travels_with_the_connection() {
+    // **落とすと、移った先で「動かない」だけが残ります**（D48）。
+    // これは人が書いた方針であって、秘密ではありません ——
+    // `ask` は**その場で人が入れる**ことしか意味せず、
+    // **持ち出しの中にパスワードは 1 バイトも入りません。**
+    let blob = encrypt_bundle(&sample(), PASS).expect("書き出せない");
+    let back = decrypt_bundle(&blob, PASS).expect("読み戻せない");
+
+    assert_eq!(back.connections.connections[0].elevation, Elevation::Ask);
 }
 
 #[test]

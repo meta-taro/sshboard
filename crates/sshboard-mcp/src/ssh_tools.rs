@@ -151,7 +151,15 @@ impl SshboardMcp {
                        with \"approval needed\" and puts the exact command on the human's \
                        screen for them to allow or refuse; call it again once they have \
                        allowed it. **One approval runs it once.** There is also an hourly \
-                       ceiling per operation. Use list_operations to see what exists."
+                       ceiling per operation. Use list_operations to see what exists. \
+                       This is also how you reach anything only root can read: if the \
+                       human set `become = \"ask\"` on the connection, an operation whose \
+                       command starts with `sudo` gets a password box on their screen, \
+                       and sshboard feeds what they type to sudo over stdin for that one \
+                       run. **You never see it and it is never stored.** If reading a \
+                       file fails with a permission error, say which path you could not \
+                       read and suggest they add an operation for it - do not ask them to \
+                       paste the contents to you."
     )]
     pub async fn run_operation(
         &self,
@@ -231,9 +239,15 @@ impl SshboardMcp {
             // 鍵のパスフレーズ待ちの接続（識別子だけ）。
             "waitingForPassphrase": engine.passphrase_request(),
             // 走らせてよいかを尋ねている操作（識別子と、実際に打つもの）。
-            "waitingForOperation": engine
-                .operation_request()
-                .map(|(id, runs)| serde_json::json!({ "id": id, "runs": runs })),
+            // `needsSecret` は **人がその場でパスワードを入れる必要があるか**（D48）。
+            // **秘密そのものは、ここにも他のどこにも流れません。**
+            "waitingForOperation": engine.operation_request().map(|asked| {
+                serde_json::json!({
+                    "id": asked.id,
+                    "runs": asked.runs,
+                    "needsSecret": asked.needs_secret,
+                })
+            }),
         }))
         .map_err(|error| ErrorData::internal_error(error.to_string(), None))
     }

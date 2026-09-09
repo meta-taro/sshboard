@@ -7,7 +7,7 @@ use std::cell::RefCell;
 use std::collections::BTreeMap;
 
 use sshboard_bundle::{apply_payload, build_payload, SecretVault, TransferError};
-use sshboard_connections::{ConnectionEntry, Connections};
+use sshboard_connections::{ConnectionEntry, Connections, Elevation};
 
 /// 試験用の保管庫。**実物の OS ストアを触りません。**
 #[derive(Default)]
@@ -78,6 +78,7 @@ fn entry(id: &str, keyring_ref: Option<&str>) -> ConnectionEntry {
         color: None,
         tag: None,
         write_roots: vec![],
+        elevation: Elevation::None,
     }
 }
 

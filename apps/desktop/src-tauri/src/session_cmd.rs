@@ -9,7 +9,7 @@ use std::sync::Arc;
 use serde::Serialize;
 use sshboard_band::Actor;
 use sshboard_diag::Event;
-use sshboard_engine::{Engine, OnConflict, Opened};
+use sshboard_engine::{Engine, OnConflict, Opened, OperationAsk as EngineOperationAsk};
 use tauri::{AppHandle, Emitter, State};
 
 /// 開いている接続が変わったことを画面へ配るイベント。
@@ -526,16 +526,25 @@ pub const OPERATION_REQUEST_EVENT: &str = "operation://request";
 pub struct OperationAsk {
     pub id: String,
     pub runs: String,
+    /// **人がその場でパスワードを入れる必要があるか**（D48 / Issue #19）。
+    pub needs_secret: bool,
+}
+
+impl From<EngineOperationAsk> for OperationAsk {
+    fn from(asked: EngineOperationAsk) -> Self {
+        Self {
+            id: asked.id,
+            runs: asked.runs,
+            needs_secret: asked.needs_secret,
+        }
+    }
 }
 
 pub fn spawn_operation_bridge(app: AppHandle, engine: Arc<Engine>) {
     tauri::async_runtime::spawn(async move {
         let mut watching = engine.subscribe_operation_request();
         while watching.changed().await.is_ok() {
-            let asked: Option<OperationAsk> = watching
-                .borrow()
-                .clone()
-                .map(|(id, runs)| OperationAsk { id, runs });
+            let asked: Option<OperationAsk> = watching.borrow().clone().map(OperationAsk::from);
             if let Err(error) = app.emit(OPERATION_REQUEST_EVENT, asked) {
                 eprintln!("[sshboard] 操作の問いを画面へ渡せません: {error}");
             }
@@ -548,16 +557,25 @@ pub fn spawn_operation_bridge(app: AppHandle, engine: Arc<Engine>) {
 pub async fn operation_request(
     engine: State<'_, Arc<Engine>>,
 ) -> Result<Option<OperationAsk>, String> {
-    Ok(engine
-        .operation_request()
-        .map(|(id, runs)| OperationAsk { id, runs }))
+    Ok(engine.operation_request().map(OperationAsk::from))
 }
 
-/// 人が答える（D47）。**答えられるのは人だけ。**
+/// 人が答える（D47 / D48）。**答えられるのは人だけ。**
+///
+/// `secret` は **人が画面でその場で入れたパスワードだけ**が入ります。
+/// **保存しません。**許可 1 回ぶんと一緒に持ち、走った瞬間に捨てます
+/// （`Engine::answer_operation`）。
+///
+/// **ここから記録へ 1 バイトも流しません。**エラーにも載せません ——
+/// 載せると診断ログに残ります。
 #[tauri::command]
-pub async fn operation_answer(allow: bool, engine: State<'_, Arc<Engine>>) -> Result<(), String> {
+pub async fn operation_answer(
+    allow: bool,
+    secret: Option<String>,
+    engine: State<'_, Arc<Engine>>,
+) -> Result<(), String> {
     engine
-        .answer_operation(Actor::Human, allow)
+        .answer_operation(Actor::Human, allow, secret)
         .await
         .map_err(|error| error.to_string())
 }

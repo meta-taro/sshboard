@@ -4,11 +4,13 @@
 //! **AI へはホスト名も利用者名も渡しません。**識別子と名前だけです
 //! （CLAUDE.md 禁止事項 5）。
 
+mod elevation;
 mod entry;
 mod mark;
 mod store;
 mod watch;
 
+pub use elevation::{elevated, Elevated, Elevation};
 pub use entry::{ConnectionEntry, ConnectionSummary};
 pub use mark::{
     is_connection_color, is_connection_tag, CONNECTION_COLORS, CONNECTION_TAG_MAX_CHARS,

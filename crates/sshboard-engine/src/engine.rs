@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use sshboard_band::{Actor, Band};
-use sshboard_connections::{ConnectionEntry, Connections};
+use sshboard_connections::{elevated, ConnectionEntry, Connections, Elevation};
 use sshboard_credentials::SecretStore;
 use sshboard_diag::{Diagnostics, Stage};
 use sshboard_readonly::{Allowlist, Operations, ReadonlyCommand, Refusals};
@@ -25,6 +25,11 @@ const KEYRING_SERVICE: &str = "sshboard";
 struct Live {
     session: Arc<SshSession>,
     opened: Opened,
+    /// **この接続での権限の上げ方**（D48 / Issue #19）。
+    ///
+    /// 繋いだときの値を持ちます。**接続中に `connections.toml` を書き換えても
+    /// 効きません** —— 効くと、人が画面で見ている状態と食い違います。
+    elevation: Elevation,
 }
 
 /// 端末を握っている側と、その 1 本（D29）。
@@ -70,6 +75,33 @@ struct Held {
     active: Option<String>,
 }
 
+/// **AI が走らせたい操作**。人が答えるまで残り、**画面にそのまま出ます。**
+///
+/// **秘密は持ちません。**画面に出るものへ秘密を載せたら、
+/// 巻き戻し（D40）にも残ります。持つのは「聞く必要があるか」だけです。
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+pub struct OperationAsk {
+    /// 人が `operations.toml` へ書いた識別子。
+    pub id: String,
+    /// **実際に打つ文字列**（上げ方を当てはめたあとの形）。
+    ///
+    /// 当てはめる前を見せると、**人は `sudo -S` が付くことを知らないまま
+    /// パスワードを求められます。**打つものをそのまま見せます。
+    pub runs: String,
+    /// **人がその場でパスワードを入れる必要があるか**（D48）。
+    pub needs_secret: bool,
+}
+
+/// 人が出した許可 1 枚。**使い切りです。**
+struct Approval {
+    id: String,
+    at: std::time::Instant,
+    /// 人がその場で入れたもの（D48）。**保存しません。**
+    ///
+    /// **札と一緒に消えます** —— 残ると、人が見ていない間に何度でも上がれます。
+    secret: Option<String>,
+}
+
 /// **すべての操作が通る 1 か所**（PRD §4-1）。
 pub struct Engine {
     band: Band,
@@ -90,9 +122,9 @@ pub struct Engine {
     ///
     /// 持つのは**識別子と、実際に打つ文字列**だけ。人が「何が走るのか」を
     /// 読んでから答えられるようにするためです。
-    operation_request: watch::Sender<Option<(String, String)>>,
-    /// いつ走らせたか。**回数の上限**（`max_per_hour`）を数えるため。
-    operation_runs: Mutex<Vec<(String, std::time::Instant)>>,
+    operation_request: watch::Sender<Option<OperationAsk>>,
+    /// 人が出した許可の札。**回数の上限**（`max_per_hour`）もここで数えます。
+    operation_runs: Mutex<Vec<Approval>>,
     /// **AI が繋ごうとして、パスフレーズで止まった接続**（Issue #13）。
     ///
     /// 識別子だけを持ちます。**パスフレーズ本体はここへ来ません**（D14）——
@@ -307,6 +339,8 @@ impl Engine {
             Live {
                 session: Arc::new(session),
                 opened: opened.clone(),
+                // **繋いだ時点の値。**人が画面で見ている状態と食い違わせない。
+                elevation: entry.elevation,
             },
         );
         // **開いたものを宛先にする。**開いたのに何も向いていない、を作らない。
@@ -751,7 +785,24 @@ impl Engine {
 
     /// コマンドを 1 回打つ。**stderr も終了コードも返します**（握り潰さない）。
     pub async fn exec(&self, actor: Actor, command: &str) -> Result<Ran, EngineError> {
-        let ran = self.session().await?.exec(actor, command).await?;
+        self.exec_with_stdin(actor, command, None).await
+    }
+
+    /// 同じものを、**標準入力を渡して**打つ（D48 / Issue #19）。
+    ///
+    /// **渡したものは画面にも記録にも出ません。**出るのは `$ {command}` と、
+    /// サーバーが返したものだけ —— 今までと同じです。
+    async fn exec_with_stdin(
+        &self,
+        actor: Actor,
+        command: &str,
+        stdin: Option<&str>,
+    ) -> Result<Ran, EngineError> {
+        let ran = self
+            .session()
+            .await?
+            .exec_with_stdin(actor, command, stdin)
+            .await?;
 
         // **打ったものと、返ってきたものを画面へ出す**（Issue #14 の 2 つ目）。
         //
@@ -850,13 +901,23 @@ impl Engine {
             .map_err(|error| EngineError::Allowlist(error.to_string()))
     }
 
-    /// いま人に問うている操作（識別子と、実際に打つもの）。
-    pub fn operation_request(&self) -> Option<(String, String)> {
+    /// いま人に問うている操作。**秘密は載りません。**
+    pub fn operation_request(&self) -> Option<OperationAsk> {
         self.operation_request.borrow().clone()
     }
 
-    pub fn subscribe_operation_request(&self) -> watch::Receiver<Option<(String, String)>> {
+    pub fn subscribe_operation_request(&self) -> watch::Receiver<Option<OperationAsk>> {
         self.operation_request.subscribe()
+    }
+
+    /// いまの宛先での権限の上げ方（D48）。**繋がっていなければ「上げない」。**
+    async fn elevation(&self) -> Elevation {
+        let held = self.held.lock().await;
+        held.active
+            .as_ref()
+            .and_then(|id| held.live.get(id))
+            .map(|live| live.elevation)
+            .unwrap_or_default()
     }
 
     /// 人が答える（D47）。**答えられるのは人だけ。**
@@ -864,21 +925,37 @@ impl Engine {
     /// 許しても、**走らせるのは AI がもう一度呼んだとき**です。
     /// ここで走らせると、人が「許可」を押した瞬間にサーバーが動くことになり、
     /// **帯にも端末にも、誰が起こしたのかが出ません。**
-    pub async fn answer_operation(&self, actor: Actor, allow: bool) -> Result<(), EngineError> {
+    /// `secret` は **人がその場で入れたパスワードだけ**が入ります（D48）。
+    /// **保存しません。**許可の札と一緒に持ち、走った瞬間に捨てます。
+    /// 断られたら、その場で捨てます。
+    pub async fn answer_operation(
+        &self,
+        actor: Actor,
+        allow: bool,
+        secret: Option<String>,
+    ) -> Result<(), EngineError> {
         if actor != Actor::Human {
+            // **AI が自分へ権限を渡せたら、承認の意味がありません。**
             return Err(EngineError::ConsoleApprovalNeeded);
         }
-        let Some((id, _)) = self.operation_request.borrow().clone() else {
+        let Some(asked) = self.operation_request.borrow().clone() else {
             return Ok(());
         };
+        let id = asked.id;
         self.operation_request.send_replace(None);
         if allow {
             let mut runs = self.operation_runs.lock().await;
-            runs.push((id.clone(), std::time::Instant::now()));
+            runs.push(Approval {
+                id: id.clone(),
+                at: std::time::Instant::now(),
+                secret,
+            });
             drop(runs);
+            // **記録に出すのは識別子だけ。**入れたものは 1 バイトも書きません。
             self.diag
                 .info(Stage::Exec, None, format!("人が {id} を許可しました"));
         } else {
+            // `secret` はここで落ちます（断ったのに残る、を作らない）。
             self.diag
                 .info(Stage::Exec, None, format!("人が {id} を断りました"));
         }
@@ -898,50 +975,86 @@ impl Engine {
             return Err(self.refuse_readonly(actor, id).await);
         };
 
+        // **どうやって権限を得るか**（D48 / Issue #19）。
+        //
+        // `operations.toml` は「**どのコマンドを走らせてよいか**」を解きますが、
+        // 「**どうやって権限を得るか**」は解いていませんでした。実機の指摘:
+        //
+        // > **AI 側から root 領域を読む道が、現時点でゼロです。**
+        //
+        // 上げ方は**接続ごとに人が書きます**。`sudo` で始まらないものは
+        // 何も変わりません（`Elevation::None` なら、そもそも 1 文字も変わりません）。
+        let raised = elevated(&operation.run, self.elevation().await);
+
         // **回数で止まる。**暴走しても、ここで止まります。
         let mut runs = self.operation_runs.lock().await;
         let hour = std::time::Duration::from_secs(3600);
-        runs.retain(|(_, at)| at.elapsed() < hour);
-        let lately = runs.iter().filter(|(held, _)| held == id).count() as u32;
+        runs.retain(|held| held.at.elapsed() < hour);
+        let lately = runs.iter().filter(|held| held.id == id).count() as u32;
         drop(runs);
 
         // 人はいつでも走らせられます。**上限と承認は AI にかかります。**
-        if actor != Actor::Human {
-            if lately > operation.max_per_hour {
-                self.diag.error(
-                    Stage::Exec,
-                    None,
-                    format!("{id} は 1 時間に {} 回までです", operation.max_per_hour),
-                    "時間を空けるか、人に operations.toml を見直してもらってください",
-                );
-                return Err(EngineError::NotAllowed { id: id.to_owned() });
-            }
-            // **許可を貰っているか。**貰っていなければ、問いを立てて断ります。
-            let approved = self.take_operation_approval(id).await;
-            if !approved {
-                self.operation_request
-                    .send_replace(Some((operation.id.clone(), operation.run.clone())));
-                self.diag.info(
-                    Stage::Exec,
-                    None,
-                    format!("{id} を走らせてよいか、人に尋ねています"),
-                );
-                return Err(EngineError::ConsoleApprovalNeeded);
-            }
+        if actor != Actor::Human && lately > operation.max_per_hour {
+            self.diag.error(
+                Stage::Exec,
+                None,
+                format!("{id} は 1 時間に {} 回までです", operation.max_per_hour),
+                "時間を空けるか、人に operations.toml を見直してもらってください",
+            );
+            return Err(EngineError::NotAllowed { id: id.to_owned() });
         }
+
+        // **札を取るのは、承認が要るときか、秘密が要るとき。**
+        // 人が自分で走らせるだけなら、承認も秘密も間に挟みません。
+        let approval = if actor != Actor::Human || raised.needs_secret {
+            self.take_operation_approval(id).await
+        } else {
+            None
+        };
+
+        if actor != Actor::Human && approval.is_none() {
+            // **貰っていなければ、問いを立てて断ります。**
+            // 画面へ出すのは、**上げ方を当てはめたあとの、実際に打つ文字列**です。
+            self.operation_request.send_replace(Some(OperationAsk {
+                id: operation.id.clone(),
+                runs: raised.command.clone(),
+                needs_secret: raised.needs_secret,
+            }));
+            self.diag.info(
+                Stage::Exec,
+                None,
+                format!("{id} を走らせてよいか、人に尋ねています"),
+            );
+            return Err(EngineError::ConsoleApprovalNeeded);
+        }
+
+        // **`-S` を付けたら、標準入力を必ず閉じます。**
+        //
+        // 秘密が無くても `Some("")` を渡します。渡さないと `sudo -S` は
+        // **入力を待ったまま返ってきません**（exec に端末はありません）。
+        // 空で閉じれば、その場で「パスワードがありません」と落ちて人に伝わります。
+        let fed = raised.needs_secret.then(|| {
+            approval
+                .and_then(|held| held.secret)
+                .unwrap_or_default()
+                // sudo は 1 行として読みます。**改行が無いと待ち続けます。**
+                + "\n"
+        });
 
         // 帯へは `exec` が `$ ...` を出します。**二重に出しません。**
-        self.exec(actor, &operation.run).await
+        // **入れたものは帯にも画面にも出ません**（`exec_with_stdin` の約束）。
+        self.exec_with_stdin(actor, &raised.command, fed.as_deref())
+            .await
     }
 
-    /// 許可を 1 回ぶん使う。**使い切りです**（許可 1 回につき 1 回だけ走る）。
-    async fn take_operation_approval(&self, id: &str) -> bool {
+    /// 許可を 1 枚ぶん使う。**使い切りです**（許可 1 回につき 1 回だけ走る）。
+    ///
+    /// **秘密も札と一緒に出ていきます。**残すと、人が見ていない間に
+    /// 何度でも権限を上げられます。
+    async fn take_operation_approval(&self, id: &str) -> Option<Approval> {
         let mut runs = self.operation_runs.lock().await;
-        if let Some(at) = runs.iter().position(|(held, _)| held == id) {
-            runs.remove(at);
-            return true;
-        }
-        false
+        let at = runs.iter().position(|held| held.id == id)?;
+        Some(runs.remove(at))
     }
 
     pub async fn run_readonly(&self, actor: Actor, id: &str) -> Result<Ran, EngineError> {

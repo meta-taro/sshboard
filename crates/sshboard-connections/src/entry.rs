@@ -9,6 +9,8 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::Elevation;
+
 /// 既定の SSH ポート。
 const DEFAULT_PORT: u16 = 22;
 
@@ -71,6 +73,24 @@ pub struct ConnectionEntry {
     /// 人（GUI）はここに関係なく自由に書ける（PRD §3）。
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub write_roots: Vec<String>,
+
+    /// **どうやって権限を上げるか**（D48 / Issue #19）。
+    ///
+    /// サーバーによって使える道が違うため、**接続ごとに人が書きます。**
+    /// 既定は「上げない」—— 書くまで、いまと 1 文字も変わりません。
+    ///
+    /// **ここに秘密は入りません。**`ask` は人がその場で入れるもので、
+    /// 保存する場所を作っていません（D11 / D48）。
+    #[serde(
+        default,
+        rename = "become",
+        skip_serializing_if = "is_default_elevation"
+    )]
+    pub elevation: Elevation,
+}
+
+fn is_default_elevation(how: &Elevation) -> bool {
+    *how == Elevation::default()
 }
 
 /// **AI へ渡す形。**

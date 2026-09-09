@@ -194,15 +194,36 @@ max_per_hour = 3
 
 - 檻そのもの —— `sudoers` / `visudo` / `authorized_keys`
 - **鍵** —— `.ssh` / `id_rsa` / `id_ed25519` / `id_ecdsa`
+- **パスワードの入れ物** —— `/etc/shadow` / `/etc/gshadow`
 - sshboard 自身の設定 —— `connections.toml` / `readonly.toml` / `operations.toml`
 - 利用者とロール —— `useradd` / `usermod` / `userdel` / `groupadd`
 - 壊す操作 —— `mkfs` / `fdisk` / `dd ` / `rm -rf`
 
 **AI が自分の檻を広げられないこと**が、この一覧の芯です。
 
-### `sudo` は sshboard が扱いません
+## root が要る操作（`become`）
 
-**持ちません。運びません。聞きません。**代わりに**サーバー側で範囲を切ります。**
+`operations.toml` は「**どのコマンドを走らせてよいか**」を決めます。
+「**どうやって権限を得るか**」は、**接続ごとに書きます**（`connections.toml`）。
+
+```toml
+[[connections]]
+id = "..."
+become = "sudoers"   # サーバー側で範囲が切ってある（推奨）
+# become = "ask"     # 要るときに人へ聞く。**保存しません**
+# 書かなければ「上げない」
+```
+
+| `become` | sshboard が打つもの | パスワード |
+|---|---|---|
+| 書かない | 人が `run` に書いたまま | 要りません |
+| `sudoers` | `sudo -n …` | 要りません（`sudoers.d` が持つ） |
+| `ask` | `sudo -S -p '' …` | **人が画面でその場で入れます** |
+
+**`sudo ` で始まる `run` だけが対象**です。それ以外は 1 文字も変わりません。
+`ask` にしても、`sudo` を使わない操作でパスワードを聞かれることはありません。
+
+### `sudoers`（推奨）
 
 ```
 <利用者> ALL=(root) NOPASSWD: /usr/bin/systemctl restart httpd, /usr/bin/systemctl reload httpd
@@ -218,8 +239,6 @@ sudo chmod 0440 /etc/sudoers.d/sshboard
 範囲が `sudoers` に書いてあるので**後から人が読んで検証でき**、
 **sshboard 側に秘密が 1 つも増えません。**
 
-`su` で先に root になる運用は**勧めません** —— **範囲が消えます。**
-
 効いているかは、こう確かめます。
 
 ```sh
@@ -228,6 +247,37 @@ sudo -n systemctl restart nginx   # 書いていないものは断られるは�
 ```
 
 **2 つ目が通ってしまったら、範囲が広すぎます。**
+
+### `ask`（`sudoers` を触れないとき）
+
+**サーバーを触れない事情は実在します** —— 借りている・権限が無い・台数が多い。
+`sudo -n` が「パスワードが必要です」と返るサーバーでは、`sudoers` の道は
+**最初から閉じています。**そのための `ask` です。
+
+承認の画面にパスワードの欄が出て、**人がその場で入れます。**
+
+- **保存しません。**ディスクにも OS ストアにも置きません
+- **コマンド行に載せません。**標準入力から渡すので、`ps` に出ません
+- **画面にも記録にも出ません。**出るのは `$ sudo -S -p '' …` までです
+- **1 回の許可で 1 回だけ。**走った瞬間に捨てます
+- **断れば、その場で捨てます**
+
+**root しか読めないログを読む**のも、この形です。
+
+```toml
+[[operation]]
+id = "read-letsencrypt-log"
+run = "sudo tail -n 200 /var/log/letsencrypt/letsencrypt.log"
+description = "証明書の更新がなぜ失敗したかを見る"
+max_per_hour = 6
+```
+
+**読み取りの許可リスト（`readonly.toml`）には効きません。**
+効かせると、**読み取りのたびにパスワードを聞かれます。**
+root が要る読み取りは、`operations.toml` に書いてください。
+
+`su` で先に root になる運用は**勧めません** —— **範囲が消えます。**
+`su -` しか無いサーバー向けの道は、**まだありません**（`.claude/decisions.md` D48）。
 
 ### 製品が保証できないこと
 

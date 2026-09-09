@@ -66,6 +66,11 @@ fn what_must_never_run_is_refused_even_when_written_down() {
         "useradd attacker",
         "usermod -aG wheel someone",
         "cat ~/.ssh/id_ed25519",
+        // **パスワードの入れ物**（D48 で新しく届くようになった所）。
+        // `become = "ask"` を入れるまで、root しか読めないものは
+        // **そもそも読めませんでした。**読めるようになった以上、ここも塞ぎます。
+        "sudo cat /etc/shadow",
+        "sudo tail /etc/gshadow",
         // 壊す
         "rm -rf /var",
         "mkfs.ext4 /dev/sda1",

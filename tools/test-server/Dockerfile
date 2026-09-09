@@ -10,7 +10,9 @@
 FROM almalinux:9
 
 # glibc-gconv-extra が無いと iconv が EUC-JP を知らない（RHEL 9 は変換表が別）。
-RUN dnf -y install openssh-server acl glibc-langpack-ja glibc-gconv-extra \
+# **sudo を入れます**（D48 / Issue #19）。実機で `sudo -n true` が
+# 「パスワードが必要です」と返った状態を、手元で作れるようにするためです。
+RUN dnf -y install openssh-server acl glibc-langpack-ja glibc-gconv-extra sudo \
     && dnf clean all \
     && ssh-keygen -A
 
@@ -39,6 +41,19 @@ RUN useradd -m -s /bin/bash probe
 # パスワードは試験用の固定文字列で、**製品にも実機にも一切関係しません。**
 RUN useradd -m -s /bin/bash pw \
     && echo 'pw:sshboard-test-password' | chpasswd
+
+# **パスワードを聞かれる sudo**（D48 / Issue #19）。
+#
+# 実機の状態がこれでした ——
+#
+# ```
+# $ sudo -n true
+# sudo: パスワードが必要です
+# ```
+#
+# `NOPASSWD` を**付けません。**付けたら、直したい状態が再現しません。
+# **`probe` には sudo を与えません** —— `sudoers` の道が閉じている側も要ります。
+RUN echo 'pw ALL=(ALL) ALL' > /etc/sudoers.d/pw && chmod 440 /etc/sudoers.d/pw
 
 # --- ここから「再現したい状態」 ---
 
