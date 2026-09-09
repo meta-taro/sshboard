@@ -1361,7 +1361,7 @@
 							<span class="at">{(event.atMs / 1000).toFixed(1)}s</span>
 							<span class="stage">{event.stage}</span>
 							{#if event.connection}<span class="who">{event.connection}</span>{/if}
-							<span class="what">
+							<span class="detail">
 								{event.message}
 								{#if event.hint}<em class="hint">→ {event.hint}</em>{/if}
 							</span>
@@ -1820,7 +1820,17 @@
 		border-radius: 999px;
 	}
 
-	.what {
+	/*
+	 * 診断の 1 行の中身。**面の説明文（`.what`）と名前が衝突していました**（Issue #22）。
+	 *
+	 * 同じ `.what` が 2 か所で定義され、**`flex: 1 1 auto` が説明文にも効いて**
+	 * いました。説明文の `<p>` が縦へ伸び、**上に 250px の空白ができ、
+	 * その分だけ下の出力ペインと一覧が潰れて重なっていました。**
+	 *
+	 * **CSS は後勝ちですが、片方にしか無い宣言は生き残ります。**
+	 * 名前を分けます。
+	 */
+	.detail {
 		flex: 1 1 auto;
 		min-width: 0;
 	}
@@ -2073,7 +2083,9 @@
 	}
 
 	/* **この面が何をする所か**を書く 1 行。読んで分からない面は、無いのと同じ。 */
+	/* 面の説明文。**伸びません**（Issue #22 —— 伸びて 250px の空白を作っていました）。 */
 	.what {
+		flex: 0 0 auto;
 		margin: 0 0 0.35rem;
 		font-size: 0.72rem;
 		line-height: 1.6;
@@ -2125,7 +2137,9 @@
 
 	.band {
 		flex: 1;
-		min-height: 0;
+		/* **下端で切れないように。**`min-height: 0` だけだと、中身が伸びて
+		   ウィンドウの外へはみ出します（Issue #22）。 */
+		min-height: 6rem;
 		overflow-y: auto;
 		background: var(--shell);
 		border: 1px solid var(--hairline);
