@@ -203,6 +203,41 @@ impl SshboardMcp {
             .map_err(|error| ErrorData::internal_error(error.to_string(), None))
     }
 
+    /// **人が答えたかどうか**を知る口（Issue #20）。**サーバーへは触りません。**
+    #[tool(
+        description = "Check whether the person has answered anything you asked for: the \
+                       console hold, a key passphrase, or an operation approval. **Touches no \
+                       remote server and shows nothing on their screen**, so polling this is \
+                       free - use it instead of re-calling console_open or connect in a loop. \
+                       Returns who holds the console, whether a question is still waiting, and \
+                       which connection is waiting for a passphrase."
+    )]
+    pub async fn pending_status(&self) -> Result<String, ErrorData> {
+        // **帯へ載せません。**何度呼んでも人の画面に何も出ない、が要点です。
+        // 載せると、ポーリングのたびに帯が埋まります。
+        let engine = self.engine()?;
+        let holder = match engine.console_holder().await {
+            Some(Actor::Human) => "human",
+            Some(Actor::Ai) => "ai",
+            None => "none",
+        };
+        serde_json::to_string(&serde_json::json!({
+            "console": {
+                "holder": holder,
+                "onConnection": engine.console_connection().await,
+                // **人の答え待ちか。**true の間は、頼み直さないこと。
+                "waitingForTheHuman": engine.console_request().await.is_some(),
+            },
+            // 鍵のパスフレーズ待ちの接続（識別子だけ）。
+            "waitingForPassphrase": engine.passphrase_request(),
+            // 走らせてよいかを尋ねている操作（識別子と、実際に打つもの）。
+            "waitingForOperation": engine
+                .operation_request()
+                .map(|(id, runs)| serde_json::json!({ "id": id, "runs": runs })),
+        }))
+        .map_err(|error| ErrorData::internal_error(error.to_string(), None))
+    }
+
     /// いま何が開いているか。**サーバーへは触りません。**
     #[tool(
         description = "List every connection sshboard currently holds open, where the AI may write on each, and which one file and command operations currently go to. Touches no remote server."
@@ -813,7 +848,8 @@ impl SshboardMcp {
     ) -> Result<String, ErrorData> {
         let cols = request.cols.unwrap_or(80).clamp(20, 500);
         let rows = request.rows.unwrap_or(24).clamp(5, 200);
-        self.engine()?
+        let opened = self
+            .engine()?
             .console_open(Actor::Ai, cols, rows)
             .await
             .map_err(refuse)?;
@@ -824,8 +860,20 @@ impl SshboardMcp {
             .console_connection()
             .await
             .unwrap_or_else(|| "?".to_string());
+        // **黙って別のシェルになるのが一番危ない**（Issue #21）。
+        // 受け取ったのか、新しく立てたのかを必ず言います。
+        let how = match opened {
+            sshboard_engine::ConsoleOpened::TookOver => {
+                "You took over the shell that was already running - whatever the person set up \
+                 (su, working directory, environment, running jobs) is still there."
+            }
+            sshboard_engine::ConsoleOpened::Fresh => {
+                "**This is a new shell.** Anything the person had set up in an earlier one \
+                 (su, working directory, environment) is not here."
+            }
+        };
         Ok(format!(
-            "console opened on {on} ({cols}x{rows}). Read the output with read_stream. \
+            "console opened on {on} ({cols}x{rows}). {how} Read the output with read_stream. \
              It stays on {on} even if the focus moves to another connection."
         ))
     }

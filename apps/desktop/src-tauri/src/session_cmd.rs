@@ -636,11 +636,15 @@ pub async fn console_open(
     cols: u32,
     rows: u32,
     engine: State<'_, Arc<Engine>>,
-) -> Result<(), String> {
-    engine
+) -> Result<bool, String> {
+    // **新しく立てたのか、受け取ったのか**を画面へ返します（Issue #21）。
+    // **黙って別のシェルになるのが一番危ない** —— 人が `su -` した状態も、
+    // カレントディレクトリも、実行中のジョブも消えるためです。
+    let opened = engine
         .console_open(Actor::Human, cols.max(20), rows.max(5))
         .await
-        .map_err(|error| error.to_string())
+        .map_err(|error| error.to_string())?;
+    Ok(matches!(opened, sshboard_engine::ConsoleOpened::Fresh))
 }
 
 /// 打ち込む。**握っている側だけ**（Engine が判断します）。

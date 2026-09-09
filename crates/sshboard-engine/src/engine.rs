@@ -48,6 +48,17 @@ struct ConsoleSlot {
     request: Option<Actor>,
 }
 
+/// 端末を開いたときに、**新しく立てたのか、受け取ったのか**（Issue #21）。
+///
+/// **黙って別のシェルになるのが一番危ない**ので、呼んだ側へ返します。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ConsoleOpened {
+    /// 新しいシェルを立てた。**それまでの `su` も環境変数も引き継がれません。**
+    Fresh,
+    /// 既にあるシェルを受け取った。**そのまま続きから打てます。**
+    TookOver,
+}
+
 /// 開いているもの全部と、いま操作の宛先になっているもの。
 ///
 /// **1 本残らずここに入ります**（D25）。裏に持つ場所はありません。
@@ -384,7 +395,7 @@ impl Engine {
         actor: Actor,
         cols: u32,
         rows: u32,
-    ) -> Result<(), EngineError> {
+    ) -> Result<ConsoleOpened, EngineError> {
         // **AI が握るには、人の許可が要る**（D42）。**サーバーへ行く前に**尋ねます。
         self.ask_first(actor).await?;
 
@@ -432,6 +443,33 @@ impl Engine {
             }
         }
 
+        // **既に開いているなら、新しく開きません**（Issue #21）。
+        //
+        // それまでは握りを渡すたびに PTY を立て直しており、
+        // **人と AI で別々のシェルが立っていました。**画面には
+        // 「人と AI で共有します」と書いてあるのに、共有していませんでした。
+        //
+        // 実機ではこう出ました —— 人が `su -` して root になったあと AI へ渡すと、
+        // **`Last login` が途中で出て、プロンプトが元の利用者に戻る。**
+        // `su` も、カレントディレクトリも、環境変数も、実行中のジョブも消えます。
+        //
+        // **そして `read_stream` は 2 本の出力を区切り無しに 1 本に見せます。**
+        // 「root だと思っていない AI が実は root」の並びがあれば事故になります。
+        {
+            let mut slot = self.console.lock().await;
+            if slot.console.is_some() && slot.connection.as_deref() == Some(target.as_str()) {
+                slot.holder = Some(actor);
+                drop(slot);
+                self.diag.info(
+                    Stage::Exec,
+                    Some(&target),
+                    format!("握りが{}へ移りました（同じシェルのまま）", who(actor)),
+                );
+                let _ = self.console_changed.send(Some(actor));
+                return Ok(ConsoleOpened::TookOver);
+            }
+        }
+
         let session = self.session().await?;
         let console = session
             .open_console(actor, cols, rows, Arc::clone(&self.stream))
@@ -462,7 +500,7 @@ impl Engine {
             format!("端末を開きました（{}・{cols}×{rows}）", who(actor)),
         );
         let _ = self.console_changed.send(Some(actor));
-        Ok(())
+        Ok(ConsoleOpened::Fresh)
     }
 
     /// 打ち込む。**握っている側だけ**（D29）。

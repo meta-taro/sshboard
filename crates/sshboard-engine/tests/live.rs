@@ -979,3 +979,52 @@ async fn what_a_purpose_built_tool_runs_shows_up_on_the_screen() {
         "**返ってきたものが画面に出ていない**:\n{shown}"
     );
 }
+
+#[tokio::test]
+async fn handing_the_console_over_keeps_the_same_shell() {
+    // **実機の指摘**（Issue #21）—— 握りを渡すと別のシェルが開いていました。
+    //
+    // > 人が `su -` して root になったあと AI へ渡すと、
+    // > **`Last login` が途中で出て、プロンプトが元の利用者に戻る**
+    //
+    // `su` も、カレントディレクトリも、環境変数も、実行中のジョブも消えます。
+    // そして **`read_stream` は 2 本の出力を区切り無しに 1 本に見せます。**
+    if !server_is_up().await {
+        println!("テスト用サーバーが建っていません（想定内・飛ばします）");
+        return;
+    }
+    let dir = tempfile::tempdir().expect("一時ディレクトリ");
+    let engine = engine_connected(&dir).await;
+
+    // 人が開いて、下ごしらえをする。
+    let first = engine
+        .console_open(Actor::Human, 80, 24)
+        .await
+        .expect("人が開けない");
+    assert_eq!(first, sshboard_engine::ConsoleOpened::Fresh);
+
+    // AI が握る（D42 の承認を通す）。
+    let asked = engine.console_open(Actor::Ai, 80, 24).await;
+    assert!(
+        matches!(asked, Err(EngineError::ConsoleApprovalNeeded)),
+        "許可なく握れてしまう: {asked:?}"
+    );
+    engine
+        .console_answer(Actor::Human, true)
+        .await
+        .expect("人が許せない");
+
+    let second = engine
+        .console_open(Actor::Ai, 80, 24)
+        .await
+        .expect("許可したのに開けない");
+
+    // **ここが本題。**新しく立てず、受け取ること。
+    assert_eq!(
+        second,
+        sshboard_engine::ConsoleOpened::TookOver,
+        "**握りを渡したのに、別のシェルが開いている。**\
+         人が `su -` した状態も、カレントディレクトリも消えます"
+    );
+    assert_eq!(engine.console_holder().await, Some(Actor::Ai));
+}

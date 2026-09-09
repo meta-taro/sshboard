@@ -183,6 +183,12 @@ async fn the_server_advertises_only_the_phase_zero_tools() {
         // **AI が「こちらを見て」と言える口**（D44 / Issue #15）。
         // 承認も実行も増えません —— 奪えないことは画面側が担保します。
         "show_view",
+        // **人が答えたかを知る口**（Issue #20）。帯にも画面にも何も出さないので、
+        // **ポーリングしても害がありません** —— それが要点です。
+        "pending_status",
+        // **状態を変える操作**（D45 / Issue #17）。渡せるのは id だけ。
+        "run_operation",
+        "list_operations",
     ] {
         assert!(
             listed.contains(expected),
