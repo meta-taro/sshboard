@@ -8,7 +8,7 @@
 - **`.claude/rules/product-baseline.md`** — 開発のベースルール。**最優先で従うこと**。
 - **`PRD.md`** — このプロダクトの方向性・仕様。
 - **`.claude/roadmap.md`** — フェーズと進め方。**Phase 0 は技術項目を抜け、Phase 1 に入っています**。
-- **`.claude/decisions.md`** — 決定と、その理由（D1〜D41）。**未決は D10 と D41**。
+- **`.claude/decisions.md`** — 決定と、その理由（D1〜D47）。**未決は D10 / D41 / D47 の届け先**。
 - **`.claude/issues/`** — 着手すべきローカル Issue。
 
 ## この製品に固有の禁止事項（最優先）
