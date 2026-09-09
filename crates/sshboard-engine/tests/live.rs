@@ -934,3 +934,48 @@ async fn moving_around_does_not_lose_the_active_session() {
         );
     }
 }
+
+#[tokio::test]
+async fn what_a_purpose_built_tool_runs_shows_up_on_the_screen() {
+    // **実機の指摘**（Issue #14 の 2 つ目）:
+    //
+    // > 用途別ツールは実際にサーバーでコマンドを走らせているので、
+    // > **端末に出ないほうが不自然**です
+    //
+    // `exec` は共有している出力へ 1 バイトも流しておらず、
+    // **AI がサーバーで何を見たのかを、人は追えません**でした。
+    if !server_is_up().await {
+        println!("テスト用サーバーが建っていません（想定内・飛ばします）");
+        return;
+    }
+    let dir = tempfile::tempdir().expect("一時ディレクトリ");
+    let engine = engine_at(registry(&dir, &[]).await);
+    engine
+        .connect(Actor::Human, "local", None)
+        .await
+        .expect("繋がらない");
+
+    // **画面の側で待ち受けてから走らせる。**
+    let mut watching = engine.stream().subscribe_raw();
+
+    let ran = engine
+        .runtime_versions(Actor::Ai)
+        .await
+        .expect("用途別ツールが走らない");
+
+    // 画面へ届いた分を集める。**打ったものと、返ってきたものの両方。**
+    let mut shown = String::new();
+    while let Ok(chunk) = watching.try_recv() {
+        shown.push_str(&String::from_utf8_lossy(&chunk));
+    }
+
+    assert!(
+        shown.contains('$'),
+        "**打ったコマンドが画面に出ていない。**\
+         人は AI が何を走らせたのか追えません:\n{shown}"
+    );
+    assert!(
+        !ran.out.is_empty() && shown.contains(ran.out.lines().next().unwrap_or("")),
+        "**返ってきたものが画面に出ていない**:\n{shown}"
+    );
+}

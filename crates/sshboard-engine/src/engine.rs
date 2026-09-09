@@ -701,7 +701,58 @@ impl Engine {
 
     /// コマンドを 1 回打つ。**stderr も終了コードも返します**（握り潰さない）。
     pub async fn exec(&self, actor: Actor, command: &str) -> Result<Ran, EngineError> {
-        Ok(self.session().await?.exec(actor, command).await?)
+        let ran = self.session().await?.exec(actor, command).await?;
+
+        // **打ったものと、返ってきたものを画面へ出す**（Issue #14 の 2 つ目）。
+        //
+        // 実機の指摘:
+        //
+        // > 用途別ツールは実際にサーバーでコマンドを走らせているので、
+        // > **端末に出ないほうが不自然**です
+        //
+        // **そのとおりでした。**`exec` は共有している出力へ 1 バイトも流しておらず、
+        // **AI がサーバーで何を見たのかを、人は追えません**でした。
+        // 端末（D29）と `tail -f` は流しているのに、ここだけ抜けていました。
+        //
+        // 別のタブ（操作の記録）へ寄せる案は採りません ——
+        // **見る場所が 1 つで済み、人が打った分と AI が打った分が同じ時系列に並ぶ**
+        // 方が、「1 つのシェルを共有する」という説明と見え方が一致します。
+        //
+        // **`tail -f` と混ざります。**出どころの札（D41）は付けていません ——
+        // 混ざって困ると分かってから足します（YAGNI）。
+        // **いまは「出ない」方が困っている**ので、まず出します。
+        self.echo_to_screen(command, &ran);
+        Ok(ran)
+    }
+
+    /// 打ったものと返ってきたものを、端末の面へ流す。
+    ///
+    /// **失敗しても握り潰しません**が、**ここで操作を失敗にもしません** ——
+    /// 画面へ出せなかったことを理由に、成功したコマンドを失敗扱いにすると、
+    /// **AI は同じものを打ち直します**（サーバーで 2 回走ります）。
+    fn echo_to_screen(&self, command: &str, ran: &Ran) {
+        let mut shown = format!("$ {command}\r\n");
+        if !ran.out.is_empty() {
+            shown.push_str(&ran.out.replace('\n', "\r\n"));
+        }
+        if !ran.err.is_empty() {
+            shown.push_str(&ran.err.replace('\n', "\r\n"));
+        }
+        // **終了コードは、0 でないときだけ。**0 を毎回出すと画面が埋まります。
+        // **返してこないサーバーもある**ので、そのときは黙ります。
+        if let Some(status) = ran.status {
+            if status != 0 {
+                shown.push_str(&format!("[終了コード {status}]\r\n"));
+            }
+        }
+        if self.stream.push(shown.as_bytes()).is_err() {
+            // 人が［止める］を押している。**そういう状態なので、記録もしません。**
+            self.diag.info(
+                Stage::Exec,
+                None,
+                "出力が止められているので画面へ出しません",
+            );
+        }
     }
 
     // --- 許可リストのコマンド（D3） -----------------------------------------
