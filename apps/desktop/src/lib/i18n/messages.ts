@@ -78,6 +78,13 @@ const en = {
 	'console.request.body': 'If you allow it, the AI can type into this terminal. You will see every keystroke on screen, and you can take it back at any time.',
 	'console.request.allow': 'Allow',
 	'console.request.deny': 'Refuse',
+	// **AI が状態を変える操作を走らせたい**（D45 / D47）。
+	// **何が走るのかを見せてから聞く。**id だけでは答えられません。
+	'operation.request.title': 'The AI wants to run an operation',
+	'operation.request.body': 'This is what would run on the server:',
+	'operation.request.note': 'You listed it in operations.toml. One approval runs it once.',
+	'operation.request.allow': 'Allow once',
+	'operation.request.deny': 'Refuse',
 	'stream.path': 'path to a log on the server',
 	'band.what': "Every operation, yours and the AI's, one line each. This is how you see what the AI did without being asked.",
 	'stream.start': 'Follow',
@@ -325,6 +332,13 @@ const ja: Catalog = {
 	'console.request.body': '許可すると、AI はこの端末に打てるようになります。打った内容は画面にそのまま出ますし、あなたはいつでも取り返せます。',
 	'console.request.allow': '許可する',
 	'console.request.deny': '断る',
+	// **AI が状態を変える操作を走らせたい**（D45 / D47）。
+	// **何が走るのかを見せてから聞く。**id だけでは答えられません。
+	'operation.request.title': 'AI が操作を走らせたいと言っています',
+	'operation.request.body': 'サーバーで、これが走ります:',
+	'operation.request.note': 'あなたが operations.toml に書いたものです。1 回の許可で 1 回だけ走ります。',
+	'operation.request.allow': '1 回だけ許可',
+	'operation.request.deny': '断る',
 	'stream.path': 'サーバー上のログのパス',
 	'band.what': '人と AI の操作が、1 行ずつ全部ここに出ます。AI が何をしたかを、聞かずに見られる場所です。',
 	'stream.start': '追う',

@@ -143,6 +143,66 @@ impl SshboardMcp {
         ))
     }
 
+    /// 人が許した操作を走らせる（D45）。**渡せるのは id だけ。**
+    #[tool(
+        description = "Run one of the state-changing operations the human listed in \
+                       operations.toml, by id. **You cannot pass a command** - only an id, \
+                       and only ids that are already in that file. The first call refuses \
+                       with \"approval needed\" and puts the exact command on the human's \
+                       screen for them to allow or refuse; call it again once they have \
+                       allowed it. **One approval runs it once.** There is also an hourly \
+                       ceiling per operation. Use list_operations to see what exists."
+    )]
+    pub async fn run_operation(
+        &self,
+        Parameters(request): Parameters<OperationId>,
+    ) -> Result<String, ErrorData> {
+        let ran = self
+            .engine()?
+            .run_operation(Actor::Ai, &request.operation_id)
+            .await
+            .map_err(refuse)?;
+
+        let (out, out_cut) = capped(ran.out);
+        let (err, err_cut) = capped(ran.err);
+        serde_json::to_string(&serde_json::json!({
+            "operationId": request.operation_id,
+            "stdout": out,
+            "stderr": err,
+            // **返してこないサーバーもある。**分からないことを 0 と言わない。
+            "exitCode": ran.status,
+            "outputWasTruncated": out_cut || err_cut,
+        }))
+        .map_err(|error| ErrorData::internal_error(error.to_string(), None))
+    }
+
+    /// 人が列挙した操作の一覧（D45）。**サーバーへは触りません。**
+    #[tool(
+        description = "List the state-changing operations the human has listed in \
+                       operations.toml: their ids, what each one actually runs, the \
+                       description the human wrote, and the hourly ceiling. **Empty until \
+                       a person writes that file** - sshboard ships with none."
+    )]
+    pub async fn list_operations(&self) -> Result<String, ErrorData> {
+        self.show("list_operations").await?;
+
+        let listed = self.engine()?.operations().map_err(refuse)?;
+        let shown: Vec<_> = listed
+            .all()
+            .iter()
+            .map(|held| {
+                serde_json::json!({
+                    "id": held.id,
+                    "runs": held.run,
+                    "description": held.description,
+                    "maxPerHour": held.max_per_hour,
+                })
+            })
+            .collect();
+        serde_json::to_string(&shown)
+            .map_err(|error| ErrorData::internal_error(error.to_string(), None))
+    }
+
     /// いま何が開いているか。**サーバーへは触りません。**
     #[tool(
         description = "List every connection sshboard currently holds open, where the AI may write on each, and which one file and command operations currently go to. Touches no remote server."
@@ -696,6 +756,14 @@ pub struct WriteFile {
 
 /// 一度に打てる上限。**貼り付け事故を小さくする。**
 const MAX_TYPED: usize = 4096;
+
+/// `run_operation` の引数。**識別子だけ**（コマンドは渡せません・D3）。
+#[derive(Debug, Deserialize, rmcp::schemars::JsonSchema)]
+#[schemars(crate = "rmcp::schemars")]
+pub struct OperationId {
+    /// `operations.toml` に人が書いた id。
+    pub operation_id: String,
+}
 
 /// `show_view` の引数。**画面のタブ名だけ**（接続先も何も通りません）。
 #[derive(Debug, Deserialize, rmcp::schemars::JsonSchema)]

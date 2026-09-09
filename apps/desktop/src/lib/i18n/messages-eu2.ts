@@ -49,6 +49,13 @@ export const ptBR: Catalog = {
 	'console.request.body': 'Se você permitir, a IA poderá digitar neste terminal. Cada tecla aparece na tela e você pode retomar a qualquer momento.',
 	'console.request.allow': 'Permitir',
 	'console.request.deny': 'Recusar',
+	// **AI が状態を変える操作を走らせたい**（D45 / D47）。
+	// **何が走るのかを見せてから聞く。**id だけでは答えられません。
+	'operation.request.title': 'A IA quer executar uma operação',
+	'operation.request.body': 'Isto é o que seria executado no servidor:',
+	'operation.request.note': 'Você o escreveu em operations.toml. Uma permissão executa uma vez.',
+	'operation.request.allow': 'Permitir uma vez',
+	'operation.request.deny': 'Recusar',
 	'stream.stop': 'Parar',
 	'stream.path': 'caminho de um log no servidor',
 	'band.what': 'Cada operação, sua e da IA, uma linha por vez. É assim que você vê o que a IA fez sem precisar perguntar.',
@@ -255,6 +262,13 @@ export const ru: Catalog = {
 	'console.request.body': 'Если разрешить, ИИ сможет печатать в этом терминале. Каждое нажатие видно на экране, и вы в любой момент можете забрать управление.',
 	'console.request.allow': 'Разрешить',
 	'console.request.deny': 'Отказать',
+	// **AI が状態を変える操作を走らせたい**（D45 / D47）。
+	// **何が走るのかを見せてから聞く。**id だけでは答えられません。
+	'operation.request.title': 'ИИ хочет выполнить операцию',
+	'operation.request.body': 'Вот что будет выполнено на сервере:',
+	'operation.request.note': 'Вы записали это в operations.toml. Одно разрешение — один запуск.',
+	'operation.request.allow': 'Разрешить один раз',
+	'operation.request.deny': 'Отказать',
 	'stream.stop': 'Остановить',
 	'stream.path': 'путь к журналу на сервере',
 	'band.what': 'Каждое действие — ваше и ИИ — по одной строке. Так вы видите, что сделал ИИ, не спрашивая.',
@@ -460,6 +474,13 @@ export const it: Catalog = {
 	'console.request.body': "Se lo consenti, l'IA potrà scrivere in questo terminale. Ogni tasto premuto appare sullo schermo e puoi riprenderne il controllo in qualsiasi momento.",
 	'console.request.allow': 'Consenti',
 	'console.request.deny': 'Rifiuta',
+	// **AI が状態を変える操作を走らせたい**（D45 / D47）。
+	// **何が走るのかを見せてから聞く。**id だけでは答えられません。
+	'operation.request.title': "L'IA vuole eseguire un'operazione",
+	'operation.request.body': 'Ecco cosa verrebbe eseguito sul server:',
+	'operation.request.note': "L'hai scritto in operations.toml. Un permesso lo esegue una volta sola.",
+	'operation.request.allow': 'Consenti una volta',
+	'operation.request.deny': 'Rifiuta',
 	'stream.stop': 'Ferma',
 	'stream.label': "Output (a colori per te, testo semplice per l'IA)",
 	'stream.path': 'percorso di un log sul server',

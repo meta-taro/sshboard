@@ -49,6 +49,13 @@ export const ko: Catalog = {
 	'console.request.body': '허용하면 AI가 이 터미널에 입력할 수 있습니다. 입력 내용은 화면에 그대로 표시되며, 언제든지 다시 가져올 수 있습니다.',
 	'console.request.allow': '허용',
 	'console.request.deny': '거절',
+	// **AI が状態を変える操作を走らせたい**（D45 / D47）。
+	// **何が走るのかを見せてから聞く。**id だけでは答えられません。
+	'operation.request.title': 'AI가 작업을 실행하려고 합니다',
+	'operation.request.body': '서버에서 다음이 실행됩니다:',
+	'operation.request.note': '직접 operations.toml에 적어 두신 항목입니다. 한 번 허용하면 한 번만 실행됩니다.',
+	'operation.request.allow': '한 번만 허용',
+	'operation.request.deny': '거절',
 	'stream.stop': '멈추기',
 	'stream.path': '서버의 로그 경로',
 	'band.what': '사람과 AI의 조작이 한 줄씩 모두 여기에 나옵니다. AI가 무엇을 했는지 묻지 않고 볼 수 있는 곳입니다.',
@@ -255,6 +262,13 @@ export const zhCN: Catalog = {
 	'console.request.body': '允许后，AI 就能在这个终端里输入。它敲的每一个键都会显示在屏幕上，你随时可以收回。',
 	'console.request.allow': '允许',
 	'console.request.deny': '拒绝',
+	// **AI が状態を変える操作を走らせたい**（D45 / D47）。
+	// **何が走るのかを見せてから聞く。**id だけでは答えられません。
+	'operation.request.title': 'AI 想要执行一项操作',
+	'operation.request.body': '将在服务器上执行：',
+	'operation.request.note': '这是你写在 operations.toml 里的。允许一次，只执行一次。',
+	'operation.request.allow': '允许一次',
+	'operation.request.deny': '拒绝',
 	'stream.stop': '停止',
 	'stream.path': '服务器上的日志路径',
 	'band.what': '你和 AI 的每一次操作，各占一行，全部显示在这里。不用问也能看到 AI 做了什么。',
@@ -461,6 +475,13 @@ export const zhTW: Catalog = {
 	'console.request.body': '允許後，AI 就能在這個終端機裡輸入。它敲的每一個鍵都會顯示在畫面上，你隨時可以收回。',
 	'console.request.allow': '允許',
 	'console.request.deny': '拒絕',
+	// **AI が状態を変える操作を走らせたい**（D45 / D47）。
+	// **何が走るのかを見せてから聞く。**id だけでは答えられません。
+	'operation.request.title': 'AI 想要執行一項操作',
+	'operation.request.body': '將在伺服器上執行：',
+	'operation.request.note': '這是你寫在 operations.toml 裡的。允許一次，只執行一次。',
+	'operation.request.allow': '允許一次',
+	'operation.request.deny': '拒絕',
 	'stream.stop': '停止',
 	'stream.path': '伺服器上的日誌路徑',
 	'band.what': '你和 AI 的每一次操作，各佔一行，全部顯示在這裡。不用問也能看到 AI 做了什麼。',

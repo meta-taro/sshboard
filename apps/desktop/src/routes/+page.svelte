@@ -6,6 +6,7 @@
 	import { appendLine, type BandLine } from '$lib/band';
 	import ConnectionManager from '$lib/components/ConnectionManager.svelte';
 	import ConsoleRequestDialog from '$lib/components/ConsoleRequestDialog.svelte';
+	import OperationRequestDialog from '$lib/components/OperationRequestDialog.svelte';
 	import PassphraseDialog from '$lib/components/PassphraseDialog.svelte';
 	import ConnectPanel from '$lib/components/ConnectPanel.svelte';
 	import FileBrowser from '$lib/components/FileBrowser.svelte';
@@ -127,6 +128,22 @@
 	 * **問いがどこにも出ませんでした。**問いは人の経路にしか無かったためです。
 	 * 案内された側は詰みます。**存在しない操作を指していました。**
 	 */
+	/**
+	 * **AI が走らせたい操作**（D45 / D47）。**何が走るのかも一緒に持ちます** ——
+	 * id だけでは、人は何を許したのか分かりません。
+	 */
+	let operationAsk = $state<{ id: string; runs: string } | null>(null);
+
+	async function answerOperation(allow: boolean) {
+		// **先に画面から消す。**残っていると二重に押します。
+		operationAsk = null;
+		try {
+			await invoke('operation_answer', { allow });
+		} catch (error: unknown) {
+			failure = String(error);
+		}
+	}
+
 	let passphraseFor = $state<string | null>(null);
 	let passphraseBusy = $state(false);
 
@@ -631,6 +648,22 @@
 			.catch(() => {
 				/* 取れなくても画面は出す */
 			});
+		// **走らせてよいかの問い**（D45 / D47）。起動直後の取りこぼしも拾う。
+		invoke<{ id: string; runs: string } | null>('operation_request')
+			.then((asked) => {
+				operationAsk = asked;
+			})
+			.catch(() => {
+				/* 取れなくても画面は出す */
+			});
+		listen<{ id: string; runs: string } | null>('operation://request', (event) => {
+			operationAsk = event.payload;
+		})
+			.then((stop) => stops.push(stop))
+			.catch(() => {
+				/* 購読できないだけ。**画面は出す。** */
+			});
+
 		// **パスフレーズの頼み**（Issue #13）。起動直後の取りこぼしも拾う。
 		invoke<string | null>('passphrase_request')
 			.then((waiting) => {
@@ -645,7 +678,12 @@
 			const wanted = event.payload;
 			if (!isView(wanted)) return;
 			// **問いが出ている間は動かさない。**動かすと、人は何に答えたのか分からなくなります。
-			const askOpen = passphraseFor !== null || consoleAsk === 'ai' || aboutOpen || showUpdate;
+			const askOpen =
+				passphraseFor !== null ||
+				consoleAsk === 'ai' ||
+				operationAsk !== null ||
+				aboutOpen ||
+				showUpdate;
 			const active = document.activeElement;
 			const focusInField =
 				active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement;
@@ -1162,6 +1200,19 @@
 		ありませんでした。**部品はそのまま使います —— 問いを 2 か所に作ると、
 		片方だけ直る日が来ます（D39 と同じ理由）。
 	-->
+	<!--
+		**AI が状態を変える操作を走らせたい**（D45 / D47）。
+		**何が走るのかを見せてから聞きます** —— id だけでは答えられません。
+	-->
+	{#if operationAsk}
+		<OperationRequestDialog
+			id={operationAsk.id}
+			runs={operationAsk.runs}
+			onAllow={() => answerOperation(true)}
+			onDeny={() => answerOperation(false)}
+		/>
+	{/if}
+
 	{#if passphraseFor}
 		<PassphraseDialog
 			id={passphraseFor}

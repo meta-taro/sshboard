@@ -106,6 +106,8 @@ pub fn run() {
             session_cmd::console_stop,
             session_cmd::console_holder,
             session_cmd::console_request,
+            session_cmd::operation_request,
+            session_cmd::operation_answer,
             session_cmd::passphrase_request,
             session_cmd::passphrase_dismiss,
             session_cmd::console_answer,
@@ -169,6 +171,8 @@ pub fn run() {
             session_cmd::spawn_console_request_bridge(app.handle().clone(), Arc::clone(&engine));
             // **出せない画面を案内しない**（Issue #13）。
             session_cmd::spawn_passphrase_bridge(app.handle().clone(), Arc::clone(&engine));
+            // **走らせてよいかを人へ問う**（D45 / D47）。
+            session_cmd::spawn_operation_bridge(app.handle().clone(), Arc::clone(&engine));
 
             mcp_host::spawn(
                 app.handle().clone(),

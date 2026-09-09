@@ -8,7 +8,7 @@ use sshboard_band::{Actor, Band};
 use sshboard_connections::{ConnectionEntry, Connections};
 use sshboard_credentials::SecretStore;
 use sshboard_diag::{Diagnostics, Stage};
-use sshboard_readonly::{Allowlist, ReadonlyCommand, Refusals};
+use sshboard_readonly::{Allowlist, Operations, ReadonlyCommand, Refusals};
 use sshboard_ssh::{
     inspect_key, Auth, Console, DirEntry, FileFacts, KeyFacts, KeyFormat, KeyVerdict, Ran,
     SshSession, Target, WriteScope,
@@ -75,6 +75,13 @@ pub struct Engine {
     /// **AI からの頼みを画面へ押し出す**（D42）。
     /// 出せない問いは、無いのと同じです。
     console_request_changed: watch::Sender<Option<Actor>>,
+    /// **AI が走らせたい操作**（D45 / D47）。人が答えるまで残ります。
+    ///
+    /// 持つのは**識別子と、実際に打つ文字列**だけ。人が「何が走るのか」を
+    /// 読んでから答えられるようにするためです。
+    operation_request: watch::Sender<Option<(String, String)>>,
+    /// いつ走らせたか。**回数の上限**（`max_per_hour`）を数えるため。
+    operation_runs: Mutex<Vec<(String, std::time::Instant)>>,
     /// **AI が繋ごうとして、パスフレーズで止まった接続**（Issue #13）。
     ///
     /// 識別子だけを持ちます。**パスフレーズ本体はここへ来ません**（D14）——
@@ -99,6 +106,7 @@ impl Engine {
         let (console_changed, _) = watch::channel(None);
         let (console_request_changed, _) = watch::channel(None);
         let (passphrase_request, _) = watch::channel(None);
+        let (operation_request, _) = watch::channel(None);
         Self {
             band,
             diag,
@@ -109,6 +117,8 @@ impl Engine {
             console_changed,
             console_request_changed,
             passphrase_request,
+            operation_request,
+            operation_runs: Mutex::new(Vec::new()),
             changed,
         }
     }
@@ -161,7 +171,7 @@ impl Engine {
 
     /// 問いを畳む。**人が入れたときも、断ったときも通ります。**
     pub fn clear_passphrase_request(&self) {
-        let _ = self.passphrase_request.send(None);
+        self.passphrase_request.send_replace(None);
     }
 
     /// 共有している出力（`tail -f` の行き先）。
@@ -236,7 +246,9 @@ impl Engine {
             // 人の画面に出る**ようにします（D42 と同じ形）。
             Err(EngineError::PassphraseNeeded { id }) => {
                 if actor != Actor::Human {
-                    let _ = self.passphrase_request.send(Some(id.clone()));
+                    // **`send` は購読者が居ないと値を更新しません**（tokio の watch）。
+                    // 画面がまだ購読していない瞬間に取りこぼすので、`send_replace` を使います。
+                    self.passphrase_request.send_replace(Some(id.clone()));
                 }
                 return Err(EngineError::PassphraseNeeded { id });
             }
@@ -789,6 +801,111 @@ impl Engine {
     /// **許可の判定はサーバーへ触る前に済ませます。**繋がっていないことより先に
     /// 「許可されていない」を返すのは、繋がった瞬間だけ何でも通る作りを
     /// テストで捕まえられるようにするためです。
+    /// 状態を変える操作の置き場所（D45）。**`readonly.toml` とは別のファイル。**
+    pub fn operations_path(&self) -> PathBuf {
+        self.beside_connections("operations.toml")
+    }
+
+    /// 人が書いた一覧。**既定は空 ＝ 1 本も走りません。**
+    pub fn operations(&self) -> Result<Operations, EngineError> {
+        Operations::load_or_empty(&self.operations_path())
+            .map_err(|error| EngineError::Allowlist(error.to_string()))
+    }
+
+    /// いま人に問うている操作（識別子と、実際に打つもの）。
+    pub fn operation_request(&self) -> Option<(String, String)> {
+        self.operation_request.borrow().clone()
+    }
+
+    pub fn subscribe_operation_request(&self) -> watch::Receiver<Option<(String, String)>> {
+        self.operation_request.subscribe()
+    }
+
+    /// 人が答える（D47）。**答えられるのは人だけ。**
+    ///
+    /// 許しても、**走らせるのは AI がもう一度呼んだとき**です。
+    /// ここで走らせると、人が「許可」を押した瞬間にサーバーが動くことになり、
+    /// **帯にも端末にも、誰が起こしたのかが出ません。**
+    pub async fn answer_operation(&self, actor: Actor, allow: bool) -> Result<(), EngineError> {
+        if actor != Actor::Human {
+            return Err(EngineError::ConsoleApprovalNeeded);
+        }
+        let Some((id, _)) = self.operation_request.borrow().clone() else {
+            return Ok(());
+        };
+        self.operation_request.send_replace(None);
+        if allow {
+            let mut runs = self.operation_runs.lock().await;
+            runs.push((id.clone(), std::time::Instant::now()));
+            drop(runs);
+            self.diag
+                .info(Stage::Exec, None, format!("人が {id} を許可しました"));
+        } else {
+            self.diag
+                .info(Stage::Exec, None, format!("人が {id} を断りました"));
+        }
+        Ok(())
+    }
+
+    /// **状態を変える操作を走らせる**（D45 / D47）。
+    ///
+    /// **AI が渡せるのは id だけ**（D3）。走るのは人が `operations.toml` へ
+    /// 書いた文字列そのもので、**AI が組み立てる余地はありません。**
+    ///
+    /// **人が許可するまで走りません。**1 回目は問いを立てて断り、
+    /// 人が答えたあとにもう一度呼ばれると走ります（D42 と同じ形）。
+    pub async fn run_operation(&self, actor: Actor, id: &str) -> Result<Ran, EngineError> {
+        let listed = self.operations()?;
+        let Some(operation) = listed.get(id) else {
+            return Err(self.refuse_readonly(actor, id).await);
+        };
+
+        // **回数で止まる。**暴走しても、ここで止まります。
+        let mut runs = self.operation_runs.lock().await;
+        let hour = std::time::Duration::from_secs(3600);
+        runs.retain(|(_, at)| at.elapsed() < hour);
+        let lately = runs.iter().filter(|(held, _)| held == id).count() as u32;
+        drop(runs);
+
+        // 人はいつでも走らせられます。**上限と承認は AI にかかります。**
+        if actor != Actor::Human {
+            if lately > operation.max_per_hour {
+                self.diag.error(
+                    Stage::Exec,
+                    None,
+                    format!("{id} は 1 時間に {} 回までです", operation.max_per_hour),
+                    "時間を空けるか、人に operations.toml を見直してもらってください",
+                );
+                return Err(EngineError::NotAllowed { id: id.to_owned() });
+            }
+            // **許可を貰っているか。**貰っていなければ、問いを立てて断ります。
+            let approved = self.take_operation_approval(id).await;
+            if !approved {
+                self.operation_request
+                    .send_replace(Some((operation.id.clone(), operation.run.clone())));
+                self.diag.info(
+                    Stage::Exec,
+                    None,
+                    format!("{id} を走らせてよいか、人に尋ねています"),
+                );
+                return Err(EngineError::ConsoleApprovalNeeded);
+            }
+        }
+
+        // 帯へは `exec` が `$ ...` を出します。**二重に出しません。**
+        self.exec(actor, &operation.run).await
+    }
+
+    /// 許可を 1 回ぶん使う。**使い切りです**（許可 1 回につき 1 回だけ走る）。
+    async fn take_operation_approval(&self, id: &str) -> bool {
+        let mut runs = self.operation_runs.lock().await;
+        if let Some(at) = runs.iter().position(|(held, _)| held == id) {
+            runs.remove(at);
+            return true;
+        }
+        false
+    }
+
     pub async fn run_readonly(&self, actor: Actor, id: &str) -> Result<Ran, EngineError> {
         let allowlist = self.allowlist()?;
 

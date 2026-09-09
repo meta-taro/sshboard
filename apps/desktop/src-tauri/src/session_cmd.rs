@@ -514,6 +514,54 @@ pub async fn console_answer(allow: bool, engine: State<'_, Arc<Engine>>) -> Resu
         .map_err(|error| error.to_string())
 }
 
+// --- 状態を変える操作の承認（D45 / D47 / Issue #17） ------------------------
+
+/// 走らせてよいかを人へ問うイベント。
+pub const OPERATION_REQUEST_EVENT: &str = "operation://request";
+
+/// 問いの中身。**実際に打つものを人へ見せます** ——
+/// 「restart-httpd を許可しますか」だけでは、何が走るのか読めません。
+#[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct OperationAsk {
+    pub id: String,
+    pub runs: String,
+}
+
+pub fn spawn_operation_bridge(app: AppHandle, engine: Arc<Engine>) {
+    tauri::async_runtime::spawn(async move {
+        let mut watching = engine.subscribe_operation_request();
+        while watching.changed().await.is_ok() {
+            let asked: Option<OperationAsk> = watching
+                .borrow()
+                .clone()
+                .map(|(id, runs)| OperationAsk { id, runs });
+            if let Err(error) = app.emit(OPERATION_REQUEST_EVENT, asked) {
+                eprintln!("[sshboard] 操作の問いを画面へ渡せません: {error}");
+            }
+        }
+    });
+}
+
+/// いま人に問うている操作。**起動直後の取りこぼし対策。**
+#[tauri::command]
+pub async fn operation_request(
+    engine: State<'_, Arc<Engine>>,
+) -> Result<Option<OperationAsk>, String> {
+    Ok(engine
+        .operation_request()
+        .map(|(id, runs)| OperationAsk { id, runs }))
+}
+
+/// 人が答える（D47）。**答えられるのは人だけ。**
+#[tauri::command]
+pub async fn operation_answer(allow: bool, engine: State<'_, Arc<Engine>>) -> Result<(), String> {
+    engine
+        .answer_operation(Actor::Human, allow)
+        .await
+        .map_err(|error| error.to_string())
+}
+
 // --- 画面を「こちらを見て」と動かす（D44 / Issue #15） ----------------------
 
 /// 見てほしい画面を配るイベント。
