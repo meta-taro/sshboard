@@ -23,6 +23,7 @@
 	import { textSize } from '$lib/text-size/text-size.svelte';
 	import { theme, type ThemeMode } from '$lib/theme/theme.svelte';
 	import { attachFit, attachSearch, createTerminal, writeChunk } from '$lib/terminal.svelte';
+	import { emptyBacklog, remember, replay, type Backlog } from '$lib/stream-backlog';
 	import { attachClipboard, browserClipboard, detectPlatform } from '$lib/terminal-clipboard';
 	import { isFindShortcut, type TerminalSearch } from '$lib/terminal-search';
 	import '@xterm/xterm/css/xterm.css';
@@ -81,6 +82,16 @@
 	// **`$state` にする。**そうしないと、文字サイズの効果が
 	// 「端末ができたこと」を追えず、片方だけ取り残される（実際に取り残された）。
 	let consoleTerm = $state<Terminal | undefined>();
+
+	/**
+	 * **直近の出力**（Issue #14 / #11）。
+	 *
+	 * 端末の面は、そのタブを見ている間しか存在しません。別のタブに居る間に
+	 * 届いた分は**どこへも書かれず**、見に行くと**まっさら**でした。
+	 * 承認のダイアログは「打った内容は画面にそのまま出ます」と約束しているのに、
+	 * **出ていませんでした。**面ができた時点で、ここから書き戻します。
+	 */
+	let backlog: Backlog = emptyBacklog();
 	/** 誰が握っているか。`null` は誰も握っていない。 */
 	let holder = $state<'human' | 'ai' | null>(null);
 	/** **どの接続の端末か。**タブを移しても端末は付いてこない（D25）。 */
@@ -273,6 +284,9 @@
 			// **打てる面。**握っていないときは Rust 側が断るので、
 			// ここで打てること自体は塞がない（断り方で伝える）。
 			consoleTerm = createTerminal(host, textSize.terminalPx, true);
+			// **作った端に書き戻す**（Issue #14 / #11）。
+			// タブを行き来しても消えず、見ていない間の分も出ます。
+			writeChunk(consoleTerm, replay(backlog));
 			consoleTerm.onData((data) => {
 				// **握っていなければ打たない。**往復させて断られるより、
 				// 画面で止める方が速い（Rust 側でも同じ判断をしている）。
@@ -317,6 +331,9 @@
 		if (!host) return;
 		if (!terminal) {
 			terminal = createTerminal(host, textSize.terminalPx);
+			// **こちらも書き戻す。**同じ 1 本の出力を見ている面なので、
+			// 片方だけ戻ると「どちらが本当か」が分からなくなります。
+			writeChunk(terminal, replay(backlog));
 			detachOutput.push(attachFit(terminal, host));
 			// **見るだけの面でも、なぞればコピーできます。**ログを拾うのはここ。
 			// 貼り付けは付けません（`disableStdin` の面から文字が出ると嘘になる）。
@@ -607,6 +624,9 @@
 			// 走らせている間はその出力も端末の面に混ざります。**まず映すこと**を
 			// 採りました — 混ざるより、何も出ない方が悪い。
 			// 出どころで振り分ける案は `decisions.md` に出してあります。
+			// **面が無くても覚えておく**（Issue #14）。
+			// ここを通らないと、別のタブに居る間の分が丸ごと消えます。
+			backlog = remember(backlog, event.payload);
 			if (terminal) writeChunk(terminal, event.payload);
 			if (consoleTerm) writeChunk(consoleTerm, event.payload);
 		})

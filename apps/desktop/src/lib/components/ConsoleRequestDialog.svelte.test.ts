@@ -96,6 +96,28 @@ describe('AI が端末を使いたいときの問い（D42）', () => {
 		expect(onAllow).not.toHaveBeenCalled();
 	});
 
+	test('keeps both buttons plain, with no decoration to misread', () => {
+		// **実機で豆腐（□）に見えた**（Issue #16）。
+		//
+		// 原因はフォントではなく、端末アイコンの字形でした ——
+		// 「枠 ＋ 中に `>` と `_`」を `size={13}` で描くと、
+		// **中身が潰れて外枠だけが残ります。**
+		//
+		// > 「アプリが壊れている」という印象を、
+		// > **よりによって権限を渡す瞬間に与えます**
+		//
+		// **ここは AI に端末を渡す唯一の同意ボタン**です。飾りを置きません。
+		mount();
+
+		for (const name of ['許可する', '断る']) {
+			const button = screen.getByRole('button', { name });
+			expect(
+				button.querySelector('svg'),
+				`同意の釦に飾りが戻っている（${name}）。**壊れて見えると、押してよいかの判断が濁ります**`
+			).toBeNull();
+		}
+	});
+
 	test('allows only when the person actually presses Allow', () => {
 		const { onAllow, onDeny } = mount();
 

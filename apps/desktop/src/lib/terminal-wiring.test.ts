@@ -43,6 +43,30 @@ describe('端末の配線', () => {
 		expect(created).toContain('consoleTerm');
 	});
 
+	test('replays what it remembered into every terminal it creates', () => {
+		// **作ったのに書き戻さない端末を作らない**（Issue #14 / #11）。
+		//
+		// 端末の面は、そのタブを見ている間しか存在しません。書き戻しが無いと、
+		// **別のタブに居る間の出力が丸ごと消えます。**承認のダイアログは
+		// 「打った内容は画面にそのまま出ます」と約束しているので、
+		// **消えると、同意の前提が実態と違うことになります。**
+		const created = terminalsCreatedIn(source);
+		const unseeded = created.filter(
+			(name) => !source.includes(`writeChunk(${name}, replay(`)
+		);
+
+		expect(
+			unseeded,
+			`作ったのに書き戻していない端末: ${unseeded.join(', ')}`
+		).toEqual([]);
+	});
+
+	test('remembers the stream even when no terminal exists', () => {
+		// **面が無い間も覚えておく。**ここを通らないと、
+		// 書き戻す中身がそもそも溜まりません。
+		expect(source).toContain('backlog = remember(backlog,');
+	});
+
 	test('writes the incoming stream into every terminal it creates', () => {
 		// **作ったのに書かない端末を作らない。**それが Issue #10 の中身です。
 		const created = terminalsCreatedIn(source);

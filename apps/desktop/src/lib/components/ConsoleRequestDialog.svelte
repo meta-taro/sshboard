@@ -67,8 +67,19 @@
 			<button type="button" bind:this={denyButton} onclick={onDeny}>
 				{i18n.t('console.request.deny')}
 			</button>
+			<!--
+				**飾りを置きません**（Issue #16）。以前はここに端末のアイコンを
+				`size={13}` で置いていました。あの字形は「枠 ＋ 中に `>` と `_`」で、
+				**小さすぎて中身が潰れ、外枠だけが残って □ に見えていました。**
+
+				大きくする手もありますが、外します。
+
+				- **［断る］には無いので、片方だけ飾りが付いているのが不揃いでした**
+				- **ここは AI に端末を渡す唯一の同意ボタン**です。
+				  判断の役に立たない飾りを置かない
+				- 飾りが 1 つ減れば、**壊れようがなくなります**
+			-->
 			<button type="button" class="cta" onclick={onAllow}>
-				<Icon name="terminal" size={13} />
 				{i18n.t('console.request.allow')}
 			</button>
 		</div>
