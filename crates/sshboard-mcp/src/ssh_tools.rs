@@ -13,6 +13,7 @@ use serde::Deserialize;
 use sshboard_band::Actor;
 use sshboard_engine::EngineError;
 
+use crate::about::{changes_since, CHANGELOG};
 use crate::server::SshboardMcp;
 
 /// 一度に読み書きする上限。**丸ごとメモリに載るため。**
@@ -209,6 +210,56 @@ impl SshboardMcp {
             .collect();
         serde_json::to_string(&shown)
             .map_err(|error| ErrorData::internal_error(error.to_string(), None))
+    }
+
+    /// **この道具が何なのかを名乗る。**サーバーへは触りません。
+    ///
+    /// 実機からの要望（2026-09-09）——
+    ///
+    /// > MCP にこのソフト概要みたいなのを AI エージェント向けに出力するやつ設置したい。
+    /// > **バージョンごとになにが変わったかも返す**ように。
+    ///
+    /// **走っている実行ファイルに焼き込んであります**（`include_str!`）。
+    /// 手元のファイルを読みに行くと、**配った版と中身がずれます。**
+    #[tool(
+        description = "What sshboard is, what you as an AI may and may not do through it,                        and what changed in each version. Read this first when you are new                        to this server, and pass `since` with the version you last saw to                        get only what changed. Touches no remote server and puts nothing                        on the human's screen."
+    )]
+    pub async fn about_sshboard(
+        &self,
+        Parameters(request): Parameters<AboutRequest>,
+    ) -> Result<String, ErrorData> {
+        // **帯へ出しません。**名乗るだけでサーバーへは触らず、
+        // 人に見せる価値のある動きではありません（`pending_status` と同じ扱い）。
+        let running = env!("CARGO_PKG_VERSION");
+        let Some(changes) = changes_since(CHANGELOG, request.since.as_deref()) else {
+            return Err(ErrorData::invalid_params(
+                format!(
+                    "sshboard has no version `{}`. This server is running {running}.                      Omit `since` to get the whole history.",
+                    request.since.unwrap_or_default()
+                ),
+                None,
+            ));
+        };
+        let history: Vec<_> = changes
+            .iter()
+            .map(|one| {
+                serde_json::json!({
+                    "version": one.version,
+                    "headline": one.headline,
+                    "changes": one.body,
+                })
+            })
+            .collect();
+
+        serde_json::to_string(&serde_json::json!({
+            "version": running,
+            "whatThisIs": WHAT_THIS_IS,
+            "howItWorks": HOW_IT_WORKS,
+            "whatYouCanDo": WHAT_YOU_CAN_DO,
+            "whatYouCannotDo": WHAT_YOU_CANNOT_DO,
+            "history": history,
+        }))
+        .map_err(|error| ErrorData::internal_error(error.to_string(), None))
     }
 
     /// **人が答えたかどうか**を知る口（Issue #20）。**サーバーへは触りません。**
@@ -805,6 +856,52 @@ pub struct WriteFile {
 
 /// 一度に打てる上限。**貼り付け事故を小さくする。**
 const MAX_TYPED: usize = 4096;
+
+/// `about_sshboard` の引数。
+#[derive(Debug, Deserialize, rmcp::schemars::JsonSchema)]
+#[schemars(crate = "rmcp::schemars")]
+pub struct AboutRequest {
+    /// 前に見た版（`0.1.9` のような形）。**それより後のぶんだけ**返ります。
+    /// 省くと全部。**知らない版を渡すと断ります**（黙って空を返しません）。
+    #[serde(default)]
+    pub since: Option<String>,
+}
+
+/// **AI へ名乗る文言。**設定にせず、ここに直書きします ——
+/// 「AI に何を約束しているか」の文言なので、**コードと同じ扱いで読まれるべき**です。
+const WHAT_THIS_IS: &str = "\
+sshboard is a desktop app where a person and an AI agent share ONE SSH session to a \
+server. The person watches the same screen you are working on. It exists for servers \
+that are administered by hand - the kind with no CI, no container, and a person who \
+logs in with WinSCP or Tera Term.";
+
+const HOW_IT_WORKS: &str = "\
+Every operation - yours and the person's - goes through one engine and one SSH \
+connection per server. There is no hidden session: if you do something, it appears on \
+their screen. Several connections can be open at once; file and command operations go \
+to whichever one the person (or focus_connection) has focused. Use session_status to \
+see which.";
+
+const WHAT_YOU_CAN_DO: &str = "\
+Read anywhere the login user can read (list_directory, read_file, stat, search, \
+read_log, disk_usage, process_list, service_status, network_listen, runtime_versions). \
+Run commands the person listed in readonly.toml, by id (run_readonly). Write, but only \
+under the directories the person listed for that connection (write_file, upload_file, \
+make_directory). Use the shared terminal, after asking (console_open). Run \
+state-changing operations the person listed in operations.toml, by id, after they \
+approve each run (run_operation).";
+
+const WHAT_YOU_CANNOT_DO: &str = "\
+There is no tool that takes a shell command string - by design. You pass ids from lists \
+a person wrote; you never compose the command. Both lists ship EMPTY, so until someone \
+writes them you can run nothing: that is the intended state, not a fault - say which id \
+you wanted and let them decide. You cannot write outside the listed directories, and \
+that list is empty by default too. You cannot delete, rename, move, chmod, chown, or \
+restart services. You cannot download to the person's machine. You cannot read or set \
+any passphrase, password, or token - if one is needed, ask the person and it goes \
+straight from their screen to the server. You never see host names, IP addresses, user \
+names, or key paths: connections have ids and names only, and it must stay that way in \
+anything you write, quote, or screenshot.";
 
 /// `run_operation` の引数。**識別子だけ**（コマンドは渡せません・D3）。
 #[derive(Debug, Deserialize, rmcp::schemars::JsonSchema)]

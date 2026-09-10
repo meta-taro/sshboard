@@ -189,6 +189,9 @@ async fn the_server_advertises_only_the_phase_zero_tools() {
         // **状態を変える操作**（D45 / Issue #17）。渡せるのは id だけ。
         "run_operation",
         "list_operations",
+        // **この道具が何なのかを名乗る口**（実機の要望・2026-09-09）。
+        // 初めて繋いだ AI が、何をしてよくて何が駄目かをここで読めます。
+        "about_sshboard",
     ] {
         assert!(
             listed.contains(expected),
@@ -200,7 +203,7 @@ async fn the_server_advertises_only_the_phase_zero_tools() {
     //
     // 上の一覧は「在ること」しか見ないので、**足しても誰も気づきません。**
     // 記録の表（`.claude/project-status.md` / `CLAUDE.md`）と実物は、
-    // **これまで 3 回ずれました**（16→15・29→30・30→34）。毎回、
+    // **これまで 3 回ずれました**（16→15・29→30・30→34・34→35）。毎回、
     // **足したときに表を直していない**のが原因です。
     //
     // ここで数えておけば、**足した本人がその場で気づきます。**
@@ -209,7 +212,7 @@ async fn the_server_advertises_only_the_phase_zero_tools() {
     // `inputSchema` は 1 本につきちょうど 1 つです。
     let counted = listed.matches("inputSchema").count();
     assert_eq!(
-        counted, 34,
+        counted, 35,
         "**MCP のツールが {counted} 本になりました。**足した／消したなら、\
          `.claude/project-status.md` の表と `CLAUDE.md` の本数も同じ commit で直してください\
          （product-baseline §10）。直したら、ここの数字も合わせてください"
@@ -564,4 +567,118 @@ async fn the_capture_tool_redacts_unless_it_is_told_otherwise() {
         called.contains("画面がありません"),
         "画面が無いのに撮ったことになっている: {called}"
     );
+}
+
+#[tokio::test]
+async fn naming_itself_reaches_the_caller_and_leaves_the_band_alone() {
+    // **作ったのに繋いでいない、を作らない**（Issue #10 の教訓）。
+    // 一覧に名前が在ることと、呼んで中身が返ることは別です。
+    //
+    // 同時に、**帯へ 1 行も出ないこと**を見ます（D49）。
+    // サーバーへ触らず、人に見せる価値のある動きではないので、
+    // **名乗るたびに帯が増えると、本当の操作が埋もれます。**
+    let band = Band::new();
+    let mut watching = band.subscribe();
+    let endpoint = serve(ServeParts {
+        band: band.clone(),
+        stream: Arc::new(OutputStream::new()),
+        connections_watch: Arc::new(ConnectionsWatch::new()),
+        engine: None,
+        capture: None,
+        view: None,
+        token: None,
+        port: 0,
+        ack_timeout: Duration::from_secs(5),
+    })
+    .await
+    .expect("MCP が立ち上がらない");
+    let client = reqwest::Client::new();
+
+    let init = post(&client, &endpoint, None, INIT_BODY).await;
+    let session = init
+        .headers()
+        .get("mcp-session-id")
+        .map(|v| v.to_str().unwrap().to_owned());
+    let _ = init.text().await;
+
+    let answer = post(
+        &client,
+        &endpoint,
+        session.as_deref(),
+        r#"{"jsonrpc":"2.0","id":11,"method":"tools/call","params":{"name":"about_sshboard","arguments":{}}}"#,
+    )
+    .await
+    .text()
+    .await
+    .expect("応答が読めない");
+
+    // **走っている版を名乗る。**
+    let running = env!("CARGO_PKG_VERSION");
+    assert!(answer.contains(running), "版を名乗っていない: {answer}");
+    // **できないことを言う。**ここが空だと、AI は断られてから学び直します。
+    assert!(
+        answer.contains("no tool that takes a shell command"),
+        "できないことを言っていない: {answer}"
+    );
+    // **版ごとの変更が入っている。**
+    assert!(
+        answer.contains("history"),
+        "変更履歴が入っていない: {answer}"
+    );
+    assert!(answer.contains("0.1.0"), "最初の版まで辿れない: {answer}");
+
+    // **帯には 1 行も出さない。**
+    // 待ってから見ます —— **即座に見ると「まだ来ていないだけ」と区別が付きません。**
+    let quiet = tokio::time::timeout(Duration::from_millis(300), watching.recv()).await;
+    assert!(
+        quiet.is_err(),
+        "名乗るだけで帯へ出ている（本当の操作が埋もれます）: {quiet:?}"
+    );
+
+    endpoint.shutdown();
+}
+
+#[tokio::test]
+async fn a_version_nobody_knows_is_refused_rather_than_answered_with_nothing() {
+    // **黙って空を返さない**（product-baseline §8）。
+    // 空だと「変わっていません」と読まれ、**打ち間違いに誰も気づけません。**
+    let endpoint = serve(ServeParts {
+        band: Band::new(),
+        stream: Arc::new(OutputStream::new()),
+        connections_watch: Arc::new(ConnectionsWatch::new()),
+        engine: None,
+        capture: None,
+        view: None,
+        token: None,
+        port: 0,
+        ack_timeout: Duration::from_secs(5),
+    })
+    .await
+    .expect("MCP が立ち上がらない");
+    let client = reqwest::Client::new();
+
+    let init = post(&client, &endpoint, None, INIT_BODY).await;
+    let session = init
+        .headers()
+        .get("mcp-session-id")
+        .map(|v| v.to_str().unwrap().to_owned());
+    let _ = init.text().await;
+
+    let answer = post(
+        &client,
+        &endpoint,
+        session.as_deref(),
+        r#"{"jsonrpc":"2.0","id":12,"method":"tools/call","params":{"name":"about_sshboard","arguments":{"since":"9.9.9"}}}"#,
+    )
+    .await
+    .text()
+    .await
+    .expect("応答が読めない");
+
+    assert!(
+        answer.contains("no version") && answer.contains("9.9.9"),
+        "知らない版を黙って通している: {answer}"
+    );
+
+    endpoint.shutdown();
 }

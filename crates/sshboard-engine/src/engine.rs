@@ -15,6 +15,9 @@ use sshboard_ssh::{
 };
 use sshboard_stream::OutputStream;
 use tokio::sync::{watch, Mutex};
+// **`tokio` の時計を使う。**`std` のものだと、テストで時間を進められない
+// （`tokio::time::pause` が効かず、**上限も札の寿命も確かめようがない**）。
+use tokio::time::{Duration, Instant};
 
 use crate::error::EngineError;
 use crate::open::{Opened, WriteAccess};
@@ -92,10 +95,24 @@ pub struct OperationAsk {
     pub needs_secret: bool,
 }
 
+/// **押されたまま忘れられた許可を、いつまでも持たない**（D48）。
+///
+/// 人が［許可］を押したのに AI が呼び返してこないことは在ります
+/// （会話が途切れる・別の話に移る）。そのとき**パスワードを抱えた札が
+/// 残り続ける**のは、保存しないと決めた意味を薄めます。
+///
+/// 5 分は、AI が呼び返すのに要る時間（普通は数秒）より十分長く、
+/// **人が席を立つ時間より短い**ところで採りました。
+const APPROVAL_LIVES_FOR: Duration = Duration::from_secs(5 * 60);
+
+/// **回数の上限を数える窓**（`max_per_hour`）。
+const CEILING_WINDOW: Duration = Duration::from_secs(60 * 60);
+
 /// 人が出した許可 1 枚。**使い切りです。**
 struct Approval {
     id: String,
-    at: std::time::Instant,
+    /// いつ押されたか。**古い札を捨てるため**（[`APPROVAL_LIVES_FOR`]）。
+    at: Instant,
     /// 人がその場で入れたもの（D48）。**保存しません。**
     ///
     /// **札と一緒に消えます** —— 残ると、人が見ていない間に何度でも上がれます。
@@ -123,8 +140,17 @@ pub struct Engine {
     /// 持つのは**識別子と、実際に打つ文字列**だけ。人が「何が走るのか」を
     /// 読んでから答えられるようにするためです。
     operation_request: watch::Sender<Option<OperationAsk>>,
-    /// 人が出した許可の札。**回数の上限**（`max_per_hour`）もここで数えます。
-    operation_runs: Mutex<Vec<Approval>>,
+    /// **人が出した許可の札**（未使用のもの）。走るときに 1 枚取り出して消えます。
+    ///
+    /// **走った回数と同じ入れ物にしません。**同じにしていたせいで、
+    /// **`max_per_hour` が一度も効いていませんでした** ——
+    /// 札は走るときに消えるので、走った回数が 1 件も残らなかったからです。
+    operation_approvals: Mutex<Vec<Approval>>,
+    /// **実際に走った記録。**`max_per_hour` を数えるのはこちら。
+    ///
+    /// **走ったものだけ**が入ります。許可しただけでは増えません
+    /// （許して、やっぱりやめた分を数に入れない）。
+    operation_runs: Mutex<Vec<(String, Instant)>>,
     /// **AI が繋ごうとして、パスフレーズで止まった接続**（Issue #13）。
     ///
     /// 識別子だけを持ちます。**パスフレーズ本体はここへ来ません**（D14）——
@@ -161,6 +187,7 @@ impl Engine {
             console_request_changed,
             passphrase_request,
             operation_request,
+            operation_approvals: Mutex::new(Vec::new()),
             operation_runs: Mutex::new(Vec::new()),
             changed,
         }
@@ -995,13 +1022,13 @@ impl Engine {
         let id = asked.id;
         self.operation_request.send_replace(None);
         if allow {
-            let mut runs = self.operation_runs.lock().await;
-            runs.push(Approval {
+            let mut approvals = self.operation_approvals.lock().await;
+            approvals.push(Approval {
                 id: id.clone(),
-                at: std::time::Instant::now(),
+                at: Instant::now(),
                 secret,
             });
-            drop(runs);
+            drop(approvals);
             // **記録に出すのは識別子だけ。**入れたものは 1 バイトも書きません。
             self.diag
                 .info(Stage::Exec, None, format!("人が {id} を許可しました"));
@@ -1038,14 +1065,19 @@ impl Engine {
         let raised = elevated(&operation.run, self.elevation().await);
 
         // **回数で止まる。**暴走しても、ここで止まります。
+        //
+        // 数えるのは**走った回数**であって、許可の枚数ではありません。
+        // 同じ入れ物で数えていた頃は、**札が走るときに消えるので 1 件も残らず、
+        // 上限が一度も効いていませんでした**（`the_hourly_ceiling_actually_stops_it`）。
         let mut runs = self.operation_runs.lock().await;
-        let hour = std::time::Duration::from_secs(3600);
-        runs.retain(|held| held.at.elapsed() < hour);
-        let lately = runs.iter().filter(|held| held.id == id).count() as u32;
+        runs.retain(|(_, at)| at.elapsed() < CEILING_WINDOW);
+        let lately = runs.iter().filter(|(held, _)| held == id).count() as u32;
         drop(runs);
 
         // 人はいつでも走らせられます。**上限と承認は AI にかかります。**
-        if actor != Actor::Human && lately > operation.max_per_hour {
+        // **`>=` です。**`>` だと 1 回ぶん多く走ります
+        // （`max_per_hour = 1` で 2 回走れてしまう）。
+        if actor != Actor::Human && lately >= operation.max_per_hour {
             self.diag.error(
                 Stage::Exec,
                 None,
@@ -1063,8 +1095,14 @@ impl Engine {
             None
         };
 
-        if actor != Actor::Human && approval.is_none() {
-            // **貰っていなければ、問いを立てて断ります。**
+        // **問いを立てるのは 2 つの場合。**
+        //
+        // 1. AI が許可を貰っていない（D45）
+        // 2. **パスワードが要るのに、持っていない**（D48）——
+        //    人が自分で走らせるときも同じです。**製品はパスワードを作れません。**
+        //    ここで通すと、`sudo -S` に空を渡して落ちるだけで、
+        //    **人には打ち込む場所が 1 つも出ません。**
+        if approval.is_none() && (actor != Actor::Human || raised.needs_secret) {
             // 画面へ出すのは、**上げ方を当てはめたあとの、実際に打つ文字列**です。
             self.operation_request.send_replace(Some(OperationAsk {
                 id: operation.id.clone(),
@@ -1092,6 +1130,10 @@ impl Engine {
                 + "\n"
         });
 
+        // **走る直前に数える。**走ってから数えると、失敗した分が数に入りません
+        // （失敗もサーバーへは届いています）。
+        self.record_operation_run(id).await;
+
         // 帯へは `exec` が `$ ...` を出します。**二重に出しません。**
         // **入れたものは帯にも画面にも出ません**（`exec_with_stdin` の約束）。
         self.exec_with_stdin(actor, &raised.command, fed.as_deref())
@@ -1103,9 +1145,18 @@ impl Engine {
     /// **秘密も札と一緒に出ていきます。**残すと、人が見ていない間に
     /// 何度でも権限を上げられます。
     async fn take_operation_approval(&self, id: &str) -> Option<Approval> {
+        let mut approvals = self.operation_approvals.lock().await;
+        // **古い札は、取る前に捨てます。**抱えている秘密ごと落とすため、
+        // 「取れなかった」より先に**必ずここを通します。**
+        approvals.retain(|held| held.at.elapsed() < APPROVAL_LIVES_FOR);
+        let at = approvals.iter().position(|held| held.id == id)?;
+        Some(approvals.remove(at))
+    }
+
+    /// **走ったことを記録する。**`max_per_hour` はこれを数えます。
+    async fn record_operation_run(&self, id: &str) {
         let mut runs = self.operation_runs.lock().await;
-        let at = runs.iter().position(|held| held.id == id)?;
-        Some(runs.remove(at))
+        runs.push((id.to_owned(), Instant::now()));
     }
 
     pub async fn run_readonly(&self, actor: Actor, id: &str) -> Result<Ran, EngineError> {

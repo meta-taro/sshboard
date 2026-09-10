@@ -2,12 +2,14 @@
 //!
 //! GUI には依存しない。ここが Tauri を知った瞬間、ヘッドレスでテストできなくなる。
 
+mod about;
 mod capture;
 mod http;
 mod server;
 mod ssh_tools;
 mod view;
 
+pub use about::{changes_since, releases, Release, CHANGELOG};
 pub use capture::{WindowCapture, WindowShot};
 pub use http::{new_token, serve, McpEndpoint, ServeParts, MCP_PATH};
 pub use server::{

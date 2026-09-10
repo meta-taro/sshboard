@@ -8,7 +8,7 @@
 - **`.claude/rules/product-baseline.md`** — 開発のベースルール。**最優先で従うこと**。
 - **`PRD.md`** — このプロダクトの方向性・仕様。
 - **`.claude/roadmap.md`** — フェーズと進め方。**Phase 0 は技術項目を抜け、Phase 1 に入っています**。
-- **`.claude/decisions.md`** — 決定と、その理由（D1〜D48）。**未決は D10 / D47 の届け先**。
+- **`.claude/decisions.md`** — 決定と、その理由（D1〜D49）。**未決は D10 / D47 の届け先**。
 - **`.claude/issues/`** — 着手すべきローカル Issue。
 
 ## この製品に固有の禁止事項（最優先）
@@ -62,7 +62,7 @@
 
 > **用途別の読み取りツールは書き終わりました**（`stat` / `search` / `disk_usage` /
 > `process_list` / `service_status` / `read_log` / `network_listen` / `runtime_versions`）。
-> MCP は **34 本**です（`grep -rho '#\[tool(' crates/sshboard-mcp/src/ | wc -l` で数えられます）。
+> MCP は **35 本**です（`grep -rho '#\[tool(' crates/sshboard-mcp/src/ | wc -l` で数えられます）。
 
 **手元のテスト用サーバー**を先に建てること。実機に触らずに全部確かめられます。
 

@@ -243,3 +243,161 @@ async fn a_person_never_has_to_ask_anyone() {
     );
     assert!(engine.operation_request().is_none(), "人に問いが立っている");
 }
+
+#[tokio::test]
+async fn the_hourly_ceiling_actually_stops_it() {
+    // **README にも承認の画面にも「1 時間あたりの上限」があると書いてあります。**
+    // `max_per_hour = 0` は書けない、という検証まで入れてあります。
+    //
+    // **効いていませんでした。**
+    //
+    // 数えていた入れ物が、**許可の札と同じもの**でした。札は走るときに
+    // 取り出されて消えるので、**走った回数は 1 件も残りません。**
+    // `lately` は多くても 1 で、`max_per_hour` は 1 以上と決めてあるため、
+    // **`lately > max_per_hour` は決して真になりません。**
+    //
+    // 製品が「止まる所がある」と言っておいて、止まらないのが一番悪い形です。
+    let dir = tempfile::tempdir().expect("一時ディレクトリ");
+    std::fs::write(
+        dir.path().join("operations.toml"),
+        "version = 1\n\n[[operation]]\nid = \"once-an-hour\"\n\
+         run = \"systemctl reload httpd\"\n\
+         description = \"1 時間に 1 回だけ\"\nmax_per_hour = 1\n",
+    )
+    .expect("一覧を書けない");
+    let engine = engine_in(&dir);
+
+    // 1 回目。**人が許して、走る**（繋がっていないのでそこで止まるのが正しい）。
+    let _ = engine.run_operation(Actor::Ai, "once-an-hour").await;
+    engine
+        .answer_operation(Actor::Human, true, None)
+        .await
+        .expect("人が許せない");
+    let first = engine.run_operation(Actor::Ai, "once-an-hour").await;
+    assert!(
+        matches!(first, Err(EngineError::NotConnected)),
+        "1 回目が走っていない: {first:?}"
+    );
+
+    // 2 回目。**人がもう一度許しても、上限で止まる。**
+    let _ = engine.run_operation(Actor::Ai, "once-an-hour").await;
+    engine
+        .answer_operation(Actor::Human, true, None)
+        .await
+        .expect("人が許せない");
+    let second = engine.run_operation(Actor::Ai, "once-an-hour").await;
+
+    assert!(
+        matches!(second, Err(EngineError::NotAllowed { .. })),
+        "**1 時間あたりの上限が効いていない**: {second:?}"
+    );
+}
+
+#[tokio::test]
+async fn a_person_is_not_stopped_by_the_ceiling() {
+    // **上限は AI にかかります。**画面の前に居る人は、見えているので止めません。
+    let dir = tempfile::tempdir().expect("一時ディレクトリ");
+    std::fs::write(
+        dir.path().join("operations.toml"),
+        "version = 1\n\n[[operation]]\nid = \"once-an-hour\"\n\
+         run = \"systemctl reload httpd\"\n\
+         description = \"1 時間に 1 回だけ\"\nmax_per_hour = 1\n",
+    )
+    .expect("一覧を書けない");
+    let engine = engine_in(&dir);
+
+    for round in 1..=3 {
+        let ran = engine.run_operation(Actor::Human, "once-an-hour").await;
+        assert!(
+            matches!(ran, Err(EngineError::NotConnected)),
+            "{round} 回目で人が止められている: {ran:?}"
+        );
+    }
+}
+
+#[tokio::test(start_paused = true)]
+async fn an_approval_that_is_never_used_does_not_keep_the_secret_forever() {
+    // **人が［許可］を押したのに、AI が呼び返してこないことは在ります**
+    // （会話が途切れる・別の話に移る）。そのとき**パスワードを抱えた札が
+    // 残り続ける**なら、「保存しない」と言っている意味が薄れます。
+    //
+    // 時計を進めて確かめます（`tokio::time` の時計）。
+    let dir = tempfile::tempdir().expect("一時ディレクトリ");
+    allow(&dir);
+    let engine = engine_in(&dir);
+    let _ = engine.run_operation(Actor::Ai, "reload-httpd").await;
+    engine
+        .answer_operation(Actor::Human, true, Some("not-a-real-password".into()))
+        .await
+        .expect("人が許せない");
+
+    // **6 分後。**押されたことを忘れているべき時間です。
+    tokio::time::advance(std::time::Duration::from_secs(6 * 60)).await;
+
+    let refused = engine.run_operation(Actor::Ai, "reload-httpd").await;
+
+    assert!(
+        matches!(refused, Err(EngineError::ConsoleApprovalNeeded)),
+        "**古い許可がそのまま使えている**: {refused:?}"
+    );
+}
+
+#[tokio::test(start_paused = true)]
+async fn an_approval_still_works_a_moment_later() {
+    // **短くしすぎない。**AI が呼び返すのは普通は数秒後です。
+    // ここが厳しすぎると、**押しても走らない**という別の壊れ方になります。
+    let dir = tempfile::tempdir().expect("一時ディレクトリ");
+    allow(&dir);
+    let engine = engine_in(&dir);
+    let _ = engine.run_operation(Actor::Ai, "reload-httpd").await;
+    engine
+        .answer_operation(Actor::Human, true, None)
+        .await
+        .expect("人が許せない");
+
+    tokio::time::advance(std::time::Duration::from_secs(30)).await;
+
+    let used = engine.run_operation(Actor::Ai, "reload-httpd").await;
+
+    assert!(
+        matches!(used, Err(EngineError::NotConnected)),
+        "30 秒で許可が切れている: {used:?}"
+    );
+}
+
+#[tokio::test(start_paused = true)]
+async fn the_ceiling_lets_go_after_an_hour() {
+    // **上限は「1 時間あたり」です。**永久に止めるものではありません。
+    // 明けないなら、それは上限ではなく禁止です。
+    let dir = tempfile::tempdir().expect("一時ディレクトリ");
+    std::fs::write(
+        dir.path().join("operations.toml"),
+        "version = 1\n\n[[operation]]\nid = \"once-an-hour\"\n\
+         run = \"systemctl reload httpd\"\n\
+         description = \"1 時間に 1 回だけ\"\nmax_per_hour = 1\n",
+    )
+    .expect("一覧を書けない");
+    let engine = engine_in(&dir);
+
+    let _ = engine.run_operation(Actor::Ai, "once-an-hour").await;
+    engine
+        .answer_operation(Actor::Human, true, None)
+        .await
+        .expect("人が許せない");
+    let _ = engine.run_operation(Actor::Ai, "once-an-hour").await;
+
+    // **1 時間と 1 分後。**窓から出ているべき時間です。
+    tokio::time::advance(std::time::Duration::from_secs(61 * 60)).await;
+
+    let _ = engine.run_operation(Actor::Ai, "once-an-hour").await;
+    engine
+        .answer_operation(Actor::Human, true, None)
+        .await
+        .expect("人が許せない");
+    let again = engine.run_operation(Actor::Ai, "once-an-hour").await;
+
+    assert!(
+        matches!(again, Err(EngineError::NotConnected)),
+        "**1 時間経っても明けていない**: {again:?}"
+    );
+}

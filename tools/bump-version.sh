@@ -60,3 +60,8 @@ echo "  cargo check --workspace"
 echo
 echo "揃っているかの確認:"
 echo "  cargo test -p sshboard-desktop version"
+echo ""
+echo "**CHANGELOG.md に $VERSION の見出しを足してください。**"
+echo "足さないと cargo test -p sshboard-mcp が落ちます（about_sshboard が"
+echo "その版について何も答えられなくなるため）。"
+

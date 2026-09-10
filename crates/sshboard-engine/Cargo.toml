@@ -18,5 +18,7 @@ tokio = { workspace = true, features = ["fs"] }
 serde = { version = "1", features = ["derive"] }
 
 [dev-dependencies]
-tokio = { version = "1", features = ["sync", "time", "macros", "rt", "rt-multi-thread", "net"] }
+# **`test-util` は時計を止めるため**（D48）。上限が明けることも、
+# 許可の札が古くなることも、**時間を進めないと確かめようがありません。**
+tokio = { version = "1", features = ["sync", "time", "macros", "rt", "rt-multi-thread", "net", "test-util"] }
 tempfile = "3"
