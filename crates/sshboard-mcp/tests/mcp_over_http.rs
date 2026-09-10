@@ -682,3 +682,59 @@ async fn a_version_nobody_knows_is_refused_rather_than_answered_with_nothing() {
 
     endpoint.shutdown();
 }
+
+#[tokio::test]
+async fn the_server_says_what_it_is_before_any_tool_is_called() {
+    // **`instructions` は、呼ばなくてもクライアントが AI へ渡します。**
+    // `about_sshboard` を作っても、**呼ばれなければ届きません。**
+    //
+    // ここには「入口」だけを置きます —— 全部書くと、
+    // **繋いだ全員の文脈を毎回それだけ食います。**
+    let endpoint = serve(ServeParts {
+        band: Band::new(),
+        stream: Arc::new(OutputStream::new()),
+        connections_watch: Arc::new(ConnectionsWatch::new()),
+        engine: None,
+        capture: None,
+        view: None,
+        token: None,
+        port: 0,
+        ack_timeout: Duration::from_secs(5),
+    })
+    .await
+    .expect("MCP が立ち上がらない");
+    let client = reqwest::Client::new();
+
+    let said = post(&client, &endpoint, None, INIT_BODY)
+        .await
+        .text()
+        .await
+        .expect("応答が読めない");
+
+    // **人が見ていることを最初に言う。**ここが伝わらないと、
+    // AI は「誰も見ていない所で動いている」前提で振る舞います。
+    assert!(
+        said.contains("watches") || said.contains("watching"),
+        "人が見ていることを言っていない: {said}"
+    );
+    // **既定が空なのは故障ではない**、を最初に言う。
+    // 言わないと、断られた AI は「壊れている」と報告します。
+    assert!(said.contains("EMPTY"), "既定が空だと言っていない: {said}");
+    // **自分の名前を名乗る。**既定のままだと `rmcp`（ライブラリ名）を名乗り、
+    // 繋いだ AI からは**何のサーバーなのか分かりません。**
+    assert!(
+        said.contains("\"name\":\"sshboard\""),
+        "sshboard と名乗っていない: {said}"
+    );
+    assert!(
+        said.contains(env!("CARGO_PKG_VERSION")),
+        "版を名乗っていない: {said}"
+    );
+    // **続きの読み方を示す。**
+    assert!(
+        said.contains("about_sshboard"),
+        "全体像の読み方を示していない: {said}"
+    );
+
+    endpoint.shutdown();
+}

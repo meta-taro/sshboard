@@ -22,6 +22,25 @@ use sshboard_connections::{
 use sshboard_engine::Engine;
 use sshboard_stream::OutputStream;
 
+/// 繋いだ瞬間に AI へ渡る文言（D49）。**短く保つこと** ——
+/// ここは呼ばれなくても毎回文脈に載ります。
+const INSTRUCTIONS: &str = "\
+sshboard shares ONE SSH session between you and a person who watches the same screen. \
+Everything you do appears there; there is no hidden session.\n\
+\n\
+There is no tool that takes a shell command string. You pass ids from lists a person \
+wrote (readonly.toml for reading, operations.toml for anything that changes state), and \
+you write only under directories they listed. All of those lists ship EMPTY. Being able \
+to run nothing is the intended starting state, not a fault - name the id or path you \
+wanted and let the person decide, rather than reporting sshboard as broken or asking \
+them to paste server output to you.\n\
+\n\
+Connections have ids and names only. You never see host names, IP addresses, user \
+names, or key paths, and must not put such things in what you write or quote.\n\
+\n\
+Call about_sshboard for the full picture, what you may and may not do, and what changed \
+in each version.";
+
 /// 撮った画像の長辺の既定値。**dbboard と揃える**（同じ操作感にする）。
 const DEFAULT_MAX_EDGE: u32 = 1400;
 
@@ -602,7 +621,24 @@ fn default_ssh_port() -> u16 {
 #[tool_handler(router = self.tool_router)]
 impl ServerHandler for SshboardMcp {
     fn get_info(&self) -> ServerInfo {
-        ServerInfo::new(ServerCapabilities::builder().enable_tools().build())
+        // **呼ばなくても届く唯一の場所**（D49）。
+        //
+        // `about_sshboard` を作っても、**呼ばれなければ届きません。**
+        // ここには**入口だけ**を置きます —— 全部書くと、
+        // **繋いだ全員の文脈を毎回それだけ食います。**
+        //
+        // 選んだ 3 つは、**知らないと振る舞いが変わってしまうもの**です。
+        //
+        // 1. **人が同じ画面を見ている**（知らないと「誰も見ていない」前提で動く）
+        // 2. **既定が空なのは故障ではない**（知らないと「壊れている」と報告する）
+        // 3. **続きの読み方**
+        let mut info = ServerInfo::new(ServerCapabilities::builder().enable_tools().build());
+        // **自分の名前を名乗る。**既定のままだと `rmcp`（ライブラリの名前）を
+        // 名乗ってしまい、繋いだ AI からは**何のサーバーなのか分かりません。**
+        info.server_info.name = "sshboard".into();
+        info.server_info.version = env!("CARGO_PKG_VERSION").into();
+        info.instructions = Some(INSTRUCTIONS.to_owned());
+        info
     }
 }
 

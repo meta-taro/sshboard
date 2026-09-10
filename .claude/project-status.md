@@ -84,7 +84,7 @@ AI が渡せるのは id で、走るのは人が `operations.toml` に書いた
 
 ```
 cargo fmt --all                                        →  差分なし（2026-09-09）
-cargo test --workspace                                 →  385 passed; 0 failed（2026-09-09・実機込み）
+cargo test --workspace                                 →  386 passed; 0 failed（2026-09-09・実機込み）
 pnpm --filter desktop check                            →  336 files, 0 errors, 0 warnings（2026-09-09）
 pnpm --filter desktop test                             →  218 passed（2026-09-09・**部品を描く 21 本を含む**）
 cargo clippy --workspace --all-targets -- -D warnings  →  0 warnings（2026-09-09）
@@ -675,6 +675,23 @@ whatYouCanDo / whatYouCannotDo / history**。
 
 履歴は **0.1.0 から 0.1.12 まで**、git のタグ間の commit から起こしました
 （**記憶で書いていません**）。
+
+### **呼ばれなければ届かない** —— `instructions` を埋めました
+
+`about_sshboard` を作ったあとで気づきました。**AI がそれを呼ぶとは限りません。**
+
+MCP の **`instructions`** は、**クライアントが繋いだ瞬間に AI へ渡します。**
+**呼ばなくても届く唯一の場所**で、ここが空でした。
+
+**入口だけ**を置いています（全部書くと、繋いだ全員の文脈を毎回食います）。
+
+1. **人が同じ画面を見ている**
+2. **既定が空なのは故障ではない** —— 言わないと「壊れている」と報告されます
+3. **接続先は見えない**
+4. 続きの読み方（`about_sshboard`）
+
+**ついでに、`rmcp` と名乗っていたのを直しました。**`ServerInfo` を既定のままに
+していたため、繋いだ AI から見える名前が**ライブラリの名前**でした。
 
 ### 実際に呼ぶテストを足しました
 
