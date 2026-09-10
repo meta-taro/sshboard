@@ -187,10 +187,23 @@ impl Engine {
     }
 
     /// 宛先を変える。**開いていないものは指定できない。**
+    ///
+    /// **断り方を `NotConnected` と分けています**（Issue #8）。
+    /// 画面がタブを押してここへ来たのに開いていないなら、
+    /// **画面が持っている一覧が実態とずれている**ということで、
+    /// 「接続を開いてください」は的外れな案内になります。
     pub async fn focus(&self, id: &str) -> Result<Opened, EngineError> {
         let mut held = self.held.lock().await;
         let Some(live) = held.live.get(id) else {
-            return Err(EngineError::NotConnected);
+            let open = held.live.keys().cloned().collect::<Vec<_>>().join(" , ");
+            drop(held);
+            self.diag.error(
+                Stage::Registry,
+                Some(id),
+                format!("開いていない接続を宛先にしようとしました（開いているもの: {open}）"),
+                "画面の一覧が実態とずれています。この行をそのまま貼って報告してください（Issue #8）",
+            );
+            return Err(EngineError::NotOpen { id: id.to_owned() });
         };
         let opened = live.opened.clone();
         held.active = Some(id.to_owned());
@@ -397,13 +410,51 @@ impl Engine {
     }
 
     /// 操作の宛先。**開いていなければ、そう言う。**
+    ///
+    /// **「開いていない」と「宛先が決まっていない」は別**です（Issue #8）。
+    ///
+    /// 実機の報告にあった文言 ——
+    ///
+    /// > **まだサーバーに繋がっていません。sshboard の画面で接続を開いてください**
+    ///
+    /// —— は、画面の旗ではなく**ここが返した `NotConnected` の表示文**でした
+    /// （画面側の「繋がっていません」は別の文言です）。
+    /// **画面が古い値を持っていたのではなく、実行体が本当に断っていた**わけです。
+    ///
+    /// 断る条件は 1 つ、**宛先が `live` の中に無い**こと。
+    /// `disconnect` は「残っている 1 本へ移す」で塞いでいるはずなので、
+    /// **開いているのに宛先が無いなら、塞ぎ切れていない道が在ります。**
+    ///
+    /// そのときは、
+    ///
+    /// - **記録に残す**（黙って断ると、原因が永久に分かりません）
+    /// - **人へ効く手順を言う**（「接続を開いて」は、すでに開いている人に効きません）
+    /// - **勝手に 1 本選ばない。**推測した相手へコマンドを流すのが一番危険です
     async fn session(&self) -> Result<Arc<SshSession>, EngineError> {
         let held = self.held.lock().await;
-        held.active
-            .as_ref()
-            .and_then(|id| held.live.get(id))
-            .map(|l| Arc::clone(&l.session))
-            .ok_or(EngineError::NotConnected)
+        if let Some(live) = held.active.as_ref().and_then(|id| held.live.get(id)) {
+            return Ok(Arc::clone(&live.session));
+        }
+
+        // **1 本も開いていないなら、異常ではありません。**繋ぐ前なだけです。
+        if held.live.is_empty() {
+            return Err(EngineError::NotConnected);
+        }
+
+        // ここから先は**食い違い**です。開いているのに、宛先が指せていない。
+        let open = held.live.len();
+        let ids = held.live.keys().cloned().collect::<Vec<_>>().join(" , ");
+        let pointing = held.active.clone();
+        drop(held);
+
+        self.diag.error(
+            Stage::Registry,
+            pointing.as_deref(),
+            format!("宛先が決まっていないのに {open} 本開いています（開いているもの: {ids}）"),
+            "画面でタブを押して宛先を選んでください。\
+             この行が出たこと自体が不具合です（Issue #8）—— そのまま貼って報告してください",
+        );
+        Err(EngineError::NoTarget { open })
     }
 
     // --- 端末（D29） --------------------------------------------------------

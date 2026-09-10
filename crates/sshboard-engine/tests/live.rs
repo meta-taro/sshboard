@@ -661,9 +661,15 @@ async fn focusing_something_that_is_not_open_is_refused() {
     let dir = tempfile::tempdir().expect("一時ディレクトリ");
     let engine = engine_at(dir.path().join("connections.toml"));
 
+    // **`NotConnected` とは分けます**（Issue #8）。
+    //
+    // 実機から報告された赤帯の文言は `NotConnected` の表示文でしたが、
+    // **同じ文言を返す道が 2 本**あり（宛先が決まっていない／押したタブが
+    // 開いていない）、**画面写真からどちらか判別できませんでした。**
+    // 分けたので、次に踏まれたら文言で確定します。
     assert!(matches!(
         engine.focus("nothing-here").await,
-        Err(EngineError::NotConnected)
+        Err(EngineError::NotOpen { .. })
     ));
 }
 

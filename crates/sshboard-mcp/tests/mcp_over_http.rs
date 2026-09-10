@@ -196,9 +196,33 @@ async fn the_server_advertises_only_the_phase_zero_tools() {
         );
     }
 
+    // **本数を数える。**
+    //
+    // 上の一覧は「在ること」しか見ないので、**足しても誰も気づきません。**
+    // 記録の表（`.claude/project-status.md` / `CLAUDE.md`）と実物は、
+    // **これまで 3 回ずれました**（16→15・29→30・30→34）。毎回、
+    // **足したときに表を直していない**のが原因です。
+    //
+    // ここで数えておけば、**足した本人がその場で気づきます。**
+    // **`"name":` では数えられません。**引数の中にも `name` が在ります
+    // （`register_connection` / `mark_connection`）。実際に 2 本多く数えました。
+    // `inputSchema` は 1 本につきちょうど 1 つです。
+    let counted = listed.matches("inputSchema").count();
+    assert_eq!(
+        counted, 34,
+        "**MCP のツールが {counted} 本になりました。**足した／消したなら、\
+         `.claude/project-status.md` の表と `CLAUDE.md` の本数も同じ commit で直してください\
+         （product-baseline §10）。直したら、ここの数字も合わせてください"
+    );
+
     // **ここが D3 の見張り。**引数で任意の文字列をシェルへ渡す口を 1 つも作らない。
     // **Phase 2 へ回した書き込みが、うっかり生えていないこと**（PRD §3）。
     // 上げるのは入れたが、消す・動かす・権限を変えるは入れていない。
+    //
+    // **`sudo` という名前の口も作りません**（D48 で `become = "ask"` を入れたあとも）。
+    // 権限を上げられるのは `run_operation` の中だけで、**渡せるのは id**、
+    // 走るのは**人が `operations.toml` に書いた文字列**、
+    // **しかも人が画面で許可するまで走りません。**
     for forbidden in [
         "delete_file",
         "remove_file",
