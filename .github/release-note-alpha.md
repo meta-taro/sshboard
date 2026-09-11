@@ -1,3 +1,16 @@
+## どれを取るか
+
+| 使う OS | 取るもの |
+|---|---|
+| **Windows** | **`sshboard_<版>_x64-setup.exe`**（インストーラ） |
+| Windows（MSI で入れたい） | `sshboard_<版>_x64_en-US.msi` |
+| **macOS**（Apple Silicon） | **`sshboard.app.tar.gz`** |
+
+**`.sig` は自動更新が使う署名です。**手で取る必要はありません。
+
+> **`sshboard.app.tar.gz` は macOS 用です。**macOS の `.app` は中身のあるフォルダなので、
+> **Windows で開くと、ただのフォルダに見えます。**動きません。
+
 ## これは α です
 
 **実運用のサーバーで使われ始めました。**Issue #8〜#22 は、そこで出たものです。
