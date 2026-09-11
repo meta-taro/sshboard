@@ -143,8 +143,18 @@
 				<div class="field">
 					<span class="label">{i18n.t('bundle.import.file')}</span>
 					<div class="pick">
+						<!--
+							**飾りを置きません**（Issue #23 / #16 と同じ判断）。
+							ここには `file` のアイコンを `size={12}` で置いていました。
+							あの字形は「角の折れた四角」で、**12px では折り返しの線が潰れ、
+							外枠だけが残って □ に見えていました。**
+
+							- **同じダイアログの［取り込む］［やめる］には無く、不揃いでした**
+							- 「ファイルを選ぶ」という文字の隣に紙の絵を置いても、
+							  **判断の材料が 1 つも増えません**
+							- **飾りが 1 つ減れば、壊れようがなくなります**
+						-->
 						<button type="button" onclick={pickFile} disabled={busy}>
-							<Icon name="file" size={12} />
 							{importFile === null
 								? i18n.t('bundle.import.pick')
 								: i18n.t('bundle.import.again')}
