@@ -444,6 +444,181 @@ async fn an_encrypted_putty_key_is_never_tried_without_its_passphrase() {
     );
 }
 
+/// 指紋を書かない接続一覧。**初見のホストとして弾かせるため。**
+async fn registry_with_key_unpinned(dir: &tempfile::TempDir, key: &Path) -> PathBuf {
+    let path = dir.path().join("connections.toml");
+    let toml = format!(
+        "version = 1\n\n[[connections]]\nid = \"local\"\nname = \"Local test server\"\n\
+         host = \"{HOST}\"\nport = {PORT}\nuser = \"{USER}\"\nkey_path = \"{}\"\n",
+        toml_string(key)
+    );
+    std::fs::write(&path, toml).expect("接続一覧を書けない");
+    path
+}
+
+#[tokio::test]
+async fn the_passphrase_question_is_taken_down_when_the_host_key_becomes_the_blocker() {
+    // **「気づく口」が気づけない**（Issue #24）。
+    //
+    // 実機の報告:
+    //
+    // > 初めて繋ぐホストで `host-key` で止まっていたのですが、
+    // > このとき `pending_status` は **`waitingForPassphrase` を返し続けていました**
+    //
+    // 立てる所と畳む所の間に**早期 return が 6 つ**あり、
+    // 畳むのは**完全に成功した経路の末尾だけ**でした。
+    // **ホスト鍵で弾かれると、パスフレーズ待ちのまま残ります。**
+    //
+    // 人は指紋を確かめる画面を見ているのに、AI は
+    // **「まだパスフレーズ待ちです。画面に入れてください」と言い続けます。**
+    // **無いより悪い**とはこのことです。
+    if !server_is_up().await {
+        println!("テスト用サーバーが建っていません（想定内・飛ばします）");
+        return;
+    }
+    let dir = tempfile::tempdir().expect("一時ディレクトリ");
+    let Some(ppk) = disposable_ppk(&dir, "sshboard-test-pass") else {
+        println!("puttygen がありません（想定内・飛ばします）");
+        return;
+    };
+    let engine = engine_at(registry_with_key_unpinned(&dir, &ppk).await);
+
+    // 1. AI が繋ごうとして、パスフレーズで止まる（**ここで問いが立ちます**）
+    let stopped = engine.connect(Actor::Ai, "local", None).await;
+    assert!(
+        matches!(stopped, Err(EngineError::PassphraseNeeded { .. })),
+        "パスフレーズで止まっていない: {:?}",
+        stopped.map(|open| open.id)
+    );
+    assert_eq!(
+        engine.passphrase_request().as_deref(),
+        Some("local"),
+        "問いが立っていない"
+    );
+
+    // 2. 人が入れる。**今度はホスト鍵で弾かれます**（指紋を書いていないので）
+    let refused = engine
+        .connect(Actor::Human, "local", Some("sshboard-test-pass".into()))
+        .await;
+    assert!(
+        matches!(refused, Err(EngineError::UntrustedHost { .. })),
+        "ホスト鍵で弾かれていない: {:?}",
+        refused.map(|open| open.id)
+    );
+
+    // 3. **パスフレーズはもう待っていません。**待っているのはホスト鍵です。
+    assert_eq!(
+        engine.passphrase_request(),
+        None,
+        "**パスフレーズ待ちのまま残っている**（Issue #24）"
+    );
+}
+
+#[tokio::test]
+async fn what_the_person_must_answer_next_is_the_host_key_and_it_can_be_said_so() {
+    // **型に無いものは、言えません**（Issue #24 の 2 つ目の根）。
+    //
+    // > ホスト鍵の確認待ちを表現できません
+    //
+    // 畳むだけでは足りません。**畳んだあと「では何を待っているのか」**が
+    // 返らないと、AI は今度は「待ちは無い」と言って、やはり間違えます。
+    if !server_is_up().await {
+        println!("テスト用サーバーが建っていません（想定内・飛ばします）");
+        return;
+    }
+    let dir = tempfile::tempdir().expect("一時ディレクトリ");
+    let Some(ppk) = disposable_ppk(&dir, "sshboard-test-pass") else {
+        println!("puttygen がありません（想定内・飛ばします）");
+        return;
+    };
+    let engine = engine_at(registry_with_key_unpinned(&dir, &ppk).await);
+
+    let _ = engine
+        .connect(Actor::Human, "local", Some("sshboard-test-pass".into()))
+        .await;
+
+    let waiting = engine
+        .host_key_request()
+        .expect("ホスト鍵待ちが立っていない");
+    assert_eq!(waiting.id, "local");
+    assert!(
+        waiting.fingerprint.starts_with("SHA256:"),
+        "人が突き合わせる指紋が入っていない: {waiting:?}"
+    );
+}
+
+#[tokio::test]
+async fn connecting_for_real_takes_every_question_down() {
+    // **通ったら、待ちは 1 つも残らない。**ここが崩れると #24 に戻ります。
+    if !server_is_up().await {
+        println!("テスト用サーバーが建っていません（想定内・飛ばします）");
+        return;
+    }
+    let dir = tempfile::tempdir().expect("一時ディレクトリ");
+    let Some(ppk) = disposable_ppk(&dir, "sshboard-test-pass") else {
+        println!("puttygen がありません（想定内・飛ばします）");
+        return;
+    };
+    let engine = engine_at(registry_with_key(&dir, &ppk).await);
+
+    // AI が止まって問いが立つ → 人が入れて繋がる
+    let _ = engine.connect(Actor::Ai, "local", None).await;
+    assert!(engine.passphrase_request().is_some(), "問いが立っていない");
+
+    engine
+        .connect(Actor::Human, "local", Some("sshboard-test-pass".into()))
+        .await
+        .expect("繋がらない");
+
+    assert_eq!(
+        engine.passphrase_request(),
+        None,
+        "パスフレーズ待ちが残っている"
+    );
+    assert!(
+        engine.host_key_request().is_none(),
+        "ホスト鍵待ちが残っている"
+    );
+}
+
+#[tokio::test]
+async fn a_question_is_never_raised_for_something_that_is_already_connected() {
+    // **Issue #24 の 1 つ目**（認証が通ったのに待ちのまま）。
+    //
+    // 読むだけでは辻褄が合わず、**競合**だと分かりました ——
+    // AI の `connect` が飛んでいる間に人が繋ぎ終わると、
+    // **人が畳んだ後に、AI が立て直します。**
+    //
+    // 競合そのものは狙って起こせないので、**同じ終わり方**を見ます ——
+    // **すでに繋がっている接続について、問いが立たないこと。**
+    if !server_is_up().await {
+        println!("テスト用サーバーが建っていません（想定内・飛ばします）");
+        return;
+    }
+    let dir = tempfile::tempdir().expect("一時ディレクトリ");
+    let Some(ppk) = disposable_ppk(&dir, "sshboard-test-pass") else {
+        println!("puttygen がありません（想定内・飛ばします）");
+        return;
+    };
+    let engine = engine_at(registry_with_key(&dir, &ppk).await);
+
+    // 人が繋ぎ終わっている。
+    engine
+        .connect(Actor::Human, "local", Some("sshboard-test-pass".into()))
+        .await
+        .expect("繋がらない");
+    assert_eq!(engine.passphrase_request(), None);
+
+    // そのあと AI が呼ぶ。**繋がっているので、問いを立ててはいけません。**
+    let _ = engine.connect(Actor::Ai, "local", None).await;
+
+    assert_eq!(
+        engine.passphrase_request(),
+        None,
+        "**繋がっているのにパスフレーズ待ちが立っている**（Issue #24）"
+    );
+}
+
 // --- ダウンロード（サーバー → 手元） -----------------------------------------
 
 #[tokio::test]

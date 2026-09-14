@@ -265,11 +265,15 @@ impl SshboardMcp {
     /// **人が答えたかどうか**を知る口（Issue #20）。**サーバーへは触りません。**
     #[tool(
         description = "Check whether the person has answered anything you asked for: the \
-                       console hold, a key passphrase, or an operation approval. **Touches no \
-                       remote server and shows nothing on their screen**, so polling this is \
-                       free - use it instead of re-calling console_open or connect in a loop. \
-                       Returns who holds the console, whether a question is still waiting, and \
-                       which connection is waiting for a passphrase."
+                       console hold, a key passphrase, a host key to confirm, or an operation \
+                       approval. **Touches no remote server and shows nothing on their \
+                       screen**, so polling this is free - use it instead of re-calling \
+                       console_open or connect in a loop. A field being null means that \
+                       question is no longer waiting; it does NOT mean the connection \
+                       succeeded - ask session_status for that. When a connect stops, the \
+                       thing that is now blocking moves between waitingForPassphrase and \
+                       waitingForHostKey, so read whichever is non-null rather than assuming \
+                       the first one you saw still holds."
     )]
     pub async fn pending_status(&self) -> Result<String, ErrorData> {
         // **帯へ載せません。**何度呼んでも人の画面に何も出ない、が要点です。
@@ -289,6 +293,21 @@ impl SshboardMcp {
             },
             // 鍵のパスフレーズ待ちの接続（識別子だけ）。
             "waitingForPassphrase": engine.passphrase_request(),
+            // **ホスト鍵の確認待ち**（Issue #24）。
+            //
+            // これが無かったので、ホスト鍵で止まっているのに
+            // **「パスフレーズ待ち」と言い続けていました。**
+            // 人が見ているのは「この指紋で登録しますか」の画面なので、
+            // **指紋も添えます** —— 識別子だけでは、人は答えられません。
+            "waitingForHostKey": engine.host_key_request().map(|asked| {
+                serde_json::json!({
+                    "id": asked.id,
+                    "algorithm": asked.algorithm,
+                    "fingerprint": asked.fingerprint,
+                    // 登録済みと食い違っているなら、**すり替えの疑い**。
+                    "expected": asked.expected,
+                })
+            }),
             // 走らせてよいかを尋ねている操作（識別子と、実際に打つもの）。
             // `needsSecret` は **人がその場でパスワードを入れる必要があるか**（D48）。
             // **秘密そのものは、ここにも他のどこにも流れません。**

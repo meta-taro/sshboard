@@ -78,6 +78,22 @@ struct Held {
     active: Option<String>,
 }
 
+/// **人にホスト鍵を確かめてもらっている**（Issue #24）。
+///
+/// パスフレーズ待ちと**同じ型で表せません。**指紋が要るからです ——
+/// 人は「この指紋で登録しますか」に答えるのであって、識別子だけでは答えられません。
+///
+/// **表せないものは、言えません。**この型が無かったので、
+/// ホスト鍵で止まっているのに「パスフレーズ待ち」と言い続けていました。
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+pub struct HostKeyAsk {
+    pub id: String,
+    pub algorithm: String,
+    pub fingerprint: String,
+    /// 登録済みの指紋。**あるのに食い違っているなら、すり替えの疑い。**
+    pub expected: Option<String>,
+}
+
 /// **AI が走らせたい操作**。人が答えるまで残り、**画面にそのまま出ます。**
 ///
 /// **秘密は持ちません。**画面に出るものへ秘密を載せたら、
@@ -156,6 +172,11 @@ pub struct Engine {
     /// 識別子だけを持ちます。**パスフレーズ本体はここへ来ません**（D14）——
     /// 人が入れた値は、人の経路（`connect`）へ直接渡ります。
     passphrase_request: watch::Sender<Option<String>>,
+    /// **人にホスト鍵を確かめてもらっている接続**（Issue #24）。
+    ///
+    /// パスフレーズ待ちと**別に持ちます。**同じ枠に入れると、
+    /// **どちらを待っているのか言えません**（実際に言えませんでした）。
+    host_key_request: watch::Sender<Option<HostKeyAsk>>,
     /// 開いているものが変わったことを配る。**画面が知らないまま繋がっている、を作らない。**
     changed: watch::Sender<Vec<Opened>>,
 }
@@ -175,6 +196,7 @@ impl Engine {
         let (console_changed, _) = watch::channel(None);
         let (console_request_changed, _) = watch::channel(None);
         let (passphrase_request, _) = watch::channel(None);
+        let (host_key_request, _) = watch::channel(None);
         let (operation_request, _) = watch::channel(None);
         Self {
             band,
@@ -186,6 +208,7 @@ impl Engine {
             console_changed,
             console_request_changed,
             passphrase_request,
+            host_key_request,
             operation_request,
             operation_approvals: Mutex::new(Vec::new()),
             operation_runs: Mutex::new(Vec::new()),
@@ -257,6 +280,41 @@ impl Engine {
         self.passphrase_request.send_replace(None);
     }
 
+    /// **いま、どの接続がホスト鍵の確認待ちか**（Issue #24）。
+    pub fn host_key_request(&self) -> Option<HostKeyAsk> {
+        self.host_key_request.borrow().clone()
+    }
+
+    pub fn subscribe_host_key_request(&self) -> watch::Receiver<Option<HostKeyAsk>> {
+        self.host_key_request.subscribe()
+    }
+
+    /// **この接続について立っている問いを、全部畳む**（Issue #24）。
+    ///
+    /// **出口の数を数えるのをやめます。**
+    ///
+    /// これまでは「立てる所」と「畳む所」を手で対応させており、
+    /// **`connect` の出口が 7 つあるのに畳む所が 1 つ**でした。
+    /// 抜けるのは時間の問題で、実際に抜けました ——
+    /// ホスト鍵で弾かれると、**パスフレーズ待ちのまま残り**、
+    /// AI は「まだパスフレーズ待ちです」と言い続けました（実機で起きました）。
+    ///
+    /// **入口で畳んで、その回に分かった待ちだけを立て直します。**
+    /// こうすると、**出口がいくつ増えても古い問いは残りません。**
+    fn clear_questions_for(&self, id: &str) {
+        if self.passphrase_request.borrow().as_deref() == Some(id) {
+            self.passphrase_request.send_replace(None);
+        }
+        let stale = self
+            .host_key_request
+            .borrow()
+            .as_ref()
+            .is_some_and(|asked| asked.id == id);
+        if stale {
+            self.host_key_request.send_replace(None);
+        }
+    }
+
     /// 共有している出力（`tail -f` の行き先）。
     pub fn stream(&self) -> &Arc<OutputStream> {
         &self.stream
@@ -286,6 +344,13 @@ impl Engine {
         id: &str,
         passphrase: Option<String>,
     ) -> Result<Opened, EngineError> {
+        // **まず、この接続について立っている問いを全部畳む**（Issue #24）。
+        //
+        // **出口を数えるのをやめました。**畳むのを末尾に置いていた頃は、
+        // 途中で抜けた分だけ古い問いが残り、**AI が実態と違うことを言い続けました。**
+        // ここで畳んでおけば、**この回に分かった待ちだけ**が下で立ちます。
+        self.clear_questions_for(id);
+
         // **同じ相手を二重に開かない。**別の相手は開ける（D25）。
         {
             let held = self.held.lock().await;
@@ -328,7 +393,20 @@ impl Engine {
             // パスフレーズの問いは人の経路にしか無かったので、**AI が頼めば
             // 人の画面に出る**ようにします（D42 と同じ形）。
             Err(EngineError::PassphraseNeeded { id }) => {
-                if actor != Actor::Human {
+                // **もう繋がっているなら、立てません**（Issue #24 の 1 つ目）。
+                //
+                // 実機の報告は「**認証が通ったのに、待ちのまま**」でした。
+                // 読むだけでは辻褄が合わず、**競合**だと分かりました ——
+                //
+                //   AI が connect を呼ぶ（パスフレーズが要る／まだ返っていない）
+                //     → その間に人が画面から入れて、繋がる（**問いを畳む**）
+                //       → AI 側の呼び出しがここへ来て、**畳まれた後に立て直す**
+                //
+                // 入口の `clear_questions_for` はこの順番を直せません
+                // （AI の入口は人の成功より**前**に通っているため）。
+                // **立てる直前に、いま繋がっているかを見ます。**
+                let already = self.held.lock().await.live.contains_key(&id);
+                if actor != Actor::Human && !already {
                     // **`send` は購読者が居ないと値を更新しません**（tokio の watch）。
                     // 画面がまだ購読していない瞬間に取りこぼすので、`send_replace` を使います。
                     self.passphrase_request.send_replace(Some(id.clone()));
@@ -349,14 +427,24 @@ impl Engine {
             // 人がそこで行き止まりになる（**実際になった**）。
             .map_err(|error| match error {
                 sshboard_ssh::SshError::UntrustedHost { seen, trust } => {
+                    let expected = match trust {
+                        sshboard_ssh::Trust::Mismatch { expected } => Some(expected),
+                        _ => None,
+                    };
+                    // **待っているものを言えるようにする**（Issue #24）。
+                    // 畳むだけでは足りません —— 畳んだあと「では何を待っているのか」が
+                    // 返らないと、AI は今度は「待ちは無い」と言って、やはり間違えます。
+                    self.host_key_request.send_replace(Some(HostKeyAsk {
+                        id: entry.id.clone(),
+                        algorithm: seen.algorithm.clone(),
+                        fingerprint: seen.fingerprint.clone(),
+                        expected: expected.clone(),
+                    }));
                     EngineError::UntrustedHost {
                         id: entry.id.clone(),
                         algorithm: seen.algorithm,
                         fingerprint: seen.fingerprint,
-                        expected: match trust {
-                            sshboard_ssh::Trust::Mismatch { expected } => Some(expected),
-                            _ => None,
-                        },
+                        expected,
                     }
                 }
                 other => EngineError::Ssh(other),
@@ -389,9 +477,10 @@ impl Engine {
         drop(held);
 
         let _ = self.changed.send(all);
-        // **繋がったら問いを畳む**（Issue #13）。
-        // 人が入れて繋がったのに問いが残ると、**もう一度入れさせる**ことになります。
-        self.clear_passphrase_request();
+        // **繋がったら問いを畳む**（Issue #13 / #24）。
+        // 入口でも畳んでいますが、ここでも畳みます —— この間に AI が
+        // 別の経路で立て直している見込みがあるためです。
+        self.clear_questions_for(&entry.id);
         Ok(opened)
     }
 
