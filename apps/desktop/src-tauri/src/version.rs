@@ -69,6 +69,59 @@ mod tests {
         );
     }
 
+    /// 更新の宛先。**アプリに焼き込まれるので、間違うと直せません。**
+    fn updater_endpoints() -> Vec<String> {
+        let raw = include_str!("../tauri.conf.json");
+        let at = raw.find("\"endpoints\"").expect("endpoints が無い");
+        let open = raw[at..].find('[').expect("[ が無い") + at;
+        let close = raw[open..].find(']').expect("] が無い") + open;
+        raw[open + 1..close]
+            .split(',')
+            .map(|one| one.trim().trim_matches('"').to_owned())
+            .filter(|one| !one.is_empty())
+            .collect()
+    }
+
+    #[test]
+    fn the_new_update_address_comes_first_and_the_old_one_is_still_there() {
+        // **移行の最中です**（D51 / Issue #25）。
+        //
+        // `updater` という版でないタグが Release の一覧に並び、
+        // **実リリースが全部 prerelease だったので Latest まで奪っていました。**
+        // 版のリリースへ `latest.json` を添付する形へ移します。
+        //
+        // **古い宛先を今すぐ消せません。**すでに入っている 0.1.5〜0.1.12 は
+        // この URL を焼き込んでいて、消すと**二度と更新に気づけません。**
+        //
+        // **2 本とも要ります。**新しい方が先（そちらが本命）。
+        let endpoints = updater_endpoints();
+
+        assert_eq!(endpoints.len(), 2, "宛先が 2 本でない: {endpoints:?}");
+        assert!(
+            endpoints[0].ends_with("/releases/latest/download/latest.json"),
+            "**新しい宛先が先頭でない**: {endpoints:?}"
+        );
+        assert!(
+            endpoints[1].ends_with("/releases/download/updater/latest.json"),
+            "**古い宛先が消えている**（入っている端末が更新に気づけなくなります）: {endpoints:?}"
+        );
+    }
+
+    #[test]
+    fn every_update_address_is_a_fixed_url() {
+        // **版の番号が混ざっていたら、焼き込んだ瞬間に古くなります。**
+        // D34 の条件はここです ——「アプリに焼き込む URL は変えられない」。
+        let version = env!("CARGO_PKG_VERSION");
+
+        for endpoint in updater_endpoints() {
+            assert!(
+                !endpoint.contains(version),
+                "**宛先に版の番号が入っています**（次の版で更新が死にます）: {endpoint}"
+            );
+            assert!(endpoint.starts_with("https://"), "https でない: {endpoint}");
+        }
+    }
+
     #[test]
     fn the_version_looks_like_three_numbers() {
         // **prerelease をここへ書かない**（D30）。α はタグと prerelease の印で表す。

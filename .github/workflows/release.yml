@@ -237,14 +237,21 @@ jobs:
           TAG: ${{ github.ref_name }}
         run: |
           set -eu
-          # `-` を含むタグ（v0.1.0-alpha.1）は α / β。**prerelease の印を必ず付ける。**
-          PRERELEASE=""
-          case "${TAG}" in
-            *-*) PRERELEASE="--prerelease" ;;
-          esac
-
-          gh release create "${TAG}" --title "${TAG}" --generate-notes ${PRERELEASE} \
-            upload/*
+          # **版のリリースに prerelease の印を付けません**（D51 / Issue #25）。
+          #
+          # 付けていた頃、**実リリースがすべて prerelease だったので、
+          # `updater`（版ではなく宛先）が Latest を奪っていました。**
+          # 外から来た人が最初に見る行が、日本語の運用メモという状態でした。
+          #
+          # **α であることは 3 か所に残ります** ——
+          # タグ名（`v0.1.12-alpha.13`）、ノートの 1 行目（「これは α です」）、
+          # README の冒頭（「⚠️ This is alpha.」）。
+          # **`Latest` は「いちばん新しいリリース」であって「安定版」ではありません。**
+          #
+          # **`latest.json` もここへ添付します。**宛先を
+          # `/releases/latest/download/latest.json` にするためです（D51）。
+          gh release create "${TAG}" --title "${TAG}" --generate-notes \
+            upload/* latest.json
 
           # **断り書きを先頭に置く。**未署名で何が起きるかを、
           # 自動生成のコミット一覧より先に読ませる。
@@ -252,8 +259,12 @@ jobs:
           cat .github/release-note-alpha.md generated.md > note.md
           gh release edit "${TAG}" --notes-file note.md
 
-      # **更新の宛先は 1 つに固定する。**アプリに焼き込んだ URL は変えられないため。
-      - name: updater タグの目録を差し替える
+      # **古い宛先も当面は出し続ける**（D51 の移行）。
+      #
+      # すでに入っている 0.1.5〜0.1.12 は、**この URL を焼き込んでいます。**
+      # 消すと**その端末は二度と更新に気づけません。**
+      # **入っている端末が全部新しい版に乗ったのを確かめてから**消します。
+      - name: updater タグの目録を差し替える（古い端末のため・D51 の移行）
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ github.ref_name }}
