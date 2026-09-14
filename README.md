@@ -1,50 +1,54 @@
 # sshboard
 
+*English ／ [日本語](README.ja.md)*
+
 **MCP SFTP client and MCP SSH terminal — let an AI agent *see* your remote server, over one SSH session, on the same screen you are looking at.**
 
-リモートサーバーの中身を、**人と AI が同じ画面で見る**ための道具です。
-ファイルも、コマンドの出力も、**同じ 1 本の SSH の上**で見ます。
+Files, command output, everything — **over the same single SSH connection**, shown to
+you and to the agent at once.
 
-> ⚠️ **α です。**実運用のサーバーで**使われ始めました**（2026-09-09・証明書更新の調査）。
-> テストは **550 本**通っており（Rust 341 / フロント 209）、Windows・macOS の
-> インストーラも束ねられています。**それと道具として使えることは別です** ——
-> 実際、**端末に 1 バイトも出ていない状態を 3 日間配っていました**（Issue #10）。
-> 方向性は [`PRD.md`](PRD.md)、進め方は [`.claude/roadmap.md`](.claude/roadmap.md)、
-> 決定と理由は [`.claude/decisions.md`](.claude/decisions.md) にあります。
+> ⚠️ **This is alpha.** It **started being used on a production server** on 2026-09-09
+> (investigating a failed certificate renewal). **611 tests pass** (390 Rust, 221
+> frontend) and installers are bundled for Windows and macOS. **None of that means it
+> works as a tool** — we shipped a build whose terminal displayed *not one byte* for
+> three days (Issue #10).
+> Direction lives in [`PRD.md`](PRD.md), the plan in
+> [`.claude/roadmap.md`](.claude/roadmap.md), and every decision with its reasoning in
+> [`.claude/decisions.md`](.claude/decisions.md).
 
 ---
 
-## なぜ作るか
+## Why this exists
 
-従来型のレンタルサーバー / VPS の上で動き続けているサービスがあります。
-そこを AI と一緒に保守すると、毎回これが起きます。
-
-```
-人 : このサービスの設定を直したい
-AI : サーバー側の状態が分からないので教えてください
-人 : （ターミナルを開いて調べて、貼る）
-AI : ではこの設定ファイルの中身も見せてください
-人 : （SFTP を開いて落として、貼る）
-```
-
-**この往復を消すための道具です。**
-AI にサーバーを操作させる必要はありません。**見せるだけで消えます。**
-
-## どう使うものか
-
-**画面のボタンを押す道具ではありません。**あなたはターミナルの AI エージェントに話しかけ、
-エージェントが sshboard の内蔵 MCP を呼びます。
+There are services still running on ordinary shared hosting and VPSes. Maintain one of
+those *with* an AI agent and this happens every single time:
 
 ```
-あなた → ターミナルの AI エージェントへ「メールが届かない。調べて」
+you : I want to fix this service's config
+AI  : I can't see the server, so please tell me its state
+you : (open a terminal, look, paste)
+AI  : now show me that config file too
+you : (open SFTP, download, paste)
+```
+
+**This tool exists to delete that round trip.**
+The agent does not need to *operate* your server. **Letting it see is enough.**
+
+## How you actually use it
+
+**This is not a tool you drive by clicking buttons.** You talk to an AI agent in your
+terminal, and the agent calls sshboard's built-in MCP server.
+
+```
+you → the AI agent in your terminal: "mail isn't arriving. look into it"
               │
-              │  MCP（アプリ内蔵・別プロセスを立てない）
+              │  MCP (inside the app — no extra process)
               ▼
-        sshboard  ── SSH 1 本 ──▶  サーバー
-              │      （sftp / exec）
+        sshboard  ── one SSH ──▶  server
+              │     (sftp / exec)
               ▼
-   sshboard の画面に [AI] の行が流れる
-   ── あなたは見ているだけ。何を読んで何を打ったかが、その場で分かる
+   an [AI] line scrolls past in sshboard's window
+   ── you are just watching. what it read and what it typed is visible as it happens
 ```
 
 ```
@@ -55,55 +59,58 @@ Filesystem      Size  Used Avail Use% Mounted on
 [AI]    read /etc/postfix/main.cf  (4.1 KB)
 ```
 
-**人の側は制限しません。**ファイル 2 ペインとターミナルタブは、普通の SFTP クライアント /
-ターミナルとして自由に使えます。**制限するのは AI の口だけ**です。
+**You are not restricted.** The two-pane file browser and the terminal tab work like any
+other SFTP client and terminal. **Only the agent's side is fenced.**
 
-### AI が呼べるもの（Phase 1・読み取りのみ）
+### What the agent may call (Phase 1 — reading)
 
 `list_connections` / `list_directory` / `stat` / `read_file` / `search` / `download` /
 `disk_usage` / `process_list` / `service_status` / `runtime_versions` / `read_log` /
-`network_listen` / `run_readonly`（許可リスト方式）
+`network_listen` / `run_readonly` (allowlist)
 
-**`run_command(cmd)` を作りません。**1 つ置けば全部できてしまい、破壊的操作を防ぐ手段が
-「使わない約束」しか残らないからです。**約束は手順書であって、ゲートではありません。**
+**There is no `run_command(cmd)`.** One such tool does everything, and once you have it
+the only thing standing between an agent and a destructive command is a promise not to
+use it. **A promise is a runbook, not a gate.**
 
-`run_readonly` で AI が渡せるのは、**人が `readonly.toml` に書いた項目の識別子だけ**です。
-引数のスロットはありません。**既定は空 ＝ 書くまで 1 本も走りません。**
-断った分は画面の帯に出て、`readonly-refused.log` に残ります。**足すのは人です。**
+With `run_readonly` the agent may pass **only an id that a person wrote into
+`readonly.toml`**. There is no argument slot. **The list ships empty — until you write
+it, nothing runs at all.** Refusals show up in the window's activity band and are
+recorded in `readonly-refused.log`. **Adding entries is a person's job.**
 
-## 成功条件（唯一）
+## The one success criterion
 
-> **AI が「サーバー側の状態を教えてください」と言わなくなること。**
+> **The agent stops saying "please tell me the state of the server."**
 
-ダウンロード数でも star 数でもありません。実際の保守作業で往復が消えたかどうかです。
+Not downloads, not stars. Whether the round trip disappeared during real maintenance.
 
-## 用途を近代化しません
+## It will not modernise your setup
 
-- サーバーを別の基盤へ移させる道具ではありません
-- **従来の構成のまま使えること**が価値です
-- 従来型のサービスは今後 10 年以上残ります。そこに AI 開発を持ち込む道具が存在していません
+- This is not a tool for migrating your server somewhere else
+- **Working with the setup you already have** is the point
+- These services will still be here in ten years. Nothing exists today that brings AI
+  development to them
 
-## 形
+## Shape
 
 ```
    ┌──────────┬──────────┐        ┌──────────┐
-   │ ファイル  │  端末     │        │   MCP    │
-   │  2 ペイン │  タブ     │        │          │
+   │  files   │ terminal │        │   MCP    │
+   │ two-pane │   tab    │        │          │
    └────┬─────┴────┬─────┘        └────┬─────┘
         └──────────┴───────┬───────────┘
                            ▼
               ┌────────────────────────┐
-              │  Operation Engine      │  ← 実装はここに 1 つだけ
+              │  Operation Engine      │  ← exactly one implementation lives here
               └───────────┬────────────┘
                           ▼
-                       SSH 1 本
-                    （sftp / exec）
+                    one SSH connection
+                      (sftp / exec)
 ```
 
-**SFTP の実装を 2 つ持ちません。裏で見えない SSH セッションを張りません。**
-見えないことが最大の危険だからです。
+**We do not keep two SFTP implementations, and we never open an SSH session you cannot
+see.** Being invisible is the single biggest danger here.
 
-誰が触ったかは同じ帯に流れます。**面が違っても記録は 1 本です。**
+Whoever touched what flows into the same band. **Different surfaces, one record.**
 
 ```
 [Human] $ cd /var/www
@@ -113,53 +120,50 @@ Filesystem      Size  Used Avail Use% Mounted on
 [AI]    read /etc/postfix/main.cf  (4.1 KB)
 ```
 
-## Phase 1 は読み取り専用
+## Phase 1 is read-only
 
-**書き込みを一切入れません。**用途（障害調査・メール設定調査・提案）がすべて読み取りだからです。
-危険がほぼゼロになるので、**稼働中の本番サーバーを初日から対象にできます。**
+**No writes at all.** Every intended use — incident triage, mail-config investigation,
+writing up a proposal — is reading. That makes the risk close to zero, which means
+**you can point it at a live production server on day one.**
 
-AI が呼べるもの:
-`list_connections` / `list_directory` / `stat` / `read_file` / `search` / `download` /
-`disk_usage` / `process_list` / `service_status` / `runtime_versions` /
-`read_log` / `network_listen` / `run_readonly`（許可リスト方式）
+### There is no `run_command(cmd)`
 
-### `run_command(cmd)` を作りません
+Put one arbitrary-command tool in place and it can do everything. **That is exactly why
+it does not exist.**
 
-任意コマンドを 1 つ置けば全部できます。**だから作りません。**
+- Hand it over and the only remaining defence against a destructive command is a promise
+- **A promise is a runbook, not a gate**
+- With an allowlist, dangerous commands are **not expressible**
 
-- 渡した時点で、破壊的操作を防ぐ手段が「使わない約束」しか残らなくなります
-- **約束は手順書であって、ゲートではありません**
-- 許可リスト方式なら、**危険なコマンドは呼びようがありません**
-
-#### `readonly.toml` の形（人が書きます）
+#### What `readonly.toml` looks like (a person writes it)
 
 ```toml
 version = 1
 
 [[command]]
-id = "uptime"          # AI が渡せる唯一の値
-run = "uptime"         # 実際に走る文字列。**人が書いたものがそのまま走ります**
-description = "稼働時間"
+id = "uptime"          # the only value the agent may pass
+run = "uptime"         # what actually runs. **exactly what a person wrote**
+description = "how long it has been up"
 ```
 
-**製品は既定の項目を 1 本も持ちません。**実務で何が要るかの一覧を誰も持っていないので、
-推測で埋めると必ず外します。AI が呼んで断られた分が `readonly-refused.log` に溜まるので、
-**そこを見て、本当に要ったものだけを足してください。**
+**The product ships with zero entries.** Nobody has the list of what real maintenance
+needs, and filling it in by guesswork gets it wrong. Refused calls pile up in
+`readonly-refused.log` — **read that, and add only what was genuinely needed.**
 
-**この仕組みが検証できないこと:** 書いた `run` が本当に読み取り専用かどうかは、
-**製品には分かりません。**`uptime` と `rm -rf /` を機械が見分ける方法はありません。
-ここが防ぐのは「AI がコマンド文字列を組み立てること」だけです。
+**What this cannot verify:** whether the `run` you wrote is truly read-only. **The
+product cannot know.** No machine can tell `uptime` from `rm -rf /` by inspection. What
+this prevents is exactly one thing: **the agent composing a command string.**
 
-**人（GUI）の側は制限しません。**普通の SFTP クライアント / ターミナルとして自由に使えます。
-制限するのは AI の口だけです。
+**The human side (the GUI) is not restricted.** Use it as an ordinary SFTP client and
+terminal. Only the agent's side is fenced.
 
-## 状態を変える操作（`operations.toml`）
+## State-changing operations (`operations.toml`)
 
-> **既定は空です。**このファイルを書くまで、AI は 1 本も走らせられません。
+> **The list ships empty.** Until you write this file, the agent can run nothing.
 
-読み取りの許可リスト（`readonly.toml`）とは**別のファイル**です。
-**`readonly` という名前のファイルに書き込み操作を入れない**ためで、
-名前で区別がつくことが要点です。`connections.toml` と同じディレクトリに置きます。
+This is a **separate file** from the read allowlist (`readonly.toml`), so that write
+operations never live in a file called `readonly`. Telling them apart by name is the
+point. Put it next to `connections.toml`.
 
 ```toml
 version = 1
@@ -167,188 +171,189 @@ version = 1
 [[operation]]
 id = "restart-httpd"
 run = "sudo systemctl restart httpd"
-description = "Apache を再起動する"
+description = "restart Apache"
 max_per_hour = 3
 ```
 
-| 項目 | 何を書くか |
+| field | what to write |
 |---|---|
-| `id` | **AI が渡せるのはこれだけ。**短く、読んで分かる名前 |
-| `run` | **実際に打つもの。**AI は組み立てられません |
-| `description` | **承認の画面に出ます。**半年後の自分が読んで分かる言葉で |
-| `max_per_hour` | 1 時間あたりの上限。**0 は書けません**（止まる所が要るため） |
+| `id` | **the only thing the agent may pass.** Short, readable |
+| `run` | **what actually gets typed.** The agent cannot compose it |
+| `description` | **shown on the approval dialog.** Words you will understand in six months |
+| `max_per_hour` | hourly ceiling. **`0` is rejected** (there has to be a place it stops) |
 
-### 走るまでに通る関門
+### Gates it passes through before running
 
-1. **人が書いた一覧に在ること。**無い id は断られ、断った事実が記録に残ります
-2. **1 時間あたりの上限を超えていないこと**
-3. **人が画面で許可すること。**AI からの 1 回目は必ず断られ、
-   画面に「**何が走るのか**」がそのまま出ます
-4. **許可は使い切り。**1 回の許可で 1 回だけ走ります
-5. **許可は 5 分で切れます。**押したのに AI が呼び返してこないことは在ります
-   （会話が途切れる・別の話に移る）。**押しっぱなしの許可を残しません** ——
-   `become = "ask"` のときは、**パスワードもここで一緒に落ちます**
+1. **It is in the list a person wrote.** Unknown ids are refused, and the refusal is recorded
+2. **It is under the hourly ceiling**
+3. **A person approves it on screen.** The agent's first call is always refused, and the
+   window shows **what would actually run**
+4. **An approval is spent once.** One approval, one run
+5. **An approval expires after five minutes.** People press allow and the agent never
+   calls back (the conversation moves on). **We do not leave approvals lying around** —
+   with `become = "ask"`, **the password is dropped here too**
 
-**人（画面）は 3〜5 を通りません。**画面の前に居るなら、見えているからです。
-**ただし `become = "ask"` のパスワードだけは人にも尋ねます** ——
-承認とは別で、**製品はパスワードを作れない**からです。
+**A person at the screen does not pass 3–5.** They are looking at it.
+**The one exception is the `become = "ask"` password** — that is not approval, it is a
+credential, and **the product cannot invent it.**
 
-### 書いても弾かれるもの
+### Refused even if you write it down
 
-**設定で有効にできません。**`operations.toml` に書いても断ります。
+**No setting enables these.** They are rejected even when present in `operations.toml`.
 
-- 檻そのもの —— `sudoers` / `visudo` / `authorized_keys`
-- **鍵** —— `.ssh` / `id_rsa` / `id_ed25519` / `id_ecdsa`
-- **パスワードの入れ物** —— `/etc/shadow` / `/etc/gshadow`
-- sshboard 自身の設定 —— `connections.toml` / `readonly.toml` / `operations.toml`
-- 利用者とロール —— `useradd` / `usermod` / `userdel` / `groupadd`
-- 壊す操作 —— `mkfs` / `fdisk` / `dd ` / `rm -rf`
+- The cage itself — `sudoers` / `visudo` / `authorized_keys`
+- **Keys** — `.ssh` / `id_rsa` / `id_ed25519` / `id_ecdsa`
+- **Where passwords live** — `/etc/shadow` / `/etc/gshadow`
+- sshboard's own config — `connections.toml` / `readonly.toml` / `operations.toml`
+- Users and roles — `useradd` / `usermod` / `userdel` / `groupadd`
+- Destruction — `mkfs` / `fdisk` / `dd ` / `rm -rf`
 
-**AI が自分の檻を広げられないこと**が、この一覧の芯です。
+**The agent cannot widen its own cage.** That is what this list is for.
 
-## root が要る操作（`become`）
+## Operations that need root (`become`)
 
-`operations.toml` は「**どのコマンドを走らせてよいか**」を決めます。
-「**どうやって権限を得るか**」は、**接続ごとに書きます**（`connections.toml`）。
+`operations.toml` decides **which commands may run**. **How privilege is obtained** is
+written **per connection** (`connections.toml`).
 
 ```toml
 [[connections]]
 id = "..."
-become = "sudoers"   # サーバー側で範囲が切ってある（推奨）
-# become = "ask"     # 要るときに人へ聞く。**保存しません**
-# 書かなければ「上げない」
+become = "sudoers"   # scope is cut on the server side (recommended)
+# become = "ask"     # ask the person when it is needed. **never stored**
+# omit it entirely   # do not elevate
 ```
 
-| `become` | sshboard が打つもの | パスワード |
+| `become` | what sshboard types | password |
 |---|---|---|
-| 書かない | 人が `run` に書いたまま | 要りません |
-| `sudoers` | `sudo -n …` | 要りません（`sudoers.d` が持つ） |
-| `ask` | `sudo -S -p '' …` | **人が画面でその場で入れます** |
+| omitted | exactly what you wrote in `run` | none |
+| `sudoers` | `sudo -n …` | none (`sudoers.d` holds the scope) |
+| `ask` | `sudo -S -p '' …` | **typed by a person, on screen, in the moment** |
 
-**`sudo ` で始まる `run` だけが対象**です。それ以外は 1 文字も変わりません。
-`ask` にしても、`sudo` を使わない操作でパスワードを聞かれることはありません。
+**Only a `run` that starts with `sudo ` is touched.** Everything else is left byte for
+byte. Choosing `ask` does not make non-`sudo` operations ask for a password.
 
-### `sudoers`（推奨）
+### `sudoers` (recommended)
 
 ```
-<利用者> ALL=(root) NOPASSWD: /usr/bin/systemctl restart httpd, /usr/bin/systemctl reload httpd
+<user> ALL=(root) NOPASSWD: /usr/bin/systemctl restart httpd, /usr/bin/systemctl reload httpd
 ```
 
 ```sh
-# 必ず visudo で。書き間違えると、誰も sudo できなくなります
+# always through visudo. get it wrong and nobody can sudo any more
 sudo visudo -f /etc/sudoers.d/sshboard
 sudo chmod 0440 /etc/sudoers.d/sshboard
 ```
 
-**これは OS が強制するゲート**で、アプリの約束ではありません。
-範囲が `sudoers` に書いてあるので**後から人が読んで検証でき**、
-**sshboard 側に秘密が 1 つも増えません。**
+**This is a gate the OS enforces**, not a promise the app makes. The scope is written in
+`sudoers`, so **a person can audit it afterwards**, and **sshboard gains no secret.**
 
-効いているかは、こう確かめます。
+Check that it works:
 
 ```sh
-sudo -n systemctl reload httpd    # パスワードを聞かれずに通れば OK
-sudo -n systemctl restart nginx   # 書いていないものは断られるはず
+sudo -n systemctl reload httpd    # passes with no password prompt → good
+sudo -n systemctl restart nginx   # not listed → should be refused
 ```
 
-**2 つ目が通ってしまったら、範囲が広すぎます。**
+**If the second one succeeds, your scope is too wide.**
 
-### `ask`（`sudoers` を触れないとき）
+### `ask` (when you cannot touch `sudoers`)
 
-**サーバーを触れない事情は実在します** —— 借りている・権限が無い・台数が多い。
-`sudo -n` が「パスワードが必要です」と返るサーバーでは、`sudoers` の道は
-**最初から閉じています。**そのための `ask` です。
+**Not being able to touch the server is a real situation** — rented, no rights, too many
+machines. On a server where `sudo -n` answers "a password is required", the `sudoers`
+route **was never open.** That is what `ask` is for.
 
-承認の画面にパスワードの欄が出て、**人がその場で入れます。**
+A password field appears on the approval dialog and **a person types it there.**
 
-- **保存しません。**ディスクにも OS ストアにも置きません
-- **コマンド行に載せません。**標準入力から渡すので、`ps` に出ません
-- **画面にも記録にも出ません。**出るのは `$ sudo -S -p '' …` までです
-- **1 回の許可で 1 回だけ。**走った瞬間に捨てます
-- **断れば、その場で捨てます**
+- **Never stored.** Not on disk, not in the OS credential store
+- **Never on the command line.** It goes in over stdin, so it does not show up in `ps`
+- **Never on screen and never in the log.** What appears is `$ sudo -S -p '' …` and no more
+- **One approval, one run.** Dropped the instant it is used
+- **Refuse, and it is dropped there and then**
 
-**root しか読めないログを読む**のも、この形です。
+**Reading a log only root can read** works the same way:
 
 ```toml
 [[operation]]
 id = "read-letsencrypt-log"
 run = "sudo tail -n 200 /var/log/letsencrypt/letsencrypt.log"
-description = "証明書の更新がなぜ失敗したかを見る"
+description = "find out why the certificate renewal failed"
 max_per_hour = 6
 ```
 
-**読み取りの許可リスト（`readonly.toml`）には効きません。**
-効かせると、**読み取りのたびにパスワードを聞かれます。**
-root が要る読み取りは、`operations.toml` に書いてください。
+**This does not apply to the read allowlist (`readonly.toml`).** If it did, **every read
+would ask for a password.** Reads that need root belong in `operations.toml`.
 
-`su` で先に root になる運用は**勧めません** —— **範囲が消えます。**
-`su -` しか無いサーバー向けの道は、**まだありません**（`.claude/decisions.md` D48）。
+Becoming root first with `su` is **not recommended** — **the scope disappears.** A route
+for servers that only have `su -` **does not exist yet** (`.claude/decisions.md` D48).
 
-### 製品が保証できないこと
+### What the product cannot guarantee
 
-**「本当にその操作だけをするか」を、製品は検証できません。**
-走るのは人が書いた文字列です。`readonly.toml` と同じで、**そこは人が読んで
-確かめる所**です。だから `sudoers` で **OS に強制させます。**
+**Whether an operation really does only what it says, the product cannot verify.** What
+runs is a string a person wrote. As with `readonly.toml`, **that is the part a person
+has to read and confirm.** Which is why `sudoers` **makes the OS enforce it.**
 
-**出先への承認の届け先は、まだありません**（`.claude/decisions.md` の D47・未決）。
-いまは**画面の前に居る人だけ**が答えられます。人が居なければ操作は走りません。
+**There is no way to deliver an approval to someone who is away from the screen yet**
+(`.claude/decisions.md` D47 — undecided). Today **only a person at the screen** can
+answer. With nobody there, the operation does not run.
 
-## やらないこと
+## What this will not do
 
-| やらない | 理由 |
+| not doing | why |
 |---|---|
-| AI に書き込みを渡す（Phase 1） | 用途がすべて読み取り。本番サーバーを初日から対象にできる |
-| AI に任意コマンドを渡す | 許可リストで構造的に防ぐ |
-| AI に sudo を渡す | Phase 1 で権限昇格を扱わない |
-| 自前の鍵ストアを作る | OS 資格情報ストア / ssh-agent へ委譲する。持たなければ守らなくてよい |
-| AI チャット UI を内蔵する | エージェントはアプリの外にいる |
-| レポート生成機能を作る | 読めれば提案は AI が書く。足すものが無い |
-| サーバーの移行を促す | 従来構成のまま使えることが価値 |
+| Give the agent write access (Phase 1) | Every use is reading. Lets us target production on day one |
+| Give the agent arbitrary commands | An allowlist prevents it structurally |
+| Give the agent sudo | Phase 1 does not deal with privilege escalation |
+| Build our own key store | Delegate to the OS credential store and ssh-agent. What you do not hold, you need not guard |
+| Embed an AI chat UI | The agent lives outside the app |
+| Generate reports | If it can read, the agent writes the proposal. Nothing to add |
+| Push you to migrate | Working with your existing setup is the point |
 
-## 動かす
+## Running it
 
-**まだ α です。**実運用のサーバーへ向ける前に、**手元のテスト用サーバーで一度動かしてください。**
+**This is still alpha.** Before pointing it at a production server, **run it once against
+the local test server.**
 
-### 前提
+### Requirements
 
 | | |
 |---|---|
-| OS | macOS / Windows（Linux は配布対象外） |
-| Rust | `rust-toolchain.toml` が 1.98.0 を指定。`rustup` が入っていれば自動で揃います |
-| Node | 20 以上 |
-| pnpm | `corepack enable`（**npm / yarn は使いません**） |
-| Docker | 手元のテスト用サーバーを建てる場合だけ |
+| OS | macOS / Windows (Linux is not a distribution target) |
+| Rust | `rust-toolchain.toml` pins 1.98.0. `rustup` sorts it out |
+| Node | 20 or newer |
+| pnpm | `corepack enable` (**npm / yarn are not used**) |
+| Docker | only if you want the local test server |
 
-**鍵は ssh-agent に入れておくのを勧めます。**そうすれば sshboard はパスフレーズを
-一度も受け取りません。
+**Keeping your key in ssh-agent is recommended.** Then sshboard never receives a
+passphrase at all.
 
-### 起動
+### Start
 
 ```sh
 pnpm install
 pnpm --filter desktop tauri dev
 ```
 
-### テスト
+### Tests
 
 ```sh
 cargo test --workspace         # Rust
-pnpm --filter desktop test     # フロント
-pnpm --filter desktop check    # 型検査
+pnpm --filter desktop test     # frontend
+pnpm --filter desktop check    # type check
 ```
 
-### 手元のテスト用サーバー
+### Local test server
 
-**あなたのサーバーには一切触りません。**使い捨ての鍵を作り、Docker で 1 台建てます。
+**It does not touch your servers at all.** It creates a throwaway key and brings up one
+machine in Docker.
 
 ```sh
-sh tools/test-server/up.sh        # 建てる
-sh tools/test-server/up.sh down   # 片付ける
+sh tools/test-server/up.sh        # up
+sh tools/test-server/up.sh down   # down
 ```
 
-### AI（MCP）から繋ぐ
+### Connecting an agent (MCP)
 
-#### すすめる形 — 合言葉をどこにも書かない
+#### Recommended — the token is never written anywhere
 
 ```sh
 # macOS
@@ -358,38 +363,39 @@ claude mcp add sshboard -- /Applications/sshboard.app/Contents/MacOS/sshboard --
 claude mcp add sshboard -- "%LOCALAPPDATA%\\sshboard\\sshboard.exe" --mcp-stdio-proxy
 ```
 
-**この形なら、合言葉はどこにも残りません**（Issue #2）。
-`--mcp-stdio-proxy` で起動された sshboard は、**窓を作らず中継として走ります。**
-合言葉は自分で読み、動いている本体へ流すだけです。
+**This way the token is left nowhere** (Issue #2). Started with `--mcp-stdio-proxy`,
+sshboard **runs as a relay with no window.** It reads the token itself and passes it to
+the running app.
 
-- **`~/.claude.json` にもコマンド履歴にも合言葉が載りません**
-- ポートを移しても（`SSHBOARD_MCP_PORT`）**登録し直しは要りません**
-- 本体が動いていなければ「**sshboard が動いていません。アプリを起動してから、
-  もう一度お試しください。**」と返ります
+- **The token appears neither in `~/.claude.json` nor in your shell history**
+- Move the port (`SSHBOARD_MCP_PORT`) and **you do not have to re-register**
+- If the app is not running you get: "**sshboard is not running. Start the app and try
+  again.**"
 
-**SSH を張るのは本体だけです。**中継は Engine も帯も持ちません。
-**見えない SSH セッションは 1 本も増えません**（禁止事項 3）。
+**Only the app opens SSH connections.** The relay holds no engine and no band.
+**It adds not one invisible SSH session** (prohibition 3).
 
-#### 直に HTTP で繋ぐ形
+#### Straight over HTTP
 
-画面右上の **「MCP の登録コマンドを写す」ボタン**から、合言葉ごと 1 行を写せます。
+The **"Copy the MCP registration command" button** at the top right of the window copies
+a single line, token included.
 
 ```sh
 claude mcp add --transport http sshboard http://127.0.0.1:22022/mcp \
-  --header "Authorization: Bearer <合言葉>"
+  --header "Authorization: Bearer <token>"
 ```
 
-**`--transport http` が要ります。**パスは `/mcp` で、合言葉は `Authorization: Bearer` で渡ります。
+**`--transport http` is required.** The path is `/mcp` and the token goes in
+`Authorization: Bearer`.
 
-**ポートは `22022` に固定です**（D33）。合言葉も使い回すので、
-**登録は 1 回で終わります。**立ち上げ直しても同じ URL のままです。
+**The port is fixed at `22022`** (D33), and the token is reused, so **you register once.**
+Restarting keeps the same URL.
 
-> ⚠️ **`claude mcp add` を使うと、合言葉が `~/.claude.json` に平文で残ります。**
-> loopback の取っ手なので鍵そのものではありませんが、
-> **これを持っている相手は、あなたの繋いでいるサーバーを読めます。**
-> 消すときは `claude mcp remove sshboard` を忘れずに。
+> ⚠️ **`claude mcp add` leaves the token in `~/.claude.json` in plain text.**
+> It is a loopback handle rather than a key, but **whoever holds it can read the servers
+> you are connected to.** Remember `claude mcp remove sshboard` when you are done.
 
-`.mcp.json` に書いても構いません（**こちらもファイルに平文で残ります**）。
+`.mcp.json` works too (**also plain text on disk**):
 
 ```json
 {
@@ -397,65 +403,70 @@ claude mcp add --transport http sshboard http://127.0.0.1:22022/mcp \
     "sshboard": {
       "type": "http",
       "url": "http://127.0.0.1:22022/mcp",
-      "headers": { "Authorization": "Bearer <画面の「MCP」ボタンから写せます>" }
+      "headers": { "Authorization": "Bearer <copy it from the MCP button>" }
     }
   }
 }
 ```
 
-> ポートがぶつかったら、**黙って別の番号へ逃げません。**
-> 画面に「立ち上がりませんでした（ポート 22022）」と出します。
-> 移すときは環境変数 `SSHBOARD_MCP_PORT` を設定してください。
+> If the port is taken, **it does not quietly move somewhere else.**
+> The window says "failed to start (port 22022)".
+> Set `SSHBOARD_MCP_PORT` to move it.
 
-### 更新
+### Updates
 
-**新しい版が出ると、起動したときに画面へ出ます**（D34）。
+**When a new version exists, the window tells you at startup** (D34).
 
-**黙って入れ替えません。**落として入れるのも、再起動するのも、押すのは人です。
-この道具は SSH の鍵を扱うので、無断で自分を書き換える形にはしていません。
+**It never replaces itself quietly.** Downloading, installing and restarting are all
+things a person presses. This tool handles SSH keys, so it does not rewrite itself
+without being asked.
 
-更新そのものは **minisign で署名されており、Tauri が必ず検証します。**
-**コード署名（D12・OS の警告が出るかどうか）とは別の話**で、
-「配布元が本物か」はこちらで担保されています。
+The update itself is **signed with minisign, and Tauri always verifies it.** That is
+**separate from code signing** (D12 — whether the OS shows a warning); what is
+guaranteed here is that the update came from us.
 
-### α で知っておいてほしいこと
+### Things to know during alpha
 
-- **署名していません。**ただし **Windows で止まるかどうかは、取り方で変わります**（Issue #3・実測）
-  - **ブラウザで取ってダブルクリック** → SmartScreen が止まります
-  - **`gh run download` / CI / スクリプトで取る** → **止まりません。**
-    Mark of the Web が付かず、SmartScreen のアプリ評価チェックが起点を失うため
-  - macOS の Gatekeeper は未検証です
-- **AI が書けるのは、接続ごとに人が列挙したディレクトリの下だけ**です。**既定は空 ＝ 1 バイトも書けません**
-- **`run_readonly` の許可リストも既定は空**です。`readonly.toml` に人が書くまで 1 本も走りません。
-  用途別のツール（`disk_usage` など）は、書かなくても動きます
-- **端末は人と AI で共有します。**AI が握っている間は人の入力が締まり、
-  **［止める］はいつでも効きます**
-- **インストーラは Release に付けます**（D32）。
-  Windows は `.msi` と NSIS の `-setup.exe`、macOS は `.app.zip`。
-  **未署名なので、Windows は SmartScreen、macOS は Gatekeeper が止めます。**
-  **警告が出て分からなかった、は Issue に書いてください** — 署名を買う判断の材料です（D12）
+- **It is not code-signed.** Whether Windows stops you **depends on how you fetched it**
+  (Issue #3, measured):
+  - **Downloaded in a browser, double-clicked** → SmartScreen stops you
+  - **`gh run download` / CI / a script** → **it does not.**
+    No Mark of the Web, so SmartScreen's reputation check has nothing to trigger on
+  - macOS Gatekeeper is untested
+- **The agent may write only under directories a person listed for that connection.**
+  **The list is empty by default — not one byte**
+- **The `run_readonly` allowlist is empty by default** too. Nothing runs until a person
+  writes `readonly.toml`. The purpose-built tools (`disk_usage` and friends) work without it
+- **The terminal is shared between you and the agent.** While the agent holds it your
+  input is locked out, and **[Stop] always works**
+- **Installers are attached to each Release** (D32).
+  Windows gets `.msi` and an NSIS `-setup.exe`, macOS gets `.app.zip`.
+  **They are unsigned, so Windows shows SmartScreen and macOS shows Gatekeeper.**
+  **If a warning stopped you and you did not know what to do, please open an issue** —
+  that is what decides whether we buy a certificate (D12)
 
-## 技術スタック
+## Stack
 
 | | |
 |---|---|
-| 殻 | Tauri 2（Windows / macOS） |
-| 本体 | Rust |
-| 画面 | SvelteKit + xterm.js（**ANSI の解釈を自前で書かない**） |
-| SSH | **`russh` + `russh-sftp`**（9 台の実機で両方試して決定・D6） |
-| MCP | **アプリ内蔵**（別バイナリにしない・別ビルドを要求しない） |
-| 資格情報 | OS 資格情報ストア + ssh-agent |
+| Shell | Tauri 2 (Windows / macOS) |
+| Core | Rust |
+| UI | SvelteKit + xterm.js (**we do not write our own ANSI parser**) |
+| SSH | **`russh` + `russh-sftp`** (both tried against 9 real machines before deciding — D6) |
+| MCP | **Inside the app** (not a separate binary, not a separate build) |
+| Credentials | OS credential store + ssh-agent |
 
-## ライセンス
+## Licence
 
 MIT
 
-## 開発ルール
+## Development rules
 
-このリポジトリは AI エージェント開発のベースルールに従います。
-詳細は [`.claude/rules/product-baseline.md`](.claude/rules/product-baseline.md) と [`CLAUDE.md`](CLAUDE.md) を参照してください。
+This repository follows a baseline set of rules for AI-agent development. See
+[`.claude/rules/product-baseline.md`](.claude/rules/product-baseline.md) and
+[`CLAUDE.md`](CLAUDE.md).
 
-- commit は AI、push は人間（人間確認なしの push 禁止）
-- テスト後回し・削除禁止
-- **public リポジトリです。**接続先ホスト名 / IP / ユーザー名・個人名・個人メールを
-  コード・文書・commit history・スクリーンショットに残さないこと
+- The AI commits, a human pushes (no pushing without human review)
+- Tests are never deferred and never deleted
+- **This is a public repository.** No server hostnames, IPs, usernames, personal names or
+  personal email addresses in code, docs, commit history or screenshots

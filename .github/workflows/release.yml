@@ -259,9 +259,25 @@ jobs:
           TAG: ${{ github.ref_name }}
         run: |
           set -eu
-          # 既にあれば消して作り直す。**prerelease にしない** — ここは版ではなく宛先。
+          # 既にあれば消して作り直す。
+          #
+          # **`--prerelease` を付けます**（Issue #25）。
+          #
+          # 付けていなかった頃、**この宛先が Latest を奪っていました。**
+          # 実リリースはすべて prerelease（`v…-alpha.N`）なので、
+          # GitHub は「prerelease でない唯一の Release」であるここを最新と見なします。
+          #
+          # 結果、**リポジトリのトップと `/releases/latest` に、
+          # 日本語の運用メモが「最新リリース」として出ていました。**
+          # 外から来た人が最初に見る行がこれです。
+          #
+          # **自動更新は落ちません。**アプリが見に行くのは
+          # `releases/download/updater/latest.json` という**添付の直リンク**で、
+          # prerelease の印は「どれを Latest と呼ぶか」にしか効きません
+          # （ログイン無しの実測でも、prerelease の添付は 200 で取れます）。
           gh release delete updater --yes --cleanup-tag 2>/dev/null || true
           gh release create updater \
+            --prerelease \
             --title "更新の宛先（自動生成・触らないでください）" \
             --notes "アプリが更新を探しに来る先です（D34）。中身は ${TAG} を指しています。" \
             latest.json
