@@ -33,9 +33,17 @@ fn every_release_can_be_pulled_out_on_its_own() {
 #[test]
 fn the_newest_one_comes_first() {
     // **AI は上から読みます。**古い順だと、いま何ができるかに辿り着くのが最後になります。
+    //
+    // **版を直書きしません。**書くと、**版を上げるたびにこのテストが落ちます** ——
+    // 実際に 0.1.13 で落ちました。**毎回書き換える試験は、
+    // 「落ちたら数字を直す」を人に教えてしまいます。**
     let listed = releases(CHANGELOG);
 
-    assert_eq!(listed[0].version, "0.1.12");
+    assert_eq!(
+        listed[0].version,
+        env!("CARGO_PKG_VERSION"),
+        "**先頭が、いま名乗っている版でない**"
+    );
     assert_eq!(listed.last().expect("空").version, "0.1.0");
 }
 
@@ -43,21 +51,24 @@ fn the_newest_one_comes_first() {
 fn it_can_start_from_where_the_reader_left_off() {
     // **「前に見た版以降」だけ読めること。**毎回全部返すと、
     // **本当に変わった所が埋もれます。**
-    let since = changes_since(CHANGELOG, Some("0.1.9")).expect("切り出せない");
+    //
+    // **数えて確かめます。**版を直書きすると、上げるたびに落ちます。
+    let all = releases(CHANGELOG);
+    let fourth = all[3].version.clone();
+
+    let since = changes_since(CHANGELOG, Some(&fourth)).expect("切り出せない");
 
     let versions: Vec<&str> = since.iter().map(|one| one.version.as_str()).collect();
-    assert_eq!(
-        versions,
-        ["0.1.12", "0.1.11", "0.1.10"],
-        "実際: {versions:?}"
-    );
+    let expected: Vec<&str> = all[..3].iter().map(|one| one.version.as_str()).collect();
+    assert_eq!(versions, expected, "実際: {versions:?}");
 }
 
 #[test]
 fn asking_from_the_newest_one_gives_nothing_rather_than_everything() {
     // **最新から先は無い。**ここで全部返すと、
     // 「変わっていない」と「全部変わった」が区別できません。
-    let since = changes_since(CHANGELOG, Some("0.1.12")).expect("切り出せない");
+    let newest = releases(CHANGELOG)[0].version.clone();
+    let since = changes_since(CHANGELOG, Some(&newest)).expect("切り出せない");
 
     assert!(since.is_empty(), "最新以降に何か返っている: {since:?}");
 }
