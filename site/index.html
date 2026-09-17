@@ -1,0 +1,514 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>sshboard — a human and an AI agent on one SSH session</title>
+    <meta
+      name="description"
+      content="A desktop SSH board where you and your AI agent share the same connection. The agent works inside a fence you draw, on a screen you are watching. macOS and Windows. Alpha."
+    />
+    <link rel="icon" href="./icon.png" />
+    <meta property="og:title" content="sshboard" />
+    <meta
+      property="og:description"
+      content="Your AI agent and you, on one SSH session. Nothing happens off-screen."
+    />
+    <meta property="og:image" content="./icon.png" />
+    <style>
+      /*
+       * 色は `apps/desktop/src/lib/styles/tokens.css` から採る。
+       * **アプリの見た目と食い違わせない** —— 入れた人が「別の物？」と思わないように。
+       */
+      :root {
+        color-scheme: light;
+        --ground: #eef0f3;
+        --shell: #e4e7ec;
+        --surface: #ffffff;
+        --surface-2: #f7f8fa;
+        --fg: #14181d;
+        --fg-muted: #545c67;
+        --fg-faint: #858d99;
+        --hairline: rgba(16, 22, 30, 0.09);
+        --hairline-strong: rgba(16, 22, 30, 0.16);
+        --lift-2: 0 1px 2px rgba(16, 22, 30, 0.05), 0 10px 28px -12px rgba(16, 22, 30, 0.22);
+        --accent: #1f6b58;
+        --accent-fg: #ffffff;
+        --accent-soft: rgba(31, 107, 88, 0.1);
+        --warning: #8a5a12;
+        --warning-soft: rgba(138, 90, 18, 0.1);
+        --danger: #b0332f;
+        --r-shell: 14px;
+        --r-core: 10px;
+        --font-ui: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+        --font-mono: ui-monospace, SFMono-Regular, Menlo, 'Cascadia Mono', monospace;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          color-scheme: dark;
+          --ground: #0b0e11;
+          --shell: #12161b;
+          --surface: #171c22;
+          --surface-2: #1c222a;
+          --fg: #e8ecf1;
+          --fg-muted: #a3adb9;
+          --fg-faint: #737d89;
+          --hairline: rgba(255, 255, 255, 0.08);
+          --hairline-strong: rgba(255, 255, 255, 0.15);
+          --lift-2: 0 1px 2px rgba(0, 0, 0, 0.4), 0 12px 30px -12px rgba(0, 0, 0, 0.7);
+          --accent: #4fd6ae;
+          --accent-fg: #06251c;
+          --accent-soft: rgba(79, 214, 174, 0.14);
+          --warning: #e5bb6b;
+          --warning-soft: rgba(229, 187, 107, 0.12);
+          --danger: #ff8b86;
+        }
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        padding: 0 20px 72px;
+        background: var(--ground);
+        color: var(--fg);
+        font-family: var(--font-ui);
+        font-size: 15px;
+        line-height: 1.7;
+      }
+      main {
+        max-width: 760px;
+        margin: 0 auto;
+      }
+      a {
+        color: var(--accent);
+      }
+      code,
+      pre {
+        font-family: var(--font-mono);
+        font-size: 13px;
+      }
+      pre {
+        background: var(--surface-2);
+        border: 1px solid var(--hairline);
+        border-radius: var(--r-core);
+        padding: 12px 14px;
+        overflow-x: auto;
+        line-height: 1.6;
+      }
+      p code {
+        background: var(--surface-2);
+        border: 1px solid var(--hairline);
+        border-radius: 5px;
+        padding: 1px 5px;
+      }
+      h2 {
+        font-size: 19px;
+        margin: 44px 0 12px;
+        letter-spacing: -0.01em;
+      }
+      h3 {
+        font-size: 15px;
+        margin: 26px 0 8px;
+      }
+
+      /* 頭 */
+      header {
+        display: flex;
+        gap: 18px;
+        align-items: center;
+        padding: 52px 0 8px;
+      }
+      header img {
+        width: 68px;
+        height: 68px;
+        border-radius: 15px;
+        box-shadow: var(--lift-2);
+      }
+      h1 {
+        font-size: 34px;
+        margin: 0;
+        letter-spacing: -0.02em;
+      }
+      .lede {
+        font-size: 17px;
+        color: var(--fg-muted);
+        margin: 4px 0 0;
+      }
+      .tags {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 7px;
+        margin-top: 14px;
+      }
+      .tag {
+        font-size: 12px;
+        border: 1px solid var(--hairline-strong);
+        border-radius: 999px;
+        padding: 2px 11px;
+        color: var(--fg-muted);
+        background: var(--surface);
+      }
+      .tag.alpha {
+        color: var(--warning);
+        background: var(--warning-soft);
+        border-color: transparent;
+      }
+
+      /* 落とす */
+      .files {
+        display: grid;
+        gap: 12px;
+        grid-template-columns: 1fr 1fr;
+      }
+      @media (max-width: 620px) {
+        .files {
+          grid-template-columns: 1fr;
+        }
+      }
+      .card {
+        background: var(--surface);
+        border: 1px solid var(--hairline);
+        border-radius: var(--r-shell);
+        padding: 16px;
+        box-shadow: var(--lift-2);
+      }
+      .card h3 {
+        margin: 0 0 2px;
+        font-size: 15px;
+      }
+      .card .sub {
+        color: var(--fg-faint);
+        font-size: 12.5px;
+        margin: 0 0 12px;
+      }
+      .get {
+        display: inline-block;
+        background: var(--accent);
+        color: var(--accent-fg);
+        text-decoration: none;
+        font-weight: 600;
+        font-size: 14px;
+        border-radius: 8px;
+        padding: 8px 16px;
+      }
+      .get.thin {
+        background: transparent;
+        color: var(--accent);
+        border: 1px solid var(--hairline-strong);
+        font-weight: 500;
+      }
+      .size {
+        display: block;
+        margin-top: 9px;
+        font-size: 11.5px;
+        color: var(--fg-faint);
+        font-family: var(--font-mono);
+        word-break: break-all;
+      }
+
+      .note {
+        border-left: 3px solid var(--hairline-strong);
+        padding: 2px 0 2px 14px;
+        color: var(--fg-muted);
+        margin: 16px 0;
+      }
+      .note.warn {
+        border-left-color: var(--warning);
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 14px 0;
+        font-size: 14px;
+      }
+      th,
+      td {
+        text-align: left;
+        padding: 8px 10px;
+        border-bottom: 1px solid var(--hairline);
+        vertical-align: top;
+      }
+      th {
+        color: var(--fg-faint);
+        font-weight: 600;
+        font-size: 12.5px;
+      }
+
+      ul {
+        padding-left: 20px;
+      }
+      li {
+        margin: 6px 0;
+      }
+
+      footer {
+        margin-top: 56px;
+        padding-top: 20px;
+        border-top: 1px solid var(--hairline);
+        color: var(--fg-faint);
+        font-size: 13px;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <img src="./icon.png" alt="" />
+        <div>
+          <h1>sshboard</h1>
+          <p class="lede">You and your AI agent, on one SSH session.</p>
+        </div>
+      </header>
+
+      <div class="tags">
+        <span class="tag alpha">Alpha</span>
+        <span class="tag" id="ver">checking latest…</span>
+        <span class="tag">macOS (Apple&nbsp;Silicon)</span>
+        <span class="tag">Windows&nbsp;x64</span>
+        <span class="tag">11 languages</span>
+        <span class="tag">MIT</span>
+      </div>
+
+      <p style="margin-top: 22px">
+        Most agent tooling gives a model a <code>run_command(cmd)</code> hole and lets it work
+        somewhere you aren't looking. sshboard does the opposite: the agent and you hold
+        <b>the same SSH connection</b>, and everything it does lands on a screen you are sitting
+        in front of. There is no second, invisible session.
+      </p>
+
+      <h2>Download</h2>
+
+      <div class="files">
+        <div class="card">
+          <h3>macOS</h3>
+          <p class="sub">Apple Silicon</p>
+          <a class="get" id="dl-mac" href="https://github.com/meta-taro/sshboard/releases"
+            >Download</a
+          >
+          <span class="size" id="size-mac"></span>
+        </div>
+
+        <div class="card">
+          <h3>Windows</h3>
+          <p class="sub">x64 · installer (NSIS)</p>
+          <a class="get" id="dl-win" href="https://github.com/meta-taro/sshboard/releases"
+            >Download</a
+          >
+          <span class="size" id="size-win"></span>
+        </div>
+
+        <div class="card">
+          <h3>Windows (MSI)</h3>
+          <p class="sub">If your organisation deploys by MSI</p>
+          <a class="get thin" id="dl-msi" href="https://github.com/meta-taro/sshboard/releases"
+            >Download</a
+          >
+          <span class="size" id="size-msi"></span>
+        </div>
+
+        <div class="card">
+          <h3>Source</h3>
+          <p class="sub">Tauri 2 · SvelteKit · Rust</p>
+          <a class="get thin" href="https://github.com/meta-taro/sshboard">GitHub</a>
+          <span class="size">pnpm install &amp;&amp; pnpm --filter desktop tauri dev</span>
+        </div>
+      </div>
+
+      <div class="note warn">
+        <b>It is not code-signed.</b> Windows SmartScreen and macOS Gatekeeper will both stop you the
+        first time. On Windows: <i>More info → Run anyway</i>. On macOS: right-click the app →
+        <i>Open</i>. This is a tool that handles keys, and we know the first thing it teaches you is
+        to dismiss a warning — signing goes in once someone is actually hurt by its absence, and
+        <a href="https://github.com/meta-taro/sshboard/issues">saying so in an issue</a> is what
+        decides that.
+      </div>
+
+      <h3>Installing on macOS</h3>
+      <p>
+        The macOS build ships as <code>.app.tar.gz</code> rather than a <code>.dmg</code>, because
+        the same file is what the auto-updater consumes. Extract it and move it across:
+      </p>
+      <pre>tar -xzf ~/Downloads/sshboard.app.tar.gz -C /Applications</pre>
+      <p>Then open it from Finder with right-click → <b>Open</b> the first time.</p>
+
+      <h3>Installing on Windows</h3>
+      <p>
+        Run the <code>-setup.exe</code>. Windows needs <b>WebView2</b>; Windows 11 and recent 10
+        already have it, and if not the installer fetches it — so the first install needs a network
+        connection.
+      </p>
+
+      <h2>Where it actually is right now</h2>
+
+      <p>
+        <b>The features are in. The interface is not finished.</b> sshboard is being used against a
+        real production server, and the whole visible issue list came out of that use — but it has
+        not had a design pass yet, and it shows. If you are looking for something polished, this is
+        not it yet. If you are looking for something whose safety model you can read end to end, it
+        is ready for you to argue with.
+      </p>
+
+      <table>
+        <tr>
+          <th>Working</th>
+          <th>Not yet</th>
+        </tr>
+        <tr>
+          <td>
+            One shared SSH session (GUI + agent)<br />
+            35 MCP tools<br />
+            Read-only commands from an allow-list<br />
+            Approved state-changing operations<br />
+            <code>sudo</code> with a password nobody stores<br />
+            Terminal shared with a stop button<br />
+            Auto-update
+          </td>
+          <td>
+            A design pass on the UI<br />
+            Code signing<br />
+            ssh-agent on Windows (named pipe / Pageant) — unverified<br />
+            Intel macOS / Linux builds<br />
+            Tests that render the screen itself
+          </td>
+        </tr>
+      </table>
+
+      <p class="note">
+        There are no screenshots on this page, and that is deliberate: every useful screenshot of
+        this product has somebody's hostname, username and paths in it.
+      </p>
+
+      <h2>The fence</h2>
+
+      <p>
+        These are constraints on the code, not advice in a prompt. They hold whether or not the
+        model cooperates.
+      </p>
+
+      <ul>
+        <li>
+          <b>There is no <code>run_command(cmd)</code> tool.</b> Not a filtered one, not a clever
+          one. An agent cannot hand an arbitrary string to a shell.
+        </li>
+        <li>
+          <b>Read-only commands come from a list you wrote.</b> <code>readonly.toml</code> starts
+          empty, so out of the box the agent cannot run a single command.
+        </li>
+        <li>
+          <b>Writes are fenced to directories you listed,</b> per connection. That list also starts
+          empty. Upload and mkdir only — no delete, rename, move, chmod, service restart or package
+          install.
+        </li>
+        <li>
+          <b>There is no download-to-my-machine tool.</b> The fence does not protect your laptop, so
+          the agent doesn't get a door onto it.
+        </li>
+        <li>
+          <b>State-changing operations need a human press,</b> and the first attempt is always
+          refused so the screen can show you exactly what would run. Approvals expire in 5 minutes
+          and cover one run.
+        </li>
+        <li>
+          <b>Keys stay in the OS credential store and ssh-agent.</b> sshboard does not implement a
+          key store, and the tool that lists connections returns identifiers, never credentials.
+        </li>
+      </ul>
+
+      <h2>Connect your agent</h2>
+
+      <p>
+        Point your agent at the running app. This form starts sshboard as a relay with no window, so
+        <b>the token is never written to disk</b> — not into <code>~/.claude.json</code>, not into
+        your shell history.
+      </p>
+
+      <pre># macOS
+claude mcp add sshboard -- /Applications/sshboard.app/Contents/MacOS/sshboard --mcp-stdio-proxy
+
+# Windows
+claude mcp add sshboard -- "%LOCALAPPDATA%\\sshboard\\sshboard.exe" --mcp-stdio-proxy</pre>
+
+      <p>
+        The relay holds no engine and opens no connection of its own — only the app does, which is
+        the point. It is a one-time step: the port is fixed at <code>22022</code> and the token is
+        reused, so restarting does not make you register again. If the port is taken it says so on
+        screen rather than quietly moving. (There is a plain HTTP form too, but that one leaves the
+        token in a file — the window has a button that copies it if you want it.)
+      </p>
+
+      <p>
+        Ask it <code>about_sshboard</code> first — the tool exists so an agent can find out what this
+        is, what it may and may not do, and what changed in each version, without you pasting a
+        briefing.
+      </p>
+
+      <h2>What it will not become</h2>
+      <ul>
+        <li>A way to run an agent against a server while nobody is watching.</li>
+        <li>A place your keys or passphrases get stored.</li>
+        <li>A tool that opens a second SSH session you cannot see.</li>
+      </ul>
+
+      <footer>
+        <p id="when">Releases are on GitHub.</p>
+        <p>
+          <a href="https://github.com/meta-taro/sshboard">Source</a> ·
+          <a href="https://github.com/meta-taro/sshboard/releases">Releases</a> ·
+          <a href="https://github.com/meta-taro/sshboard/issues">Issues</a> ·
+          <a href="https://github.com/meta-taro/sshboard/blob/develop/README.ja.md">日本語</a>
+        </p>
+      </footer>
+    </main>
+
+    <script>
+      // **版と落とす先を、Releases から読む。**
+      // 書き換え忘れで古い版を配らないため、ここは手で書かない。
+      // 読めないときは Releases のページへ落とす（リンクは HTML 側で既にそこを指している）。
+      (async () => {
+        const put = (id, text) => {
+          const el = document.getElementById(id);
+          if (el) el.textContent = text;
+        };
+        try {
+          // **一覧から取る。**`releases/latest` は先出し版を返さないので、
+          // 印の付け方が変わっても壊れないよう、ここは一覧から拾う。
+          // **`updater` は版ではなく更新の宛先**なので、数える対象から外す（D51）。
+          const res = await fetch(
+            'https://api.github.com/repos/meta-taro/sshboard/releases?per_page=10'
+          );
+          if (!res.ok) throw new Error(String(res.status));
+          const list = await res.json();
+          const rel = (Array.isArray(list) ? list : []).find(
+            (x) => !x.draft && x.tag_name !== 'updater'
+          );
+          if (!rel) throw new Error('no release');
+
+          put('ver', rel.tag_name);
+          const d = new Date(rel.published_at);
+          const ymd = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(
+            d.getDate()
+          ).padStart(2, '0')}`;
+          put('when', `Currently shipping ${rel.tag_name} (${ymd}).`);
+
+          const find = (fn) => (rel.assets || []).find(fn);
+          const wire = (linkId, sizeId, asset) => {
+            if (!asset) return;
+            const a = document.getElementById(linkId);
+            if (a) a.href = asset.browser_download_url;
+            put(sizeId, `${asset.name} · ${(asset.size / 1048576).toFixed(1)} MB`);
+          };
+          wire('dl-mac', 'size-mac', find((x) => x.name.endsWith('.app.tar.gz')));
+          wire('dl-win', 'size-win', find((x) => x.name.endsWith('-setup.exe')));
+          wire('dl-msi', 'size-msi', find((x) => x.name.endsWith('.msi')));
+        } catch (e) {
+          // **黙って古い物を配らない。**読めなかったことを出す
+          put('ver', 'see Releases');
+          put('when', 'Could not read the release list — check the Releases page for the latest.');
+        }
+      })();
+    </script>
+  </body>
+</html>

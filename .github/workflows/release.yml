@@ -255,8 +255,26 @@ jobs:
 
           # **断り書きを先頭に置く。**未署名で何が起きるかを、
           # 自動生成のコミット一覧より先に読ませる。
+          #
+          # **英語が先、日本語は畳んで後ろ**（2026-09-17・運用者）。
+          # 「release ノートが日本語だから海外向けの SNS 投稿には向いてない」——
+          # **アプリ自体は既定が英語で 11 言語出ます。**外へ出る 1 枚だけが
+          # 日本語だったので、そこで読者を落としていました。
+          #
+          # **対で持ちます。**片方が欠けたら、ここで止めます ——
+          # 参照だけ足して実行時に壊れる形を作らない（baseline §23）。
+          for f in .github/release-note-alpha.md .github/release-note-alpha.ja.md; do
+            [ -f "$f" ] || { echo "::error::${f} がありません。英語版と日本語版は対です"; exit 1; }
+          done
+
           gh release view "${TAG}" --json body --jq .body > generated.md
-          cat .github/release-note-alpha.md generated.md > note.md
+          {
+            cat .github/release-note-alpha.md
+            printf '\n---\n\n<details>\n<summary><b>日本語</b></summary>\n\n'
+            cat .github/release-note-alpha.ja.md
+            printf '\n</details>\n\n'
+            cat generated.md
+          } > note.md
           gh release edit "${TAG}" --notes-file note.md
 
       # **古い宛先も当面は出し続ける**（D51 の移行）。

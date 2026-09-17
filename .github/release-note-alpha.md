@@ -1,97 +1,104 @@
-## どれを取るか
+<!--
+  English version. **Paired with `.github/release-note-alpha.ja.md`.**
+  **Do not edit one without the other** — this file is rewritten every release,
+  which is exactly where the two will drift apart.
+-->
 
-| 使う OS | 取るもの |
+## Which file do I want?
+
+| Your OS | Take this |
 |---|---|
-| **Windows** | **`sshboard_<版>_x64-setup.exe`**（インストーラ） |
-| Windows（MSI で入れたい） | `sshboard_<版>_x64_en-US.msi` |
-| **macOS**（Apple Silicon） | **`sshboard.app.tar.gz`** |
+| **Windows** | **`sshboard_<version>_x64-setup.exe`** (installer) |
+| Windows (prefer MSI) | `sshboard_<version>_x64_en-US.msi` |
+| **macOS** (Apple Silicon) | **`sshboard.app.tar.gz`** |
 
-**`.sig` は自動更新が使う署名です。**手で取る必要はありません。
+**The `.sig` files are signatures for the auto-updater.** You don't need to download them.
 
-> **`sshboard.app.tar.gz` は macOS 用です。**macOS の `.app` は中身のあるフォルダなので、
-> **Windows で開くと、ただのフォルダに見えます。**動きません。
+> **`sshboard.app.tar.gz` is for macOS.** A macOS `.app` is a directory with contents inside,
+> so **on Windows it just looks like a folder.** It will not run there.
 
-## これは α です
+## This is an alpha
 
-**実運用のサーバーで使われ始めました。**Issue #8〜#22 は、そこで出たものです。
-**まだ「繋いで仕事を最後まで通した」記録はありません。**
+**It is now in use against a production server.** Issues #8–#25 came out of that.
+**There is still no record of a job being carried through from connect to finish.**
 
-**0.1.12 で、root が要る操作へ届く道を開きました**（D48 / Issue #19）。
+**0.1.12 opened the path to operations that need root** (D48 / Issue #19).
 
-接続ごとに `become` を書けます。
+You can set `become` per connection:
 
 ```toml
 [[connections]]
-become = "ask"        # 人がその場で入れる。**保存しません**
-# become = "sudoers"  # sudoers.d が持っている
-# 書かなければ「上げない」（既定・いままでと 1 文字も変わりません）
+become = "ask"        # a human types it at the time. **Never stored**
+# become = "sudoers"  # sudoers.d already grants it
+# omit it and nothing is elevated (default — unchanged from every prior version)
 ```
 
-`ask` は承認の画面でパスワードを聞き、**標準入力から `sudo -S` へ渡します。**
+`ask` prompts for the password on the approval screen and **feeds it to `sudo -S` over stdin.**
 
-- **保存しません。**ディスクにも OS ストアにも置きません
-- **コマンド行に載せません**（`ps` に出ません）
-- **画面にも記録にも出ません。**出るのは `$ sudo -S -p '' …` まで
-- **1 回の許可で 1 回だけ。**許可は 5 分で切れます
+- **Not stored.** Not on disk, not in the OS credential store
+- **Never on the command line** (it does not show up in `ps`)
+- **Never on screen and never in the log.** What you see stops at `$ sudo -S -p '' …`
+- **One approval, one run.** Approvals expire after 5 minutes
 
-**それまで、AI 側から root 領域を読む道がゼロでした。**
-`operations.toml`（0.1.11）は「**どのコマンドを走らせてよいか**」を決めますが、
-「**どうやって権限を得るか**」は決めていませんでした。
+**Until then, the AI side had no route to read anything root-owned at all.**
+`operations.toml` (0.1.11) decides **which commands may run**, but it never decided
+**how privilege is obtained.**
 
-**同じ版で、`max_per_hour` が一度も効いていなかったことも直しました。**
-0.1.11 で入れた「1 時間あたりの上限」は、**数える入れ物が許可の札と同じ**だったため、
-**一度も止めていません。**上限があると書いておいて無いのが、いちばん悪い形でした。
+**The same release fixed `max_per_hour`, which had never once taken effect.**
+The per-hour ceiling added in 0.1.11 **counted into the same container as the approval tokens**,
+so it **never stopped anything.** Advertising a limit that isn't there was the worst shape of all.
 
-**AI 向けに `about_sshboard` を足しました**（D49）。
-この道具が何で、何をしてよくて何が駄目か、**版ごとに何が変わったか**を返します。
+**Added `about_sshboard` for AI agents** (D49).
+It answers what this tool is, what is and isn't allowed, and **what changed in each version.**
 
-**0.1.11 で、状態を変える操作を人の承認つきで走らせられるようにしました**（D45）。
-AI が渡せるのは **`operations.toml` に人が書いた id だけ**です。
-1 回目は必ず断られ、**画面に「何が走るのか」がそのまま出ます。**
+**0.1.11 made state-changing operations runnable under human approval** (D45).
+All the AI can pass is **an id a human wrote into `operations.toml`.**
+The first attempt is always refused, and **the screen shows exactly what would run.**
 
-> ここは**版ごとに書き換えます。**
-> 「α である」ことは変わりませんが、**どこまで確かめたかは毎回変わります。**
-> 固定文言にして放置すると、事実と食い違ったまま配られます（Issue #6）。
-> **全部の版の変更は `CHANGELOG.md`** に在ります。
+> This section **is rewritten every release.**
+> "It's an alpha" doesn't change, but **how far it has actually been verified changes every time.**
+> Freezing this text and leaving it would ship claims that no longer match reality (Issue #6).
+> **Every version's changes are in `CHANGELOG.md`.**
 
-### ⚠️ 署名していません。開くときに警告が出ます
+### ⚠️ Not code-signed. You will get a warning when you open it
 
-| 取り方 | 何が出るか | どうするか |
+| How you got it | What you'll see | What to do |
 |---|---|---|
-| Windows・**ブラウザで取ってダブルクリック** | SmartScreen が止める | 「詳細情報」→「実行」 |
-| Windows・**`gh run download` など** | **止まりません**（実測・Issue #3） | そのまま |
-| macOS | Gatekeeper が止める（**未検証**） | 右クリック →「開く」 |
+| Windows, **downloaded in a browser and double-clicked** | SmartScreen blocks it | "More info" → "Run anyway" |
+| Windows, **`gh run download` and friends** | **Nothing blocks it** (measured — Issue #3) | Just run it |
+| macOS | Gatekeeper blocks it (**unverified**) | Right-click → "Open" |
 
-Windows で結果が分かれるのは、**Mark of the Web が付くかどうか**です。
-SmartScreen のアプリ評価チェックはそこを起点に走るので、
-付かない経路（`gh` / CI / スクリプト）では警告自体が出ません。
+The split on Windows comes down to **whether Mark of the Web is attached.**
+SmartScreen's app-reputation check keys off that, so on routes that don't attach it
+(`gh`, CI, scripts) no warning appears at all.
 
-**これは鍵を扱う道具です。**「警告を無視して開く」を最初に教えることになるのは
-承知のうえで出しています。**署名は、未署名で困る人が実際に出てから入れます**（D12）。
-**警告が出た・分からなかった、は Issue に書いてください。**それが買う判断の材料です。
+**This is a tool that handles keys.** We are shipping it knowing that the first thing it teaches
+you is "dismiss the warning." **Signing goes in once someone is actually hurt by its absence** (D12).
+**If you hit a warning, or couldn't tell what to do, please file an issue.** That's what decides
+whether we buy a certificate.
 
-zip から出した直後の Windows ファイルには Mark of the Web が付きます。
-右クリック → プロパティ → **「許可する」にチェック**しておくと静かになります。
+Windows files extracted from a zip carry Mark of the Web. Right-click → Properties →
+**tick "Unblock"** to quiet it down.
 
-### 添付しているもの
+### What's attached
 
-| ファイル | 何 |
+| File | What it is |
 |---|---|
-| `sshboard_<版>_x64-setup.exe` | Windows インストーラ（NSIS）。**こちらが素直です** |
-| `sshboard_<版>_x64_en-US.msi` | Windows インストーラ（MSI） |
-| `sshboard_<版>_macos.app.zip` | macOS。展開して `/Applications` へ |
+| `sshboard_<version>_x64-setup.exe` | Windows installer (NSIS). **This is the straightforward one** |
+| `sshboard_<version>_x64_en-US.msi` | Windows installer (MSI) |
+| `sshboard.app.tar.gz` | macOS. Extract it and move it to `/Applications` |
 
-Windows は **WebView2** が要ります。Windows 11 と最近の 10 には入っています。
-無ければインストーラが取りに行くので、**初回はインターネット接続が必要**です。
+Windows needs **WebView2**. Windows 11 and recent 10 have it. If it's missing the installer
+fetches it, so **the first install needs an internet connection.**
 
-接続設定の置き場所:
+Where connection settings live:
 
 - Windows: `%APPDATA%\sshboard\sshboard\config\connections.toml`
 - macOS: `~/Library/Application Support/dev.sshboard.sshboard/connections.toml`
 
-### ソースから建てる場合
+### Building from source
 
-**実運用のサーバーへ向ける前に、手元のテスト用サーバーで一度動かしてください。**
+**Point it at your own test server once before you point it at a production one.**
 
 ```sh
 pnpm install
@@ -99,17 +106,21 @@ sh tools/test-server/up.sh
 pnpm --filter desktop tauri dev
 ```
 
-### 承知しておいてほしいこと
+### Things worth knowing up front
 
-- **MCP のポートは `22022` 固定です。** 合言葉も使い回すので、`claude mcp add` は 1 回で済みます。
-  ぶつかったときは**黙って別の番号へ逃げず**、画面にそう出ます（`SSHBOARD_MCP_PORT` で移せます）
-- **AI が書けるのは、接続ごとに人が列挙したディレクトリの下だけ**です。**既定は空 ＝ 1 バイトも書けません**
-- **`run_readonly` の許可リストも既定は空**です。`readonly.toml` に人が書くまで 1 本も走りません
-- **端末は人と AI で共有します。** AI が握っている間は人の入力が締まり、**［止める］はいつでも効きます**
-- **Windows は実機で確認していません。** CI でビルドは通していますが、
-  ssh-agent（名前付きパイプ / Pageant）に実際に繋がるかは未確認です
+- **The MCP port is fixed at `22022`,** and the token is reused, so `claude mcp add` is a one-time step.
+  On a collision it **does not quietly move to another port** — it says so on screen
+  (`SSHBOARD_MCP_PORT` moves it)
+- **The AI can only write beneath directories a human listed for that connection.**
+  **The default is empty — it cannot write a single byte**
+- **`run_readonly`'s allow-list is also empty by default.** Until a human writes `readonly.toml`,
+  not one command will run
+- **The terminal is shared between the human and the AI.** While the AI holds it your input is
+  locked out, and **[Stop] always works**
+- **It is in use on a real Windows machine.** Issues #8–#25 came from there.
+  **ssh-agent (named pipe / Pageant) is unverified** — it is currently used with passwords and key files
 
-### 不具合の出し方
+### Reporting problems
 
-**使った人が、使った直後に、自分の言葉で** Issue へ書いてください。
-要約された時点で、本当に困っていた所が落ちます。
+**Whoever used it, right after using it, in their own words** — please write the issue yourself.
+The moment it gets summarised, the part that actually hurt falls out.

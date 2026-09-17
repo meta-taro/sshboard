@@ -1,0 +1,88 @@
+name: pages
+
+# 配布ページ（`site/`）を GitHub Pages へ出す。
+#
+# **人に「入れて」と渡せる 1 枚**を置く場所である（2026-09-17・運用者
+# 「あと配布ページがない？？ 他は gh pages とか設けてるけど」）。
+#
+# **版と落とす先はページの JS が Releases から読む。**ここで埋め込まない ——
+# 埋め込むと、タグを打つたびにページを直す作業が増え、**忘れた分だけ古い物を配る**。
+#
+# 使う action は `actions/*`（GitHub 自身のもの）だけにする。
+# Pages は専用の口（`upload-pages-artifact` / `deploy-pages`）でしか出せないので、
+# **ここだけは足す**（baseline §12 —— 足す理由を書く）。
+
+on:
+  push:
+    branches:
+      - develop
+    paths:
+      - 'site/**'
+      - '.github/workflows/pages.yml'
+      # **本数を謳っているので、増減したらここも走らせて突き合わせる**
+      - 'crates/sshboard-mcp/src/**'
+  # タグを打った後に手で出せるようにしておく（成果物の名前が変わったときの確認用）
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v5
+
+      # **置く物を確かめる。**参照だけ足して壊れている状態を作らない（baseline §23）
+      - name: 中身があるか
+        run: |
+          set -eu
+          test -f site/index.html
+          test -f site/icon.png
+          grep -q '<title>' site/index.html
+
+      # **ページが謳う本数と、実際の本数を突き合わせる。**
+      #
+      # ページは「35 MCP tools」と書いている。**道具を増やしてページを直し忘れると、
+      # 外へ向けた 1 枚だけが嘘になる** —— しかも誰も気づかない。
+      # 数えられるものは、数えて止める。
+      - name: 謳っている本数が合っているか
+        run: |
+          set -eu
+          actual="$(grep -rho '#\[tool(' crates/sshboard-mcp/src/ | wc -l | tr -d ' ')"
+          grep -q "${actual} MCP tools" site/index.html || {
+            echo "::error::ページの本数が実際（${actual} 本）と合っていません。" \
+                 "site/index.html の「N MCP tools」を直してください"
+            exit 1
+          }
+          echo "本数 ${actual} 本 —— ページと一致"
+
+      # **接続先を外へ出さない**（CLAUDE.md 禁止事項 4）。
+      # このページは公開される。ホスト名・利用者名が 1 つ混ざれば、そこから漏れる。
+      - name: 接続先が混ざっていないか
+        run: |
+          set -eu
+          if grep -nE '(root@|[a-z0-9]+@[a-z0-9.-]+\.[a-z]{2,}|192\.168\.|10\.[0-9]+\.)' \
+               site/index.html; then
+            echo "::error::接続先らしきものが配布ページに混ざっています"
+            exit 1
+          fi
+          echo "接続先なし"
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+      - id: deploy
+        uses: actions/deploy-pages@v4
