@@ -1415,3 +1415,96 @@ async fn handing_the_console_over_keeps_the_same_shell() {
     );
     assert_eq!(engine.console_holder().await, Some(Actor::Ai));
 }
+
+/// **断ったことを記録に残す**（Issue #8）。
+///
+/// `NoTarget`（開いているのに宛先が無い）は記録を残していましたが、
+/// **`NotConnected`（1 本も開いていない）は黙って断っていました。**
+///
+/// そのため実機で「まだ繋がっていません」を踏んでも、
+///
+/// - **この起動で一度も繋がずにそうなったのか**（＝アプリが立ち上がり直した）
+/// - **繋がっていたものが途中で消えたのか**（＝誰かが切った）
+///
+/// の区別が付きませんでした。**#8 が 2 週間閉じられない理由がここです。**
+/// 「黙って断ると、原因が永久に分かりません」は `session()` の注記にある通りで、
+/// **片方だけ守られていませんでした。**
+#[tokio::test]
+async fn being_turned_away_with_nothing_open_leaves_a_line_behind() {
+    let dir = tempfile::tempdir().expect("一時ディレクトリ");
+    let diag = Diagnostics::new();
+    let engine = Engine::with_diagnostics(
+        Band::new(),
+        Arc::new(OutputStream::new()),
+        registry(&dir, &[]).await,
+        diag.clone(),
+    );
+
+    // **1 本も開かずに、宛先の要る操作をする。**
+    let refused = engine.list_dir(Actor::Human, ".").await;
+    assert!(
+        matches!(refused, Err(EngineError::NotConnected)),
+        "断り方が違う: {refused:?}"
+    );
+
+    let lines: Vec<String> = diag.recent(20).iter().map(|e| e.render()).collect();
+    assert!(
+        lines.iter().any(|line| line.contains("開いた回数 0")),
+        "**断ったのに記録が無い。**この起動で一度も繋いでいないことが、\
+         あとから分からない。出ている行: {lines:?}"
+    );
+}
+
+/// 切られて空になったときは、**誰が切ったか**まで残す（Issue #8）。
+///
+/// #8 のコメントで消せていない問いが、これです ——
+///
+/// > **AI 側から何か操作していましたか**（`focus_connection` など、宛先を動かすもの）
+///
+/// **人に思い出してもらう質問にしない。**記録が答えられます。
+#[tokio::test]
+async fn after_being_closed_the_line_says_who_closed_it() {
+    if !server_is_up().await {
+        println!("テスト用サーバーが建っていません（想定内・飛ばします）");
+        return;
+    }
+    let dir = tempfile::tempdir().expect("一時ディレクトリ");
+    let key = std::path::PathBuf::from(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../tools/test-server/.key"
+    ));
+    if !key.exists() {
+        println!("使い捨ての鍵がありません（想定内・飛ばします）");
+        return;
+    }
+    let diag = Diagnostics::new();
+    let engine = Engine::with_diagnostics(
+        Band::new(),
+        Arc::new(OutputStream::new()),
+        registry_with_key(&dir, &key).await,
+        diag.clone(),
+    );
+
+    engine
+        .connect(Actor::Human, "local", None)
+        .await
+        .expect("繋がらない");
+    // **AI が切る。**実機で疑われているのはこの道。
+    engine.disconnect(Actor::Ai, Some("local")).await;
+
+    let refused = engine.list_dir(Actor::Human, ".").await;
+    assert!(
+        matches!(refused, Err(EngineError::NotConnected)),
+        "断り方が違う: {refused:?}"
+    );
+
+    let lines: Vec<String> = diag.recent(20).iter().map(|e| e.render()).collect();
+    let said = lines
+        .iter()
+        .find(|line| line.contains("開いた回数"))
+        .unwrap_or_else(|| panic!("断りの記録が無い: {lines:?}"));
+    assert!(
+        said.contains("local") && said.contains("AI"),
+        "**誰が切ったかが残っていない。**出ている行: {said}"
+    );
+}

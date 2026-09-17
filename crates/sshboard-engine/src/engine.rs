@@ -76,6 +76,17 @@ struct Held {
     live: BTreeMap<String, Live>,
     /// いまの宛先。**閉じたら次の 1 本へ移る**（宛先が無いまま開いている、を作らない）。
     active: Option<String>,
+    /// **この起動で開いた回数**（Issue #8）。
+    ///
+    /// `0` なら、**この起動では一度も繋いでいません** ——
+    /// つまり人が見ていた「繋がっている画面」は、**別の起動のもの**です。
+    /// これが分かるだけで、原因の半分が消えます。
+    opened_total: u64,
+    /// **最後に閉じたものと、閉じた側**（Issue #8）。
+    ///
+    /// #8 で消せていない問いが「**AI 側から何か操作していましたか**」でした。
+    /// **人に思い出してもらう質問にしない。**ここが答えます。
+    last_closed: Option<(String, Actor)>,
 }
 
 /// **人にホスト鍵を確かめてもらっている**（Issue #24）。
@@ -473,6 +484,9 @@ impl Engine {
         );
         // **開いたものを宛先にする。**開いたのに何も向いていない、を作らない。
         held.active = Some(entry.id.clone());
+        // **開いた回数を数える**（Issue #8）。断ったときに「この起動で一度も
+        // 繋いでいない」と言えるようにするためで、これ以外には使いません。
+        held.opened_total += 1;
         let all = held.live.values().map(|l| l.opened.clone()).collect();
         drop(held);
 
@@ -494,6 +508,11 @@ impl Engine {
             None => held.active.clone()?,
         };
         let closed = held.live.remove(&target).map(|l| l.opened);
+        // **誰が切ったかを残す**（Issue #8）。
+        // 切った直後は誰でも分かりますが、**踏まれるのは 30 分後**です。
+        if closed.is_some() {
+            held.last_closed = Some((target.clone(), actor));
+        }
 
         // **宛先が無いまま開いている、を作らない。**残っている 1 本へ移す。
         if held.active.as_deref() == Some(target.as_str()) {
@@ -553,7 +572,31 @@ impl Engine {
         }
 
         // **1 本も開いていないなら、異常ではありません。**繋ぐ前なだけです。
+        //
+        // **それでも記録は残します**（Issue #8）。異常でないことと、
+        // 黙ってよいことは別です —— 実機で「まだ繋がっていません」を踏んだとき、
+        // **この起動で一度も繋いでいないのか、繋いだものが消えたのか**が
+        // 分からず、**2 週間そこで止まりました。**
         if held.live.is_empty() {
+            let total = held.opened_total;
+            let closed = held.last_closed.clone();
+            drop(held);
+
+            let 経緯 = match closed {
+                Some((id, who)) => format!(
+                    "この起動で開いた回数 {total}、最後に切ったのは {id} を {}",
+                    who.tag()
+                ),
+                None => format!("この起動で開いた回数 {total}"),
+            };
+            self.diag.error(
+                Stage::Registry,
+                None,
+                format!("1 本も開いていません（{経緯}）"),
+                "画面で接続を開いてください。\
+                 **開いた回数が 0 なら、いま見えている画面は別の起動のものです** \
+                 —— そのままこの行を貼って報告してください（Issue #8）",
+            );
             return Err(EngineError::NotConnected);
         }
 
