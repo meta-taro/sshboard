@@ -42,6 +42,17 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
+      # **アイコンはアプリから採る。リポジトリへ置かない。**
+      #
+      # `.gitignore` は `*.png` を落としている —— **画面のキャプチャを
+      # commit history へ焼き付けないため**（D26 / PRD §8）。
+      # **例外を開けると、そのうちキャプチャがそこから入る。**
+      #
+      # 複製を持たないので、**アプリのアイコンを変えれば配布ページも変わります。**
+      # 手元で見るときは、同じ 1 行を自分で走らせてください。
+      - name: アイコンをアプリから採る
+        run: cp apps/desktop/src-tauri/icons/icon.png site/icon.png
+
       # **置く物を確かめる。**参照だけ足して壊れている状態を作らない（baseline §23）
       - name: 中身があるか
         run: |
