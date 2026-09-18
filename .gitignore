@@ -49,3 +49,12 @@ connections.local.json
 # 対象は Windows と macOS だけ（PRD §7）。`tools/make-icons.sh` が片付けています。
 apps/desktop/src-tauri/icons/android/
 apps/desktop/src-tauri/icons/ios/
+
+# **配布ページ用の画面写真だけ、例外で通す**（D26 の例外・2026-09-18）。
+#
+# 上の `*.png` は**画面写真を commit history へ焼き付けないための禁止**で、
+# 緩めない。ここで通すのは `tools/demo/connections.demo.toml`（架空の設定）で
+# 撮ったものだけで、**置く前に人が中身を見る**（`tools/demo/README.md`）。
+#
+# **このディレクトリ以外へは広げないこと。**広げた瞬間、本物が入る道ができる。
+!site/shots/*.png

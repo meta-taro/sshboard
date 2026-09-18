@@ -531,3 +531,48 @@ fn a_reordered_list_still_saves_and_reads_back_in_the_new_order() {
 
     let _ = std::fs::remove_dir_all(&directory);
 }
+
+/// **案内している架空の設定が、実際に読めること。**
+///
+/// 配布ページ用のキャプチャは**架空の設定の上で撮る**と決まりました
+/// （2026-09-18・運用者）。その設定は `tools/demo/connections.demo.toml` に置き、
+/// `tools/demo/use-demo.sh` が入れ替えます。
+///
+/// **置いただけで誰も読まない、が一番起きる形**です（baseline §23）。
+/// 人が撮ろうとした時に初めて「読めません」と出るのでは遅いので、ここで読みます。
+///
+/// **接続先が混ざっていないことも、ここで見ます** —— この設定は
+/// リポジトリに入るので、実在のホストが 1 つでも入れば公開されます。
+#[test]
+fn the_made_up_setup_we_tell_people_to_use_actually_loads() {
+    let path = std::path::Path::new(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../tools/demo/connections.demo.toml"
+    ));
+    assert!(path.exists(), "**案内している設定が在りません**: {path:?}");
+
+    let loaded = Connections::load_or_empty(path).expect("架空の設定が読めない");
+    let all = &loaded.connections;
+    assert!(all.len() >= 3, "撮るには 2 件以上ほしい: {}", all.len());
+
+    for one in all {
+        // **手元のコンテナ以外を向いていないこと。**
+        assert_eq!(
+            one.host, "127.0.0.1",
+            "**{} が手元以外を向いています。**架空の設定に実在のホストを書かないこと",
+            one.id
+        );
+        assert!(
+            one.keyring_passphrase_ref.is_none() && one.key_path.is_none(),
+            "**{} に秘密の在りかが書かれています。**撮影用の設定には要りません",
+            one.id
+        );
+    }
+
+    // **既定が空であることを画面で見せる**ための 1 件が要る（`howto.empty`）。
+    assert!(
+        all.iter().any(|one| one.write_roots.is_empty()),
+        "**書き込み許可が空の接続が 1 件もありません。**\
+         「入れたままでは AI は何 1 つできない」を画面で見せられません"
+    );
+}

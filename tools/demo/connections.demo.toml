@@ -1,0 +1,54 @@
+# **配布ページ用の、架空の接続一覧。**
+#
+# 運用者の指示（2026-09-18）——
+#
+# > キャプチャは、架空の設定を入れた上にしてください。
+#
+# **誰のサーバーでもありません。**向き先は `tools/test-server/up.sh` が建てる
+# 手元のコンテナ（`127.0.0.1:2222`）で、**名前と識別子だけ架空**にしてあります。
+# 実際に繋がるので、**ファイルの面も端末の面も撮れます。**
+#
+# ## 使い方
+#
+#   sh tools/test-server/up.sh
+#   sh tools/demo/use-demo.sh        # いまの設定を退避して、これを置く
+#   （撮る）
+#   sh tools/demo/use-demo.sh back   # 元へ戻す
+#
+# ## 撮る前に必ず
+#
+# **窓の「伏せる」を入れてください**（D26）。
+# 架空の設定なので漏れるものはありませんが、**伏せた状態が既定**です。
+
+version = 1
+
+[[connections]]
+id = "web-01"
+name = "Web (demo)"
+host = "127.0.0.1"
+port = 2222
+user = "probe"
+tag = "demo"
+color = "teal"
+write_roots = ["/home/probe/app"]
+
+[[connections]]
+id = "db-01"
+name = "Database (demo)"
+host = "127.0.0.1"
+port = 2222
+user = "probe"
+tag = "demo"
+color = "indigo"
+# **書き込み許可は空のまま。**既定が空であることを、画面で見せるため
+write_roots = []
+
+[[connections]]
+id = "batch-01"
+name = "Batch (demo)"
+host = "127.0.0.1"
+port = 2222
+user = "probe"
+tag = "demo"
+color = "amber"
+write_roots = []
