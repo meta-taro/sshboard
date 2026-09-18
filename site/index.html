@@ -353,10 +353,10 @@
 
       <h3 data-t="h.install.mac">Installing on macOS</h3>
       <p data-t="install.mac">
-        The macOS build ships as <code>.app.tar.gz</code> rather than a <code>.dmg</code>, because
-        the same file is what the auto-updater consumes. Extract it and move it across:
+        Open the <code>.dmg</code> and drag sshboard into Applications. The
+        <code>.app.tar.gz</code> sitting next to it in the release is what the auto-updater
+        consumes — you don't need it.
       </p>
-      <pre>tar -xzf ~/Downloads/sshboard.app.tar.gz -C /Applications</pre>
       <p data-t="install.mac.open">Then open it from Finder with right-click → <b>Open</b> the first time.</p>
 
       <h3 data-t="h.install.win">Installing on Windows</h3>
@@ -733,7 +733,14 @@ claude mcp add sshboard -- "%LOCALAPPDATA%\\sshboard\\sshboard.exe" --mcp-stdio-
             if (a) a.href = asset.browser_download_url;
             put(sizeId, `${asset.name} · ${(asset.size / 1048576).toFixed(1)} MB`);
           };
-          wire('dl-mac', 'size-mac', find((x) => x.name.endsWith('.app.tar.gz')));
+          // **`.dmg` を先に。**`.app.tar.gz` は自動更新が食べる形で、
+          // **人が受け取る形ではありません** —— 実際に「変な zip」と踏まれました。
+          // 古い版には `.dmg` が無いので、無ければ従来のものへ落とします。
+          wire(
+            'dl-mac',
+            'size-mac',
+            find((x) => x.name.endsWith('.dmg')) ?? find((x) => x.name.endsWith('.app.tar.gz'))
+          );
           wire('dl-win', 'size-win', find((x) => x.name.endsWith('-setup.exe')));
           wire('dl-msi', 'size-msi', find((x) => x.name.endsWith('.msi')));
         } catch {

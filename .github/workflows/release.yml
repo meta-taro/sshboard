@@ -164,7 +164,8 @@ jobs:
           set -eu
           mkdir -p upload
           find dist -type f \
-            \( -name '*.msi' -o -name '*-setup.exe' -o -name '*.app.tar.gz' -o -name '*.sig' \) \
+            \( -name '*.msi' -o -name '*-setup.exe' -o -name '*.app.tar.gz' -o -name '*.dmg' \
+               -o -name '*.sig' \) \
             -exec cp {} upload/ \;
           ls -la upload/
           # **黙って空を出さない。**1 つも無ければ Release を作らない。

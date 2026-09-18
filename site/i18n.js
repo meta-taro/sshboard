@@ -41,7 +41,7 @@ window.SSHBOARD_I18N = {
       '<b>Подписи нет.</b> В первый раз вас остановят SmartScreen в Windows и Gatekeeper в macOS. В Windows: <i>Подробнее → Выполнить в любом случае</i>. В macOS: <i>правый клик по приложению → Открыть</i>. <b>Это инструмент, работающий с ключами.</b> Мы понимаем, что первое, чему он вас учит, — отмахнуться от предупреждения; <b>подпись появится тогда, когда её отсутствие кому-то реально навредит</b>, и <a href="https://github.com/meta-taro/sshboard/issues">написанный об этом issue</a> — это то, что решит вопрос.',
     'h.install.mac': 'Установка в macOS',
     'install.mac':
-      'Сборка для macOS поставляется как <code>.app.tar.gz</code>, а не <code>.dmg</code>, потому что <b>этот же файл использует автообновление</b>. Распакуйте и перенесите:',
+      'Откройте <code>.dmg</code> и перетащите sshboard в «Программы». Лежащий рядом <code>.app.tar.gz</code> — это <b>то, что использует автообновление</b>; вам он не нужен.',
     'install.mac.open': 'Затем откройте из Finder через <b>правый клик → Открыть</b> — только в первый раз.',
     'h.install.win': 'Установка в Windows',
     'install.win':
@@ -150,7 +150,7 @@ window.SSHBOARD_I18N = {
       "<b>Non è firmato.</b> La prima volta SmartScreen su Windows e Gatekeeper su macOS ti fermeranno. Su Windows: <i>Ulteriori informazioni → Esegui comunque</i>. Su macOS: <i>clic destro sull'app → Apri</i>. <b>Questo è uno strumento che maneggia chiavi.</b> Sappiamo che la prima cosa che ti insegna è ignorare un avviso — <b>la firma arriverà quando a qualcuno la sua assenza farà davvero male</b>, e <a href=\"https://github.com/meta-taro/sshboard/issues\">scriverlo in un issue</a> è ciò che lo deciderà.",
     'h.install.mac': 'Installazione su macOS',
     'install.mac':
-      "La build per macOS arriva come <code>.app.tar.gz</code> invece che come <code>.dmg</code>, perché <b>è lo stesso file che usa l'aggiornamento automatico</b>. Estrai e sposta:",
+      'Apri il <code>.dmg</code> e trascina sshboard in Applicazioni. Il <code>.app.tar.gz</code> accanto è <b>ciò che usa l\'aggiornamento automatico</b> — a te non serve.',
     'install.mac.open': 'Poi aprila dal Finder con <b>clic destro → Apri</b> la prima volta.',
     'h.install.win': 'Installazione su Windows',
     'install.win':
@@ -258,7 +258,7 @@ window.SSHBOARD_I18N = {
       '<b>Não é assinado.</b> O SmartScreen no Windows e o Gatekeeper no macOS vão barrar você da primeira vez. No Windows: <i>Mais informações → Executar assim mesmo</i>. No macOS: <i>clique com o botão direito no app → Abrir</i>. <b>Esta é uma ferramenta que lida com chaves.</b> Sabemos que a primeira coisa que ela ensina é ignorar um aviso — <b>a assinatura entra quando alguém for realmente prejudicado pela falta dela</b>, e <a href="https://github.com/meta-taro/sshboard/issues">dizer isso num issue</a> é o que decide.',
     'h.install.mac': 'Instalação no macOS',
     'install.mac':
-      'A build de macOS vem como <code>.app.tar.gz</code> em vez de <code>.dmg</code>, porque <b>é o mesmo arquivo que a atualização automática consome</b>. Extraia e mova:',
+      'Abra o <code>.dmg</code> e arraste o sshboard para Aplicativos. O <code>.app.tar.gz</code> ao lado é <b>o que a atualização automática usa</b> — você não precisa dele.',
     'install.mac.open': 'Depois abra pelo Finder com <b>clique direito → Abrir</b> na primeira vez.',
     'h.install.win': 'Instalação no Windows',
     'install.win':
@@ -366,7 +366,7 @@ window.SSHBOARD_I18N = {
       '<b>No está firmado.</b> SmartScreen en Windows y Gatekeeper en macOS te detendrán la primera vez. En Windows: <i>Más información → Ejecutar de todas formas</i>. En macOS: <i>clic derecho sobre la app → Abrir</i>. <b>Esta es una herramienta que maneja claves.</b> Sabemos que lo primero que te enseña es a ignorar un aviso — <b>la firma llegará cuando a alguien le perjudique de verdad no tenerla</b>, y <a href="https://github.com/meta-taro/sshboard/issues">decirlo en un issue</a> es lo que lo decidirá.',
     'h.install.mac': 'Instalación en macOS',
     'install.mac':
-      'La versión de macOS se distribuye como <code>.app.tar.gz</code> y no como <code>.dmg</code>, porque <b>ese mismo archivo es el que usa la actualización automática</b>. Descomprime y muévelo:',
+      'Abre el <code>.dmg</code> y arrastra sshboard a Aplicaciones. El <code>.app.tar.gz</code> que está al lado es <b>lo que usa la actualización automática</b>; no lo necesitas.',
     'install.mac.open': 'Después ábrelo desde el Finder con <b>clic derecho → Abrir</b> la primera vez.',
     'h.install.win': 'Instalación en Windows',
     'install.win':
@@ -474,7 +474,7 @@ window.SSHBOARD_I18N = {
       "<b>Ce n'est pas signé.</b> SmartScreen sous Windows et Gatekeeper sous macOS vous arrêteront la première fois. Sous Windows : <i>Informations complémentaires → Exécuter quand même</i>. Sous macOS : <i>clic droit sur l'app → Ouvrir</i>. <b>C'est un outil qui manipule des clés.</b> Nous savons que la première chose qu'il vous apprend est d'écarter un avertissement — <b>la signature viendra quand quelqu'un en souffrira réellement</b>, et <a href=\"https://github.com/meta-taro/sshboard/issues\">le dire dans un issue</a> est ce qui en décidera.",
     'h.install.mac': 'Installation sous macOS',
     'install.mac':
-      "La version macOS est livrée en <code>.app.tar.gz</code> plutôt qu'en <code>.dmg</code>, parce que <b>c'est le même fichier que consomme la mise à jour automatique</b>. Décompressez et déplacez :",
+      'Ouvrez le <code>.dmg</code> et glissez sshboard dans Applications. Le <code>.app.tar.gz</code> à côté est <b>ce que consomme la mise à jour automatique</b> — vous n\'en avez pas besoin.',
     'install.mac.open': "Puis ouvrez-la depuis le Finder par <b>clic droit → Ouvrir</b> la première fois.",
     'h.install.win': 'Installation sous Windows',
     'install.win':
@@ -582,7 +582,7 @@ window.SSHBOARD_I18N = {
       '<b>Nicht signiert.</b> Windows SmartScreen und macOS Gatekeeper halten Sie beim ersten Mal an. Unter Windows: <i>Weitere Informationen → Trotzdem ausführen</i>. Unter macOS: <i>Rechtsklick auf die App → Öffnen</i>. <b>Dies ist ein Werkzeug, das mit Schlüsseln umgeht.</b> Uns ist bewusst, dass es Ihnen als Erstes beibringt, eine Warnung wegzuklicken — <b>signiert wird, sobald jemandem das Fehlen der Signatur tatsächlich schadet</b>, und <a href="https://github.com/meta-taro/sshboard/issues">es in einem Issue zu schreiben</a> ist es, was darüber entscheidet.',
     'h.install.mac': 'Installation unter macOS',
     'install.mac':
-      'Der macOS-Build kommt als <code>.app.tar.gz</code> statt als <code>.dmg</code>, weil <b>dieselbe Datei vom automatischen Update verwendet wird</b>. Entpacken und verschieben:',
+      'Öffnen Sie die <code>.dmg</code> und ziehen Sie sshboard nach Programme. Die <code>.app.tar.gz</code> daneben ist das, <b>was das automatische Update verwendet</b> — Sie brauchen sie nicht.',
     'install.mac.open': 'Danach im Finder mit <b>Rechtsklick → Öffnen</b> das erste Mal starten.',
     'h.install.win': 'Installation unter Windows',
     'install.win':
@@ -690,7 +690,7 @@ window.SSHBOARD_I18N = {
       '<b>沒有程式碼簽章。</b>第一次開啟時，Windows SmartScreen 與 macOS Gatekeeper 都會擋下來。Windows：<i>其他資訊 → 仍要執行</i>；macOS：<i>在 App 上按右鍵 → 開啟</i>。<b>這是一個管金鑰的工具。</b>我們清楚它教你的第一件事就是「忽略警告」，仍然這樣發出來 —— <b>簽章會在真的有人因為沒簽章而受困之後</b>再加上。<a href="https://github.com/meta-taro/sshboard/issues">把遇到的狀況寫進 issue</a> 就是做這個判斷的依據。',
     'h.install.mac': '在 macOS 上安裝',
     'install.mac':
-      'macOS 版打包成 <code>.app.tar.gz</code> 而不是 <code>.dmg</code>，因為<b>自動更新用的就是同一個檔案</b>。解壓後搬過去：',
+      '打開 <code>.dmg</code>，把 sshboard 拖進 Applications。旁邊那個 <code>.app.tar.gz</code> 是<b>自動更新用的</b>，你不需要它。',
     'install.mac.open': '然後在 Finder 裡<b>按右鍵 → 開啟</b>，第一次這樣開。',
     'h.install.win': '在 Windows 上安裝',
     'install.win':
@@ -798,7 +798,7 @@ window.SSHBOARD_I18N = {
       '<b>没有代码签名。</b>第一次打开时，Windows SmartScreen 和 macOS Gatekeeper 都会拦住你。Windows：<i>更多信息 → 仍要运行</i>；macOS：<i>右键点应用 → 打开</i>。<b>这是一个管钥匙的工具。</b>我们清楚它教给你的第一件事就是"忽略警告"，仍然这样发出来 —— <b>签名会在真的有人因为没签名而受困之后</b>加上。<a href="https://github.com/meta-taro/sshboard/issues">把遇到的情况写进 issue</a> 就是做这个判断的依据。',
     'h.install.mac': '在 macOS 上安装',
     'install.mac':
-      'macOS 版打包成 <code>.app.tar.gz</code> 而不是 <code>.dmg</code>，因为<b>自动更新用的就是同一个文件</b>。解压后移过去：',
+      '打开 <code>.dmg</code>，把 sshboard 拖进 Applications。旁边那个 <code>.app.tar.gz</code> 是<b>自动更新用的</b>，你不需要它。',
     'install.mac.open': '然后在访达里<b>右键 → 打开</b>，第一次这样开。',
     'h.install.win': '在 Windows 上安装',
     'install.win':
@@ -906,7 +906,7 @@ window.SSHBOARD_I18N = {
       '<b>코드 서명이 되어 있지 않습니다.</b> 처음 열 때 Windows SmartScreen과 macOS Gatekeeper가 막습니다. Windows는 <i>추가 정보 → 실행</i>, macOS는 <i>앱 우클릭 → 열기</i>입니다. <b>이것은 키를 다루는 도구입니다.</b> 가장 먼저 가르치는 것이 "경고를 무시하고 열기"가 된다는 점을 알면서도 내놓습니다 —— <b>서명은 서명이 없어서 실제로 곤란한 사람이 나온 뒤에</b> 넣습니다. <a href="https://github.com/meta-taro/sshboard/issues">이슈에 적어 주는 것</a>이 그 판단 근거가 됩니다.',
     'h.install.mac': 'macOS에 설치',
     'install.mac':
-      'macOS 빌드는 <code>.dmg</code>가 아니라 <code>.app.tar.gz</code>입니다. <b>같은 파일을 자동 업데이트가 사용</b>하기 때문입니다. 풀어서 옮기세요.',
+      '<code>.dmg</code>를 열고 sshboard를 Applications로 끌어다 놓으세요. 옆에 있는 <code>.app.tar.gz</code>는 <b>자동 업데이트가 쓰는 형식</b>이라 사람이 받을 필요가 없습니다.',
     'install.mac.open': '그다음 Finder에서 <b>우클릭 → 열기</b>로 처음 한 번 엽니다.',
     'h.install.win': 'Windows에 설치',
     'install.win':
@@ -1017,7 +1017,7 @@ window.SSHBOARD_I18N = {
 
     'h.install.mac': 'macOS へ入れる',
     'install.mac':
-      'macOS 版は <code>.dmg</code> ではなく <code>.app.tar.gz</code> です。<b>同じファイルを自動更新が使う</b>ためです。展開して移してください。',
+      '<code>.dmg</code> を開いて、sshboard を Applications へ入れてください。隣に在る <code>.app.tar.gz</code> は<b>自動更新が食べる形</b>で、人が取る必要はありません。',
     'install.mac.open': 'そのあと Finder から<b>右クリック →「開く」</b>で初回を開きます。',
     'h.install.win': 'Windows へ入れる',
     'install.win':
