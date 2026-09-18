@@ -15,6 +15,28 @@ use tauri::{AppHandle, Emitter, State};
 /// 開いている接続が変わったことを画面へ配るイベント。
 pub const SESSION_EVENT: &str = "session://changed";
 
+/// 画面へ配る「いまのセッション」。
+///
+/// **開いている一覧だけでは足りません**（2026-09-18 に実機で踏みました）。
+/// AI が `focus_connection` で宛先を動かしても、**開いている顔ぶれは変わらない**ので、
+/// 一覧だけを流すと画面からは「何も変わっていない」に見えます。
+///
+/// 実測 ——
+///
+/// ```text
+/// MCP  : operationsGoTo = web-01
+/// 画面 : Batch が選ばれたまま
+/// ```
+///
+/// **この製品の根拠は「人がいつでも、どのサーバーを触っているか見えていること」**
+/// です（PRD §4-1）。**宛先は、一覧と同じ 1 通で運びます。**
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionState {
+    pub open: Vec<Opened>,
+    pub active: Option<String>,
+}
+
 /// 画面へ返すディレクトリの 1 件。
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -32,8 +54,10 @@ pub fn spawn_bridge(app: AppHandle, engine: Arc<Engine>) {
         let mut watching = engine.subscribe();
         while watching.changed().await.is_ok() {
             // **開いているもの全部**を流す（D25）。タブに 1 本残らず出すため。
-            let current: Vec<Opened> = watching.borrow().clone();
-            if let Err(error) = app.emit(SESSION_EVENT, current) {
+            let open: Vec<Opened> = watching.borrow().clone();
+            // **宛先も一緒に。**別便にすると、片方だけ届いた瞬間がずれになります。
+            let active = engine.active().await.map(|held| held.id);
+            if let Err(error) = app.emit(SESSION_EVENT, SessionState { open, active }) {
                 eprintln!("[sshboard] 接続の変化を画面へ渡せません: {error}");
             }
         }

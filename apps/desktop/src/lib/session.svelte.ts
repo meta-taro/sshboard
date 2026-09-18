@@ -29,6 +29,18 @@ export type Listed = {
 	size: number;
 };
 
+/**
+ * `session://changed` で届くもの。
+ *
+ * **一覧だけでは足りません**（2026-09-18 に実機で踏みました）。
+ * AI が宛先を動かしても**開いている顔ぶれは変わらない**ので、
+ * 一覧だけだと画面からは「何も変わっていない」に見えます。
+ */
+interface SessionSaid {
+	open: Opened[];
+	active: string | null;
+}
+
 class SessionState {
 	/** 開いているもの**全部**（D25）。**タブに 1 本残らず出す。** */
 	all = $state<Opened[]>([]);
@@ -75,8 +87,17 @@ class SessionState {
 
 	/** 実際に張る。**止めてくれと言われていたら、張った端から止める。** */
 	private async begin(): Promise<void> {
-		const stop = await listen<Opened[]>('session://changed', (event) => {
-			this.all = event.payload;
+		const stop = await listen<Opened[] | SessionSaid>('session://changed', (event) => {
+			// **古い形（一覧だけ）も受けます。**版が食い違っても画面が止まらないように。
+			const said = Array.isArray(event.payload)
+				? { open: event.payload, active: undefined }
+				: event.payload;
+			this.all = said.open;
+			// **AI が宛先を動かしたら、画面も動く**（2026-09-18 に実機で踏みました）。
+			// ここを受けていなかったので、**MCP は web-01、画面は Batch** という
+			// 状態が作れていました。**どのサーバーを触っているかが見えていない**のは、
+			// この製品でいちばん危ない形です（PRD §4-1）。
+			if (said.active !== undefined) this.activeId = said.active;
 			// 宛先が閉じられていたら、残っている 1 本へ移す。
 			if (!this.all.some((held) => held.id === this.activeId)) {
 				this.activeId = this.all[0]?.id ?? null;

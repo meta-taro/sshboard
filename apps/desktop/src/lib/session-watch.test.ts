@@ -67,7 +67,7 @@ function gate() {
 }
 
 /** 購読へ 1 回流す。**Rust 側の `session://changed` と同じ形。** */
-function emit(payload: Opened[]): void {
+function emit(payload: Opened[] | { open: Opened[]; active: string | null }): void {
 	fake.handlers[0]({ payload });
 }
 
@@ -115,5 +115,32 @@ describe('session.watch', () => {
 
 		expect(session.all.map((held) => held.id)).toEqual(['one']);
 		expect(session.activeId).toBe('one');
+	});
+
+	test('follows the target when the agent moves it', async () => {
+		// **実機で踏んだ**（2026-09-18・配布ページ用の写真を撮っていて出た）。
+		//
+		// AI が `focus_connection` で宛先を動かしたのに、**画面は前のタブを
+		// 選んだまま**だった。実測はこう ——
+		//
+		// ```
+		// MCP  : operationsGoTo = web-01
+		// 画面 : Batch が選ばれたまま
+		// ```
+		//
+		// **この製品の根拠は「人がいつでも、どのサーバーを触っているか
+		// 見えていること」**（PRD §4-1）。そこが崩れる。
+		//
+		// 原因は、流していたのが**開いている一覧だけ**で、
+		// **どれが宛先かを運んでいなかった**こと。開いている顔ぶれは
+		// 変わらないので、画面から見ると「何も変わっていない」に見えていた。
+		fake.status = { open: [opened('web'), opened('batch')], active: 'batch' };
+		await session.watch();
+		expect(session.activeId).toBe('batch');
+
+		emit({ open: [opened('web'), opened('batch')], active: 'web' });
+
+		expect(session.activeId).toBe('web');
+		expect(session.all.map((held) => held.id)).toEqual(['web', 'batch']);
 	});
 });
