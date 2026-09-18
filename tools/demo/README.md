@@ -30,8 +30,8 @@ sh tools/demo/use-demo.sh         # 架空の設定へ入れ替える（いま�
 | 1 | 接続 | 3 件が色とタグ付きで並んでいる所 | `site/shots/connections.png` |
 | 2 | ファイル | 左にサーバー、右に手元。**片方のパンくずが見えている** | `site/shots/files.png` |
 | 3 | 端末 | 何か打ったあと。**［止める］が見えている** | `site/shots/console.png` |
-| 4 | 操作の記録 | `[Human]` と `[AI]` の札が**両方**出ている所 | `site/shots/band.png` |
-| 5 | ログ | 繋がるまでの段が並んでいる所 | `site/shots/diag.png` |
+| 4 | 履歴 | `[Human]` と `[AI]` の札が**両方**出ている所 | `site/shots/band.png` |
+| 5 | 診断 | 繋がるまでの段が並んでいる所 | `site/shots/diag.png` |
 
 **4 枚目は、AI を繋いでからでないと `[AI]` の行が出ません。**
 `claude mcp add`（README 参照）で繋いで、何か 1 つ読ませてから撮ってください。

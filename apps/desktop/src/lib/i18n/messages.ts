@@ -272,7 +272,7 @@ const ja: Catalog = {
 	'mcp.label': 'MCP',
 	'mcp.starting': '立ち上げ中…',
 	'tab.connections': '接続',
-	'tab.band': '操作の記録',
+	'tab.band': '履歴',
 
 	'conn.heading': '接続',
 	'conn.new': '新規',
@@ -496,7 +496,7 @@ const ja: Catalog = {
 	"files.step3": "左へファイルを放り込み、［上げる］を押す。",
 	"files.notconnected": "繋がっていません。上でサーバーを選び、［接続］を押してください。",
 	// 診断（何が起きたか）。**AI が MCP から読むのと同じ記録。**
-	"tab.diag": "ログ",
+	"tab.diag": "診断",
 	"diag.label": "何が起きたか",
 	"diag.help": "AI が MCP から読むのと同じ記録です。ホスト名・利用者名・秘密は入りません。",
 	"diag.refresh": "読み直す",
