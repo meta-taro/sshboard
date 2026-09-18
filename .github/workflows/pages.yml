@@ -53,29 +53,30 @@ jobs:
       - name: アイコンをアプリから採る
         run: cp apps/desktop/src-tauri/icons/icon.png site/icon.png
 
+      # **道具の一覧は、コードから作り直す。**
+      #
+      # 手で持つと必ずずれる —— 道具を 1 本足してページを直し忘れると、
+      # **外へ向けた 1 枚だけが嘘になり、しかも誰も気づかない。**
+      #
+      # この生成器は**両方向で検める** ——
+      # 分類し忘れた道具でも、消えたのに残っている道具でも落ちる。
+      - name: 道具の一覧をコードから作る
+        run: python3 tools/make-site-tools.py
+
       # **置く物を確かめる。**参照だけ足して壊れている状態を作らない（baseline §23）
       - name: 中身があるか
         run: |
           set -eu
           test -f site/index.html
           test -f site/icon.png
+          test -f site/i18n.js
+          test -f site/tools.json
           grep -q '<title>' site/index.html
 
-      # **ページが謳う本数と、実際の本数を突き合わせる。**
-      #
-      # ページは「35 MCP tools」と書いている。**道具を増やしてページを直し忘れると、
-      # 外へ向けた 1 枚だけが嘘になる** —— しかも誰も気づかない。
-      # 数えられるものは、数えて止める。
-      - name: 謳っている本数が合っているか
-        run: |
-          set -eu
-          actual="$(grep -rho '#\[tool(' crates/sshboard-mcp/src/ | wc -l | tr -d ' ')"
-          grep -q "${actual} MCP tools" site/index.html || {
-            echo "::error::ページの本数が実際（${actual} 本）と合っていません。" \
-                 "site/index.html の「N MCP tools」を直してください"
-            exit 1
-          }
-          echo "本数 ${actual} 本 —— ページと一致"
+      # **訳を検める。**人の目だけでは漏れる ——
+      # 実際に、キリル文字の `р` が `prompt` に紛れ込んでいたのをここで拾った。
+      - name: 訳が揃っているか
+        run: node tools/check-site-i18n.js
 
       # **接続先を外へ出さない**（CLAUDE.md 禁止事項 4）。
       # このページは公開される。ホスト名・利用者名が 1 つ混ざれば、そこから漏れる。

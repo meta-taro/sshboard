@@ -258,6 +258,35 @@
         margin-bottom: 4px;
       }
 
+      /* 言語切替。**アプリと同じ 11 言語**（`locales.ts`） */
+      .lang {
+        display: flex;
+        justify-content: flex-end;
+        padding-top: 14px;
+      }
+      .lang select {
+        font: inherit;
+        font-size: 12.5px;
+        color: var(--fg-muted);
+        background: var(--surface);
+        border: 1px solid var(--hairline-strong);
+        border-radius: 7px;
+        padding: 4px 8px;
+      }
+
+      /* 道具の一覧。**`site/tools.json` から描く**（手で持たない） */
+      table.tools td:first-child {
+        width: 34%;
+        white-space: nowrap;
+      }
+      table.tools code {
+        font-size: 12.5px;
+      }
+      table.tools td {
+        font-size: 13.5px;
+        padding: 6px 10px;
+      }
+
       .note {
         border-left: 3px solid var(--hairline-strong);
         padding: 2px 0 2px 14px;
@@ -305,69 +334,67 @@
   </head>
   <body>
     <main>
+      <div class="lang">
+        <select id="lang" aria-label="Language"></select>
+      </div>
+
       <header>
         <img src="./icon.png" alt="" />
         <div>
           <h1>sshboard</h1>
-          <p class="lede">You and your AI agent, on one SSH session.</p>
+          <p class="lede" data-t="lede">You and your AI agent, on one SSH session.</p>
         </div>
       </header>
 
       <div class="tags">
-        <span class="tag alpha">Alpha</span>
-        <span class="tag" id="ver">checking latest…</span>
-        <span class="tag">macOS (Apple&nbsp;Silicon)</span>
-        <span class="tag">Windows&nbsp;x64</span>
-        <span class="tag">11 languages</span>
+        <span class="tag alpha" data-t="tag.alpha">Alpha</span>
+        <span class="tag" id="ver">…</span>
+        <span class="tag" data-t="tag.mac">macOS (Apple Silicon)</span>
+        <span class="tag" data-t="tag.win">Windows x64</span>
+        <span class="tag" data-t="tag.langs">11 languages</span>
         <span class="tag">MIT</span>
       </div>
 
-      <p style="margin-top: 22px">
+      <p style="margin-top: 22px" data-t="intro">
         Most agent tooling gives a model a <code>run_command(cmd)</code> hole and lets it work
         somewhere you aren't looking. sshboard does the opposite: the agent and you hold
-        <b>the same SSH connection</b>, and everything it does lands on a screen you are sitting
-        in front of. There is no second, invisible session.
+        <b>the same SSH connection</b>, and everything it does lands on a screen you are sitting in
+        front of. There is no second, invisible session.
       </p>
 
-      <h2>Download</h2>
+      <h2 data-t="h.download">Download</h2>
 
       <div class="files">
         <div class="card">
           <h3>macOS</h3>
-          <p class="sub">Apple Silicon</p>
-          <a class="get" id="dl-mac" href="https://github.com/meta-taro/sshboard/releases"
-            >Download</a
-          >
+          <p class="sub" data-t="dl.mac.sub">Apple Silicon</p>
+          <a class="get" id="dl-mac" data-t="dl.button" href="https://github.com/meta-taro/sshboard/releases">Download</a>
           <span class="size" id="size-mac"></span>
         </div>
 
         <div class="card">
           <h3>Windows</h3>
-          <p class="sub">x64 · installer (NSIS)</p>
-          <a class="get" id="dl-win" href="https://github.com/meta-taro/sshboard/releases"
-            >Download</a
-          >
+          <p class="sub" data-t="dl.win.sub">x64 · installer (NSIS)</p>
+          <a class="get" id="dl-win" data-t="dl.button" href="https://github.com/meta-taro/sshboard/releases">Download</a>
           <span class="size" id="size-win"></span>
         </div>
 
         <div class="card">
-          <h3>Windows (MSI)</h3>
-          <p class="sub">If your organisation deploys by MSI</p>
-          <a class="get thin" id="dl-msi" href="https://github.com/meta-taro/sshboard/releases"
-            >Download</a
-          >
+          <h3 data-t="dl.msi.title">Windows (MSI)</h3>
+          <p class="sub" data-t="dl.msi.sub">If your organisation deploys by MSI</p>
+          <a class="get thin" id="dl-msi" data-t="dl.button" href="https://github.com/meta-taro/sshboard/releases">Download</a>
           <span class="size" id="size-msi"></span>
         </div>
 
         <div class="card">
-          <h3>Source</h3>
+          <h3 data-t="dl.src.title">Source</h3>
           <p class="sub">Tauri 2 · SvelteKit · Rust</p>
           <a class="get thin" href="https://github.com/meta-taro/sshboard">GitHub</a>
           <span class="size">pnpm install &amp;&amp; pnpm --filter desktop tauri dev</span>
         </div>
       </div>
 
-      <div class="note warn">
+      <div class="note warn" data-t="unsigned">
         <b>It is not code-signed.</b> Windows SmartScreen and macOS Gatekeeper will both stop you the
         first time. On Windows: <i>More info → Run anyway</i>. On macOS: right-click the app →
         <i>Open</i>. This is a tool that handles keys, and we know the first thing it teaches you is
@@ -376,94 +403,75 @@
         decides that.
       </div>
 
-      <h3>Installing on macOS</h3>
-      <p>
+      <h3 data-t="h.install.mac">Installing on macOS</h3>
+      <p data-t="install.mac">
         The macOS build ships as <code>.app.tar.gz</code> rather than a <code>.dmg</code>, because
         the same file is what the auto-updater consumes. Extract it and move it across:
       </p>
       <pre>tar -xzf ~/Downloads/sshboard.app.tar.gz -C /Applications</pre>
-      <p>Then open it from Finder with right-click → <b>Open</b> the first time.</p>
+      <p data-t="install.mac.open">Then open it from Finder with right-click → <b>Open</b> the first time.</p>
 
-      <h3>Installing on Windows</h3>
-      <p>
+      <h3 data-t="h.install.win">Installing on Windows</h3>
+      <p data-t="install.win">
         Run the <code>-setup.exe</code>. Windows needs <b>WebView2</b>; Windows 11 and recent 10
         already have it, and if not the installer fetches it — so the first install needs a network
         connection.
       </p>
 
-      <h2>What you are looking at</h2>
+      <h2 data-t="h.ui">What you are looking at</h2>
 
-      <p>
-        One window, five tabs. There are no screenshots on this page — every useful screenshot of
-        this product has somebody's hostname, username and paths in it — so here is the shape of it
-        instead.
+      <p data-t="ui.intro">
+        One window, five tabs. There are no screenshots on this page yet — every screenshot of this
+        product has somebody's hostname, username and paths in it, so the ones that go here will be
+        taken against a made-up configuration. Until then, here is the shape of it.
       </p>
 
       <div class="window">
         <div class="bar">
-          <span class="on">Connections</span><span>Files</span><span>Console</span
-          ><span>Activity</span><span>Log</span>
+          <span class="on" data-t="tab.connections">Connections</span
+          ><span data-t="tab.files">Files</span><span data-t="tab.console">Console</span
+          ><span data-t="tab.band">Activity</span><span data-t="tab.diag">Log</span>
         </div>
         <div class="panes">
           <div class="pane">
-            <b>Left</b>
-            The servers you registered. One row each. Open one and it becomes a tab along the top of
-            the working area.
+            <b data-t="ui.left.title">Left</b>
+            <span data-t="ui.left">The servers you registered. One row each. Open one and it becomes a tab along the top of the working area.</span>
           </div>
           <div class="pane">
-            <b>Right</b>
-            Whatever that tab is for — a directory listing, a live terminal, or one of the two
-            record views below.
+            <b data-t="ui.right.title">Right</b>
+            <span data-t="ui.right">Whatever that tab is for — a directory listing, a live terminal, or one of the two record views below.</span>
           </div>
         </div>
       </div>
 
       <table>
         <tr>
-          <th>Tab</th>
-          <th>What it holds</th>
+          <th data-t="ui.th.tab">Tab</th>
+          <th data-t="ui.th.what">What it holds</th>
         </tr>
         <tr>
-          <td><b>Connections</b></td>
-          <td>
-            The servers you registered, and the button that opens one. Credentials live in the OS
-            credential store and ssh-agent, never here.
-          </td>
+          <td><b data-t="tab.connections">Connections</b></td>
+          <td data-t="ui.t.connections">The servers you registered, and the button that opens one. Credentials live in the OS credential store and ssh-agent, never here.</td>
         </tr>
         <tr>
-          <td><b>Files</b></td>
-          <td>
-            Two panes: the server on one side, your machine on the other. Upload, download, make a
-            directory. The agent is fenced to directories you listed; you are not.
-          </td>
+          <td><b data-t="tab.files">Files</b></td>
+          <td data-t="ui.t.files">Two panes: the server on one side, your machine on the other. Upload, download, make a directory. The agent is fenced to directories you listed; you are not.</td>
         </tr>
         <tr>
-          <td><b>Console</b></td>
-          <td>
-            A real terminal on the same SSH connection — <b>shared with the agent.</b> While the
-            agent holds it your input is locked out and a Stop button is showing. It never opens a
-            second session you can't see.
-          </td>
+          <td><b data-t="tab.console">Console</b></td>
+          <td data-t="ui.t.console">A real terminal on the same SSH connection — <b>shared with the agent.</b> While the agent holds it your input is locked out and a Stop button is showing. It never opens a second session you can't see.</td>
         </tr>
         <tr>
-          <td><b>Activity</b></td>
-          <td>
-            <b>Who did what.</b> One line per operation, tagged <code>[Human]</code> or
-            <code>[AI]</code>, in the order it happened. This is the tab you read to answer "what
-            has the agent been doing?"
-          </td>
+          <td><b data-t="tab.band">Activity</b></td>
+          <td data-t="ui.t.band"><b>Who did what.</b> One line per operation, tagged <code>[Human]</code> or <code>[AI]</code>, in the order it happened. This is the tab you read to answer "what has the agent been doing?"</td>
         </tr>
         <tr>
-          <td><b>Log</b></td>
-          <td>
-            <b>Why something failed.</b> Connection stages, errors, and what to do about them. This
-            is the tab you read when something did not work — and the one to copy from when you file
-            an issue.
-          </td>
+          <td><b data-t="tab.diag">Log</b></td>
+          <td data-t="ui.t.diag"><b>Why something failed.</b> Connection stages, errors, and what to do about them. This is the tab you read when something did not work — and the one to copy from when you file an issue.</td>
         </tr>
       </table>
 
-      <div class="note">
+      <div class="note" data-t="ui.confusable">
         <b>Activity and Log are not the same thing,</b> and the names do not make that obvious
         enough yet. <b>Activity is a record of actions</b> — it answers <i>who did what</i>.
         <b>Log is a record of diagnosis</b> — it answers <i>why it failed</i>. If you are trying to
@@ -471,9 +479,36 @@
         connection would not open, you want Log.
       </div>
 
-      <h2>Where it actually is right now</h2>
+      <h2 data-t="h.howto">How you use it</h2>
 
-      <p>
+      <ol>
+        <li data-t="howto.1"><b>Register a server.</b> Connections tab → add one. You give it an id, a name, a host and a user. The passphrase or password is never stored by sshboard — it goes to the OS credential store, or you leave it to ssh-agent.</li>
+        <li data-t="howto.2"><b>Open it.</b> It becomes a tab. Several can be open at once, and every one of them is visible. If a key needs a passphrase, the question appears on your screen — the agent cannot answer it.</li>
+        <li data-t="howto.3"><b>Work in Files or Console.</b> Both run over that same connection. Nothing the agent does happens on a different one.</li>
+        <li data-t="howto.4"><b>Point your agent at it</b> (below). Ask it to look at something. What it runs appears in Activity as it happens, and its output appears in the same Console you are watching.</li>
+        <li data-t="howto.5"><b>Approve what changes things.</b> Reading is fenced by an allow-list you wrote. Anything that changes state is refused the first time and shown to you in full before it can run — and the approval is good for one run, for five minutes.</li>
+      </ol>
+
+      <div class="note" data-t="howto.empty">
+        <b>Out of the box the agent can do nothing at all.</b> The read-only allow-list starts
+        empty, the write directories start empty, and the list of state-changing operations starts
+        empty. That is not a missing setup step — it is the design. You widen it as far as you
+        actually need, one line at a time.
+      </div>
+
+      <h2 data-t="h.tools">What the agent can do</h2>
+
+      <p data-t="tools.intro">
+        <span id="tool-count"></span> tools over MCP. These are the exact descriptions the agent
+        reads, so they are shown in English as it sees them. Note what is <b>not</b> here: there is
+        no tool that takes an arbitrary command string, and no tool that downloads to your machine.
+      </p>
+
+      <div id="tools"></div>
+
+      <h2 data-t="h.state">Where it actually is right now</h2>
+
+      <p data-t="state.intro">
         <b>The features are in. The interface is not finished.</b> sshboard is being used against a
         real production server, and the whole visible issue list came out of that use — but it has
         not had a design pass yet, and it shows. If you are looking for something polished, this is
@@ -483,11 +518,11 @@
 
       <table>
         <tr>
-          <th>Working</th>
-          <th>Not yet</th>
+          <th data-t="state.working">Working</th>
+          <th data-t="state.notyet">Not yet</th>
         </tr>
         <tr>
-          <td>
+          <td data-t="state.working.list">
             One shared SSH session (GUI + agent)<br />
             35 MCP tools<br />
             Read-only commands from an allow-list<br />
@@ -496,8 +531,9 @@
             Terminal shared with a stop button<br />
             Auto-update
           </td>
-          <td>
+          <td data-t="state.notyet.list">
             A design pass on the UI<br />
+            Screenshots on this page<br />
             Code signing<br />
             ssh-agent on Windows (named pipe / Pageant) — unverified<br />
             Intel macOS / Linux builds<br />
@@ -506,45 +542,25 @@
         </tr>
       </table>
 
-      <h2>The fence</h2>
+      <h2 data-t="h.fence">The fence</h2>
 
-      <p>
+      <p data-t="fence.intro">
         These are constraints on the code, not advice in a prompt. They hold whether or not the
         model cooperates.
       </p>
 
       <ul>
-        <li>
-          <b>There is no <code>run_command(cmd)</code> tool.</b> Not a filtered one, not a clever
-          one. An agent cannot hand an arbitrary string to a shell.
-        </li>
-        <li>
-          <b>Read-only commands come from a list you wrote.</b> <code>readonly.toml</code> starts
-          empty, so out of the box the agent cannot run a single command.
-        </li>
-        <li>
-          <b>Writes are fenced to directories you listed,</b> per connection. That list also starts
-          empty. Upload and mkdir only — no delete, rename, move, chmod, service restart or package
-          install.
-        </li>
-        <li>
-          <b>There is no download-to-my-machine tool.</b> The fence does not protect your laptop, so
-          the agent doesn't get a door onto it.
-        </li>
-        <li>
-          <b>State-changing operations need a human press,</b> and the first attempt is always
-          refused so the screen can show you exactly what would run. Approvals expire in 5 minutes
-          and cover one run.
-        </li>
-        <li>
-          <b>Keys stay in the OS credential store and ssh-agent.</b> sshboard does not implement a
-          key store, and the tool that lists connections returns identifiers, never credentials.
-        </li>
+        <li data-t="fence.1"><b>There is no <code>run_command(cmd)</code> tool.</b> Not a filtered one, not a clever one. An agent cannot hand an arbitrary string to a shell.</li>
+        <li data-t="fence.2"><b>Read-only commands come from a list you wrote.</b> <code>readonly.toml</code> starts empty, so out of the box the agent cannot run a single command.</li>
+        <li data-t="fence.3"><b>Writes are fenced to directories you listed,</b> per connection. That list also starts empty. Upload and mkdir only — no delete, rename, move, chmod, service restart or package install.</li>
+        <li data-t="fence.4"><b>There is no download-to-my-machine tool.</b> The fence does not protect your laptop, so the agent doesn't get a door onto it.</li>
+        <li data-t="fence.5"><b>State-changing operations need a human press,</b> and the first attempt is always refused so the screen can show you exactly what would run. Approvals expire in 5 minutes and cover one run.</li>
+        <li data-t="fence.6"><b>Keys stay in the OS credential store and ssh-agent.</b> sshboard does not implement a key store, and the tool that lists connections returns identifiers, never credentials.</li>
       </ul>
 
-      <h2>Connect your agent</h2>
+      <h2 data-t="h.agent">Connect your agent</h2>
 
-      <p>
+      <p data-t="agent.intro">
         Point your agent at the running app. This form starts sshboard as a relay with no window, so
         <b>the token is never written to disk</b> — not into <code>~/.claude.json</code>, not into
         your shell history.
@@ -556,7 +572,7 @@ claude mcp add sshboard -- /Applications/sshboard.app/Contents/MacOS/sshboard --
 # Windows
 claude mcp add sshboard -- "%LOCALAPPDATA%\\sshboard\\sshboard.exe" --mcp-stdio-proxy</pre>
 
-      <p>
+      <p data-t="agent.note">
         The relay holds no engine and opens no connection of its own — only the app does, which is
         the point. It is a one-time step: the port is fixed at <code>22022</code> and the token is
         reused, so restarting does not make you register again. If the port is taken it says so on
@@ -564,42 +580,142 @@ claude mcp add sshboard -- "%LOCALAPPDATA%\\sshboard\\sshboard.exe" --mcp-stdio-
         token in a file — the window has a button that copies it if you want it.)
       </p>
 
-      <p>
+      <p data-t="agent.about">
         Ask it <code>about_sshboard</code> first — the tool exists so an agent can find out what this
         is, what it may and may not do, and what changed in each version, without you pasting a
         briefing.
       </p>
 
-      <h2>What it will not become</h2>
+      <h2 data-t="h.never">What it will not become</h2>
       <ul>
-        <li>A way to run an agent against a server while nobody is watching.</li>
-        <li>A place your keys or passphrases get stored.</li>
-        <li>A tool that opens a second SSH session you cannot see.</li>
+        <li data-t="never.1">A way to run an agent against a server while nobody is watching.</li>
+        <li data-t="never.2">A place your keys or passphrases get stored.</li>
+        <li data-t="never.3">A tool that opens a second SSH session you cannot see.</li>
       </ul>
 
       <footer>
-        <p id="when">Releases are on GitHub.</p>
+        <p id="when"></p>
         <p>
-          <a href="https://github.com/meta-taro/sshboard">Source</a> ·
-          <a href="https://github.com/meta-taro/sshboard/releases">Releases</a> ·
-          <a href="https://github.com/meta-taro/sshboard/issues">Issues</a> ·
-          <a href="https://github.com/meta-taro/sshboard/blob/develop/README.ja.md">日本語</a>
+          <a href="https://github.com/meta-taro/sshboard" data-t="f.source">Source</a> ·
+          <a href="https://github.com/meta-taro/sshboard/releases" data-t="f.releases">Releases</a> ·
+          <a href="https://github.com/meta-taro/sshboard/issues" data-t="f.issues">Issues</a>
         </p>
       </footer>
     </main>
 
+    <script src="./i18n.js"></script>
     <script>
-      // **版と落とす先を、Releases から読む。**
-      // 書き換え忘れで古い版を配らないため、ここは手で書かない。
-      // 読めないときは Releases のページへ落とす（リンクは HTML 側で既にそこを指している）。
+      // **版・落とす先・道具の一覧は、どれも手で書かない。**
+      // 書くと、変えるたびにページを直す作業が増え、**忘れた分だけ嘘を配る。**
       (async () => {
         const put = (id, text) => {
           const el = document.getElementById(id);
           if (el) el.textContent = text;
         };
+
+        // --- 言語 ---------------------------------------------------------
+        // **アプリと同じ 11 言語**（`apps/desktop/src/lib/i18n/locales.ts`）。
+        // 英語は HTML に直接書いてあるので、**訳が無い言語でも文章は出ます。**
+        const LOCALES = [
+          ['en', 'English'], ['ja', '日本語'], ['ko', '한국어'],
+          ['zh-CN', '简体中文'], ['zh-TW', '繁體中文'], ['de', 'Deutsch'],
+          ['fr', 'Français'], ['es', 'Español'], ['pt-BR', 'Português (Brasil)'],
+          ['ru', 'Русский'], ['it', 'Italiano'],
+        ];
+        const STORED = 'sshboard-site-lang';
+        const table = window.SSHBOARD_I18N || {};
+        const english = new Map();
+        for (const el of document.querySelectorAll('[data-t]')) {
+          english.set(el, el.innerHTML);
+        }
+
+        const resolve = (tag) => {
+          if (!tag) return null;
+          const codes = LOCALES.map(([c]) => c);
+          if (codes.includes(tag)) return tag;
+          const primary = tag.split('-')[0].toLowerCase();
+          return (
+            codes.find((c) => c.toLowerCase() === primary) ??
+            codes.find((c) => c.toLowerCase().startsWith(primary + '-')) ??
+            null
+          );
+        };
+
+        let toolCount = '';
+        const apply = (code) => {
+          const words = code === 'en' ? null : table[code];
+          for (const el of document.querySelectorAll('[data-t]')) {
+            const key = el.getAttribute('data-t');
+            const said = words && words[key];
+            el.innerHTML = said ?? english.get(el);
+          }
+          // **訳を当てると中の span も作り直される。**数はここで入れ直す ——
+          // 訳へ数を焼き込むと、道具が増えた日に**その言語だけ嘘になる。**
+          put('tool-count', toolCount);
+          document.documentElement.lang = code;
+          try {
+            localStorage.setItem(STORED, code);
+          } catch {
+            /* 記憶できないだけ。**画面は出す。** */
+          }
+        };
+
+        const picker = document.getElementById('lang');
+        if (picker) {
+          for (const [code, native] of LOCALES) {
+            const option = document.createElement('option');
+            option.value = code;
+            option.textContent = native;
+            picker.append(option);
+          }
+          let stored = null;
+          try {
+            stored = localStorage.getItem(STORED);
+          } catch {
+            /* 読めないだけ */
+          }
+          const start = resolve(stored) ?? resolve(navigator.language) ?? 'en';
+          picker.value = start;
+          apply(start);
+          picker.addEventListener('change', () => apply(picker.value));
+        }
+
+        // --- 道具の一覧 ---------------------------------------------------
+        // `tools/make-site-tools.py` が `#[tool(` から作ったもの。
+        // **道具を足して直し忘れる、が起きない形。**
         try {
-          // **一覧から取る。**`releases/latest` は先出し版を返さないので、
-          // 印の付け方が変わっても壊れないよう、ここは一覧から拾う。
+          const res = await fetch('./tools.json');
+          if (!res.ok) throw new Error(String(res.status));
+          const data = await res.json();
+          toolCount = String(data.total);
+          put('tool-count', toolCount);
+          const host = document.getElementById('tools');
+          if (host) {
+            host.innerHTML = data.groups
+              .map(
+                (g) =>
+                  `<h3 data-t="tools.${g.key}">${window.SSHBOARD_GROUPS?.[g.key] ?? g.key}</h3>` +
+                  '<table class="tools"><tbody>' +
+                  g.tools
+                    .map((t) => `<tr><td><code>${t.name}</code></td><td>${t.line}</td></tr>`)
+                    .join('') +
+                  '</tbody></table>'
+              )
+              .join('');
+            // **束の見出しも訳す。**描いたあとに当て直す
+            apply(picker ? picker.value : 'en');
+          }
+        } catch {
+          const host = document.getElementById('tools');
+          if (host) {
+            host.innerHTML =
+              '<p class="note">The tool list could not be loaded. ' +
+              '<a href="https://github.com/meta-taro/sshboard">See the source</a>.</p>';
+          }
+        }
+
+        // --- 版と落とす先 -------------------------------------------------
+        try {
           // **`updater` は版ではなく更新の宛先**なので、数える対象から外す（D51）。
           const res = await fetch(
             'https://api.github.com/repos/meta-taro/sshboard/releases?per_page=10'
@@ -616,7 +732,7 @@ claude mcp add sshboard -- "%LOCALAPPDATA%\\sshboard\\sshboard.exe" --mcp-stdio-
           const ymd = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(
             d.getDate()
           ).padStart(2, '0')}`;
-          put('when', `Currently shipping ${rel.tag_name} (${ymd}).`);
+          put('when', `${rel.tag_name} · ${ymd}`);
 
           const find = (fn) => (rel.assets || []).find(fn);
           const wire = (linkId, sizeId, asset) => {
@@ -628,10 +744,10 @@ claude mcp add sshboard -- "%LOCALAPPDATA%\\sshboard\\sshboard.exe" --mcp-stdio-
           wire('dl-mac', 'size-mac', find((x) => x.name.endsWith('.app.tar.gz')));
           wire('dl-win', 'size-win', find((x) => x.name.endsWith('-setup.exe')));
           wire('dl-msi', 'size-msi', find((x) => x.name.endsWith('.msi')));
-        } catch (e) {
+        } catch {
           // **黙って古い物を配らない。**読めなかったことを出す
           put('ver', 'see Releases');
-          put('when', 'Could not read the release list — check the Releases page for the latest.');
+          put('when', 'Could not read the release list — check the Releases page.');
         }
       })();
     </script>

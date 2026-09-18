@@ -1,0 +1,180 @@
+{
+ "total": 35,
+ "groups": [
+  {
+   "key": "connect",
+   "tools": [
+    {
+     "name": "connect",
+     "line": "Open the SSH connection registered under this id."
+    },
+    {
+     "name": "disconnect",
+     "line": "Close one open SSH connection."
+    },
+    {
+     "name": "focus_connection",
+     "line": "Point subsequent file and command operations at one of the already-open connections."
+    },
+    {
+     "name": "session_status",
+     "line": "List every connection sshboard currently holds open, where the AI may write on each, and which one file and command operations currently go to."
+    },
+    {
+     "name": "list_connections",
+     "line": "List the connections registered in sshboard."
+    },
+    {
+     "name": "register_connection",
+     "line": "Register one connection in sshboard's local list."
+    },
+    {
+     "name": "update_connection",
+     "line": "Change name, key path, tag or colour of a connection already in sshboard's local list."
+    },
+    {
+     "name": "mark_connection",
+     "line": "Set the tag and colour mark on an existing connection."
+    }
+   ]
+  },
+  {
+   "key": "look",
+   "tools": [
+    {
+     "name": "list_directory",
+     "line": "List one directory on the connected server."
+    },
+    {
+     "name": "stat",
+     "line": "Look at one file or directory on the connected server: size, permissions (octal), last modified time and owner ids."
+    },
+    {
+     "name": "read_file",
+     "line": "Read one file from the connected server as text."
+    },
+    {
+     "name": "search",
+     "line": "Search the connected server for files by name, or for text inside files."
+    },
+    {
+     "name": "read_log",
+     "line": "Read the last lines of one log file on the connected server (tail)."
+    },
+    {
+     "name": "disk_usage",
+     "line": "Report free disk space on the connected server (df)."
+    },
+    {
+     "name": "process_list",
+     "line": "List the processes running on the connected server (ps)."
+    },
+    {
+     "name": "network_listen",
+     "line": "List the TCP ports the connected server is listening on."
+    },
+    {
+     "name": "service_status",
+     "line": "Show the status of one systemd service on the connected server."
+    },
+    {
+     "name": "runtime_versions",
+     "line": "Report the operating system of the connected server and the versions of the language runtimes it has."
+    }
+   ]
+  },
+  {
+   "key": "write",
+   "tools": [
+    {
+     "name": "make_directory",
+     "line": "Create a directory (and missing parents) on the connected server."
+    },
+    {
+     "name": "upload_file",
+     "line": "Upload one local file to the connected server."
+    },
+    {
+     "name": "write_file",
+     "line": "Write text to a file on the connected server."
+    }
+   ]
+  },
+  {
+   "key": "cmds",
+   "tools": [
+    {
+     "name": "list_readonly_commands",
+     "line": "List the commands a human has allowed sshboard to run for you, with the exact text each one runs."
+    },
+    {
+     "name": "run_readonly",
+     "line": "Run one of the commands a human listed in sshboard's allowlist, chosen by its id."
+    },
+    {
+     "name": "list_operations",
+     "line": "List the state-changing operations the human has listed in operations.toml: their ids, what each one actually runs, the description the human wrote, and the hou…"
+    },
+    {
+     "name": "run_operation",
+     "line": "Run one of the state-changing operations the human listed in operations.toml, by id."
+    }
+   ]
+  },
+  {
+   "key": "console",
+   "tools": [
+    {
+     "name": "console_open",
+     "line": "Ask the person at the screen for the interactive console on the connected server."
+    },
+    {
+     "name": "console_type",
+     "line": "Type into the console you are holding."
+    },
+    {
+     "name": "console_stop",
+     "line": "Let go of the console and close the shell."
+    },
+    {
+     "name": "read_stream",
+     "line": "Read the plain-text tail of the output sshboard is following."
+    }
+   ]
+  },
+  {
+   "key": "screen",
+   "tools": [
+    {
+     "name": "show_view",
+     "line": "Ask the person at the screen to look at one of sshboard's tabs: connections, files, console, band or diag."
+    },
+    {
+     "name": "capture_window",
+     "line": "Photograph the sshboard window and return it as a PNG, so you can see what the app actually renders — a broken layout, a menu that fell back to English, text ov…"
+    },
+    {
+     "name": "pending_status",
+     "line": "Check whether the person has answered anything you asked for: the console hold, a key passphrase, a host key to confirm, or an operation approval."
+    },
+    {
+     "name": "diagnostics",
+     "line": "Read sshboard's recent diagnostic log: which stage each attempt reached, why it stopped, and what to do next."
+    }
+   ]
+  },
+  {
+   "key": "itself",
+   "tools": [
+    {
+     "name": "about_sshboard",
+     "line": "What sshboard is, what you as an AI may and may not do through it, and what changed in each version."
+    },
+    {
+     "name": "ping",
+     "line": "Check that sshboard is reachable."
+    }
+   ]
+  }
+ ]
+}
