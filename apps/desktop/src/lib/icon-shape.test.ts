@@ -126,3 +126,26 @@ describeTabs('接続タブ', () => {
 		expectTabs(declarations).toBeUndefined();
 	});
 });
+
+describeTabs('接続の帯', () => {
+	testTabs('does not turn the bar into a flex container', () => {
+		// **芯（白）が外殻（灰）を埋めること**（2026-09-18・運用者の指摘）。
+		//
+		// > 背景のグレーとズレているでしょ
+		//
+		// `.sync` の重複をまとめたときに `.bar` を同じ並びへ巻き込み、
+		// **`.bar` まで flex 容器になりました。**すると中の `.core` が
+		// **中身の幅しか取らなくなり、右に外殻の灰色が 291px 出ました**
+		// （写真の y=90 を画素で読んで、白が x=792 で切れているのを数字で確認）。
+		//
+		// **私は文字の詰まりばかり見ていて、形が揃っていないことを見ていません
+		// でした。**測れるものだけを見ると、こうなります。
+		const rule = fileBrowser
+			.replace(/\/\*[\s\S]*?\*\//g, '')
+			.match(/\n\t\.bar \{[\s\S]*?\n\t\}/)?.[0] ?? '';
+
+		expectTabs(rule).toMatch(/flex:\s*0 0 auto/);
+		expectTabs(rule).not.toMatch(/display:\s*flex/);
+	});
+});
+
