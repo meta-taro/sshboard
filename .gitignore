@@ -57,4 +57,6 @@ apps/desktop/src-tauri/icons/ios/
 # 撮ったものだけで、**置く前に人が中身を見る**（`tools/demo/README.md`）。
 #
 # **このディレクトリ以外へは広げないこと。**広げた瞬間、本物が入る道ができる。
-!site/shots/*.png
+# 言語ごとに分かれている（`site/shots/ja/` と `site/shots/en/`）ので、
+# **1 階層ぶんでは足りません。**`*.png` では `ja/` の下に届かない。
+!site/shots/**/*.png

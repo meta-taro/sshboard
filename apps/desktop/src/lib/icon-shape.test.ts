@@ -98,16 +98,31 @@ describeTabs('接続タブ', () => {
 
 		expectTabs(rule).toMatch(/white-space:\s*nowrap/);
 	});
-});
 
 	testTabs('keeps a gap between the connection name and its tag', () => {
-		// **`Batch (demo)demo` と地続きに出ていました**（2026-09-18・運用者の指摘）。
+		// **`Batch runnerdemo` と地続きに出ていました**（2026-09-18・運用者の指摘）。
 		//
-		// 名前と札の間に隙間が無い。markup では改行で分かれていますが、
-		// **Svelte は `{#if}` の周りの空白を落とす**ので、
-		// 文字としての隙間は残りません。**並べる側で隙間を持つべき**です。
-		const rule = fileBrowser.match(/\.conn-tab button:not\(\.close\) \{[\s\S]*?\}/)?.[0] ?? '';
+		// markup では改行で分かれていますが、**Svelte は `{#if}` の周りの空白を落とす**ので、
+		// 文字としての隙間は残りません。**並べる側で持ちます。**
+		const rule = fileBrowser.match(/\.conn-tab \.tag \{[\s\S]*?\}/)?.[0] ?? '';
 
-		expectTabs(rule).toMatch(/gap:/);
+		expectTabs(rule).toMatch(/margin-left:/);
 	});
 
+	testTabs('does not put flex on the button itself', () => {
+		// **`<button>` に flex を載せない**（2026-09-18・実機で切り分けました）。
+		//
+		// 載せていたとき、**名前の箱だけが中身より狭く決まり**、`Batch ru…` と
+		// 詰められていました。**WebKit は `<button>` の中身を無名ブロックで包む**ため、
+		// 中身基準の幅が正しく出ません。**Chrome では同じ CSS で 1 件も詰まりません** ——
+		// 「規則は正しいのに、出るものが違う」という形でした。
+		//
+		// **テストでは見つけられません。**画面を撮って初めて出ます（D53）。
+		// ここで止められるのは「また載せてしまう」ことだけです。
+		const declarations = fileBrowser
+			.replace(/\/\*[\s\S]*?\*\//g, '')
+			.match(/\.conn-tab button:not\(\.close\) \{[\s\S]*?\}/)?.[0];
+
+		expectTabs(declarations).toBeUndefined();
+	});
+});

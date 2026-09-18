@@ -554,7 +554,7 @@
 								title={held.fingerprint}
 							>
 								<span class="mark-bar" aria-hidden="true"></span>
-								<span data-secret>{held.name}</span>
+								<span class="who" data-secret>{held.name}</span>
 								{#if held.tag}<span class="tag" data-secret>{held.tag}</span>{/if}
 							</button>
 							<button
@@ -981,6 +981,24 @@
 		display: inline-flex;
 		align-items: center;
 		flex: none;
+		/*
+		 * **幅を中身そのものにする**（2026-09-18）。
+		 *
+		 * `flex: none` だけでは、**アプリの中では縮みました。**
+		 * 画面は WebKit で、Chrome と flex の縮み方が違います ——
+		 * 同じ CSS ファイルを Chrome で読ませると 1 件も詰まりません。
+		 * **「規則は正しいのに、出るものが違う」**という形だったので、
+		 * 規則に頼らず**幅そのものを中身に固定**します。
+		 *
+		 * 並びは横スクロールする作りなので、はみ出して困りません。
+		 */
+		width: max-content;
+		/*
+		 * **下限も明示する。**`flex: none` も `width` も、
+		 * **アプリの中（WebKit）では効きませんでした。**
+		 * 縮められない床をここで置きます。
+		 */
+		min-width: max-content;
 		border-radius: 999px;
 		border: 1px solid var(--hairline);
 		background: var(--shell);
@@ -993,16 +1011,24 @@
 	}
 
 	/*
-	 * **名前と札の間に隙間を持つ**（2026-09-18・運用者「デザイン崩れてないですか」）。
+	 * **`<button>` に flex を載せない**（2026-09-18・実機で切り分けました）。
 	 *
-	 * `Batch (demo)demo` と地続きに出ていました。markup では改行で分かれていますが、
-	 * **Svelte は `{#if}` の周りの空白を落とす**ので、文字としての隙間は残りません。
-	 * **並べる側で持ちます** —— 文字に頼ると、札が無い接続で今度は隙間が余ります。
+	 * 載せていたとき、**名前の箱だけが中身より狭く決まり**、
+	 * `Batch ru…` と詰められていました。外側（タブ・ボタン）は十分広く、
+	 * **名前の箱だけが狭い** —— 色を付けて撮って、そう見えました。
+	 * `width: 300px` を当てると名前は全部出たので、**文字ではなく箱**でした。
+	 *
+	 * WebKit は `<button>` の中身を無名ブロックで包むため、
+	 * **中身基準の幅（`max-content`）が正しく出ません。**
+	 * Chrome で同じ CSS を読ませると 1 件も詰まりません ——
+	 * **規則は正しいのに、出るものが違う**という形でした。
+	 *
+	 * なので **flex をやめます。**隙間は余白で取り、名前は詰めません。
+	 * 長い名前は**行ごと横へ流れます**（`.conn-tabs` が横スクロールします）。
+	 * **詰めるより、流す方が読めます。**
 	 */
-	.conn-tab button:not(.close) {
-		display: inline-flex;
-		align-items: center;
-		gap: 0.3rem;
+	.conn-tab .tag {
+		margin-left: 0.3rem;
 	}
 
 	.conn-tab button {
@@ -1020,9 +1046,6 @@
 		 * 右の「AI が書けるのは」が押し出されて読めなくなります。
 		 */
 		white-space: nowrap;
-		max-width: 14rem;
-		overflow: hidden;
-		text-overflow: ellipsis;
 	}
 
 	.conn-tab .close {

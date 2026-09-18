@@ -780,6 +780,11 @@
 		gap: 0.4rem;
 		padding: 0 0.6rem 0.4rem;
 		flex-wrap: wrap;
+		/*
+		 * **札を 2 行に折らない**（英語の `Export (0)` で折れていました）。
+		 * 日本語の「書き出す (0)」では収まるので、**英語でしか出ません。**
+		 */
+		white-space: nowrap;
 	}
 	.row-line {
 		display: flex;
@@ -1166,6 +1171,8 @@
 	}
 
 	.clear-mark {
+		/* **2 行に折らない**（英語の `No mark` で折れて、色見本と重なっていました）。 */
+		white-space: nowrap;
 		align-self: flex-start;
 		margin-top: 0.3rem;
 		font-size: 0.7rem;
