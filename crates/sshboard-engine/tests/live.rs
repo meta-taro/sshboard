@@ -65,6 +65,25 @@ async fn registry(dir: &tempfile::TempDir, write_roots: &[&str]) -> PathBuf {
     path
 }
 
+/// **繋がずに済む一覧**（Issue #8 の追跡テスト用）。
+///
+/// `registry` は指紋を取るために**実際にサーバーへ繋ぎます。**
+/// 1 本も繋がないテストがそこで落ちると、**サーバーの有無を試している**ことになり、
+/// **見たいものを見ていません**（実際に CI の macOS で
+/// `Connection refused (os error 61)` で落ちました）。
+fn registry_offline(dir: &tempfile::TempDir) -> PathBuf {
+    let path = dir.path().join("connections.toml");
+    std::fs::write(
+        &path,
+        format!(
+            "version = 1\n\n[[connections]]\nid = \"local\"\nname = \"Local test server\"\n\
+             host = \"{HOST}\"\nport = {PORT}\nuser = \"{USER}\"\ntag = \"test\"\n"
+        ),
+    )
+    .expect("接続一覧を書けない");
+    path
+}
+
 /// 同じ相手を 2 つの識別子で登録する。**別々の接続として開けるか**を見るため。
 async fn registry_pair(dir: &tempfile::TempDir) -> PathBuf {
     let path = dir.path().join("connections.toml");
@@ -1436,7 +1455,7 @@ async fn being_turned_away_with_nothing_open_leaves_a_line_behind() {
     let engine = Engine::with_diagnostics(
         Band::new(),
         Arc::new(OutputStream::new()),
-        registry(&dir, &[]).await,
+        registry_offline(&dir),
         diag.clone(),
     );
 
