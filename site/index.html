@@ -208,6 +208,56 @@
         word-break: break-all;
       }
 
+      /* 画面の見取り図。**写真は出せない**（接続先が写る）ので、形だけ描く */
+      .window {
+        border: 1px solid var(--hairline-strong);
+        border-radius: var(--r-shell);
+        background: var(--surface);
+        overflow: hidden;
+        margin: 18px 0;
+        box-shadow: var(--lift-2);
+      }
+      .window .bar {
+        display: flex;
+        gap: 2px;
+        padding: 7px 8px;
+        background: var(--surface-2);
+        border-bottom: 1px solid var(--hairline);
+        flex-wrap: wrap;
+      }
+      .window .bar span {
+        font-size: 12px;
+        padding: 4px 10px;
+        border-radius: 7px;
+        color: var(--fg-muted);
+        white-space: nowrap;
+      }
+      .window .bar span.on {
+        background: var(--accent-soft);
+        color: var(--accent);
+        font-weight: 600;
+      }
+      .window .panes {
+        display: flex;
+        min-height: 128px;
+      }
+      .window .pane {
+        flex: 1;
+        padding: 12px 14px;
+        font-size: 12.5px;
+        color: var(--fg-faint);
+        line-height: 1.6;
+      }
+      .window .pane + .pane {
+        border-left: 1px solid var(--hairline);
+      }
+      .window .pane b {
+        display: block;
+        color: var(--fg-muted);
+        font-size: 12px;
+        margin-bottom: 4px;
+      }
+
       .note {
         border-left: 3px solid var(--hairline-strong);
         padding: 2px 0 2px 14px;
@@ -341,6 +391,86 @@
         connection.
       </p>
 
+      <h2>What you are looking at</h2>
+
+      <p>
+        One window, five tabs. There are no screenshots on this page — every useful screenshot of
+        this product has somebody's hostname, username and paths in it — so here is the shape of it
+        instead.
+      </p>
+
+      <div class="window">
+        <div class="bar">
+          <span class="on">Connections</span><span>Files</span><span>Console</span
+          ><span>Activity</span><span>Log</span>
+        </div>
+        <div class="panes">
+          <div class="pane">
+            <b>Left</b>
+            The servers you registered. One row each. Open one and it becomes a tab along the top of
+            the working area.
+          </div>
+          <div class="pane">
+            <b>Right</b>
+            Whatever that tab is for — a directory listing, a live terminal, or one of the two
+            record views below.
+          </div>
+        </div>
+      </div>
+
+      <table>
+        <tr>
+          <th>Tab</th>
+          <th>What it holds</th>
+        </tr>
+        <tr>
+          <td><b>Connections</b></td>
+          <td>
+            The servers you registered, and the button that opens one. Credentials live in the OS
+            credential store and ssh-agent, never here.
+          </td>
+        </tr>
+        <tr>
+          <td><b>Files</b></td>
+          <td>
+            Two panes: the server on one side, your machine on the other. Upload, download, make a
+            directory. The agent is fenced to directories you listed; you are not.
+          </td>
+        </tr>
+        <tr>
+          <td><b>Console</b></td>
+          <td>
+            A real terminal on the same SSH connection — <b>shared with the agent.</b> While the
+            agent holds it your input is locked out and a Stop button is showing. It never opens a
+            second session you can't see.
+          </td>
+        </tr>
+        <tr>
+          <td><b>Activity</b></td>
+          <td>
+            <b>Who did what.</b> One line per operation, tagged <code>[Human]</code> or
+            <code>[AI]</code>, in the order it happened. This is the tab you read to answer "what
+            has the agent been doing?"
+          </td>
+        </tr>
+        <tr>
+          <td><b>Log</b></td>
+          <td>
+            <b>Why something failed.</b> Connection stages, errors, and what to do about them. This
+            is the tab you read when something did not work — and the one to copy from when you file
+            an issue.
+          </td>
+        </tr>
+      </table>
+
+      <div class="note">
+        <b>Activity and Log are not the same thing,</b> and the names do not make that obvious
+        enough yet. <b>Activity is a record of actions</b> — it answers <i>who did what</i>.
+        <b>Log is a record of diagnosis</b> — it answers <i>why it failed</i>. If you are trying to
+        find out what the agent ran, you want Activity. If you are trying to find out why a
+        connection would not open, you want Log.
+      </div>
+
       <h2>Where it actually is right now</h2>
 
       <p>
@@ -375,11 +505,6 @@
           </td>
         </tr>
       </table>
-
-      <p class="note">
-        There are no screenshots on this page, and that is deliberate: every useful screenshot of
-        this product has somebody's hostname, username and paths in it.
-      </p>
 
       <h2>The fence</h2>
 
