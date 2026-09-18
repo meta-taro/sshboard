@@ -66,7 +66,7 @@ impl SshboardMcp {
 
     /// 開いている接続を閉じる。**省略するといまの宛先。**
     #[tool(
-        description = "Close one open SSH connection. Omit connectionId to close the one operations currently go to."
+        description = "Close one open SSH connection. Omit connection_id to close the one operations currently go to."
     )]
     pub async fn disconnect(
         &self,

@@ -114,3 +114,41 @@ fn no_server_of_anyone_leaks_into_it() {
         );
     }
 }
+
+/// **説明に書いた引数名が、実物と同じであること**（2026-09-18 に実機で踏んだ）。
+///
+/// `disconnect` の説明は `connectionId` と書いていたが、実物は `connection_id`。
+/// **AI は説明どおりに書いて弾かれる** —— 実際にこう返ってきた。
+///
+/// ```text
+/// failed to deserialize parameters: missing field `connection_id`
+/// ```
+///
+/// 説明は AI への唯一の案内なので、**そこが違うと 1 回目は必ず失敗します。**
+/// 引数名は `rmcp` が snake_case のまま出すため、**説明も snake_case で書くこと。**
+#[test]
+fn what_the_description_calls_an_argument_is_what_the_argument_is_called() {
+    let sources = [
+        include_str!("../src/ssh_tools.rs"),
+        include_str!("../src/server.rs"),
+    ];
+
+    for body in sources {
+        for line in body.lines() {
+            let trimmed = line.trim();
+            if !trimmed.contains("description") && !trimmed.starts_with("//") {
+                continue;
+            }
+            // **camelCase で書かれた引数らしき語**を拾う。
+            // `connectionId` `maxEdge` `connection_id` の 3 種が実際に出る。
+            for camel in ["connectionId", "maxEdge", "keyPath", "writeRoots"] {
+                assert!(
+                    !trimmed.contains(camel),
+                    "**説明が引数名を camelCase で書いています**: {camel}\n\
+                     実物は snake_case です。AI は説明どおりに書いて弾かれます。\n\
+                     行: {trimmed}"
+                );
+            }
+        }
+    }
+}
