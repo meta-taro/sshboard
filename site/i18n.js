@@ -48,16 +48,12 @@ window.SSHBOARD_I18N = {
       'Запустите <code>-setup.exe</code>. Нужен <b>WebView2</b>; в Windows 11 и свежих 10 он уже есть, иначе установщик его скачает — то есть <b>для первой установки нужна сеть.</b>',
     'h.ui': 'Что вы видите',
     'ui.intro':
-      'Одно окно, пять вкладок. <b>Снимков экрана на этой странице пока нет.</b> На любом полезном снимке этого продукта видно чьё-то имя хоста, имя пользователя и пути — поэтому те, что здесь появятся, будут <b>сняты на вымышленной конфигурации.</b> А пока — вот его форма.',
+      'Одно окно, пять вкладок. Эти снимки сделаны на <b>вымышленной конфигурации</b> — иначе на любом снимке этого продукта было бы видно чьё-то имя хоста, имя пользователя и пути. Трёх серверов ниже не существует: они указывают на одноразовый контейнер на той машине, где снимали.',
     'tab.connections': 'Соединения',
     'tab.files': 'Файлы',
     'tab.console': 'Консоль',
     'tab.band': 'Действия',
     'tab.diag': 'Журнал',
-    'ui.left.title': 'Слева',
-    'ui.left': 'Серверы, которые вы добавили, по строке на каждый. Открытый становится вкладкой наверху рабочей области.',
-    'ui.right.title': 'Справа',
-    'ui.right': 'То, для чего эта вкладка — список каталога, живой терминал или одна из двух записей ниже.',
     'ui.th.tab': 'Вкладка',
     'ui.th.what': 'Что в ней',
     'ui.t.connections':
@@ -103,7 +99,7 @@ window.SSHBOARD_I18N = {
     'state.working.list':
       'Одна общая SSH-сессия (интерфейс + агент)<br />35 инструментов MCP<br />Команды только на чтение из списка разрешений<br />Подтверждаемые операции, меняющие состояние<br /><code>sudo</code> с паролем, который нигде не хранится<br />Общий терминал с кнопкой остановки<br />Автообновление',
     'state.notyet.list':
-      'Проход по дизайну интерфейса<br />Снимки экрана на этой странице<br />Подпись кода<br />ssh-agent в Windows (именованный канал / Pageant) — не проверено<br />Сборки для macOS Intel / Linux<br />Тесты, которые отрисовывают сам экран',
+      'Проход по дизайну интерфейса<br />Подпись кода<br />ssh-agent в Windows (именованный канал / Pageant) — не проверено<br />Сборки для macOS Intel / Linux<br />Тесты, которые отрисовывают сам экран',
     'h.fence': 'Ограда',
     'fence.intro':
       '<b>Это ограничения в коде, а не пожелания в промпте.</b> Они действуют независимо от того, сотрудничает модель или нет.',
@@ -161,16 +157,12 @@ window.SSHBOARD_I18N = {
       "Esegui il <code>-setup.exe</code>. Windows ha bisogno di <b>WebView2</b>; Windows 11 e i 10 recenti ce l'hanno già, altrimenti lo scarica il programma di installazione — quindi <b>la prima installazione richiede una connessione.</b>",
     'h.ui': 'Che cosa stai guardando',
     'ui.intro':
-      "Una finestra, cinque schede. <b>Su questa pagina non ci sono ancora schermate.</b> Ogni schermata utile di questo prodotto contiene nome host, nome utente e percorsi di qualcuno — quelle che finiranno qui saranno quindi <b>scattate su una configurazione inventata.</b> Nel frattempo, ecco la sua forma.",
+      'Una finestra, cinque schede. Queste immagini sono state scattate su una <b>configurazione inventata</b> — altrimenti ogni schermata di questo prodotto porterebbe il nome host, il nome utente e i percorsi di qualcuno. I tre server qui sotto non esistono: puntano a un contenitore usa e getta sulla macchina che ha scattato le immagini.',
     'tab.connections': 'Connessioni',
     'tab.files': 'File',
     'tab.console': 'Console',
     'tab.band': 'Attività',
     'tab.diag': 'Registro',
-    'ui.left.title': 'A sinistra',
-    'ui.left': "I server che hai registrato, uno per riga. Aprendone uno diventa una scheda in cima all'area di lavoro.",
-    'ui.right.title': 'A destra',
-    'ui.right': "Ciò a cui serve quella scheda: un elenco di directory, un terminale vivo, o una delle due registrazioni qui sotto.",
     'ui.th.tab': 'Scheda',
     'ui.th.what': 'Che cosa contiene',
     'ui.t.connections':
@@ -216,7 +208,7 @@ window.SSHBOARD_I18N = {
     'state.working.list':
       "Una sessione SSH condivisa (interfaccia + agente)<br />35 strumenti MCP<br />Comandi in sola lettura da un elenco di permessi<br />Operazioni che cambiano lo stato, approvate<br /><code>sudo</code> con una password che nessuno memorizza<br />Terminale condiviso con pulsante di arresto<br />Aggiornamento automatico",
     'state.notyet.list':
-      "Una passata di design sull'interfaccia<br />Schermate su questa pagina<br />Firma del codice<br />ssh-agent su Windows (named pipe / Pageant) — non verificato<br />Build per macOS Intel / Linux<br />Test che disegnino lo schermo stesso",
+      "Una passata di design sull'interfaccia<br />Firma del codice<br />ssh-agent su Windows (named pipe / Pageant) — non verificato<br />Build per macOS Intel / Linux<br />Test che disegnino lo schermo stesso",
     'h.fence': 'Il recinto',
     'fence.intro':
       "<b>Sono vincoli nel codice, non consigli in un prompt.</b> Valgono che il modello collabori o no.",
@@ -273,16 +265,12 @@ window.SSHBOARD_I18N = {
       'Execute o <code>-setup.exe</code>. O Windows precisa do <b>WebView2</b>; o Windows 11 e os 10 recentes já têm, e se não tiver o instalador busca — então <b>a primeira instalação precisa de conexão.</b>',
     'h.ui': 'O que você está vendo',
     'ui.intro':
-      'Uma janela, cinco abas. <b>Ainda não há capturas de tela nesta página.</b> Qualquer captura útil deste produto tem o nome de host, o usuário e os caminhos de alguém — por isso as que vierem para cá serão <b>tiradas sobre uma configuração fictícia.</b> Até lá, este é o formato dele.',
+      'Uma janela, cinco abas. Estas capturas foram feitas sobre uma <b>configuração fictícia</b> — caso contrário, qualquer captura deste produto traria o nome de host, o usuário e os caminhos de alguém. Os três servidores abaixo não existem: apontam para um contêiner descartável na máquina que tirou as imagens.',
     'tab.connections': 'Conexões',
     'tab.files': 'Arquivos',
     'tab.console': 'Console',
     'tab.band': 'Atividade',
     'tab.diag': 'Log',
-    'ui.left.title': 'Esquerda',
-    'ui.left': 'Os servidores que você cadastrou, um por linha. Ao abrir um, ele vira uma aba no topo da área de trabalho.',
-    'ui.right.title': 'Direita',
-    'ui.right': 'Aquilo para que a aba serve — uma listagem de diretório, um terminal vivo, ou um dos dois registros abaixo.',
     'ui.th.tab': 'Aba',
     'ui.th.what': 'O que ela guarda',
     'ui.t.connections':
@@ -328,7 +316,7 @@ window.SSHBOARD_I18N = {
     'state.working.list':
       'Uma sessão SSH compartilhada (interface + agente)<br />35 ferramentas MCP<br />Comandos somente leitura a partir de uma lista de permissões<br />Operações de mudança de estado aprovadas<br /><code>sudo</code> com uma senha que ninguém armazena<br />Terminal compartilhado com botão de parar<br />Atualização automática',
     'state.notyet.list':
-      'Uma rodada de design na interface<br />Capturas de tela nesta página<br />Assinatura de código<br />ssh-agent no Windows (named pipe / Pageant) — não verificado<br />Builds para macOS Intel / Linux<br />Testes que renderizem a própria tela',
+      'Uma rodada de design na interface<br />Assinatura de código<br />ssh-agent no Windows (named pipe / Pageant) — não verificado<br />Builds para macOS Intel / Linux<br />Testes que renderizem a própria tela',
     'h.fence': 'A cerca',
     'fence.intro':
       '<b>São restrições no código, não conselhos num prompt.</b> Elas valem quer o modelo coopere, quer não.',
@@ -385,16 +373,12 @@ window.SSHBOARD_I18N = {
       'Ejecuta el <code>-setup.exe</code>. Windows necesita <b>WebView2</b>; Windows 11 y los 10 recientes ya lo traen, y si no el instalador lo descarga — así que <b>la primera instalación necesita conexión a la red.</b>',
     'h.ui': 'Qué estás viendo',
     'ui.intro':
-      'Una ventana, cinco pestañas. <b>Todavía no hay capturas de pantalla en esta página.</b> Cualquier captura útil de este producto lleva el nombre de host, el usuario y las rutas de alguien — por eso las que vayan aquí se <b>tomarán sobre una configuración ficticia.</b> Mientras tanto, esta es su forma.',
+      'Una ventana, cinco pestañas. Estas capturas se tomaron sobre una <b>configuración ficticia</b> — de lo contrario, cualquier captura de este producto llevaría el nombre de host, el usuario y las rutas de alguien. Los tres servidores de abajo no existen: apuntan a un contenedor desechable en la máquina que tomó las imágenes.',
     'tab.connections': 'Conexiones',
     'tab.files': 'Archivos',
     'tab.console': 'Consola',
     'tab.band': 'Actividad',
     'tab.diag': 'Registro',
-    'ui.left.title': 'Izquierda',
-    'ui.left': 'Los servidores que has registrado, uno por fila. Al abrir uno se convierte en una pestaña arriba del área de trabajo.',
-    'ui.right.title': 'Derecha',
-    'ui.right': 'Aquello para lo que sirve esa pestaña: un listado de directorio, una terminal viva, o uno de los dos registros de abajo.',
     'ui.th.tab': 'Pestaña',
     'ui.th.what': 'Qué contiene',
     'ui.t.connections':
@@ -440,7 +424,7 @@ window.SSHBOARD_I18N = {
     'state.working.list':
       'Una sesión SSH compartida (interfaz + agente)<br />35 herramientas MCP<br />Comandos de solo lectura desde una lista de permitidos<br />Operaciones de cambio de estado aprobadas<br /><code>sudo</code> con una contraseña que nadie almacena<br />Terminal compartida con botón de parada<br />Actualización automática',
     'state.notyet.list':
-      'Una pasada de diseño sobre la interfaz<br />Capturas de pantalla en esta página<br />Firma de código<br />ssh-agent en Windows (named pipe / Pageant) — sin verificar<br />Compilaciones para macOS Intel / Linux<br />Pruebas que rendericen la pantalla misma',
+      'Una pasada de diseño sobre la interfaz<br />Firma de código<br />ssh-agent en Windows (named pipe / Pageant) — sin verificar<br />Compilaciones para macOS Intel / Linux<br />Pruebas que rendericen la pantalla misma',
     'h.fence': 'La valla',
     'fence.intro':
       '<b>Son restricciones en el código, no consejos en un prompt.</b> Se sostienen coopere o no el modelo.',
@@ -497,16 +481,12 @@ window.SSHBOARD_I18N = {
       "Lancez le <code>-setup.exe</code>. Windows a besoin de <b>WebView2</b> ; Windows 11 et les 10 récents l'ont déjà, sinon l'installateur va le chercher — <b>la première installation demande donc une connexion réseau.</b>",
     'h.ui': 'Ce que vous avez sous les yeux',
     'ui.intro':
-      "Une fenêtre, cinq onglets. <b>Il n'y a pas encore de captures d'écran sur cette page.</b> Toute capture utile de ce produit contient le nom d'hôte, le nom d'utilisateur et les chemins de quelqu'un — celles qui viendront ici seront donc <b>prises sur une configuration fictive.</b> En attendant, voici sa forme.",
+      'Une fenêtre, cinq onglets. Ces captures ont été prises sur une <b>configuration fictive</b> — sans cela, chaque capture de ce produit porterait le nom d\'hôte, le nom d\'utilisateur et les chemins de quelqu\'un. Les trois serveurs ci-dessous n\'existent pas : ils pointent vers un conteneur jetable sur la machine qui a pris les images.',
     'tab.connections': 'Connexions',
     'tab.files': 'Fichiers',
     'tab.console': 'Console',
     'tab.band': 'Activité',
     'tab.diag': 'Journal',
-    'ui.left.title': 'À gauche',
-    'ui.left': "Les serveurs que vous avez enregistrés, une ligne chacun. En ouvrir un en fait un onglet en haut de la zone de travail.",
-    'ui.right.title': 'À droite',
-    'ui.right': "Ce à quoi sert cet onglet — un listing de répertoire, un terminal vivant, ou l'un des deux relevés ci-dessous.",
     'ui.th.tab': 'Onglet',
     'ui.th.what': 'Ce qu’il contient',
     'ui.t.connections':
@@ -552,7 +532,7 @@ window.SSHBOARD_I18N = {
     'state.working.list':
       "Une session SSH partagée (interface + agent)<br />35 outils MCP<br />Commandes en lecture seule depuis une liste d'autorisations<br />Opérations de changement d'état approuvées<br /><code>sudo</code> avec un mot de passe que personne ne stocke<br />Terminal partagé avec un bouton d'arrêt<br />Mise à jour automatique",
     'state.notyet.list':
-      "Une passe de conception sur l'interface<br />Des captures d'écran sur cette page<br />La signature de code<br />ssh-agent sous Windows (named pipe / Pageant) — non vérifié<br />Versions macOS Intel / Linux<br />Des tests qui rendent l'écran lui-même",
+      "Une passe de conception sur l'interface<br />La signature de code<br />ssh-agent sous Windows (named pipe / Pageant) — non vérifié<br />Versions macOS Intel / Linux<br />Des tests qui rendent l'écran lui-même",
     'h.fence': 'La clôture',
     'fence.intro':
       "<b>Ce sont des contraintes dans le code, pas des conseils dans un prompt.</b> Elles tiennent, que le modèle coopère ou non.",
@@ -609,16 +589,12 @@ window.SSHBOARD_I18N = {
       'Führen Sie die <code>-setup.exe</code> aus. Windows braucht <b>WebView2</b>; Windows 11 und aktuelle 10er haben es bereits, sonst holt es der Installer — die <b>erste Installation braucht also eine Netzverbindung.</b>',
     'h.ui': 'Was Sie da sehen',
     'ui.intro':
-      'Ein Fenster, fünf Reiter. <b>Auf dieser Seite gibt es noch keine Screenshots.</b> Auf jedem brauchbaren Screenshot dieses Programms stehen der Hostname, der Benutzername und die Pfade von irgendjemandem — die hier werden deshalb <b>mit einer erfundenen Konfiguration aufgenommen.</b> Bis dahin hier die Form davon.',
+      'Ein Fenster, fünf Reiter. Diese Aufnahmen entstanden auf einer <b>erfundenen Konfiguration</b> — sonst stünden auf jedem Screenshot dieses Programms der Hostname, der Benutzername und die Pfade von irgendjemandem. Die drei Server unten gibt es nicht; sie zeigen auf einen Wegwerf-Container auf dem Rechner, der die Bilder gemacht hat.',
     'tab.connections': 'Verbindungen',
     'tab.files': 'Dateien',
     'tab.console': 'Konsole',
     'tab.band': 'Aktivität',
     'tab.diag': 'Protokoll',
-    'ui.left.title': 'Links',
-    'ui.left': 'Die Server, die Sie eingetragen haben, je eine Zeile. Geöffnet wird daraus ein Reiter oben im Arbeitsbereich.',
-    'ui.right.title': 'Rechts',
-    'ui.right': 'Wofür der Reiter da ist — eine Verzeichnisliste, ein laufendes Terminal oder eine der beiden Aufzeichnungen unten.',
     'ui.th.tab': 'Reiter',
     'ui.th.what': 'Was darin steht',
     'ui.t.connections':
@@ -664,7 +640,7 @@ window.SSHBOARD_I18N = {
     'state.working.list':
       'Eine geteilte SSH-Sitzung (Oberfläche + Agent)<br />35 MCP-Werkzeuge<br />Nur-Lesen-Befehle aus einer Positivliste<br />Freigegebene zustandsändernde Vorgänge<br /><code>sudo</code> mit einem Passwort, das niemand speichert<br />Geteiltes Terminal mit Stopp-Knopf<br />Automatisches Update',
     'state.notyet.list':
-      'Ein Gestaltungsdurchgang für die Oberfläche<br />Screenshots auf dieser Seite<br />Code-Signierung<br />ssh-agent unter Windows (Named Pipe / Pageant) — ungeprüft<br />Intel-macOS- / Linux-Builds<br />Tests, die den Bildschirm selbst rendern',
+      'Ein Gestaltungsdurchgang für die Oberfläche<br />Code-Signierung<br />ssh-agent unter Windows (Named Pipe / Pageant) — ungeprüft<br />Intel-macOS- / Linux-Builds<br />Tests, die den Bildschirm selbst rendern',
     'h.fence': 'Der Zaun',
     'fence.intro':
       '<b>Das sind Beschränkungen im Code, keine Bitten in einem Prompt.</b> Sie gelten, ob das Modell mitspielt oder nicht.',
@@ -721,16 +697,12 @@ window.SSHBOARD_I18N = {
       '執行 <code>-setup.exe</code>。需要 <b>WebView2</b>；Windows 11 與較新的 10 已內建，沒有的話安裝程式會去取 —— 所以<b>第一次安裝需要連網。</b>',
     'h.ui': '你看到的是什麼',
     'ui.intro':
-      '一個視窗，五個分頁。<b>這個頁面上還沒有螢幕截圖。</b>因為這個產品的畫面裡一定會拍到某個人的主機名稱、使用者名稱與路徑，所以放上來的截圖會<b>在虛構的設定上拍。</b>在那之前，先把形狀放在這裡。',
+      '一個視窗，五個分頁。這些截圖是<b>在虛構的設定上</b>拍的 —— 否則這個產品的畫面裡一定會拍到某個人的主機名稱、使用者名稱與路徑。下面這三台伺服器並不存在，它們指向拍攝這台機器上的一個一次性容器。',
     'tab.connections': '連線',
     'tab.files': '檔案',
     'tab.console': '終端機',
     'tab.band': '操作紀錄',
     'tab.diag': '日誌',
-    'ui.left.title': '左側',
-    'ui.left': '你註冊的伺服器，一列一個。打開後會成為工作區上方的一個分頁。',
-    'ui.right.title': '右側',
-    'ui.right': '那個分頁的內容 —— 目錄清單、正在執行的終端機，或下面兩種紀錄之一。',
     'ui.th.tab': '分頁',
     'ui.th.what': '裡面有什麼',
     'ui.t.connections':
@@ -776,7 +748,7 @@ window.SSHBOARD_I18N = {
     'state.working.list':
       '共用的一條 SSH 工作階段（介面 + 代理程式）<br />35 個 MCP 工具<br />來自允許清單的唯讀命令<br />經人核准的狀態變更操作<br />沒有任何地方保存的 <code>sudo</code> 密碼<br />附停止按鈕的共用終端機<br />自動更新',
     'state.notyet.list':
-      '介面的設計打磨<br />這個頁面上的螢幕截圖<br />程式碼簽章<br />Windows 上的 ssh-agent（具名管道 / Pageant）—— 未驗證<br />Intel macOS / Linux 版本<br />真正繪製介面來驗證的測試',
+      '介面的設計打磨<br />程式碼簽章<br />Windows 上的 ssh-agent（具名管道 / Pageant）—— 未驗證<br />Intel macOS / Linux 版本<br />真正繪製介面來驗證的測試',
     'h.fence': '圍籬',
     'fence.intro':
       '<b>這些是程式碼層面的約束，不是提示詞裡的請求。</b>無論模型配不配合，它們都成立。',
@@ -833,16 +805,12 @@ window.SSHBOARD_I18N = {
       '运行 <code>-setup.exe</code>。需要 <b>WebView2</b>；Windows 11 和较新的 10 已经自带，没有的话安装程序会去取 —— 所以<b>第一次安装需要联网。</b>',
     'h.ui': '你看到的是什么',
     'ui.intro':
-      '一个窗口，五个标签页。<b>这个页面上还没有截图。</b>因为这个产品的画面里一定会拍到某个人的主机名、用户名和路径，所以放上来的截图会<b>在虚构的配置上拍。</b>在那之前，先把形状放在这里。',
+      '一个窗口，五个标签页。这些截图是<b>在虚构的配置上</b>拍的 —— 否则这个产品的画面里一定会拍到某个人的主机名、用户名和路径。下面这三台服务器并不存在，它们指向拍摄这台机器上的一个一次性容器。',
     'tab.connections': '连接',
     'tab.files': '文件',
     'tab.console': '终端',
     'tab.band': '操作记录',
     'tab.diag': '日志',
-    'ui.left.title': '左侧',
-    'ui.left': '你注册的服务器，一行一个。打开后会变成工作区顶部的一个标签页。',
-    'ui.right.title': '右侧',
-    'ui.right': '那个标签页的内容 —— 目录列表、正在运行的终端，或者下面两种记录之一。',
     'ui.th.tab': '标签页',
     'ui.th.what': '里面是什么',
     'ui.t.connections':
@@ -888,7 +856,7 @@ window.SSHBOARD_I18N = {
     'state.working.list':
       '共用的一条 SSH 会话（界面 + 代理）<br />35 个 MCP 工具<br />来自白名单的只读命令<br />经人批准的状态变更操作<br />没有任何地方保存的 <code>sudo</code> 密码<br />带停止按钮的共用终端<br />自动更新',
     'state.notyet.list':
-      '界面的设计打磨<br />这个页面上的截图<br />代码签名<br />Windows 上的 ssh-agent（命名管道 / Pageant）—— 未验证<br />Intel macOS / Linux 版本<br />真正渲染界面来验证的测试',
+      '界面的设计打磨<br />代码签名<br />Windows 上的 ssh-agent（命名管道 / Pageant）—— 未验证<br />Intel macOS / Linux 版本<br />真正渲染界面来验证的测试',
     'h.fence': '围栏',
     'fence.intro':
       '<b>这些是代码层面的约束，不是提示词里的请求。</b>无论模型配不配合，它们都成立。',
@@ -945,16 +913,12 @@ window.SSHBOARD_I18N = {
       '<code>-setup.exe</code>를 실행합니다. <b>WebView2</b>가 필요합니다. Windows 11과 최근 10에는 들어 있고, 없으면 설치 프로그램이 받아오므로 <b>첫 설치에는 인터넷 연결이 필요합니다.</b>',
     'h.ui': '화면에 보이는 것',
     'ui.intro':
-      '창 하나, 탭 다섯 개입니다. <b>이 페이지에는 아직 화면 사진이 없습니다.</b> 이 제품의 화면에는 반드시 누군가의 호스트명·사용자명·경로가 찍히기 때문이며, 여기에 올릴 것은 <b>가상의 설정 위에서 찍습니다.</b> 그때까지는 형태만 둡니다.',
+      '창 하나, 탭 다섯 개입니다. 이 사진들은 <b>가상의 설정 위에서</b> 찍었습니다 —— 그렇게 하지 않으면 이 제품의 화면에는 반드시 누군가의 호스트명·사용자명·경로가 찍힙니다. 아래의 서버 세 대는 존재하지 않으며, 촬영한 기계 안의 일회용 컨테이너를 가리킵니다.',
     'tab.connections': '연결',
     'tab.files': '파일',
     'tab.console': '터미널',
     'tab.band': '작업 기록',
     'tab.diag': '로그',
-    'ui.left.title': '왼쪽',
-    'ui.left': '등록한 서버가 한 줄씩. 열면 작업 영역 위쪽에 탭으로 늘어섭니다.',
-    'ui.right.title': '오른쪽',
-    'ui.right': '그 탭의 내용 —— 디렉터리 목록, 살아 있는 터미널, 또는 아래 두 가지 기록.',
     'ui.th.tab': '탭',
     'ui.th.what': '무엇이 있는가',
     'ui.t.connections':
@@ -1000,7 +964,7 @@ window.SSHBOARD_I18N = {
     'state.working.list':
       '함께 쓰는 SSH 세션 하나 (GUI + 에이전트)<br />MCP 도구 35개<br />허용 목록 기반 읽기 명령<br />승인을 거친 상태 변경 작업<br />아무도 저장하지 않는 <code>sudo</code> 비밀번호<br />멈춤 버튼이 있는 공유 터미널<br />자동 업데이트',
     'state.notyet.list':
-      '화면 디자인 작업<br />이 페이지의 화면 사진<br />코드 서명<br />Windows의 ssh-agent (명명된 파이프 / Pageant) —— 미확인<br />Intel macOS / Linux 빌드<br />화면 자체를 그려서 확인하는 테스트',
+      '화면 디자인 작업<br />코드 서명<br />Windows의 ssh-agent (명명된 파이프 / Pageant) —— 미확인<br />Intel macOS / Linux 빌드<br />화면 자체를 그려서 확인하는 테스트',
     'h.fence': '울타리',
     'fence.intro':
       '<b>이것은 프롬프트 안의 부탁이 아니라 코드 쪽의 제약입니다.</b> 모델이 협조하든 안 하든 그대로 작동합니다.',
@@ -1061,18 +1025,12 @@ window.SSHBOARD_I18N = {
 
     'h.ui': '画面に出ているもの',
     'ui.intro':
-      '窓は 1 つ、タブは 5 つです。<b>このページにはまだ画面写真がありません。</b>この製品の画面には、必ず誰かのホスト名・利用者名・パスが写るためで、ここへ置くものは<b>架空の設定の上で撮ります。</b>それまでは、形だけ置いておきます。',
+      '窓は 1 つ、タブは 5 つです。これらは<b>架空の設定の上で撮ったもの</b>です —— そうしないと、この製品の画面には必ず誰かのホスト名・利用者名・パスが写ります。下に出ている 3 台は実在しません。撮った機械の中の使い捨てコンテナを向いています。',
     'tab.connections': '接続',
     'tab.files': 'ファイル',
     'tab.console': '端末',
     'tab.band': '履歴',
     'tab.diag': '診断',
-    'ui.left.title': '左',
-    'ui.left':
-      '登録したサーバーが 1 行ずつ。開くと、作業する側の上にタブとして並びます。',
-    'ui.right.title': '右',
-    'ui.right':
-      'そのタブのもの —— ディレクトリの一覧、動いている端末、または下の 2 つの記録。',
     'ui.th.tab': 'タブ',
     'ui.th.what': '何が在るか',
     'ui.t.connections':
@@ -1121,7 +1079,7 @@ window.SSHBOARD_I18N = {
     'state.working.list':
       '分け合う 1 本の SSH（画面と AI）<br />MCP 35 本<br />許可リストからの読み取りコマンド<br />承認つきの状態変更<br />誰も保存しない <code>sudo</code> のパスワード<br />［止める］付きの分け合う端末<br />自動更新',
     'state.notyet.list':
-      '画面の作り込み<br />このページの画面写真<br />コード署名<br />Windows の ssh-agent（名前付きパイプ / Pageant）—— 未確認<br />Intel の macOS / Linux 版<br />画面そのものを描いて確かめるテスト',
+      '画面の作り込み<br />コード署名<br />Windows の ssh-agent（名前付きパイプ / Pageant）—— 未確認<br />Intel の macOS / Linux 版<br />画面そのものを描いて確かめるテスト',
 
     'h.fence': '囲い',
     'fence.intro':

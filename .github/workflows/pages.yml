@@ -73,6 +73,22 @@ jobs:
           test -f site/tools.json
           grep -q '<title>' site/index.html
 
+          # **写真が 2 組そろっていること**（日本語と英語）。
+          #
+          # 参照だけ足して実物を忘れると、**ページは出るのに絵だけ出ません**
+          # —— しかも CI は緑のままです（baseline §23）。
+          # 撮り直すのは `sh tools/qa-shots.sh`（D53）。
+          for lang in ja en; do
+            for view in connections files console band diag; do
+              test -f "site/shots/${lang}/${view}.png" || {
+                echo "::error::site/shots/${lang}/${view}.png がありません。" \
+                     "sh tools/qa-shots.sh で撮り直してください"
+                exit 1
+              }
+            done
+          done
+          echo "写真 2 組 × 5 枚 —— そろっています"
+
       # **訳を検める。**人の目だけでは漏れる ——
       # 実際に、キリル文字の `р` が `prompt` に紛れ込んでいたのをここで拾った。
       - name: 訳が揃っているか

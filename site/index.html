@@ -208,83 +208,31 @@
         word-break: break-all;
       }
 
-      /* 画面の見取り図。**写真は出せない**（接続先が写る）ので、形だけ描く */
-      .window {
-        border: 1px solid var(--hairline-strong);
+      /*
+       * 画面写真。**架空の設定の上で撮ったもの**（D26 / 禁止事項 4）。
+       *
+       * **`loading="lazy"` は付けません。**実際の閲覧者には効くはずですが、
+       * **こちらで確かめられませんでした** —— 自動操作の中では発火せず、
+       * 5 枚とも読み込まれないままでした。
+       * **確かめられないものを、外へ出す 1 枚に使わない。**
+       * 5 枚で 650KB ほどです。
+       */
+      figure.shot {
+        margin: 18px 0 26px;
+      }
+      figure.shot img {
+        display: block;
+        width: 100%;
+        height: auto;
+        border: 1px solid var(--hairline);
         border-radius: var(--r-shell);
-        background: var(--surface);
-        overflow: hidden;
-        margin: 18px 0;
         box-shadow: var(--lift-2);
+        background: var(--surface);
       }
-      .window .bar {
-        display: flex;
-        gap: 2px;
-        padding: 7px 8px;
-        background: var(--surface-2);
-        border-bottom: 1px solid var(--hairline);
-        flex-wrap: wrap;
-      }
-      .window .bar span {
-        font-size: 12px;
-        padding: 4px 10px;
-        border-radius: 7px;
-        color: var(--fg-muted);
-        white-space: nowrap;
-      }
-      .window .bar span.on {
-        background: var(--accent-soft);
-        color: var(--accent);
-        font-weight: 600;
-      }
-      .window .panes {
-        display: flex;
-        min-height: 128px;
-      }
-      .window .pane {
-        flex: 1;
-        padding: 12px 14px;
+      figure.shot figcaption {
+        margin-top: 7px;
         font-size: 12.5px;
         color: var(--fg-faint);
-        line-height: 1.6;
-      }
-      .window .pane + .pane {
-        border-left: 1px solid var(--hairline);
-      }
-      .window .pane b {
-        display: block;
-        color: var(--fg-muted);
-        font-size: 12px;
-        margin-bottom: 4px;
-      }
-
-      /* 言語切替。**アプリと同じ 11 言語**（`locales.ts`） */
-      .lang {
-        display: flex;
-        justify-content: flex-end;
-        padding-top: 14px;
-      }
-      .lang select {
-        font: inherit;
-        font-size: 12.5px;
-        color: var(--fg-muted);
-        background: var(--surface);
-        border: 1px solid var(--hairline-strong);
-        border-radius: 7px;
-        padding: 4px 8px;
-      }
-
-      /* 道具の一覧。**`site/tools.json` から描く**（手で持たない） */
-      table.tools td:first-child {
-        width: 34%;
-        white-space: nowrap;
-      }
-      table.tools code {
-        font-size: 12.5px;
-      }
-      table.tools td {
-        font-size: 13.5px;
-        padding: 6px 10px;
       }
 
       .note {
@@ -421,28 +369,62 @@
       <h2 data-t="h.ui">What you are looking at</h2>
 
       <p data-t="ui.intro">
-        One window, five tabs. There are no screenshots on this page yet — every screenshot of this
-        product has somebody's hostname, username and paths in it, so the ones that go here will be
-        taken against a made-up configuration. Until then, here is the shape of it.
+        One window, five tabs. These were taken against a <b>made-up configuration</b> — every
+        screenshot of this product would otherwise carry somebody's hostname, username and paths.
+        The three servers below do not exist; they point at a throwaway container on the machine
+        that took the shots.
       </p>
 
-      <div class="window">
-        <div class="bar">
-          <span class="on" data-t="tab.connections">Connections</span
-          ><span data-t="tab.files">Files</span><span data-t="tab.console">Console</span
-          ><span data-t="tab.band">Activity</span><span data-t="tab.diag">Log</span>
-        </div>
-        <div class="panes">
-          <div class="pane">
-            <b data-t="ui.left.title">Left</b>
-            <span data-t="ui.left">The servers you registered. One row each. Open one and it becomes a tab along the top of the working area.</span>
-          </div>
-          <div class="pane">
-            <b data-t="ui.right.title">Right</b>
-            <span data-t="ui.right">Whatever that tab is for — a directory listing, a live terminal, or one of the two record views below.</span>
-          </div>
-        </div>
-      </div>
+      <figure class="shot">
+        <img
+          id="shot-connections"
+          src="./shots/en/connections.png"
+          alt="sshboard — Connections"
+          width="1100"
+          height="700"
+        />
+        <figcaption data-t="tab.connections">Connections</figcaption>
+      </figure>
+      <figure class="shot">
+        <img
+          id="shot-files"
+          src="./shots/en/files.png"
+          alt="sshboard — Files"
+          width="1100"
+          height="700"
+        />
+        <figcaption data-t="tab.files">Files</figcaption>
+      </figure>
+      <figure class="shot">
+        <img
+          id="shot-console"
+          src="./shots/en/console.png"
+          alt="sshboard — Console"
+          width="1100"
+          height="700"
+        />
+        <figcaption data-t="tab.console">Console</figcaption>
+      </figure>
+      <figure class="shot">
+        <img
+          id="shot-band"
+          src="./shots/en/band.png"
+          alt="sshboard — Activity"
+          width="1100"
+          height="700"
+        />
+        <figcaption data-t="tab.band">Activity</figcaption>
+      </figure>
+      <figure class="shot">
+        <img
+          id="shot-diag"
+          src="./shots/en/diag.png"
+          alt="sshboard — Log"
+          width="1100"
+          height="700"
+        />
+        <figcaption data-t="tab.diag">Log</figcaption>
+      </figure>
 
       <table>
         <tr>
@@ -533,7 +515,6 @@
           </td>
           <td data-t="state.notyet.list">
             A design pass on the UI<br />
-            Screenshots on this page<br />
             Code signing<br />
             ssh-agent on Windows (named pipe / Pageant) — unverified<br />
             Intel macOS / Linux builds<br />
@@ -652,6 +633,17 @@ claude mcp add sshboard -- "%LOCALAPPDATA%\\sshboard\\sshboard.exe" --mcp-stdio-
           // **訳を当てると中の span も作り直される。**数はここで入れ直す ——
           // 訳へ数を焼き込むと、道具が増えた日に**その言語だけ嘘になる。**
           put('tool-count', toolCount);
+          // **写真も言語に合わせる。**
+          //
+          // 撮ってあるのは日本語と英語の 2 組だけです。
+          // **他の 8 言語には英語の画面を出します** —— 日本語の画面より、
+          // まだ読める人が多いためで、**「撮っていない」を隠すためではありません。**
+          // （`Not yet` に、残りの言語の写真が無いことを書いてあります。）
+          const shots = code === 'ja' ? 'ja' : 'en';
+          for (const view of ['connections', 'files', 'console', 'band', 'diag']) {
+            const img = document.getElementById(`shot-${view}`);
+            if (img) img.src = `./shots/${shots}/${view}.png`;
+          }
           document.documentElement.lang = code;
           try {
             localStorage.setItem(STORED, code);
