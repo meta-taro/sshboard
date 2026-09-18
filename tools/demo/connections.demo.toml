@@ -24,7 +24,7 @@ version = 1
 
 [[connections]]
 id = "web-01"
-name = "Web (demo)"
+name = "Web server"
 host = "127.0.0.1"
 port = 2222
 user = "probe"
@@ -34,7 +34,7 @@ write_roots = ["/home/probe/app"]
 
 [[connections]]
 id = "db-01"
-name = "Database (demo)"
+name = "Database"
 host = "127.0.0.1"
 port = 2222
 user = "probe"
@@ -45,7 +45,7 @@ write_roots = []
 
 [[connections]]
 id = "batch-01"
-name = "Batch (demo)"
+name = "Batch runner"
 host = "127.0.0.1"
 port = 2222
 user = "probe"

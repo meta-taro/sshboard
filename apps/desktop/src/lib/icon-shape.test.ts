@@ -99,3 +99,15 @@ describeTabs('接続タブ', () => {
 		expectTabs(rule).toMatch(/white-space:\s*nowrap/);
 	});
 });
+
+	testTabs('keeps a gap between the connection name and its tag', () => {
+		// **`Batch (demo)demo` と地続きに出ていました**（2026-09-18・運用者の指摘）。
+		//
+		// 名前と札の間に隙間が無い。markup では改行で分かれていますが、
+		// **Svelte は `{#if}` の周りの空白を落とす**ので、
+		// 文字としての隙間は残りません。**並べる側で隙間を持つべき**です。
+		const rule = fileBrowser.match(/\.conn-tab button:not\(\.close\) \{[\s\S]*?\}/)?.[0] ?? '';
+
+		expectTabs(rule).toMatch(/gap:/);
+	});
+

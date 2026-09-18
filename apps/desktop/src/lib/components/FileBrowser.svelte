@@ -992,6 +992,19 @@
 		box-shadow: inset 0 0 0 1.5px var(--mark, var(--accent));
 	}
 
+	/*
+	 * **名前と札の間に隙間を持つ**（2026-09-18・運用者「デザイン崩れてないですか」）。
+	 *
+	 * `Batch (demo)demo` と地続きに出ていました。markup では改行で分かれていますが、
+	 * **Svelte は `{#if}` の周りの空白を落とす**ので、文字としての隙間は残りません。
+	 * **並べる側で持ちます** —— 文字に頼ると、札が無い接続で今度は隙間が余ります。
+	 */
+	.conn-tab button:not(.close) {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.3rem;
+	}
+
 	.conn-tab button {
 		border: none;
 		background: none;
@@ -1024,6 +1037,8 @@
 	.add {
 		flex: none;
 		color: var(--fg-muted);
+		/* **2 行に折らない**（英語では `Open another connection` で折れていました）。 */
+		white-space: nowrap;
 	}
 
 
@@ -1090,17 +1105,24 @@
 	 * 縮んでよいのは、中で巻き取れるファイル一覧（`.panes`）だけです。
 	 */
 	.bar,
+	/*
+	 * **1 つにまとめました**（2026-09-18）。`.sync` が 2 か所に分かれていて、
+	 * 後ろが前を上書きする形でした。**同じ選択子が離れて 2 つ在ると、
+	 * 片方だけ直して直ったつもりになります。**
+	 */
 	.sync {
 		flex: 0 0 auto;
-	}
-
-
-	.sync {
 		display: flex;
 		align-items: center;
 		gap: 0.4rem;
 		font-size: 0.75rem;
 		padding: 0 0.1rem 0.35rem;
+		/*
+		 * **札を 2 行に折らない**（英語の画面で踏みました）。
+		 * `Move both sides together` が折れて、行が押し広がっていました。
+		 * 説明（`.hint`）の方は、もともと詰めて「…」で切る作りです。
+		 */
+		white-space: nowrap;
 	}
 
 	.sync .hint {
@@ -1220,6 +1242,12 @@
 		color: var(--fg-faint);
 		font-variant-numeric: tabular-nums;
 		flex: none;
+		/*
+		 * **`18 B` を縦に折らない**（2026-09-18・英語の画面で踏みました）。
+		 * 日本語では「18 B」が入る幅でも、**英語は語が長いので押し出されて**
+		 * 数字と単位が別の行になっていました。**数字が読めない表は表ではありません。**
+		 */
+		white-space: nowrap;
 	}
 
 	/* 選んだファイル。**色だけに頼らない。**右端に印も出す。 */
