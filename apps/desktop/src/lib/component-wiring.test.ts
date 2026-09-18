@@ -52,3 +52,37 @@ describe('部品の配線', () => {
 		expect(orphans, `作ったのに、どこからも描かれていない部品: ${orphans.join(', ')}`).toEqual([]);
 	});
 });
+
+/**
+ * **宛先が決まったら、サーバー側の一覧を読むこと**（2026-09-18 に実機で踏みました）。
+ *
+ * 配布ページ用の写真を撮っていて出ました。接続を開いて［ファイル］を開くと、
+ * **サーバー側が「空です」**のまま。実際には 6 件在りました。
+ *
+ * ```text
+ * MCP  : upload, app, .ssh, .bashrc, .bash_profile, .bash_logout
+ * 画面 : 空です。
+ * ```
+ *
+ * `onMount` は `loadLocal()`（手元）を呼びますが、**`refresh()`（サーバー側）を
+ * 呼んでいませんでした。**しかもタブが 1 本だけだと押しても何も起きません
+ * （`switchTo` は `id === session.activeId` で素通りする）ので、
+ * **人は F5 か［↻］を押すまで、空だと信じることになります。**
+ *
+ * **「読んでいない」と「空」を同じ顔で出すのが、この製品で一番悪い形**です。
+ */
+describe('ファイルの面', () => {
+	const browser = components['./components/FileBrowser.svelte'];
+
+	test('finds the file browser', () => {
+		expect(browser).toBeTruthy();
+	});
+
+	test('reads the server side when the target becomes known', () => {
+		// **`session.activeId` を見て読み直す線が在ること。**
+		// 在れば、人がタブを押したときも、**AI が宛先を動かしたときも**追従します。
+		const watches = /\$effect\(\(\) => \{[\s\S]*?session\.activeId[\s\S]*?\}\)/.test(browser);
+
+		expect(watches).toBe(true);
+	});
+});

@@ -480,6 +480,28 @@
 		event.preventDefault();
 	}
 
+	/**
+	 * **宛先が決まったら、サーバー側を読む**（2026-09-18 に実機で踏みました）。
+	 *
+	 * `onMount` は手元だけ読んでいて、**サーバー側は一度も読まれませんでした。**
+	 * 接続を開いて［ファイル］を開くと「空です」と出る —— 実際には 6 件在るのに。
+	 *
+	 * しかも**タブが 1 本だけだと押しても何も起きません**
+	 * （`switchTo` は `id === session.activeId` で素通りする）ので、
+	 * **人は F5 か［↻］を押すまで、空だと信じることになります。**
+	 *
+	 * ここを `session.activeId` に繋いでおくと、
+	 * **人がタブを押したときも、AI が宛先を動かしたときも**追いつきます。
+	 */
+	let lastRead: string | null = null;
+	$effect(() => {
+		const target = session.activeId;
+		if (!target || target === lastRead) return;
+		lastRead = target;
+		remotePath = '.';
+		void refresh();
+	});
+
 	onMount(() => {
 		paneRatio = loadPaneRatio();
 		const stops: Array<() => void> = [];
