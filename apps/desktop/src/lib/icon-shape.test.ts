@@ -59,3 +59,43 @@ describe('アイコン（Issue #23 / #16）', () => {
 		expect(styles).toMatch(/flex:\s*none/);
 	});
 });
+
+/**
+ * **接続タブの名前を折り返さないこと**（2026-09-18 に実機で踏みました）。
+ *
+ * 配布ページ用の写真を撮っていて、運用者に「デザイン崩れてないですか」と
+ * 言われて気づきました。**名前が 2 行に折り返し、2 行目が切れていました。**
+ *
+ * ```text
+ * Batch      ← 1 行目
+ * (demo)     ← 2 行目が切れている
+ * ```
+ *
+ * 名前に**空白が含まれると**起きます。**実際の接続名は 1 語が多いので、
+ * いままで出ていませんでした** —— 架空の設定（`Web (demo)` など）が炙り出しました。
+ *
+ * 同じファイルの `.scope` と `.hint` には `white-space: nowrap` が在ります。
+ * **片方だけ抜けていた**という形です。
+ */
+import { describe as describeTabs, expect as expectTabs, test as testTabs } from 'vitest';
+
+const fileBrowser = Object.entries(
+	import.meta.glob('./components/FileBrowser.svelte', {
+		query: '?raw',
+		import: 'default',
+		eager: true
+	}) as Record<string, string>
+)[0]?.[1];
+
+describeTabs('接続タブ', () => {
+	testTabs('finds the file browser source', () => {
+		expectTabs(fileBrowser).toBeTruthy();
+	});
+
+	testTabs('does not let a connection name wrap onto a second line', () => {
+		// `.conn-tab button` の規則に `white-space: nowrap` が在ること。
+		const rule = fileBrowser.match(/\.conn-tab button \{[\s\S]*?\}/)?.[0] ?? '';
+
+		expectTabs(rule).toMatch(/white-space:\s*nowrap/);
+	});
+});

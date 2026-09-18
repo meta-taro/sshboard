@@ -996,6 +996,20 @@
 		border: none;
 		background: none;
 		border-radius: 999px;
+		/*
+		 * **名前を折り返さない**（2026-09-18 に実機で踏みました）。
+		 *
+		 * 名前に空白が入ると 2 行になり、**2 行目が切れて**出ていました
+		 * （`Batch` の下に `(demo)` の頭だけが覗く）。
+		 * **実際の接続名は 1 語が多いので、いままで出ていません。**
+		 *
+		 * 長い名前は**伸ばさずに詰める。**行が伸びると、
+		 * 右の「AI が書けるのは」が押し出されて読めなくなります。
+		 */
+		white-space: nowrap;
+		max-width: 14rem;
+		overflow: hidden;
+		text-overflow: ellipsis;
 	}
 
 	.conn-tab .close {
