@@ -216,6 +216,19 @@ export const ko: Catalog = {
 	'search.label': '찾기', 'search.placeholder': '터미널에서 찾기',
 	'search.next': '다음', 'search.prev': '이전', 'search.close': '닫기',
 	'search.none': '찾을 수 없습니다',
+	/* ホスト鍵の問い（Issue #26）。**見えるのに答えられない**を無くす */
+	"hostkey.title": "처음 보는 서버입니다",
+	"hostkey.title.mismatch": "등록된 키와 어긋납니다",
+	"hostkey.body": "아래 지문을 서버 쪽에서 확인한 뒤에 승인하세요. 승인하면 다음부터는 묻지 않습니다.",
+	"hostkey.mismatch": "중간에 누군가 있을 수 있습니다. 일부러 키를 바꾼 것이 아니라면 승인하지 마세요.",
+	"hostkey.connection": "연결",
+	"hostkey.algorithm": "방식",
+	"hostkey.fingerprint": "지문",
+	"hostkey.registered": "등록된 것",
+	"hostkey.how": "서버에서: ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub",
+	"hostkey.trust": "승인",
+	"hostkey.refuse": "거부",
+
 };
 
 export const zhCN: Catalog = {
@@ -431,6 +444,19 @@ export const zhCN: Catalog = {
 	'search.label': '查找', 'search.placeholder': '在终端中查找',
 	'search.next': '下一个', 'search.prev': '上一个', 'search.close': '关闭',
 	'search.none': '未找到',
+	/* ホスト鍵の問い（Issue #26）。**見えるのに答えられない**を無くす */
+	"hostkey.title": "这是第一次见到的服务器",
+	"hostkey.title.mismatch": "与已登记的密钥不一致",
+	"hostkey.body": "请先在服务器上核对下面的指纹，再决定是否信任。信任之后不会再问。",
+	"hostkey.mismatch": "中间可能有人。除非你确知密钥是有意更换的，否则不要信任。",
+	"hostkey.connection": "连接",
+	"hostkey.algorithm": "算法",
+	"hostkey.fingerprint": "指纹",
+	"hostkey.registered": "已登记的",
+	"hostkey.how": "在服务器上执行：ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub",
+	"hostkey.trust": "信任",
+	"hostkey.refuse": "拒绝",
+
 };
 
 export const zhTW: Catalog = {
@@ -646,4 +672,17 @@ export const zhTW: Catalog = {
 	'search.label': '尋找', 'search.placeholder': '在終端機中尋找',
 	'search.next': '下一個', 'search.prev': '上一個', 'search.close': '關閉',
 	'search.none': '找不到',
+	/* ホスト鍵の問い（Issue #26）。**見えるのに答えられない**を無くす */
+	"hostkey.title": "這是第一次見到的伺服器",
+	"hostkey.title.mismatch": "與已登記的金鑰不一致",
+	"hostkey.body": "請先在伺服器上核對下面的指紋，再決定是否信任。信任之後不會再問。",
+	"hostkey.mismatch": "中間可能有人。除非你確知金鑰是有意更換的，否則不要信任。",
+	"hostkey.connection": "連線",
+	"hostkey.algorithm": "演算法",
+	"hostkey.fingerprint": "指紋",
+	"hostkey.registered": "已登記的",
+	"hostkey.how": "在伺服器上執行：ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub",
+	"hostkey.trust": "信任",
+	"hostkey.refuse": "拒絕",
+
 };

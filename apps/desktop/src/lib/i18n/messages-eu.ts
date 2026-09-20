@@ -216,6 +216,19 @@ export const de: Catalog = {
 	'search.label': 'Suchen', 'search.placeholder': 'Im Terminal suchen',
 	'search.next': 'Weiter', 'search.prev': 'Zurück', 'search.close': 'Schließen',
 	'search.none': 'Nicht gefunden',
+	/* ホスト鍵の問い（Issue #26）。**見えるのに答えられない**を無くす */
+	"hostkey.title": "Dieser Server ist noch nie gesehen worden",
+	"hostkey.title.mismatch": "Der Schlüssel dieses Servers passt nicht zum hinterlegten",
+	"hostkey.body": "Prüfen Sie den Fingerabdruck unten am Server selbst, bevor Sie ihm vertrauen. Danach werden Sie nicht mehr gefragt.",
+	"hostkey.mismatch": "Möglicherweise steht jemand dazwischen. Vertrauen Sie nicht, es sei denn, der Schlüssel wurde absichtlich getauscht.",
+	"hostkey.connection": "Verbindung",
+	"hostkey.algorithm": "Verfahren",
+	"hostkey.fingerprint": "Fingerabdruck",
+	"hostkey.registered": "Hinterlegt",
+	"hostkey.how": "Auf dem Server: ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub",
+	"hostkey.trust": "Vertrauen",
+	"hostkey.refuse": "Ablehnen",
+
 };
 
 export const fr: Catalog = {
@@ -431,6 +444,19 @@ export const fr: Catalog = {
 	'search.label': 'Rechercher', 'search.placeholder': 'Rechercher dans le terminal',
 	'search.next': 'Suivant', 'search.prev': 'Précédent', 'search.close': 'Fermer',
 	'search.none': 'Introuvable',
+	/* ホスト鍵の問い（Issue #26）。**見えるのに答えられない**を無くす */
+	"hostkey.title": "Ce serveur n'a jamais été vu",
+	"hostkey.title.mismatch": "La clé de ce serveur ne correspond pas à celle enregistrée",
+	"hostkey.body": "Vérifiez l'empreinte ci-dessous sur le serveur lui-même avant de lui faire confiance. Ensuite, la question ne sera plus posée.",
+	"hostkey.mismatch": "Quelqu'un se tient peut-être au milieu. Ne faites pas confiance, sauf si la clé a été changée volontairement.",
+	"hostkey.connection": "Connexion",
+	"hostkey.algorithm": "Algorithme",
+	"hostkey.fingerprint": "Empreinte",
+	"hostkey.registered": "Enregistrée",
+	"hostkey.how": "Sur le serveur : ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub",
+	"hostkey.trust": "Faire confiance",
+	"hostkey.refuse": "Refuser",
+
 };
 
 export const es: Catalog = {
@@ -646,4 +672,17 @@ export const es: Catalog = {
 	'search.label': 'Buscar', 'search.placeholder': 'Buscar en la terminal',
 	'search.next': 'Siguiente', 'search.prev': 'Anterior', 'search.close': 'Cerrar',
 	'search.none': 'No encontrado',
+	/* ホスト鍵の問い（Issue #26）。**見えるのに答えられない**を無くす */
+	"hostkey.title": "Este servidor no se había visto antes",
+	"hostkey.title.mismatch": "La clave de este servidor no coincide con la registrada",
+	"hostkey.body": "Comprueba la huella de abajo en el propio servidor antes de confiar en él. Después no se volverá a preguntar.",
+	"hostkey.mismatch": "Puede haber alguien en medio. No confíes salvo que sepas que la clave se cambió a propósito.",
+	"hostkey.connection": "Conexión",
+	"hostkey.algorithm": "Algoritmo",
+	"hostkey.fingerprint": "Huella",
+	"hostkey.registered": "Registrada",
+	"hostkey.how": "En el servidor: ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub",
+	"hostkey.trust": "Confiar",
+	"hostkey.refuse": "Rechazar",
+
 };

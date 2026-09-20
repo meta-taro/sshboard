@@ -1527,3 +1527,85 @@ async fn after_being_closed_the_line_says_who_closed_it() {
         "**誰が切ったかが残っていない。**出ている行: {said}"
     );
 }
+
+/// **人が、聞かれたホスト鍵を承認できること**（Issue #26）。
+///
+/// 実機の報告（0.1.13 / Windows）——
+///
+/// > 赤帯に `[object Object]` とだけ表示され、［承認］［拒否］が描画されない
+/// > **アプリは人の答えを待ち続けるが、人には答える手段が無い**
+///
+/// **#24 で「ホスト鍵待ちを型で表せるようにした」とき、
+/// 実行体と MCP だけ直して、人が答える口を作っていませんでした。**
+///
+/// ```text
+/// host_key_request()      問いを見る    … 在った
+/// clear_questions_for()   問いを畳む    … 在った
+/// **承認する**            指紋を書き戻す … **無かった**
+/// ```
+///
+/// **見えるのに答えられない**のは、**見えないより悪い**です ——
+/// 人は「反応しない」と読み、同じ操作を繰り返します（実際そうなりました）。
+#[tokio::test]
+async fn a_human_can_trust_the_host_key_they_were_asked_about() {
+    if !server_is_up().await {
+        println!("テスト用サーバーが建っていません（想定内・飛ばします）");
+        return;
+    }
+    let dir = tempfile::tempdir().expect("一時ディレクトリ");
+    let key = std::path::PathBuf::from(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../tools/test-server/.key"
+    ));
+    if !key.exists() {
+        println!("使い捨ての鍵がありません（想定内・飛ばします）");
+        return;
+    }
+    // **指紋を書いていない一覧**（初めて見るホスト）。
+    let path = dir.path().join("connections.toml");
+    std::fs::write(
+        &path,
+        format!(
+            "version = 1\n\n[[connections]]\nid = \"local\"\nname = \"Local\"\n\
+             host = \"{HOST}\"\nport = {PORT}\nuser = \"{USER}\"\n\
+             key_path = \"{}\"\n",
+            key.display()
+        ),
+    )
+    .expect("接続一覧を書けない");
+
+    let engine = engine_at(path.clone());
+
+    // 1 回目は断られ、**問いが立つ。**
+    let refused = engine.connect(Actor::Human, "local", None).await;
+    assert!(
+        matches!(refused, Err(EngineError::UntrustedHost { .. })),
+        "初見のホストを通している: {refused:?}"
+    );
+    let asked = engine.host_key_request().expect("問いが立っていない");
+    assert_eq!(asked.id, "local");
+    assert!(asked.expected.is_none(), "初回なのに登録済みが在る");
+
+    // **人が承認する。**ここが無かった。
+    engine
+        .trust_host_key(Actor::Human, &asked.id)
+        .await
+        .expect("承認できない");
+
+    // **一覧へ書き戻っていること。**次から聞かれない、の根拠。
+    let saved = sshboard_connections::Connections::load_or_empty(&path).expect("読めない");
+    assert_eq!(
+        saved.get("local").and_then(|one| one.fingerprint.clone()),
+        Some(asked.fingerprint.clone()),
+        "承認したのに指紋が保存されていない"
+    );
+
+    // **問いは畳まれていること。**残ると「まだ待っている」と言い続ける。
+    assert!(engine.host_key_request().is_none(), "問いが残っている");
+
+    // 2 回目は通る。
+    engine
+        .connect(Actor::Human, "local", None)
+        .await
+        .expect("承認したのに繋がらない");
+}

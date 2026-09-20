@@ -6,6 +6,7 @@
 	import { appendLine, type BandLine } from '$lib/band';
 	import ConnectionManager from '$lib/components/ConnectionManager.svelte';
 	import ConsoleRequestDialog from '$lib/components/ConsoleRequestDialog.svelte';
+	import HostKeyDialog from '$lib/components/HostKeyDialog.svelte';
 	import OperationRequestDialog from '$lib/components/OperationRequestDialog.svelte';
 	import PassphraseDialog from '$lib/components/PassphraseDialog.svelte';
 	import ConnectPanel from '$lib/components/ConnectPanel.svelte';
@@ -155,6 +156,35 @@
 	}
 
 	let passphraseFor = $state<string | null>(null);
+	/**
+	 * **ホスト鍵の問い**（Issue #26）。
+	 *
+	 * #24 で型は作ったのに、**ここが無かった** —— `pending_status` は返るので
+	 * **AI からは待ちが見えるのに、人の画面には何も出ず**、
+	 * 赤帯が `[object Object]` になっていました。
+	 */
+	let hostKeyAsk = $state<{
+		id: string;
+		algorithm: string;
+		fingerprint: string;
+		expected: string | null;
+	} | null>(null);
+	let hostKeyBusy = $state(false);
+
+	async function answerHostKey(trust: boolean) {
+		const asked = hostKeyAsk;
+		if (!asked || hostKeyBusy) return;
+		hostKeyBusy = true;
+		try {
+			await invoke(trust ? 'host_key_trust' : 'host_key_refuse', { id: asked.id });
+			hostKeyAsk = null;
+		} catch (error: unknown) {
+			// **黙って閉じない。**閉じると、人は答えたつもりで答えていない状態になります。
+			failure = String(error);
+		} finally {
+			hostKeyBusy = false;
+		}
+	}
 	let passphraseBusy = $state(false);
 
 	async function answerPassphrase(passphrase: string) {
@@ -682,6 +712,22 @@
 			.catch(() => {
 				/* 取れなくても画面は出す */
 			});
+		// **ホスト鍵の頼み**（Issue #26）。起動直後の取りこぼしも拾う。
+		invoke<typeof hostKeyAsk>('host_key_request')
+			.then((waiting) => {
+				hostKeyAsk = waiting;
+			})
+			.catch(() => {
+				/* 取れなくても画面は出す */
+			});
+		listen<typeof hostKeyAsk>('host-key://request', (event) => {
+			hostKeyAsk = event.payload;
+		})
+			.then((stop) => stops.push(stop))
+			.catch(() => {
+				/* 購読できないだけ。**画面は出す。** */
+			});
+
 		// **AI が「こちらを見てください」と言ってきた**（D44 / Issue #15）。
 		// **奪わせません。**人が何かしている最中は、頼まれても動きません。
 		listen<string>('view://show', (event) => {
@@ -1230,6 +1276,18 @@
 			busy={passphraseBusy}
 			onSubmit={answerPassphrase}
 			onCancel={dismissPassphrase}
+		/>
+	{/if}
+
+	{#if hostKeyAsk}
+		<HostKeyDialog
+			id={hostKeyAsk.id}
+			algorithm={hostKeyAsk.algorithm}
+			fingerprint={hostKeyAsk.fingerprint}
+			expected={hostKeyAsk.expected}
+			busy={hostKeyBusy}
+			onTrust={() => answerHostKey(true)}
+			onRefuse={() => answerHostKey(false)}
 		/>
 	{/if}
 

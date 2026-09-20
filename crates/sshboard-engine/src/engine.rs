@@ -300,6 +300,80 @@ impl Engine {
         self.host_key_request.subscribe()
     }
 
+    /// **聞かれたホスト鍵を、人が承認する**（Issue #26）。
+    ///
+    /// 実機の報告（0.1.13）——
+    ///
+    /// > **アプリは人の答えを待ち続けるが、人には答える手段が無い**
+    ///
+    /// #24 で「待ちを型で表せるように」したとき、**見せる所までで止めていました。**
+    /// **見えるのに答えられないのは、見えないより悪い**です ——
+    /// 人は「反応しない」と読み、同じ操作を繰り返します。
+    ///
+    /// **指紋は、問いに入っていたものをそのまま書きます。**
+    /// ここで取り直すと、**人が見た指紋と、保存する指紋が別物になり得ます**
+    /// （その隙にすり替えられたら、承認の意味が消えます）。
+    ///
+    /// **答えられるのは人だけ**です（D47）。AI に渡すと、
+    /// **初めて見るホストを AI が自分で承認できる**ことになります。
+    pub async fn trust_host_key(&self, actor: Actor, id: &str) -> Result<(), EngineError> {
+        if actor != Actor::Human {
+            return Err(EngineError::HumanOnly);
+        }
+        let asked = self
+            .host_key_request
+            .borrow()
+            .clone()
+            .filter(|asked| asked.id == id)
+            .ok_or_else(|| EngineError::NoHostKeyAsk(id.to_owned()))?;
+
+        let mut connections = Connections::load_or_empty(&self.connections_path)
+            .map_err(|error| EngineError::Connections(error.to_string()))?;
+        let entry = connections
+            .connections
+            .iter_mut()
+            .find(|one| one.id == id)
+            .ok_or_else(|| EngineError::UnknownConnection(id.to_owned()))?;
+        entry.fingerprint = Some(asked.fingerprint.clone());
+        connections
+            .save(&self.connections_path)
+            .map_err(|error| EngineError::Connections(error.to_string()))?;
+
+        self.host_key_request.send_replace(None);
+        self.diag.info(
+            Stage::HostKey,
+            Some(id),
+            "人がホスト鍵を承認しました（指紋を登録しました）",
+        );
+        let _ = self.show(actor, &format!("trust_host_key {id}")).await;
+        Ok(())
+    }
+
+    /// **聞かれたホスト鍵を、人が断る**（Issue #26）。
+    ///
+    /// **断るのも答えのうち**です。畳まないと、AI は「まだ待っている」と言い続けます。
+    pub async fn refuse_host_key(&self, actor: Actor, id: &str) -> Result<(), EngineError> {
+        if actor != Actor::Human {
+            return Err(EngineError::HumanOnly);
+        }
+        let standing = self
+            .host_key_request
+            .borrow()
+            .as_ref()
+            .is_some_and(|asked| asked.id == id);
+        if !standing {
+            return Err(EngineError::NoHostKeyAsk(id.to_owned()));
+        }
+        self.host_key_request.send_replace(None);
+        self.diag.warn(
+            Stage::HostKey,
+            Some(id),
+            "人がホスト鍵を断りました（登録していません）",
+        );
+        let _ = self.show(actor, &format!("refuse_host_key {id}")).await;
+        Ok(())
+    }
+
     /// **この接続について立っている問いを、全部畳む**（Issue #24）。
     ///
     /// **出口の数を数えるのをやめます。**

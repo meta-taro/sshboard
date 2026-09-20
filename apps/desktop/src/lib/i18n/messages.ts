@@ -256,6 +256,18 @@ const en = {
 	'search.prev': 'Previous',
 	'search.close': 'Close',
 	'search.none': 'Not found',
+	/* ホスト鍵の問い（Issue #26）。**見えるのに答えられない**を無くす */
+	"hostkey.title": "This server has not been seen before",
+	"hostkey.title.mismatch": "This server's key does not match the one you registered",
+	"hostkey.body": "Check the fingerprint below against the server itself before you trust it. Once you trust it, you will not be asked again.",
+	"hostkey.mismatch": "Someone may be standing in the middle. Do not trust it unless you know the key was changed on purpose.",
+	"hostkey.connection": "Connection",
+	"hostkey.algorithm": "Algorithm",
+	"hostkey.fingerprint": "Fingerprint",
+	"hostkey.registered": "Registered",
+	"hostkey.how": "On the server: ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub",
+	"hostkey.trust": "Trust",
+	"hostkey.refuse": "Refuse",
 } as const;
 
 export type MessageKey = keyof typeof en;
@@ -511,6 +523,20 @@ const ja: Catalog = {
 	'search.prev': '前へ',
 	'search.close': '閉じる',
 	'search.none': '見つかりません',
+
+	/* ホスト鍵の問い（Issue #26）。**見えるのに答えられない**を無くす */
+	"hostkey.title": "初めて見るサーバーです",
+	"hostkey.title.mismatch": "登録されている鍵と食い違っています",
+	"hostkey.body": "下の指紋を、サーバー側で確かめてから承認してください。承認すると、次からは聞かれません。",
+	"hostkey.mismatch": "間に誰かが立っている恐れがあります。鍵を意図して入れ替えたのでなければ、承認しないでください。",
+	"hostkey.connection": "接続",
+	"hostkey.algorithm": "方式",
+	"hostkey.fingerprint": "指紋",
+	"hostkey.registered": "登録されているもの",
+	"hostkey.how": "サーバー側で: ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub",
+	"hostkey.trust": "承認する",
+	"hostkey.refuse": "断る",
+
 };
 
 import { ko, zhCN, zhTW } from './messages-cjk';

@@ -110,6 +110,12 @@ pub fn run() {
             session_cmd::operation_answer,
             session_cmd::passphrase_request,
             session_cmd::passphrase_dismiss,
+            // **ホスト鍵の問いに、人が答える口**（Issue #26）。
+            // 無いまま出していたので、**AI からは待ちが見えるのに
+            // 人の画面から答えられない**状態でした。
+            session_cmd::host_key_request,
+            session_cmd::host_key_trust,
+            session_cmd::host_key_refuse,
             session_cmd::console_answer,
             session_cmd::diagnostics_recent,
             menu::set_menu_labels
@@ -171,6 +177,7 @@ pub fn run() {
             session_cmd::spawn_console_request_bridge(app.handle().clone(), Arc::clone(&engine));
             // **出せない画面を案内しない**（Issue #13）。
             session_cmd::spawn_passphrase_bridge(app.handle().clone(), Arc::clone(&engine));
+            session_cmd::spawn_host_key_bridge(app.handle().clone(), Arc::clone(&engine));
             // **走らせてよいかを人へ問う**（D45 / D47）。
             session_cmd::spawn_operation_bridge(app.handle().clone(), Arc::clone(&engine));
 

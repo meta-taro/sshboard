@@ -672,6 +672,55 @@ pub async fn passphrase_dismiss(engine: State<'_, Arc<Engine>>) -> Result<(), St
     Ok(())
 }
 
+// --- ホスト鍵の問い（Issue #26） ------------------------------------------
+
+/// **どの接続がホスト鍵の確認待ちか**を画面へ配るイベント。
+pub const HOST_KEY_REQUEST_EVENT: &str = "host-key://request";
+
+/// 頼みの変化を画面へ押し出す。
+///
+/// **#24 で型は作ったのに、ここが無かった**（Issue #26）。
+/// `pending_status` は `waitingForHostKey` を返すので **AI からは見えるのに、
+/// 人の画面には何も出ず**、赤帯が `[object Object]` になっていました。
+/// **見えるのに答えられないのは、見えないより悪い**です。
+pub fn spawn_host_key_bridge(app: AppHandle, engine: Arc<Engine>) {
+    tauri::async_runtime::spawn(async move {
+        let mut watching = engine.subscribe_host_key_request();
+        while watching.changed().await.is_ok() {
+            let waiting = watching.borrow().clone();
+            if let Err(error) = app.emit(HOST_KEY_REQUEST_EVENT, waiting) {
+                eprintln!("[sshboard] ホスト鍵の頼みを画面へ渡せません: {error}");
+            }
+        }
+    });
+}
+
+/// いまホスト鍵待ちの接続。**起動直後の取りこぼし対策。**
+#[tauri::command]
+pub async fn host_key_request(
+    engine: State<'_, Arc<Engine>>,
+) -> Result<Option<sshboard_engine::HostKeyAsk>, String> {
+    Ok(engine.host_key_request())
+}
+
+/// 人が承認した。**指紋を登録し、次から聞かれないようにする。**
+#[tauri::command]
+pub async fn host_key_trust(id: String, engine: State<'_, Arc<Engine>>) -> Result<(), String> {
+    engine
+        .trust_host_key(Actor::Human, &id)
+        .await
+        .map_err(|error| error.to_string())
+}
+
+/// 人が断った。**断るのも答えのうち。**畳まないと「まだ待っている」と言い続けます。
+#[tauri::command]
+pub async fn host_key_refuse(id: String, engine: State<'_, Arc<Engine>>) -> Result<(), String> {
+    engine
+        .refuse_host_key(Actor::Human, &id)
+        .await
+        .map_err(|error| error.to_string())
+}
+
 /// 端末を開いて握る。**人の操作。**
 #[tauri::command]
 pub async fn console_open(

@@ -216,6 +216,19 @@ export const ptBR: Catalog = {
 	'search.label': 'Procurar', 'search.placeholder': 'Procurar no terminal',
 	'search.next': 'Próximo', 'search.prev': 'Anterior', 'search.close': 'Fechar',
 	'search.none': 'Não encontrado',
+	/* ホスト鍵の問い（Issue #26）。**見えるのに答えられない**を無くす */
+	"hostkey.title": "Este servidor nunca foi visto antes",
+	"hostkey.title.mismatch": "A chave deste servidor não confere com a registrada",
+	"hostkey.body": "Confira a impressão digital abaixo no próprio servidor antes de confiar. Depois disso, não será mais perguntado.",
+	"hostkey.mismatch": "Pode haver alguém no meio. Não confie, a menos que a chave tenha sido trocada de propósito.",
+	"hostkey.connection": "Conexão",
+	"hostkey.algorithm": "Algoritmo",
+	"hostkey.fingerprint": "Impressão digital",
+	"hostkey.registered": "Registrada",
+	"hostkey.how": "No servidor: ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub",
+	"hostkey.trust": "Confiar",
+	"hostkey.refuse": "Recusar",
+
 };
 
 export const ru: Catalog = {
@@ -431,6 +444,19 @@ export const ru: Catalog = {
 	'search.label': 'Найти', 'search.placeholder': 'Искать в терминале',
 	'search.next': 'Далее', 'search.prev': 'Назад', 'search.close': 'Закрыть',
 	'search.none': 'Не найдено',
+	/* ホスト鍵の問い（Issue #26）。**見えるのに答えられない**を無くす */
+	"hostkey.title": "Этот сервер встречается впервые",
+	"hostkey.title.mismatch": "Ключ этого сервера не совпадает с записанным",
+	"hostkey.body": "Сверьте отпечаток ниже на самом сервере, прежде чем доверять. После этого вопрос больше не появится.",
+	"hostkey.mismatch": "Возможно, кто-то стоит посередине. Не доверяйте, если ключ не меняли намеренно.",
+	"hostkey.connection": "Подключение",
+	"hostkey.algorithm": "Алгоритм",
+	"hostkey.fingerprint": "Отпечаток",
+	"hostkey.registered": "Записан",
+	"hostkey.how": "На сервере: ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub",
+	"hostkey.trust": "Доверять",
+	"hostkey.refuse": "Отклонить",
+
 };
 
 export const it: Catalog = {
@@ -646,4 +672,17 @@ export const it: Catalog = {
 	'search.label': 'Cerca', 'search.placeholder': 'Cerca nel terminale',
 	'search.next': 'Successivo', 'search.prev': 'Precedente', 'search.close': 'Chiudi',
 	'search.none': 'Non trovato',
+	/* ホスト鍵の問い（Issue #26）。**見えるのに答えられない**を無くす */
+	"hostkey.title": "Questo server non è mai stato visto prima",
+	"hostkey.title.mismatch": "La chiave di questo server non corrisponde a quella registrata",
+	"hostkey.body": "Verifica l'impronta qui sotto sul server stesso prima di fidarti. Dopo non verrà più chiesto.",
+	"hostkey.mismatch": "Qualcuno potrebbe essersi messo in mezzo. Non fidarti, a meno che la chiave non sia stata cambiata di proposito.",
+	"hostkey.connection": "Connessione",
+	"hostkey.algorithm": "Algoritmo",
+	"hostkey.fingerprint": "Impronta",
+	"hostkey.registered": "Registrata",
+	"hostkey.how": "Sul server: ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub",
+	"hostkey.trust": "Fidarsi",
+	"hostkey.refuse": "Rifiutare",
+
 };

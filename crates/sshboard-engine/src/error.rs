@@ -57,6 +57,16 @@ pub enum EngineError {
     /// **形式の名前だけを持ちます。**鍵のパスは接続先の情報なので、
     /// 画面にも記録にも出しません（CLAUDE.md 禁止事項 4）。
     UnusableKey { id: String, format: String },
+    /// **人だけが答えられる**（D47）。
+    ///
+    /// ホスト鍵の承認を AI に渡すと、**初めて見るホストを AI が自分で通せます。**
+    /// この製品が「人が見ていること」を安全の根拠にしている以上、そこは渡しません。
+    HumanOnly,
+    /// **その接続についての問いが立っていない。**
+    ///
+    /// 承認や拒否が、**立っていない問いへ飛んできた**ということです。
+    /// 黙って成功にすると、**答えたつもりの人が、答えていない**状態になります。
+    NoHostKeyAsk(String),
     /// **ホスト鍵を信用できない。**初見か、登録と食い違う。
     ///
     /// 文字列にせず**構造のまま**返す。画面が「この指紋で登録しますか」を
@@ -93,6 +103,15 @@ pub enum EngineError {
 impl fmt::Display for EngineError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            EngineError::HumanOnly => write!(
+                f,
+                "これは人だけが答えられます。sshboard の画面で答えてください"
+            ),
+            EngineError::NoHostKeyAsk(id) => write!(
+                f,
+                "{id} について、ホスト鍵の問いは立っていません。\
+                 答え終わっているか、別の接続の問いです"
+            ),
             EngineError::NotConnected => write!(
                 f,
                 "まだサーバーに繋がっていません。sshboard の画面で接続を開いてください"
