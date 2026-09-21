@@ -46,7 +46,6 @@
 	let chosenId = $state('');
 	let passphrase = $state('');
 	let needsPassphrase = $state(false);
-	let untrusted = $state<Untrusted | null>(null);
 	let failure = $state<string | null>(null);
 
 	async function loadRegistered() {
@@ -63,7 +62,6 @@
 	async function connect() {
 		if (!chosenId || session.busy) return;
 		failure = null;
-		untrusted = null;
 		session.busy = true;
 		try {
 			await invoke('session_connect', { id: chosenId, passphrase: passphrase || null });
@@ -76,7 +74,8 @@
 			const why = error as ConnectFailure;
 			if (why?.kind === 'untrusted') {
 				// **行き止まりにしない。**指紋を見せて、人が確かめて登録できるようにする。
-				untrusted = why;
+				// **ここでは出しません。**実行体が問いを立て、
+				// 画面（`HostKeyDialog`）が出します（Issue #26）。
 			} else if (why?.kind === 'passphraseNeeded') {
 				needsPassphrase = true;
 				failure = i18n.t('files.passphrase.needed');
@@ -88,27 +87,6 @@
 		}
 	}
 
-	/**
-	 * 見えた指紋を、この接続の正解として登録する。**人が確かめたという記録。**
-	 *
-	 * 以後この接続は、**同じ指紋の相手としか繋がらない**（すり替えを検出できる）。
-	 */
-	async function trustFingerprint() {
-		if (!untrusted) return;
-		const entry = registered.find((held) => held.id === chosenId);
-		if (!entry) return;
-
-		try {
-			await invoke('connection_save', {
-				entry: { ...entry, fingerprint: untrusted.fingerprint }
-			});
-			untrusted = null;
-			await loadRegistered();
-			await connect();
-		} catch (error: unknown) {
-			failure = String(error);
-		}
-	}
 </script>
 
 {#if registered.length === 0}
@@ -174,46 +152,16 @@
 {/if}
 
 <!-- **初見の指紋は、行き止まりにしない。**確かめて登録する道をここに置く。 -->
-{#if untrusted}
-	<div class="trust shell" class:danger={untrusted.expected}>
-		<div class="core">
-			{#if untrusted.expected}
-				<p class="head">
-					<Icon name="warning" size={14} />
-					<strong>{i18n.t('files.trust.mismatch')}</strong>
-				</p>
-				<p class="body">{i18n.t('files.trust.mismatch.body')}</p>
-				<dl>
-					<dt>{i18n.t('files.trust.seen')}</dt>
-					<dd><code data-secret>{untrusted.fingerprint}</code></dd>
-					<dt>{i18n.t('files.trust.expected')}</dt>
-					<dd><code data-secret>{untrusted.expected}</code></dd>
-				</dl>
-				<!-- **一押しで受け入れる道を置かない。**すり替えかもしれないため。 -->
-				<p class="body">{i18n.t('files.trust.mismatch.how')}</p>
-			{:else}
-				<p class="head">
-					<Icon name="key" size={14} />
-					<strong>{i18n.t('files.trust.first')}</strong>
-				</p>
-				<p class="body">{i18n.t('files.trust.first.body')}</p>
-				<dl>
-					<dt>{untrusted.algorithm}</dt>
-					<dd><code data-secret>{untrusted.fingerprint}</code></dd>
-				</dl>
-				<div class="trust-actions">
-					<button type="button" class="primary" onclick={trustFingerprint}>
-						<Icon name="check" />
-						{i18n.t('files.trust.accept')}
-					</button>
-					<button type="button" onclick={() => (untrusted = null)}>
-						{i18n.t('files.trust.cancel')}
-					</button>
-				</div>
-			{/if}
-		</div>
-	</div>
-{/if}
+<!--
+	**ホスト鍵の問いは、ここには置きません**（Issue #26 の後始末・2026-09-21）。
+
+	以前はここに帯を出していました。**MCP から繋いだときは出ない**ので、
+	#26 で画面側（`HostKeyDialog`）へ移しました。
+	**両方に置いたままだと、人が［開く］で繋いだときに 2 つ出ます。**
+
+	`+page.svelte` のコメントが、先に同じことを言っています ——
+	**「問いを 2 か所に作ると、片方だけ直る日が来ます」**（D39）。
+-->
 
 {#if failure}
 	<p class="failure" role="alert">{failure}</p>
@@ -246,18 +194,7 @@
 
 	/* 枠。**`.shell` はこの部品の外にあった**ので、ここで持ち直します。 */
 	.picker,
-	.trust {
-		background: var(--surface);
-		border: 1px solid var(--hairline);
-		border-radius: var(--r-shell);
-	}
-
 	.picker .core,
-	.trust .core {
-		background: var(--surface);
-		border-radius: var(--r-shell);
-	}
-
 	/* 1 件も登録が無いとき。**空の枠だけを出さない。** */
 	.empty-core {
 		display: flex;
@@ -368,64 +305,6 @@
 		align-items: center;
 		gap: 0.5rem;
 		padding: 0.35rem 0.2rem 0.05rem;
-	}
-
-	/* 初見の指紋。**行き止まりにしない。** */
-	.trust .core {
-		padding: 0.6rem 0.7rem;
-	}
-
-	.trust.danger .core {
-		background: var(--danger-soft);
-	}
-
-	.trust .head {
-		display: flex;
-		align-items: center;
-		gap: 0.35rem;
-		margin: 0 0 0.3rem;
-		font-size: 0.78rem;
-	}
-
-	.trust.danger .head {
-		color: var(--danger);
-	}
-
-	.trust .body {
-		margin: 0 0 0.4rem;
-		font-size: 0.72rem;
-		color: var(--fg-muted);
-		line-height: 1.6;
-	}
-
-	.trust dl {
-		margin: 0 0 0.5rem;
-		display: grid;
-		grid-template-columns: auto 1fr;
-		gap: 0.15rem 0.5rem;
-		align-items: baseline;
-	}
-
-	.trust dt {
-		font-size: 0.66rem;
-		color: var(--fg-faint);
-		white-space: nowrap;
-	}
-
-	.trust dd {
-		margin: 0;
-		min-width: 0;
-	}
-
-	.trust code {
-		font-family: var(--font-mono);
-		font-size: 0.68rem;
-		word-break: break-all;
-	}
-
-	.trust-actions {
-		display: flex;
-		gap: 0.4rem;
 	}
 
 	/*

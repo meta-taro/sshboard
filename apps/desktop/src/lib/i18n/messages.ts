@@ -215,15 +215,6 @@ const en = {
 	"files.pick.help": "Double-click to connect.",
 	"files.known": "Fingerprint registered",
 	"files.passphrase.needed": "This key needs a passphrase. Enter it and connect again.",
-	"files.trust.first": "First time seeing this host",
-	"files.trust.seen": "Seen",
-	"files.trust.expected": "Registered",
-	"files.trust.first.body": "Compare this fingerprint with the one your server operator gave you, or with `ssh-keygen -lf` on the server. Once registered, sshboard will refuse anything else.",
-	"files.trust.accept": "I checked it — register and connect",
-	"files.trust.cancel": "Not now",
-	"files.trust.mismatch": "The host key does not match what is registered",
-	"files.trust.mismatch.body": "Either the server was rebuilt, or something is impersonating it. sshboard will not connect.",
-	"files.trust.mismatch.how": "If you know the server was rebuilt, clear the fingerprint on the Connections tab and connect again.",
 
 	// --- 文字サイズ（アクセシビリティ） ---
 	"text.label": "Text size",
@@ -259,14 +250,14 @@ const en = {
 	/* ホスト鍵の問い（Issue #26）。**見えるのに答えられない**を無くす */
 	"hostkey.title": "This server has not been seen before",
 	"hostkey.title.mismatch": "This server's key does not match the one you registered",
-	"hostkey.body": "Check the fingerprint below against the server itself before you trust it. Once you trust it, you will not be asked again.",
+	"hostkey.body": "Compare this fingerprint with the one your server operator gave you, or with `ssh-keygen -lf` on the server. Once registered, sshboard will refuse anything else.",
 	"hostkey.mismatch": "Someone may be standing in the middle. Do not trust it unless you know the key was changed on purpose.",
 	"hostkey.connection": "Connection",
 	"hostkey.algorithm": "Algorithm",
 	"hostkey.fingerprint": "Fingerprint",
 	"hostkey.registered": "Registered",
 	"hostkey.how": "On the server: ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub",
-	"hostkey.trust": "Trust",
+	"hostkey.trust": "I checked it — register and connect",
 	"hostkey.refuse": "Refuse",
 } as const;
 
@@ -483,15 +474,6 @@ const ja: Catalog = {
 	"files.pick.help": "ダブルクリックで繋がります。",
 	"files.known": "指紋を登録済み",
 	"files.passphrase.needed": "この鍵にはパスフレーズが要ります。入れてもう一度繋いでください。",
-	"files.trust.first": "初めて見るホストです",
-	"files.trust.seen": "見えたもの",
-	"files.trust.expected": "登録",
-	"files.trust.first.body": "サーバーの管理者から渡された指紋か、サーバー上の `ssh-keygen -lf` の出力と見比べてください。登録すると、以後それ以外は繋がりません。",
-	"files.trust.accept": "確かめた — 登録して繋ぐ",
-	"files.trust.cancel": "やめる",
-	"files.trust.mismatch": "ホスト鍵が登録と違います",
-	"files.trust.mismatch.body": "サーバーを建て直したか、別の何かがなりすましています。繋ぎません。",
-	"files.trust.mismatch.how": "建て直したと分かっているなら、接続タブで指紋を消してから繋ぎ直してください。",
 
 	// --- 文字サイズ（アクセシビリティ） ---
 	"text.label": "文字サイズ",
@@ -527,14 +509,14 @@ const ja: Catalog = {
 	/* ホスト鍵の問い（Issue #26）。**見えるのに答えられない**を無くす */
 	"hostkey.title": "初めて見るサーバーです",
 	"hostkey.title.mismatch": "登録されている鍵と食い違っています",
-	"hostkey.body": "下の指紋を、サーバー側で確かめてから承認してください。承認すると、次からは聞かれません。",
+	"hostkey.body": "サーバーの管理者から渡された指紋か、サーバー上の `ssh-keygen -lf` の出力と見比べてください。登録すると、以後それ以外は繋がりません。",
 	"hostkey.mismatch": "間に誰かが立っている恐れがあります。鍵を意図して入れ替えたのでなければ、承認しないでください。",
 	"hostkey.connection": "接続",
 	"hostkey.algorithm": "方式",
 	"hostkey.fingerprint": "指紋",
 	"hostkey.registered": "登録されているもの",
 	"hostkey.how": "サーバー側で: ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub",
-	"hostkey.trust": "承認する",
+	"hostkey.trust": "確かめた — 登録して繋ぐ",
 	"hostkey.refuse": "断る",
 
 };

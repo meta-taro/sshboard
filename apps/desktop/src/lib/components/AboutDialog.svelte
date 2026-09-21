@@ -97,9 +97,6 @@
 
 	.dialog {
 		width: min(30rem, 92vw);
-		display: flex;
-		flex-direction: column;
-		gap: 0.8rem;
 		padding: 1.1rem;
 		background: var(--surface);
 		border: 1px solid var(--hairline);
@@ -108,7 +105,7 @@
 	}
 
 	.head h2 {
-		margin: 0;
+		margin: 0.7rem 0 0;
 		font-size: 1rem;
 		font-weight: 600;
 	}
@@ -117,7 +114,7 @@
 		display: grid;
 		grid-template-columns: auto 1fr;
 		gap: 0.3rem 0.9rem;
-		margin: 0;
+		margin: 0.7rem 0 0;
 	}
 
 	.meta dt {
@@ -130,7 +127,7 @@
 	}
 
 	.meta dd {
-		margin: 0;
+		margin: 0.7rem 0 0;
 		font-size: 0.82rem;
 		overflow-wrap: anywhere;
 	}
@@ -140,7 +137,7 @@
 	}
 
 	.note {
-		margin: 0;
+		margin: 0.7rem 0 0;
 		font-size: 0.76rem;
 		color: var(--fg-muted);
 		line-height: 1.6;
@@ -151,4 +148,5 @@
 		justify-content: flex-end;
 		gap: 0.4rem;
 	}
+
 </style>

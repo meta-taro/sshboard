@@ -179,15 +179,6 @@ export const ko: Catalog = {
 	"files.pick.help": "더블클릭하면 연결됩니다.",
 	"files.known": "지문 등록됨",
 	"files.passphrase.needed": "이 키에는 암호가 필요합니다. 입력하고 다시 연결하세요.",
-	"files.trust.first": "처음 보는 호스트입니다",
-	"files.trust.seen": "보인 것",
-	"files.trust.expected": "등록",
-	"files.trust.first.body": "서버 관리자에게 받은 지문이나 서버의 `ssh-keygen -lf` 출력과 대조하세요. 등록하면 이후 다른 것은 연결되지 않습니다.",
-	"files.trust.accept": "확인했습니다 — 등록하고 연결",
-	"files.trust.cancel": "취소",
-	"files.trust.mismatch": "호스트 키가 등록된 것과 다릅니다",
-	"files.trust.mismatch.body": "서버를 다시 만들었거나, 다른 무언가가 위장하고 있습니다. 연결하지 않습니다.",
-	"files.trust.mismatch.how": "다시 만든 것이 확실하다면 연결 탭에서 지문을 지우고 다시 연결하세요.",
 
 	// --- 文字サイズ（アクセシビリティ） ---
 	"text.label": "글자 크기",
@@ -219,14 +210,14 @@ export const ko: Catalog = {
 	/* ホスト鍵の問い（Issue #26）。**見えるのに答えられない**を無くす */
 	"hostkey.title": "처음 보는 서버입니다",
 	"hostkey.title.mismatch": "등록된 키와 어긋납니다",
-	"hostkey.body": "아래 지문을 서버 쪽에서 확인한 뒤에 승인하세요. 승인하면 다음부터는 묻지 않습니다.",
+	"hostkey.body": "서버 관리자에게 받은 지문이나 서버의 `ssh-keygen -lf` 출력과 대조하세요. 등록하면 이후 다른 것은 연결되지 않습니다.",
 	"hostkey.mismatch": "중간에 누군가 있을 수 있습니다. 일부러 키를 바꾼 것이 아니라면 승인하지 마세요.",
 	"hostkey.connection": "연결",
 	"hostkey.algorithm": "방식",
 	"hostkey.fingerprint": "지문",
 	"hostkey.registered": "등록된 것",
 	"hostkey.how": "서버에서: ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub",
-	"hostkey.trust": "승인",
+	"hostkey.trust": "확인했습니다 — 등록하고 연결",
 	"hostkey.refuse": "거부",
 
 };
@@ -407,15 +398,6 @@ export const zhCN: Catalog = {
 	"files.pick.help": "双击即可连接。",
 	"files.known": "已登记指纹",
 	"files.passphrase.needed": "此密钥需要口令。输入后再连接一次。",
-	"files.trust.first": "第一次见到这台主机",
-	"files.trust.seen": "看到的",
-	"files.trust.expected": "已登记",
-	"files.trust.first.body": "请与服务器管理员给你的指纹，或服务器上 `ssh-keygen -lf` 的输出比对。登记之后，其它的一律不连。",
-	"files.trust.accept": "已核对 — 登记并连接",
-	"files.trust.cancel": "暂不",
-	"files.trust.mismatch": "主机密钥与登记的不一致",
-	"files.trust.mismatch.body": "要么服务器被重建了，要么有东西在冒充它。不予连接。",
-	"files.trust.mismatch.how": "如果确知是重建，请在连接标签页清除指纹后再连。",
 
 	// --- 文字サイズ（アクセシビリティ） ---
 	"text.label": "文字大小",
@@ -447,14 +429,14 @@ export const zhCN: Catalog = {
 	/* ホスト鍵の問い（Issue #26）。**見えるのに答えられない**を無くす */
 	"hostkey.title": "这是第一次见到的服务器",
 	"hostkey.title.mismatch": "与已登记的密钥不一致",
-	"hostkey.body": "请先在服务器上核对下面的指纹，再决定是否信任。信任之后不会再问。",
+	"hostkey.body": "请与服务器管理员给你的指纹，或服务器上 `ssh-keygen -lf` 的输出比对。登记之后，其它的一律不连。",
 	"hostkey.mismatch": "中间可能有人。除非你确知密钥是有意更换的，否则不要信任。",
 	"hostkey.connection": "连接",
 	"hostkey.algorithm": "算法",
 	"hostkey.fingerprint": "指纹",
 	"hostkey.registered": "已登记的",
 	"hostkey.how": "在服务器上执行：ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub",
-	"hostkey.trust": "信任",
+	"hostkey.trust": "已核对 — 登记并连接",
 	"hostkey.refuse": "拒绝",
 
 };
@@ -635,15 +617,6 @@ export const zhTW: Catalog = {
 	"files.pick.help": "連按兩下即可連線。",
 	"files.known": "已登記指紋",
 	"files.passphrase.needed": "此金鑰需要通行碼。輸入後再連線一次。",
-	"files.trust.first": "第一次見到這台主機",
-	"files.trust.seen": "看到的",
-	"files.trust.expected": "已登記",
-	"files.trust.first.body": "請與伺服器管理者給你的指紋，或伺服器上 `ssh-keygen -lf` 的輸出比對。登記之後，其它的一律不連。",
-	"files.trust.accept": "已核對 — 登記並連線",
-	"files.trust.cancel": "暫不",
-	"files.trust.mismatch": "主機金鑰與登記的不一致",
-	"files.trust.mismatch.body": "可能是伺服器重建了，也可能有東西在冒充它。不予連線。",
-	"files.trust.mismatch.how": "若確知是重建，請在連線分頁清除指紋後再連。",
 
 	// --- 文字サイズ（アクセシビリティ） ---
 	"text.label": "文字大小",
@@ -675,14 +648,14 @@ export const zhTW: Catalog = {
 	/* ホスト鍵の問い（Issue #26）。**見えるのに答えられない**を無くす */
 	"hostkey.title": "這是第一次見到的伺服器",
 	"hostkey.title.mismatch": "與已登記的金鑰不一致",
-	"hostkey.body": "請先在伺服器上核對下面的指紋，再決定是否信任。信任之後不會再問。",
+	"hostkey.body": "請與伺服器管理者給你的指紋，或伺服器上 `ssh-keygen -lf` 的輸出比對。登記之後，其它的一律不連。",
 	"hostkey.mismatch": "中間可能有人。除非你確知金鑰是有意更換的，否則不要信任。",
 	"hostkey.connection": "連線",
 	"hostkey.algorithm": "演算法",
 	"hostkey.fingerprint": "指紋",
 	"hostkey.registered": "已登記的",
 	"hostkey.how": "在伺服器上執行：ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub",
-	"hostkey.trust": "信任",
+	"hostkey.trust": "已核對 — 登記並連線",
 	"hostkey.refuse": "拒絕",
 
 };

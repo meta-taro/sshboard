@@ -101,9 +101,6 @@
 
 	.dialog {
 		width: min(26rem, 92vw);
-		display: flex;
-		flex-direction: column;
-		gap: 0.7rem;
 		padding: 1.1rem;
 		background: var(--surface);
 		/* **色だけを手がかりにしない**（DESIGN.md）。枠でも分かるようにします。 */
@@ -140,7 +137,7 @@
 	}
 
 	.note {
-		margin: 0;
+		margin: 0.7rem 0 0;
 		font-size: 0.78rem;
 		color: var(--fg-muted);
 		line-height: 1.6;
@@ -151,4 +148,5 @@
 		justify-content: flex-end;
 		gap: 0.5rem;
 	}
+
 </style>

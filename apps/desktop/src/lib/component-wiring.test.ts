@@ -134,6 +134,25 @@ describe('問いの題字', () => {
 		expect(flexed).toEqual([]);
 	});
 
+	test('does not stack the dialog body with flex either', () => {
+		// **今日 3 度目の同じ形**（2026-09-21）。
+		// `.dialog { display: flex; flex-direction: column; gap }` で積んでいたとき、
+		// **本文が 3 行に折れると、その下の要素と間が詰まって接触しました。**
+		//
+		// 題字（`3563a1d`）・接続タブ（`22fd621`）と同じ ——
+		// **WebKit では flex 容器の高さが中身に追いつかない場面がある。**
+		const flexed = dialogs
+			.filter(([, source]) => {
+				const rule = source
+					.replace(/\/\*[\s\S]*?\*\//g, '')
+					.match(/\n\t\.dialog \{[\s\S]*?\n\t\}/)?.[0];
+				return rule ? /display:\s*flex/.test(rule) : false;
+			})
+			.map(([path]) => nameOf(path));
+
+		expect(flexed).toEqual([]);
+	});
+
 	test('keeps the icon inside the heading so the box grows with the text', () => {
 		// **繋ぎ忘れの見張り。**`header` の規則を消しただけで、
 		// markup が `<header><Icon/><h2>` のままだと、**見た目は直りません。**
@@ -142,5 +161,33 @@ describe('問いの題字', () => {
 			.map(([path]) => nameOf(path));
 
 		expect(stragglers).toEqual([]);
+	});
+});
+
+/**
+ * **ホスト鍵の問いは、画面に 1 つだけ**（Issue #26 の後始末）。
+ *
+ * `+page.svelte` のコメントが、先に警告していました ——
+ *
+ * > 問いは `ConnectPanel` の中にしか無く、**MCP の経路から出す口がありませんでした。**
+ * > 部品はそのまま使います —— **問いを 2 か所に作ると、片方だけ直る日が来ます**（D39）
+ *
+ * **#26 を直すとき、私はそれを読まずに 2 つ目を作りました。**
+ * 結果、**人が［開く］で繋ぐと、帯とダイアログが両方出る**状態になりました。
+ *
+ * パスフレーズは 1 つです（`PassphraseDialog` を `ConnectPanel` も画面も使う）。
+ * **ホスト鍵も同じにします。**
+ */
+describe('ホスト鍵の問い', () => {
+	test('asks about host keys in exactly one place', () => {
+		const asking = Object.entries(sources)
+			.filter(([path]) => /\.svelte$/.test(path) && !/\.test\./.test(path))
+			.filter(([, source]) => /files\.trust\.|hostkey\./.test(source))
+			.map(([path]) => path.slice(path.lastIndexOf('/') + 1));
+
+		// **問いの文言を持つのは `HostKeyDialog` だけ。**
+		// `+page.svelte` は値を渡して描くだけなので、文言は持ちません。
+		// **`ConnectPanel` が入っていたら、問いが 2 か所に在るということ。**
+		expect(asking.sort()).toEqual(['HostKeyDialog.svelte']);
 	});
 });

@@ -179,15 +179,6 @@ export const ptBR: Catalog = {
 	"files.pick.help": "Clique duas vezes para conectar.",
 	"files.known": "Impressão registrada",
 	"files.passphrase.needed": "Esta chave precisa de senha. Digite e conecte de novo.",
-	"files.trust.first": "Primeira vez que vemos este host",
-	"files.trust.seen": "Visto",
-	"files.trust.expected": "Registrado",
-	"files.trust.first.body": "Compare esta impressão com a que o operador do servidor lhe passou, ou com `ssh-keygen -lf` no servidor. Depois de registrada, o sshboard recusa qualquer outra.",
-	"files.trust.accept": "Conferi — registrar e conectar",
-	"files.trust.cancel": "Agora não",
-	"files.trust.mismatch": "A chave do host não bate com a registrada",
-	"files.trust.mismatch.body": "Ou o servidor foi refeito, ou algo está se passando por ele. O sshboard não conecta.",
-	"files.trust.mismatch.how": "Se você sabe que o servidor foi refeito, limpe a impressão na aba Conexões e conecte de novo.",
 
 	// --- 文字サイズ（アクセシビリティ） ---
 	"text.label": "Tamanho do texto",
@@ -219,14 +210,14 @@ export const ptBR: Catalog = {
 	/* ホスト鍵の問い（Issue #26）。**見えるのに答えられない**を無くす */
 	"hostkey.title": "Este servidor nunca foi visto antes",
 	"hostkey.title.mismatch": "A chave deste servidor não confere com a registrada",
-	"hostkey.body": "Confira a impressão digital abaixo no próprio servidor antes de confiar. Depois disso, não será mais perguntado.",
+	"hostkey.body": "Compare esta impressão com a que o operador do servidor lhe passou, ou com `ssh-keygen -lf` no servidor. Depois de registrada, o sshboard recusa qualquer outra.",
 	"hostkey.mismatch": "Pode haver alguém no meio. Não confie, a menos que a chave tenha sido trocada de propósito.",
 	"hostkey.connection": "Conexão",
 	"hostkey.algorithm": "Algoritmo",
 	"hostkey.fingerprint": "Impressão digital",
 	"hostkey.registered": "Registrada",
 	"hostkey.how": "No servidor: ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub",
-	"hostkey.trust": "Confiar",
+	"hostkey.trust": "Conferi — registrar e conectar",
 	"hostkey.refuse": "Recusar",
 
 };
@@ -407,15 +398,6 @@ export const ru: Catalog = {
 	"files.pick.help": "Двойной щелчок — подключиться.",
 	"files.known": "Отпечаток записан",
 	"files.passphrase.needed": "Этому ключу нужен пароль. Введите его и подключитесь снова.",
-	"files.trust.first": "Этот хост виден впервые",
-	"files.trust.seen": "Увидели",
-	"files.trust.expected": "Записано",
-	"files.trust.first.body": "Сверьте отпечаток с тем, что дал администратор сервера, или с выводом `ssh-keygen -lf` на сервере. После записи sshboard не примет никакой другой.",
-	"files.trust.accept": "Сверил — записать и подключиться",
-	"files.trust.cancel": "Не сейчас",
-	"files.trust.mismatch": "Ключ хоста не совпадает с записанным",
-	"files.trust.mismatch.body": "Либо сервер пересоздали, либо кто-то выдаёт себя за него. sshboard не подключается.",
-	"files.trust.mismatch.how": "Если сервер точно пересоздан, удалите отпечаток на вкладке подключений и подключитесь снова.",
 
 	// --- 文字サイズ（アクセシビリティ） ---
 	"text.label": "Размер текста",
@@ -447,14 +429,14 @@ export const ru: Catalog = {
 	/* ホスト鍵の問い（Issue #26）。**見えるのに答えられない**を無くす */
 	"hostkey.title": "Этот сервер встречается впервые",
 	"hostkey.title.mismatch": "Ключ этого сервера не совпадает с записанным",
-	"hostkey.body": "Сверьте отпечаток ниже на самом сервере, прежде чем доверять. После этого вопрос больше не появится.",
+	"hostkey.body": "Сверьте отпечаток с тем, что дал администратор сервера, или с выводом `ssh-keygen -lf` на сервере. После записи sshboard не примет никакой другой.",
 	"hostkey.mismatch": "Возможно, кто-то стоит посередине. Не доверяйте, если ключ не меняли намеренно.",
 	"hostkey.connection": "Подключение",
 	"hostkey.algorithm": "Алгоритм",
 	"hostkey.fingerprint": "Отпечаток",
 	"hostkey.registered": "Записан",
 	"hostkey.how": "На сервере: ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub",
-	"hostkey.trust": "Доверять",
+	"hostkey.trust": "Сверил — записать и подключиться",
 	"hostkey.refuse": "Отклонить",
 
 };
@@ -635,15 +617,6 @@ export const it: Catalog = {
 	"files.pick.help": "Doppio clic per connettersi.",
 	"files.known": "Impronta registrata",
 	"files.passphrase.needed": "Questa chiave richiede una passphrase. Inseriscila e riconnettiti.",
-	"files.trust.first": "È la prima volta che vediamo questo host",
-	"files.trust.seen": "Visto",
-	"files.trust.expected": "Registrato",
-	"files.trust.first.body": "Confronta questa impronta con quella data dall'operatore del server, o con `ssh-keygen -lf` sul server. Una volta registrata, sshboard rifiuterà qualsiasi altra.",
-	"files.trust.accept": "Verificato — registra e connetti",
-	"files.trust.cancel": "Non ora",
-	"files.trust.mismatch": "La chiave dell'host non corrisponde a quella registrata",
-	"files.trust.mismatch.body": "O il server è stato rifatto, oppure qualcosa si sta spacciando per lui. sshboard non si connette.",
-	"files.trust.mismatch.how": "Se sai che il server è stato rifatto, cancella l'impronta nella scheda Connessioni e riconnettiti.",
 
 	// --- 文字サイズ（アクセシビリティ） ---
 	"text.label": "Dimensione del testo",
@@ -675,14 +648,14 @@ export const it: Catalog = {
 	/* ホスト鍵の問い（Issue #26）。**見えるのに答えられない**を無くす */
 	"hostkey.title": "Questo server non è mai stato visto prima",
 	"hostkey.title.mismatch": "La chiave di questo server non corrisponde a quella registrata",
-	"hostkey.body": "Verifica l'impronta qui sotto sul server stesso prima di fidarti. Dopo non verrà più chiesto.",
+	"hostkey.body": "Confronta questa impronta con quella data dall'operatore del server, o con `ssh-keygen -lf` sul server. Una volta registrata, sshboard rifiuterà qualsiasi altra.",
 	"hostkey.mismatch": "Qualcuno potrebbe essersi messo in mezzo. Non fidarti, a meno che la chiave non sia stata cambiata di proposito.",
 	"hostkey.connection": "Connessione",
 	"hostkey.algorithm": "Algoritmo",
 	"hostkey.fingerprint": "Impronta",
 	"hostkey.registered": "Registrata",
 	"hostkey.how": "Sul server: ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub",
-	"hostkey.trust": "Fidarsi",
+	"hostkey.trust": "Verificato — registra e connetti",
 	"hostkey.refuse": "Rifiutare",
 
 };

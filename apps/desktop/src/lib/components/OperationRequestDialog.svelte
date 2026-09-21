@@ -160,9 +160,6 @@
 
 	.dialog {
 		width: min(30rem, 92vw);
-		display: flex;
-		flex-direction: column;
-		gap: 0.6rem;
 		padding: 1.1rem;
 		background: var(--surface);
 		/* **色だけを手がかりにしない**（DESIGN.md）。枠でも分かるように。 */
@@ -199,14 +196,14 @@
 	}
 
 	.what {
-		margin: 0;
+		margin: 0.7rem 0 0;
 		font-family: var(--font-mono);
 		font-size: 0.85rem;
 	}
 
 	.lead,
 	.note {
-		margin: 0;
+		margin: 0.7rem 0 0;
 		font-size: 0.78rem;
 		color: var(--fg-muted);
 		line-height: 1.6;
@@ -214,7 +211,7 @@
 
 	/* **打つものは、折り返してでも全部見せる。**隠すと判断できません。 */
 	.runs {
-		margin: 0;
+		margin: 0.7rem 0 0;
 		padding: 0.6rem 0.7rem;
 		background: var(--surface-2);
 		border: 1px solid var(--hairline);
@@ -249,4 +246,5 @@
 		justify-content: flex-end;
 		gap: 0.5rem;
 	}
+
 </style>

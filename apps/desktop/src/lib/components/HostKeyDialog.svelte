@@ -107,9 +107,6 @@
 
 	.dialog {
 		width: min(30rem, 92vw);
-		display: flex;
-		flex-direction: column;
-		gap: 0.7rem;
 		padding: 1.1rem;
 		background: var(--surface);
 		/* **色だけを手がかりにしない**（DESIGN.md）。枠でも分かるようにします。 */
@@ -147,7 +144,7 @@
 
 	.note,
 	.how {
-		margin: 0;
+		margin: 0.7rem 0 0;
 		font-size: 0.78rem;
 		color: var(--fg-muted);
 		line-height: 1.6;
@@ -157,7 +154,7 @@
 		display: grid;
 		grid-template-columns: auto 1fr;
 		gap: 0.25rem 0.7rem;
-		margin: 0;
+		margin: 0.7rem 0 0;
 		font-size: 0.78rem;
 	}
 
@@ -195,4 +192,5 @@
 		border-color: transparent;
 		color: var(--accent-fg);
 	}
+
 </style>

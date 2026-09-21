@@ -216,9 +216,6 @@
 
 	.dialog {
 		width: min(34rem, 92vw);
-		display: flex;
-		flex-direction: column;
-		gap: 0.9rem;
 		padding: 1.1rem;
 		background: var(--surface);
 		border: 1px solid var(--hairline);
@@ -254,14 +251,14 @@
 	}
 
 	.what {
-		margin: 0;
+		margin: 0.7rem 0 0;
 		font-size: 0.82rem;
 		line-height: 1.65;
 		color: var(--fg-muted);
 	}
 
 	.count {
-		margin: 0;
+		margin: 0.7rem 0 0;
 		font-size: 0.85rem;
 		font-weight: 600;
 	}
@@ -309,7 +306,7 @@
 	}
 
 	.note {
-		margin: 0;
+		margin: 0.7rem 0 0;
 		font-size: 0.78rem;
 		color: var(--danger);
 		line-height: 1.6;
@@ -319,7 +316,7 @@
 		display: flex;
 		align-items: center;
 		gap: 0.35rem;
-		margin: 0;
+		margin: 0.7rem 0 0;
 		font-size: 0.85rem;
 		color: var(--ok);
 	}
@@ -329,4 +326,5 @@
 		justify-content: flex-end;
 		gap: 0.5rem;
 	}
+
 </style>

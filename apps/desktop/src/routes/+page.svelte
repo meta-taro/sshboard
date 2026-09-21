@@ -178,6 +178,12 @@
 		try {
 			await invoke(trust ? 'host_key_trust' : 'host_key_refuse', { id: asked.id });
 			hostKeyAsk = null;
+			// **承認したら、そのまま繋ぎ直す**（Issue #26 の後始末）。
+			//
+			// 以前は `ConnectPanel` が自分で繋ぎ直していました。問いを画面側へ
+			// 移したので、**繋ぎ直しも一緒に移します** ——
+			// 置いてこないと、**人は承認したのに何も起きない**と読みます。
+			if (trust) await invoke('session_connect', { id: asked.id, passphrase: null });
 		} catch (error: unknown) {
 			// **黙って閉じない。**閉じると、人は答えたつもりで答えていない状態になります。
 			failure = String(error);

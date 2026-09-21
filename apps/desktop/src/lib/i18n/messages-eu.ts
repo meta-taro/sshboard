@@ -179,15 +179,6 @@ export const de: Catalog = {
 	"files.pick.help": "Doppelklick verbindet.",
 	"files.known": "Fingerabdruck hinterlegt",
 	"files.passphrase.needed": "Dieser Schlüssel braucht eine Passphrase. Eingeben und erneut verbinden.",
-	"files.trust.first": "Dieser Host ist neu",
-	"files.trust.seen": "Gesehen",
-	"files.trust.expected": "Hinterlegt",
-	"files.trust.first.body": "Vergleichen Sie diesen Fingerabdruck mit dem, den Ihnen der Serverbetreiber gegeben hat, oder mit `ssh-keygen -lf` auf dem Server. Nach dem Hinterlegen lässt sshboard nichts anderes mehr zu.",
-	"files.trust.accept": "Geprüft — hinterlegen und verbinden",
-	"files.trust.cancel": "Jetzt nicht",
-	"files.trust.mismatch": "Der Hostschlüssel passt nicht zum hinterlegten",
-	"files.trust.mismatch.body": "Entweder wurde der Server neu aufgesetzt, oder etwas gibt sich als er aus. sshboard verbindet nicht.",
-	"files.trust.mismatch.how": "Wenn Sie wissen, dass der Server neu aufgesetzt wurde: Fingerabdruck im Tab Verbindungen löschen und erneut verbinden.",
 
 	// --- 文字サイズ（アクセシビリティ） ---
 	"text.label": "Schriftgröße",
@@ -219,14 +210,14 @@ export const de: Catalog = {
 	/* ホスト鍵の問い（Issue #26）。**見えるのに答えられない**を無くす */
 	"hostkey.title": "Dieser Server ist noch nie gesehen worden",
 	"hostkey.title.mismatch": "Der Schlüssel dieses Servers passt nicht zum hinterlegten",
-	"hostkey.body": "Prüfen Sie den Fingerabdruck unten am Server selbst, bevor Sie ihm vertrauen. Danach werden Sie nicht mehr gefragt.",
+	"hostkey.body": "Vergleichen Sie diesen Fingerabdruck mit dem, den Ihnen der Serverbetreiber gegeben hat, oder mit `ssh-keygen -lf` auf dem Server. Nach dem Hinterlegen lässt sshboard nichts anderes mehr zu.",
 	"hostkey.mismatch": "Möglicherweise steht jemand dazwischen. Vertrauen Sie nicht, es sei denn, der Schlüssel wurde absichtlich getauscht.",
 	"hostkey.connection": "Verbindung",
 	"hostkey.algorithm": "Verfahren",
 	"hostkey.fingerprint": "Fingerabdruck",
 	"hostkey.registered": "Hinterlegt",
 	"hostkey.how": "Auf dem Server: ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub",
-	"hostkey.trust": "Vertrauen",
+	"hostkey.trust": "Geprüft — hinterlegen und verbinden",
 	"hostkey.refuse": "Ablehnen",
 
 };
@@ -407,15 +398,6 @@ export const fr: Catalog = {
 	"files.pick.help": "Double-cliquez pour vous connecter.",
 	"files.known": "Empreinte enregistrée",
 	"files.passphrase.needed": "Cette clé demande une phrase secrète. Saisissez-la et reconnectez-vous.",
-	"files.trust.first": "Hôte vu pour la première fois",
-	"files.trust.seen": "Vu",
-	"files.trust.expected": "Enregistré",
-	"files.trust.first.body": "Comparez cette empreinte avec celle fournie par l'exploitant du serveur, ou avec `ssh-keygen -lf` sur le serveur. Une fois enregistrée, sshboard refusera toute autre.",
-	"files.trust.accept": "Vérifié — enregistrer et connecter",
-	"files.trust.cancel": "Pas maintenant",
-	"files.trust.mismatch": "La clé d'hôte ne correspond pas à celle enregistrée",
-	"files.trust.mismatch.body": "Soit le serveur a été refait, soit quelque chose usurpe son identité. sshboard ne se connecte pas.",
-	"files.trust.mismatch.how": "Si vous savez que le serveur a été refait, effacez l'empreinte dans l'onglet Connexions puis reconnectez-vous.",
 
 	// --- 文字サイズ（アクセシビリティ） ---
 	"text.label": "Taille du texte",
@@ -447,14 +429,14 @@ export const fr: Catalog = {
 	/* ホスト鍵の問い（Issue #26）。**見えるのに答えられない**を無くす */
 	"hostkey.title": "Ce serveur n'a jamais été vu",
 	"hostkey.title.mismatch": "La clé de ce serveur ne correspond pas à celle enregistrée",
-	"hostkey.body": "Vérifiez l'empreinte ci-dessous sur le serveur lui-même avant de lui faire confiance. Ensuite, la question ne sera plus posée.",
+	"hostkey.body": "Comparez cette empreinte avec celle fournie par l'exploitant du serveur, ou avec `ssh-keygen -lf` sur le serveur. Une fois enregistrée, sshboard refusera toute autre.",
 	"hostkey.mismatch": "Quelqu'un se tient peut-être au milieu. Ne faites pas confiance, sauf si la clé a été changée volontairement.",
 	"hostkey.connection": "Connexion",
 	"hostkey.algorithm": "Algorithme",
 	"hostkey.fingerprint": "Empreinte",
 	"hostkey.registered": "Enregistrée",
 	"hostkey.how": "Sur le serveur : ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub",
-	"hostkey.trust": "Faire confiance",
+	"hostkey.trust": "Vérifié — enregistrer et connecter",
 	"hostkey.refuse": "Refuser",
 
 };
@@ -635,15 +617,6 @@ export const es: Catalog = {
 	"files.pick.help": "Doble clic para conectar.",
 	"files.known": "Huella registrada",
 	"files.passphrase.needed": "Esta clave necesita una frase secreta. Introdúzcala y conecte de nuevo.",
-	"files.trust.first": "Es la primera vez que se ve este host",
-	"files.trust.seen": "Visto",
-	"files.trust.expected": "Registrado",
-	"files.trust.first.body": "Compare esta huella con la que le dio el operador del servidor, o con `ssh-keygen -lf` en el servidor. Una vez registrada, sshboard rechazará cualquier otra.",
-	"files.trust.accept": "Comprobado — registrar y conectar",
-	"files.trust.cancel": "Ahora no",
-	"files.trust.mismatch": "La clave del host no coincide con la registrada",
-	"files.trust.mismatch.body": "O el servidor se rehízo, o algo se está haciendo pasar por él. sshboard no conecta.",
-	"files.trust.mismatch.how": "Si sabe que el servidor se rehízo, borre la huella en la pestaña Conexiones y vuelva a conectar.",
 
 	// --- 文字サイズ（アクセシビリティ） ---
 	"text.label": "Tamaño del texto",
@@ -675,14 +648,14 @@ export const es: Catalog = {
 	/* ホスト鍵の問い（Issue #26）。**見えるのに答えられない**を無くす */
 	"hostkey.title": "Este servidor no se había visto antes",
 	"hostkey.title.mismatch": "La clave de este servidor no coincide con la registrada",
-	"hostkey.body": "Comprueba la huella de abajo en el propio servidor antes de confiar en él. Después no se volverá a preguntar.",
+	"hostkey.body": "Compare esta huella con la que le dio el operador del servidor, o con `ssh-keygen -lf` en el servidor. Una vez registrada, sshboard rechazará cualquier otra.",
 	"hostkey.mismatch": "Puede haber alguien en medio. No confíes salvo que sepas que la clave se cambió a propósito.",
 	"hostkey.connection": "Conexión",
 	"hostkey.algorithm": "Algoritmo",
 	"hostkey.fingerprint": "Huella",
 	"hostkey.registered": "Registrada",
 	"hostkey.how": "En el servidor: ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub",
-	"hostkey.trust": "Confiar",
+	"hostkey.trust": "Comprobado — registrar y conectar",
 	"hostkey.refuse": "Rechazar",
 
 };
