@@ -86,3 +86,43 @@ describe('ファイルの面', () => {
 		expect(watches).toBe(true);
 	});
 });
+
+/**
+ * **問いの題字が、本文へ重ならないこと**（2026-09-18 に実機で踏みました）。
+ *
+ * 端末の同意ダイアログを英語で撮ったら、こうなっていました ——
+ *
+ * ```text
+ * The AI wants to use the
+ * console          ← **本文の 1 行目に重なっている**
+ * If you allow it, the AI can type into this terminal.
+ * ```
+ *
+ * **日本語では出ません。**「AI が端末を使いたいと言っています」は 1 行に収まります。
+ * **英語は語が長い**ので、そこだけ折れます。
+ *
+ * `header { align-items: center }` は**題字が 1 行である前提**の置き方です。
+ * 2 行になったとき、**アイコンを中央に合わせようとして高さが伸びません。**
+ * **`flex-start` なら、アイコンは 1 行目に付き、題字は素直に下へ伸びます。**
+ *
+ * **ここは「AI に端末を渡す唯一の同意画面」**です（D42）。
+ * **読めない同意は、同意ではありません。**
+ */
+describe('問いの題字', () => {
+	const dialogs = Object.entries(components).filter(([path]) => /Dialog\.svelte$/.test(path));
+
+	test('finds the dialogs', () => {
+		expect(dialogs.length).toBeGreaterThanOrEqual(4);
+	});
+
+	test('does not centre a heading that can wrap to two lines', () => {
+		const centred = dialogs
+			.filter(([, source]) => {
+				const rule = source.replace(/\/\*[\s\S]*?\*\//g, '').match(/\theader \{[\s\S]*?\n\t\}/)?.[0];
+				return rule ? /align-items:\s*center/.test(rule) : false;
+			})
+			.map(([path]) => nameOf(path));
+
+		expect(centred).toEqual([]);
+	});
+});
