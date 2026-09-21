@@ -115,14 +115,32 @@ describe('問いの題字', () => {
 		expect(dialogs.length).toBeGreaterThanOrEqual(4);
 	});
 
-	test('does not centre a heading that can wrap to two lines', () => {
-		const centred = dialogs
+	test('does not lay the heading out with flex', () => {
+		// **`align-items` をどちらにしても直りませんでした**（2026-09-21）。
+		// **WebKit では flex 容器の高さが中身に追いつかない場面がある** ——
+		// 接続タブの名前が切れたのと同じ族です。
+		//
+		// **アイコンを題字の中へ入れて、普通の行の流れにする。**
+		// 行が増えれば高さも増える —— **仕組みで保証されます。**
+		const flexed = dialogs
 			.filter(([, source]) => {
-				const rule = source.replace(/\/\*[\s\S]*?\*\//g, '').match(/\theader \{[\s\S]*?\n\t\}/)?.[0];
-				return rule ? /align-items:\s*center/.test(rule) : false;
+				const rule = source
+					.replace(/\/\*[\s\S]*?\*\//g, '')
+					.match(/\n\theader \{[\s\S]*?\n\t\}/)?.[0];
+				return rule ? /display:\s*flex/.test(rule) : false;
 			})
 			.map(([path]) => nameOf(path));
 
-		expect(centred).toEqual([]);
+		expect(flexed).toEqual([]);
+	});
+
+	test('keeps the icon inside the heading so the box grows with the text', () => {
+		// **繋ぎ忘れの見張り。**`header` の規則を消しただけで、
+		// markup が `<header><Icon/><h2>` のままだと、**見た目は直りません。**
+		const stragglers = dialogs
+			.filter(([, source]) => /<header>\s*<Icon/.test(source))
+			.map(([path]) => nameOf(path));
+
+		expect(stragglers).toEqual([]);
 	});
 });

@@ -95,8 +95,7 @@
 		aria-label={i18n.t('operation.request.title')}
 	>
 		<header>
-			<Icon name="warning" size={15} />
-			<h2>{i18n.t('operation.request.title')}</h2>
+			<h2><Icon name="warning" size={15} /> {i18n.t('operation.request.title')}</h2>
 		</header>
 
 		<p class="what">{id}</p>
@@ -172,25 +171,31 @@
 		box-shadow: var(--lift-3);
 	}
 
-	header {
-		display: flex;
-		/*
-		 * **題字が 2 行になっても、本文へ重ねない**（2026-09-18 に実機で踏みました）。
-		 *
-		 * `center` は**題字が 1 行である前提**の置き方です。折れたとき、
-		 * **アイコンを中央に合わせようとして高さが伸びません。**
-		 * `flex-start` なら、アイコンは 1 行目に付き、題字は素直に下へ伸びます。
-		 *
-		 * **日本語では出ません。**英語は語が長いので、そこだけ折れます。
-		 */
-		align-items: flex-start;
-		gap: 0.45rem;
-	}
 
+	/*
+	 * **flex を使いません**（2026-09-18 に実機で踏み、2026-09-21 に本当の原因が分かりました）。
+	 *
+	 * 題字が 2 行になると、**2 行目が本文へ重なっていました**（英語のみ）。
+	 * `align-items: center` を `flex-start` に変えても直りませんでした ——
+	 * **WebKit では、flex 容器の高さが中身に追いつかない場面がある**ためです
+	 * （接続タブの名前が切れたのと同じ族）。
+	 *
+	 * **アイコンを題字の中へ入れて、普通の行の流れにします。**
+	 * 行が増えれば高さも増える —— **ここは仕組みで保証されます。**
+	 *
+	 * **読めない同意は、同意ではありません。**
+	 */
 	header h2 {
 		margin: 0;
 		font-size: 1rem;
 		font-weight: 600;
+		/* アイコンを文字と同じ行に置く（`Icon` は inline-block） */
+		display: block;
+	}
+
+	header h2 :global(svg) {
+		vertical-align: -0.125em;
+		margin-right: 0.35rem;
 	}
 
 	.what {
