@@ -1,0 +1,30 @@
+#!/bin/sh
+# commit 前の手元ゲート（product-baseline §5）。
+#
+# **2026-09-24 に、これが無いまま `cargo fmt` を掛けずに commit して CI を落としました**
+# （814909f・`core` が 3 OS すべてで format 落ち）。手元では test と clippy を
+# 走らせていたので「緑」に見えていた ——「自分の緑を信じる」の型です。
+#
+# **ここに入れるのは速いものだけ。**clippy と test は分単位かかるので入れません。
+# 遅いゲートは必ず `--no-verify` で外されるようになり、そのとき fmt も一緒に外れます。
+# 重い面は CI が最終ゲート（§5）。
+
+set -e
+
+if ! command -v cargo >/dev/null 2>&1; then
+  if [ -x "$HOME/.cargo/bin/cargo" ]; then
+    PATH="$HOME/.cargo/bin:$PATH"
+    export PATH
+  else
+    echo "pre-commit: cargo が見つかりません。fmt を確かめずに通します。" >&2
+    echo "pre-commit: **CI の format が最終ゲートです。**" >&2
+    exit 0
+  fi
+fi
+
+if ! cargo fmt --all -- --check; then
+  echo "" >&2
+  echo "pre-commit: **整形が合っていません。**上の差分が CI の format で落ちます。" >&2
+  echo "pre-commit: 直し方 — cargo fmt --all" >&2
+  exit 1
+fi

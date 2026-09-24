@@ -1640,7 +1640,9 @@ async fn the_agent_can_wait_for_the_human_instead_of_asking_again() {
 
     // **何も立っていないなら、待たずにすぐ返る。**
     // 立っていない問いを待つと、AI は黙って固まります。
-    let nothing = engine.wait_for_answer(std::time::Duration::from_secs(5)).await;
+    let nothing = engine
+        .wait_for_answer(std::time::Duration::from_secs(5))
+        .await;
     assert!(
         matches!(nothing, sshboard_engine::Answered::NothingPending),
         "問いが無いのに待っている: {nothing:?}"
@@ -1656,7 +1658,11 @@ async fn the_agent_can_wait_for_the_human_instead_of_asking_again() {
     // **待っている間に、人が答える。**
     let waiting = {
         let engine = std::sync::Arc::clone(&engine);
-        tokio::spawn(async move { engine.wait_for_answer(std::time::Duration::from_secs(10)).await })
+        tokio::spawn(async move {
+            engine
+                .wait_for_answer(std::time::Duration::from_secs(10))
+                .await
+        })
     };
     tokio::time::sleep(std::time::Duration::from_millis(200)).await;
     let _ = engine.console_answer(Actor::Human, false).await;
