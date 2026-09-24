@@ -31,6 +31,12 @@ if command -v python3 >/dev/null 2>&1; then
     echo "pre-commit: **使っていない色の名前があります。**上を直してください。" >&2
     exit 1
   fi
+  if ! python3 tools/check-css-contrast.py >/dev/null; then
+    python3 tools/check-css-contrast.py || true
+    echo "" >&2
+    echo "pre-commit: **字と地の対比が足りません。**上を直してください。" >&2
+    exit 1
+  fi
 else
   echo "pre-commit: python3 が無いので色の名前は確かめません。**CI が最終ゲートです。**" >&2
 fi

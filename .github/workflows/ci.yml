@@ -97,6 +97,14 @@ jobs:
           python3 tools/check-css-tokens.py --self
           python3 tools/check-css-tokens.py
 
+      # **目で見て決めた値は、しばしば足りない。**
+      # 暗い配色で選ばれたタブが帯と差 6 / 255 しか無かった件（a7d1128）を
+      # 直したとき、こちらは明るさの差で値を選び、**対比比を数えていなかった。**
+      - name: 字と地の対比
+        run: |
+          python3 tools/check-css-contrast.py --self
+          python3 tools/check-css-contrast.py
+
       - name: 型検査
         run: pnpm --filter desktop check
 
