@@ -110,6 +110,20 @@ jobs:
           }
           echo "og:image —— ${rel} は在ります"
 
+          # **ページが指す画像が、全部そろっていること。**
+          #
+          # CSP が `img-src 'self'` なので、**無い画像は「遅い」ではなく「無い」**です
+          # —— 空の四角が出るだけで、理由は誰も開かないコンソールにしか出ません。
+          tr '\n' ' ' < site/index.html \
+            | grep -o 'src="\./[^"]*"' | grep -o '\./[^"]*' | sort -u \
+            | while read -r src; do
+                test -f "site/${src#./}" || {
+                  echo "::error::ページが指す ${src} がありません"
+                  exit 1
+                }
+              done
+          echo "画像 —— ページが指すものは全部在ります"
+
           # **外から何も読み込まない**（CSP）。**インラインの script を置かない** ——
           # 置くと `script-src 'self'` が効かず、差し込む口が開きます。
           grep -q "Content-Security-Policy" site/index.html || {

@@ -212,6 +212,19 @@
         margin: 0 0 2px;
         font-size: 15px;
       }
+
+      /*
+       * カードに付く印。**題字の上に置きます。**
+       *
+       * 横に並べません —— 題字は言語によって 2 行になり、
+       * **並べると行が増えたぶんだけ揃わなくなります。**上に置けば、
+       * 何行になっても崩れようがありません。
+       */
+      .card img.mark {
+        display: block;
+        margin: 0 0 8px;
+        border-radius: 6px;
+      }
       .card .sub {
         color: var(--fg-faint);
         font-size: 12.5px;
@@ -625,8 +638,20 @@ claude mcp add sshboard -- "%LOCALAPPDATA%\\sshboard\\sshboard.exe" --mcp-stdio-
         both sides</b> — no CI service, no deploy platform, no secrets uploaded anywhere.
       </p>
 
+      <!--
+        **アイコンはここに置いたものを使います。**
+        CSP が `img-src 'self'` なので、相手のサイトを指すと**何も描かれません**
+        （遅い画像に劣化するのではなく、無くなります）。
+        dbboard 側も同じ理由で sshboard のアイコンを自分の所に置いています。
+      -->
       <div class="files">
         <div class="card">
+          <!--
+            **印は題字の外に置きます。**
+            中に入れると、訳を当てるときに `innerHTML` ごと置き換わって**消えます**
+            （実際に消えました）。訳が持つのは文字だけにしておく。
+          -->
+          <img class="mark" src="./icon.png" width="28" height="28" alt="" />
           <h3 data-t="pair.here">sshboard — the server half</h3>
           <p class="fam" data-t="pair.here.body">
             Upload into directories you listed. Run commands from a list you wrote. Take the
@@ -636,6 +661,7 @@ claude mcp add sshboard -- "%LOCALAPPDATA%\\sshboard\\sshboard.exe" --mcp-stdio-
         </div>
 
         <div class="card">
+          <img class="mark" src="./dbboard-icon-256.png" width="28" height="28" alt="" />
           <h3 data-t="pair.there">dbboard — the database half</h3>
           <p class="fam" data-t="pair.there.body">
             Nine engines, from MySQL and PostgreSQL to Turso, D1 and Firestore. <b>Read-only
