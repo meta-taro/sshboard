@@ -4,11 +4,15 @@
 # 使い方:
 #   .github/scripts/oss-privacy-check.sh <BASE> <HEAD>   # 範囲の commit + 差分を検査
 #   .github/scripts/oss-privacy-check.sh                 # 未 commit の作業ツリー差分のみ検査
+#   .github/scripts/oss-privacy-check.sh --message-file <path>
+#                                                        # **まだ commit されていない message だけ**を検査
+#                                                        # （commit-msg hook 用。git の範囲を要しない）
 #
 # 環境変数（すべて任意）:
 #   OSS_ALLOWED_AUTHOR_EMAIL_REGEX  commit author/committer に許可するメールの ERE
 #                                   既定: @users\.noreply\.github\.com$
-#   OSS_ALLOWED_EMAIL_DOMAINS       追加行・commit message で許可するメールドメイン（空白区切り）
+#   OSS_ALLOWED_EMAIL_DOMAINS       許可ドメインへ**追加**するもの（空白区切り）。
+#                                   既定は DEFAULT_ALLOWED_DOMAINS（下）。置き換えではない
 #   OSS_DENY_WORDS                  禁止語（実名等）を 1 行 1 語。CI では secrets から渡す
 #
 # 設計上の約束:
@@ -18,8 +22,33 @@
 set -uo pipefail
 
 ALLOWED_AUTHOR_RE="${OSS_ALLOWED_AUTHOR_EMAIL_REGEX:-@users\.noreply\.github\.com$}"
-ALLOWED_DOMAINS="${OSS_ALLOWED_EMAIL_DOMAINS:-example.com example.org example.net users.noreply.github.com}"
+# **許可ドメインの既定は、ここが唯一の置き場所。**
+# 以前は workflow の env 側だけに並べていたので、**手元の hook から呼ぶと
+# `noreply@anthropic.com` が弾かれた**（AI の commit が毎回止まる＝hook が外される）。
+#
+#   example.*                  文書の例示用
+#   users.noreply.github.com   GitHub の返信不可アドレス（§25 の推奨先）
+#   openssh.com / libssh.org / tartarus.org
+#                              SSH のアルゴリズム名は RFC 4250 §4.6.1 で
+#                              `name@domainname` 形式。**メールではない。**
+#                              SSH 製品なのでソースにも試験にも常時出る
+#   anthropic.com              AI エージェントの Co-Authored-By に入る返信不可の窓口。
+#                              **個人名でも個人メールでもない**ので §25 の対象外
+#
+# `OSS_ALLOWED_EMAIL_DOMAINS` を渡すと**置き換え**になる（足すのではない）ので、
+# workflow 側は `vars.` の追加ぶんだけを渡し、この既定に足す形にしている。
+DEFAULT_ALLOWED_DOMAINS="example.com example.org example.net users.noreply.github.com openssh.com libssh.org tartarus.org anthropic.com"
+ALLOWED_DOMAINS="$DEFAULT_ALLOWED_DOMAINS ${OSS_ALLOWED_EMAIL_DOMAINS:-}"
 DENY_WORDS="${OSS_DENY_WORDS:-}"
+
+# `--message-file <path>` —— commit される前の message を検査する口。
+# **同じ許可ドメイン表と同じマスク処理を使うため、別スクリプトにしない。**
+# 2 つ持つと、片方だけ直る日が来る。
+MSG_FILE=""
+if [ "${1:-}" = "--message-file" ]; then
+  MSG_FILE="${2:-}"
+  shift 2 2>/dev/null || shift $#
+fi
 
 EMAIL_RE='[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}'
 # 検査スクリプト自身は正規表現やドメイン例を含むため除外する
@@ -41,6 +70,46 @@ allowed_email() {
   done
   return 1
 }
+
+# --- 0. message だけを検査して終わる（commit-msg hook） ---------------------
+if [ -n "$MSG_FILE" ]; then
+  if [ ! -f "$MSG_FILE" ]; then
+    note "NG [message-file] $MSG_FILE が読めません"
+    exit 1
+  fi
+  # コメント行（`#` 始まり）は commit message に残らないので除く。
+  # `git commit` のテンプレートには diff や branch 名が入るため、
+  # **除かないと自分の作業内容で誤検出する。**
+  msg="$(grep -v '^#' "$MSG_FILE")"
+
+  while read -r found; do
+    [ -z "${found:-}" ] && continue
+    allowed_email "$found" && continue
+    note "NG [message-email] （commit 前） : $(printf '%s' "$found" | mask_email)"
+    fail=1
+  done < <(printf '%s' "$msg" | grep -Eo "$EMAIL_RE" | sort -u)
+
+  if [ -n "$DENY_WORDS" ]; then
+    i=0
+    while IFS= read -r w; do
+      i=$((i + 1))
+      [ -z "$w" ] && continue
+      if printf '%s' "$msg" | grep -qiF -- "$w"; then
+        note "NG [message-denyword] （commit 前） : 禁止語 #$i に一致"
+        fail=1
+      fi
+    done <<< "$DENY_WORDS"
+  fi
+
+  if [ "$fail" -ne 0 ]; then
+    note ""
+    note "commit message に個人情報が混ざっています。**まだ commit されていないので、直せます。**"
+    note "  message を書き直してください（history に入ると rebase と force push が要ります）"
+    exit 1
+  fi
+  note "OK commit message に個人情報の混入は検出されませんでした"
+  exit 0
+fi
 
 # --- 範囲の解決 -------------------------------------------------------------
 BASE="${1:-}"

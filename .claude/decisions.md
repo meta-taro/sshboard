@@ -3200,3 +3200,36 @@ hook を直したとき、**入れ直すまで古いものが走り続ける。*
   HEAD は 814909f のまま動かなかった）。探り棒は外した
 - `tools/git-hooks/install.sh` — `core.hooksPath` を向けるだけ
 - **cargo が PATH に無い席では、通す**（止めない）。その旨を出して CI へ委ねる
+
+### 追記 —— **commit-msg も足した。許可ドメインの表は 1 か所へ寄せた**（2026-09-24）
+
+割符席の手元ゲートは 10 段あり、こちらに無い段が 1 つあった ——
+**`commit message の個人情報`**。`oss-privacy-check` は CI に在るが、
+**そこで捕まえた時点でもう commit が在る。**message は history へ焼き付くので、
+直すには rebase と force push が要る ＝ 実質不可逆。**1 秒で済むので手前へ置く。**
+
+```
+足した   tools/git-hooks/commit-msg
+         → .github/scripts/oss-privacy-check.sh --message-file <path> を呼ぶだけ
+```
+
+**別スクリプトにしなかった。**許可ドメイン表を 2 つ持つと、片方だけ直る日が来る。
+
+**そしてその「2 つ持つ」が既に起きていた。**許可ドメインは
+`oss-privacy-check.yml` の env 側にしか並んでおらず、**スクリプトの既定は 4 個だけ**
+だった。手元の hook から呼ぶと **`noreply@anthropic.com` が弾かれる** ——
+**AI が commit するたび止まる hook は、外される。**
+
+```
+寄せた   DEFAULT_ALLOWED_DOMAINS（スクリプト内）が唯一の置き場所
+         env の OSS_ALLOWED_EMAIL_DOMAINS は**追加ぶんだけ**（置き換えではない）
+```
+
+**確かめ方（両側）** ——
+
+```
+RED    個人メール入りの message で commit → **止まった。HEAD が動かなかった**
+       出力は t***@***.com にマスクされていた（CI ログは公開されるため原文を出さない）
+GREEN  noreply@anthropic.com + zlib@openssh.com の message → 通った
+回帰   引数なし（作業ツリー）と範囲指定（CI と同じ形）を両方 → どちらも OK
+```

@@ -1,0 +1,17 @@
+#!/bin/sh
+# commit message の個人情報を、**commit される前に**止める（§25・D56）。
+#
+# CI（`oss-privacy-check`）は push / PR で同じことを見ますが、**そこで捕まえると
+# もう commit が在ります。**message は history に焼き付くので、直すには rebase と
+# force push が要る —— 実質不可逆。**1 秒で済むので、手前に置きます。**
+#
+# **検査本体は CI と同じスクリプトを呼びます。**許可ドメイン表を 2 つ持つと、
+# 片方だけ直る日が来ます。
+#
+# `OSS_DENY_WORDS`（実名等）は CI の secret なので、**手元では空**です。
+# つまりここで見られるのはメールだけ。**禁止語は CI が最終ゲート。**
+
+set -e
+SCRIPT=".github/scripts/oss-privacy-check.sh"
+[ -f "$SCRIPT" ] || exit 0
+exec bash "$SCRIPT" --message-file "$1"
