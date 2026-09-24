@@ -90,6 +90,13 @@ jobs:
       - name: 依存を入れる
         run: pnpm install --frozen-lockfile
 
+      # `var(--typo)` は**黙って当たらない。**型検査も試験も通り、画面を見るまで
+      # 分からない（2026-09-24・割符の席が同じ穴で 4 件）。**先に機械に見させる。**
+      - name: 色の名前
+        run: |
+          python3 tools/check-css-tokens.py --self
+          python3 tools/check-css-tokens.py
+
       - name: 型検査
         run: pnpm --filter desktop check
 
