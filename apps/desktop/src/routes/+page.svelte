@@ -1996,10 +1996,15 @@
 		transform: scale(0.97);
 	}
 
+	/*
+	 * **選ばれているタブ。**`--surface` では暗い配色で帯との差が 6 / 255 しか無く、
+	 * **どれが選ばれているか分かりませんでした**（実機の指摘・2026-09-24）。
+	 * 影は暗い背景に出ないので、**明るさで浮かせます**（`--surface-raised`）。
+	 */
 	.view-panel button.active,
 	.tabs button.active {
 		color: var(--fg);
-		background: var(--surface);
+		background: var(--surface-raised);
 		box-shadow: var(--inner-highlight), var(--lift-1);
 	}
 
