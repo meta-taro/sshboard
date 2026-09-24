@@ -70,7 +70,11 @@ jobs:
           test -f site/index.html
           test -f site/icon.png
           test -f site/i18n.js
+          test -f site/app.js
           test -f site/tools.json
+          test -f site/llms.txt
+          test -f site/robots.txt
+          test -f site/sitemap.xml
           grep -q '<title>' site/index.html
 
           # **写真が 2 組そろっていること**（日本語と英語）。
@@ -88,6 +92,44 @@ jobs:
             done
           done
           echo "写真 2 組 × 5 枚 —— そろっています"
+
+          # **SNS に貼ったときに出るものが、実在すること。**
+          #
+          # `og:image` が 404 だと、**絵の無いカードが貼られます** ——
+          # 壊れていても CI は緑のままで、**貼った人が気づくまで分かりません。**
+          # **属性は行をまたぎます。**畳んでから拾わないと、空で取れます
+          # （実際に一度空で取れました）。
+          og="$(tr '\n' ' ' < site/index.html \
+                | grep -o 'property="og:image" *content="[^"]*"' \
+                | grep -o 'https://[^"]*' | head -1)"
+          [ -n "$og" ] || { echo "::error::og:image が在りません"; exit 1; }
+          rel="site/${og#https://meta-taro.github.io/sshboard/}"
+          test -f "$rel" || {
+            echo "::error::og:image が指す ${rel} がありません"
+            exit 1
+          }
+          echo "og:image —— ${rel} は在ります"
+
+          # **外から何も読み込まない**（CSP）。**インラインの script を置かない** ——
+          # 置くと `script-src 'self'` が効かず、差し込む口が開きます。
+          grep -q "Content-Security-Policy" site/index.html || {
+            echo "::error::CSP が在りません"; exit 1
+          }
+          if grep -qE '<script>[^<]' site/index.html; then
+            echo "::error::インラインの script が在ります。CSP が効きません"
+            exit 1
+          fi
+          echo "CSP —— 在ります／インラインの script なし"
+
+          # **兄弟を相互に紹介していること**（2026-09-24・運用者）。
+          # 片方だけ足して忘れる、が起きやすい所です。
+          for sibling in dbboard warifu; do
+            grep -q "meta-taro.github.io/${sibling}" site/index.html || {
+              echo "::error::${sibling} への導線がありません"
+              exit 1
+            }
+          done
+          echo "兄弟 —— dbboard と warifu を紹介しています"
 
       # **訳を検める。**人の目だけでは漏れる ——
       # 実際に、キリル文字の `р` が `prompt` に紛れ込んでいたのをここで拾った。

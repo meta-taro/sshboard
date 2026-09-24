@@ -8,13 +8,47 @@
       name="description"
       content="A desktop SSH board where you and your AI agent share the same connection. The agent works inside a fence you draw, on a screen you are watching. macOS and Windows. Alpha."
     />
+    <link rel="canonical" href="https://meta-taro.github.io/sshboard/" />
     <link rel="icon" href="./icon.png" />
-    <meta property="og:title" content="sshboard" />
+
+    <!--
+      **SNS に貼ったときに出るもの。**
+      絵はアイコンではなく**実物の画面**にします —— アイコンでは、
+      何をする道具なのかが 1 秒で伝わりません。
+      この写真は**架空の設定の上で撮ったもの**です（D26 / 禁止事項 4）。
+    -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="sshboard" />
+    <meta property="og:url" content="https://meta-taro.github.io/sshboard/" />
+    <meta property="og:title" content="sshboard — you and your AI agent, on one SSH session" />
     <meta
       property="og:description"
-      content="Your AI agent and you, on one SSH session. Nothing happens off-screen."
+      content="A desktop SSH client with an MCP server built in. The agent has no run_command tool, writes only inside directories you listed, and everything it does lands on your screen. macOS and Windows. Free and open source."
     />
-    <meta property="og:image" content="./icon.png" />
+    <meta
+      property="og:image"
+      content="https://meta-taro.github.io/sshboard/shots/en/files.png"
+    />
+    <meta property="og:image:width" content="1100" />
+    <meta property="og:image:height" content="700" />
+    <meta
+      property="og:image:alt"
+      content="sshboard with three servers open as tabs, a local pane and a remote pane side by side."
+    />
+    <meta name="twitter:card" content="summary_large_image" />
+
+    <!--
+      **外から何も読み込みません。**
+      外向きは GitHub の API（版と資産名を読む所）だけ。
+      **`'self'` も要ります** —— ページ自身が `tools.json` を読むためで、
+      これを落とすと**道具の一覧が丸ごと出なくなります**（実際に一度そうなりました）。
+      script も style も自分のものだけ —— **鍵を扱う道具の入口なので、
+      ここから何かを差し込ませない。**
+    -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'self'; connect-src 'self' https://api.github.com; img-src 'self'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'"
+    />
     <style>
       /*
        * 色は `apps/desktop/src/lib/styles/tokens.css` から採る。
@@ -233,6 +267,14 @@
         margin-top: 7px;
         font-size: 12.5px;
         color: var(--fg-faint);
+      }
+
+      /* 兄弟プロダクトの 1 段落。落とす先のカードより文が長いので、行間を持たせる */
+      .card p.fam {
+        margin: 0 0 12px;
+        font-size: 13px;
+        line-height: 1.65;
+        color: var(--fg-muted);
       }
 
       .note {
@@ -567,6 +609,37 @@ claude mcp add sshboard -- "%LOCALAPPDATA%\\sshboard\\sshboard.exe" --mcp-stdio-
         briefing.
       </p>
 
+      <h2 data-t="h.family">The same idea, elsewhere</h2>
+
+      <p data-t="family.intro">
+        Three tools, one rule: <b>the agent works where you can see it, inside a fence you drew.</b>
+        All free, all open source, all self-hosted — none of them has a service to sign up for.
+      </p>
+
+      <div class="files">
+        <div class="card">
+          <h3>dbboard</h3>
+          <p class="sub" data-t="family.db.sub">Databases</p>
+          <p class="fam" data-t="family.db">
+            A desktop database client with an MCP server built in — nine adapters, from
+            MySQL and PostgreSQL to Turso, D1 and Firestore. <b>Read-only unless you opt a
+            connection in,</b> and even then grants, role DDL, <code>TRUNCATE</code> and
+            <code>DROP</code> are refused whatever you set.
+          </p>
+          <a class="get thin" href="https://meta-taro.github.io/dbboard/">meta-taro.github.io/dbboard</a>
+        </div>
+
+        <div class="card">
+          <h3>warifu</h3>
+          <p class="sub" data-t="family.wa.sub">Conversations</p>
+          <p class="fam" data-t="family.wa">
+            People and agents in one conversation, peer to peer. <b>No central account and no
+            server to run</b> — you hand someone a key, and that key is what lets them in.
+          </p>
+          <a class="get thin" href="https://meta-taro.github.io/warifu/">meta-taro.github.io/warifu</a>
+        </div>
+      </div>
+
       <h2 data-t="h.never">What it will not become</h2>
       <ul>
         <li data-t="never.1">A way to run an agent against a server while nobody is watching.</li>
@@ -585,170 +658,6 @@ claude mcp add sshboard -- "%LOCALAPPDATA%\\sshboard\\sshboard.exe" --mcp-stdio-
     </main>
 
     <script src="./i18n.js"></script>
-    <script>
-      // **版・落とす先・道具の一覧は、どれも手で書かない。**
-      // 書くと、変えるたびにページを直す作業が増え、**忘れた分だけ嘘を配る。**
-      (async () => {
-        const put = (id, text) => {
-          const el = document.getElementById(id);
-          if (el) el.textContent = text;
-        };
-
-        // --- 言語 ---------------------------------------------------------
-        // **アプリと同じ 11 言語**（`apps/desktop/src/lib/i18n/locales.ts`）。
-        // 英語は HTML に直接書いてあるので、**訳が無い言語でも文章は出ます。**
-        const LOCALES = [
-          ['en', 'English'], ['ja', '日本語'], ['ko', '한국어'],
-          ['zh-CN', '简体中文'], ['zh-TW', '繁體中文'], ['de', 'Deutsch'],
-          ['fr', 'Français'], ['es', 'Español'], ['pt-BR', 'Português (Brasil)'],
-          ['ru', 'Русский'], ['it', 'Italiano'],
-        ];
-        const STORED = 'sshboard-site-lang';
-        const table = window.SSHBOARD_I18N || {};
-        const english = new Map();
-        for (const el of document.querySelectorAll('[data-t]')) {
-          english.set(el, el.innerHTML);
-        }
-
-        const resolve = (tag) => {
-          if (!tag) return null;
-          const codes = LOCALES.map(([c]) => c);
-          if (codes.includes(tag)) return tag;
-          const primary = tag.split('-')[0].toLowerCase();
-          return (
-            codes.find((c) => c.toLowerCase() === primary) ??
-            codes.find((c) => c.toLowerCase().startsWith(primary + '-')) ??
-            null
-          );
-        };
-
-        let toolCount = '';
-        const apply = (code) => {
-          const words = code === 'en' ? null : table[code];
-          for (const el of document.querySelectorAll('[data-t]')) {
-            const key = el.getAttribute('data-t');
-            const said = words && words[key];
-            el.innerHTML = said ?? english.get(el);
-          }
-          // **訳を当てると中の span も作り直される。**数はここで入れ直す ——
-          // 訳へ数を焼き込むと、道具が増えた日に**その言語だけ嘘になる。**
-          put('tool-count', toolCount);
-          // **写真も言語に合わせる。**
-          //
-          // 撮ってあるのは日本語と英語の 2 組だけです。
-          // **他の 8 言語には英語の画面を出します** —— 日本語の画面より、
-          // まだ読める人が多いためで、**「撮っていない」を隠すためではありません。**
-          // （`Not yet` に、残りの言語の写真が無いことを書いてあります。）
-          const shots = code === 'ja' ? 'ja' : 'en';
-          for (const view of ['connections', 'files', 'console', 'band', 'diag']) {
-            const img = document.getElementById(`shot-${view}`);
-            if (img) img.src = `./shots/${shots}/${view}.png`;
-          }
-          document.documentElement.lang = code;
-          try {
-            localStorage.setItem(STORED, code);
-          } catch {
-            /* 記憶できないだけ。**画面は出す。** */
-          }
-        };
-
-        const picker = document.getElementById('lang');
-        if (picker) {
-          for (const [code, native] of LOCALES) {
-            const option = document.createElement('option');
-            option.value = code;
-            option.textContent = native;
-            picker.append(option);
-          }
-          let stored = null;
-          try {
-            stored = localStorage.getItem(STORED);
-          } catch {
-            /* 読めないだけ */
-          }
-          const start = resolve(stored) ?? resolve(navigator.language) ?? 'en';
-          picker.value = start;
-          apply(start);
-          picker.addEventListener('change', () => apply(picker.value));
-        }
-
-        // --- 道具の一覧 ---------------------------------------------------
-        // `tools/make-site-tools.py` が `#[tool(` から作ったもの。
-        // **道具を足して直し忘れる、が起きない形。**
-        try {
-          const res = await fetch('./tools.json');
-          if (!res.ok) throw new Error(String(res.status));
-          const data = await res.json();
-          toolCount = String(data.total);
-          put('tool-count', toolCount);
-          const host = document.getElementById('tools');
-          if (host) {
-            host.innerHTML = data.groups
-              .map(
-                (g) =>
-                  `<h3 data-t="tools.${g.key}">${window.SSHBOARD_GROUPS?.[g.key] ?? g.key}</h3>` +
-                  '<table class="tools"><tbody>' +
-                  g.tools
-                    .map((t) => `<tr><td><code>${t.name}</code></td><td>${t.line}</td></tr>`)
-                    .join('') +
-                  '</tbody></table>'
-              )
-              .join('');
-            // **束の見出しも訳す。**描いたあとに当て直す
-            apply(picker ? picker.value : 'en');
-          }
-        } catch {
-          const host = document.getElementById('tools');
-          if (host) {
-            host.innerHTML =
-              '<p class="note">The tool list could not be loaded. ' +
-              '<a href="https://github.com/meta-taro/sshboard">See the source</a>.</p>';
-          }
-        }
-
-        // --- 版と落とす先 -------------------------------------------------
-        try {
-          // **`updater` は版ではなく更新の宛先**なので、数える対象から外す（D51）。
-          const res = await fetch(
-            'https://api.github.com/repos/meta-taro/sshboard/releases?per_page=10'
-          );
-          if (!res.ok) throw new Error(String(res.status));
-          const list = await res.json();
-          const rel = (Array.isArray(list) ? list : []).find(
-            (x) => !x.draft && x.tag_name !== 'updater'
-          );
-          if (!rel) throw new Error('no release');
-
-          put('ver', rel.tag_name);
-          const d = new Date(rel.published_at);
-          const ymd = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(
-            d.getDate()
-          ).padStart(2, '0')}`;
-          put('when', `${rel.tag_name} · ${ymd}`);
-
-          const find = (fn) => (rel.assets || []).find(fn);
-          const wire = (linkId, sizeId, asset) => {
-            if (!asset) return;
-            const a = document.getElementById(linkId);
-            if (a) a.href = asset.browser_download_url;
-            put(sizeId, `${asset.name} · ${(asset.size / 1048576).toFixed(1)} MB`);
-          };
-          // **`.dmg` を先に。**`.app.tar.gz` は自動更新が食べる形で、
-          // **人が受け取る形ではありません** —— 実際に「変な zip」と踏まれました。
-          // 古い版には `.dmg` が無いので、無ければ従来のものへ落とします。
-          wire(
-            'dl-mac',
-            'size-mac',
-            find((x) => x.name.endsWith('.dmg')) ?? find((x) => x.name.endsWith('.app.tar.gz'))
-          );
-          wire('dl-win', 'size-win', find((x) => x.name.endsWith('-setup.exe')));
-          wire('dl-msi', 'size-msi', find((x) => x.name.endsWith('.msi')));
-        } catch {
-          // **黙って古い物を配らない。**読めなかったことを出す
-          put('ver', 'see Releases');
-          put('when', 'Could not read the release list — check the Releases page.');
-        }
-      })();
-    </script>
+    <script src="./app.js"></script>
   </body>
 </html>

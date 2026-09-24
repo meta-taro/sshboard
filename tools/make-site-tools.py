@@ -90,6 +90,20 @@ def main() -> None:
     target.write_text(json.dumps(out, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
     print(f"{len(found)} 本を {target.relative_to(ROOT)} へ書きました")
 
+    # **`llms.txt` の本数も、ここで埋める。**
+    #
+    # あそこは **AI がこの製品を読む入口**で、手で書くと**道具を増やした日に
+    # そこだけ嘘になります。**ページ本体は JS が `tools.json` から読みますが、
+    # `llms.txt` は素のテキストなので、生成のときに差し込みます。
+    llms = ROOT / "site/llms.txt"
+    text = llms.read_text(encoding="utf-8")
+    filled = re.sub(r"(\{\{TOOL_COUNT\}\}|\b\d+) tools over MCP", f"{len(found)} tools over MCP", text)
+    if filled == text and "tools over MCP" not in text:
+        sys.exit("**`llms.txt` に本数を書く場所がありません。**"
+                 "`N tools over MCP` の 1 行を残してください")
+    llms.write_text(filled, encoding="utf-8")
+    print(f"llms.txt の本数を {len(found)} にしました")
+
 
 if __name__ == "__main__":
     main()

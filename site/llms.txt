@@ -1,0 +1,77 @@
+# sshboard
+
+> A desktop SSH client where a human and an AI agent hold **the same one
+> connection**. The agent works through an MCP server built into the app, and
+> everything it does lands on a screen the human is sitting in front of. Tauri 2
+> + SvelteKit shell, Rust core, MIT-licensed, self-hosted only — there is no
+> service to sign up for.
+
+This file exists because the README is long and the part you probably need —
+how to connect, and what you are and are not allowed to do — is spread across
+it. If you were asked to "connect sshboard", read the two sections below and
+stop.
+
+**Three facts worth having before you read anything else.**
+
+**There is no `run_command(cmd)` tool.** Not a filtered one, not a clever one.
+An agent cannot hand an arbitrary string to a shell. Read-only commands come
+from an allow-list a human wrote in `readonly.toml`, which **starts empty** —
+out of the box you cannot run a single command.
+
+**Writes are fenced to directories a human listed**, per connection, and that
+list also starts empty. Upload and mkdir only: no delete, rename, move, chmod,
+service restart or package install. There is **no download-to-my-machine
+tool** — the fence does not protect the human's laptop, so no door is opened
+onto it.
+
+**Anything that changes state needs a human press.** The first attempt is
+always refused so the screen can show exactly what would run. Approvals expire
+in five minutes and cover one run.
+
+## Connect sshboard as an MCP server
+
+The app must be running. This form starts sshboard as a relay with no window,
+so the token is never written to disk — not into `~/.claude.json`, not into
+shell history:
+
+```sh
+# macOS
+claude mcp add sshboard -- /Applications/sshboard.app/Contents/MacOS/sshboard --mcp-stdio-proxy
+
+# Windows
+claude mcp add sshboard -- "%LOCALAPPDATA%\sshboard\sshboard.exe" --mcp-stdio-proxy
+```
+
+The port is fixed at `22022` and the token is reused, so this is a one-time
+step; restarting the app does not make you register again. If the port is
+taken it says so on screen rather than quietly moving.
+
+## Call `about_sshboard` first
+
+That tool exists so you can find out what this is, what you may and may not do,
+and what changed in each version, without a human pasting a briefing. It
+touches no remote server and puts nothing on the human's screen.
+
+## What you can do
+
+35 tools over MCP, in seven groups: connecting and choosing where operations
+go; looking at the server (listing, stat, reading files, search, disk usage,
+processes, listening ports, service status, runtime versions); writing inside
+the fence; running commands from the human's allow-lists; the shared terminal;
+the human's screen; and sshboard itself.
+
+The terminal is **shared**. While you hold it the human's input is locked out
+and a Stop button is showing on their screen — they can take it back at any
+time, and every keystroke you send is visible to them as you send it.
+
+## Sibling projects
+
+- **dbboard** — the same idea for databases: a desktop client plus an MCP
+  server, read-only unless a human opts a connection in.
+  https://meta-taro.github.io/dbboard/
+- **warifu** — people and agents in one conversation, peer to peer, with no
+  central account. https://meta-taro.github.io/warifu/
+
+## Source
+
+https://github.com/meta-taro/sshboard

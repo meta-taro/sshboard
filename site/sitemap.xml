@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- 1 枚だけ。**外からのリンク以外に、検索が見つける道を 1 本持たせる**ため。 -->
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>https://meta-taro.github.io/sshboard/</loc>
+    <changefreq>weekly</changefreq>
+  </url>
+</urlset>

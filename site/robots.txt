@@ -1,0 +1,6 @@
+# 配布ページは sshboard の公開の入口で、ここに私的なものはありません。
+# **接続先は 1 つも置いていません**（CLAUDE.md 禁止事項 4）ので、全部を通します。
+User-agent: *
+Allow: /
+
+Sitemap: https://meta-taro.github.io/sshboard/sitemap.xml
