@@ -54,7 +54,7 @@ touches no remote server and puts nothing on the human's screen.
 
 ## What you can do
 
-35 tools over MCP, in seven groups: connecting and choosing where operations
+36 tools over MCP, in seven groups: connecting and choosing where operations
 go; looking at the server (listing, stat, reading files, search, disk usage,
 processes, listening ports, service status, runtime versions); writing inside
 the fence; running commands from the human's allow-lists; the shared terminal;

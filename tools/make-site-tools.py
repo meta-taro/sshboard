@@ -35,7 +35,7 @@ GROUPS = [
     ("cmds", ["list_readonly_commands", "run_readonly", "list_operations",
               "run_operation"]),
     ("console", ["console_open", "console_type", "console_stop", "read_stream"]),
-    ("screen", ["show_view", "capture_window", "pending_status", "diagnostics"]),
+    ("screen", ["show_view", "capture_window", "pending_status", "await_answer", "diagnostics"]),
     ("itself", ["about_sshboard", "ping"]),
 ]
 

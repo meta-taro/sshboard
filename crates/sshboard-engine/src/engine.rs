@@ -89,6 +89,30 @@ struct Held {
     last_closed: Option<(String, Actor)>,
 }
 
+/// **待った結果**（2026-09-24）。
+///
+/// **3 つを型で分けます。**同じ顔にすると、AI が取り違えます ——
+/// 「断られた」なら諦めるべきで、「まだ」なら待ち直してよく、
+/// 「そもそも立っていない」なら**待つこと自体が誤り**です。
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "camelCase", tag = "kind")]
+pub enum Answered {
+    /// **問いが 1 つも立っていない。**待たずにすぐ返ります ——
+    /// 立っていない問いを待つと、AI は黙って固まります。
+    NothingPending,
+    /// **人が答えた。**何が答えられ、何がまだ残っているか。
+    ///
+    /// **答えの中身（許したか断ったか）はここに入れません。**
+    /// それは `pending_status` と、その操作の結果が持っています。
+    /// ここが言うのは「**動いた**」だけです。
+    Answered {
+        answered: Vec<String>,
+        waiting: Vec<String>,
+    },
+    /// **時間切れ。**まだ答えられていません。**断られたのとは別**です。
+    StillWaiting { waiting: Vec<String> },
+}
+
 /// **人にホスト鍵を確かめてもらっている**（Issue #24）。
 ///
 /// パスフレーズ待ちと**同じ型で表せません。**指紋が要るからです ——
@@ -270,7 +294,7 @@ impl Engine {
         held.active = Some(id.to_owned());
         let all = held.live.values().map(|l| l.opened.clone()).collect();
         drop(held);
-        let _ = self.changed.send(all);
+        let _ = self.changed.send_replace(all);
         Ok(opened)
     }
 
@@ -298,6 +322,104 @@ impl Engine {
 
     pub fn subscribe_host_key_request(&self) -> watch::Receiver<Option<HostKeyAsk>> {
         self.host_key_request.subscribe()
+    }
+
+    /// **人が答えるまで待つ**（2026-09-24）。
+    ///
+    /// 運用者の指摘 ——
+    ///
+    /// > **押した時点であなたが検知できないということでしょう。
+    /// > ずーっと前から指摘しています。**
+    ///
+    /// `pending_status` は**聞く**ことしかできません。
+    /// **押された瞬間に AI へ何かが届くわけではない**ので、毎回こうなります。
+    ///
+    /// ```text
+    /// AI「押してください」→ 人が押す → **AI は知らない**
+    ///                    → 人「押しました」→ AI が確かめる
+    /// ```
+    ///
+    /// **その「押しました」は、人が AI の目の代わりをしている**ということです。
+    /// **待てる口が在れば、その往復が消えます。**
+    ///
+    /// ## 帯へ載せません
+    ///
+    /// `pending_status` と同じ扱いです。**待っているだけで人の画面に何も出ない**、
+    /// が要点 —— 載せると、待つたびに帯が埋まります。
+    ///
+    /// ## 時間切れと、答えは別物
+    ///
+    /// **同じ顔にすると、AI は「断られた」と「まだ答えていない」を取り違えます。**
+    /// 断られたなら諦めるべきで、まだなら待ち直してよい。**逆をやると害が出ます。**
+    pub async fn wait_for_answer(&self, how_long: Duration) -> Answered {
+        // **いま立っている問いを数える。**立っていないなら待ちません ——
+        // 立っていない問いを待つと、AI は黙って固まります。
+        let standing = self.standing_questions().await;
+        if standing.is_empty() {
+            return Answered::NothingPending;
+        }
+
+        let mut console = self.console_request_changed.subscribe();
+        let mut passphrase = self.passphrase_request.subscribe();
+        let mut host_key = self.host_key_request.subscribe();
+        let mut operation = self.operation_request.subscribe();
+
+        let deadline = tokio::time::Instant::now() + how_long;
+        loop {
+            let left = deadline.saturating_duration_since(tokio::time::Instant::now());
+            if left.is_zero() {
+                return Answered::StillWaiting { waiting: standing };
+            }
+            // **どれかが動いたら見に行く。**どれが動いたかは問いません ——
+            // 動いたあとに数え直せば、何が残っているかはそこで分かります。
+            let moved = tokio::time::timeout(left, async {
+                tokio::select! {
+                    _ = console.changed() => {}
+                    _ = passphrase.changed() => {}
+                    _ = host_key.changed() => {}
+                    _ = operation.changed() => {}
+                }
+            })
+            .await;
+            if moved.is_err() {
+                return Answered::StillWaiting { waiting: standing };
+            }
+            let now = self.standing_questions().await;
+            // **減っていたら、人が答えたということ。**
+            // 増えただけなら（別の問いが立った）、待ち続けます。
+            if now.len() < standing.len() {
+                let answered = standing
+                    .iter()
+                    .filter(|one| !now.contains(one))
+                    .cloned()
+                    .collect();
+                return Answered::Answered {
+                    answered,
+                    waiting: now,
+                };
+            }
+        }
+    }
+
+    /// いま人の答えを待っている問い。**名前だけ**を返します。
+    ///
+    /// **中身は返しません** —— 指紋も、走る中身も、`pending_status` が持っています。
+    /// ここは「**何が待っているか**」だけを数えるためのものです。
+    async fn standing_questions(&self) -> Vec<String> {
+        let mut waiting = Vec::new();
+        if self.console_request_changed.borrow().is_some() {
+            waiting.push("console".to_owned());
+        }
+        if self.passphrase_request.borrow().is_some() {
+            waiting.push("passphrase".to_owned());
+        }
+        if self.host_key_request.borrow().is_some() {
+            waiting.push("hostKey".to_owned());
+        }
+        if self.operation_request.borrow().is_some() {
+            waiting.push("operation".to_owned());
+        }
+        waiting
     }
 
     /// **聞かれたホスト鍵を、人が承認する**（Issue #26）。
@@ -564,7 +686,7 @@ impl Engine {
         let all = held.live.values().map(|l| l.opened.clone()).collect();
         drop(held);
 
-        let _ = self.changed.send(all);
+        let _ = self.changed.send_replace(all);
         // **繋がったら問いを畳む**（Issue #13 / #24）。
         // 入口でも畳んでいますが、ここでも畳みます —— この間に AI が
         // 別の経路で立て直している見込みがあるためです。
@@ -601,7 +723,7 @@ impl Engine {
             let _ = self.show(actor, &format!("disconnect {}", open.id)).await;
             self.diag.info(Stage::Reach, Some(&open.id), "切りました");
         }
-        let _ = self.changed.send(all);
+        let _ = self.changed.send_replace(all);
         closed
     }
 
@@ -783,7 +905,7 @@ impl Engine {
                     Some(&target),
                     format!("握りが{}へ移りました（同じシェルのまま）", who(actor)),
                 );
-                let _ = self.console_changed.send(Some(actor));
+                let _ = self.console_changed.send_replace(Some(actor));
                 return Ok(ConsoleOpened::TookOver);
             }
         }
@@ -817,7 +939,7 @@ impl Engine {
             Some(&target),
             format!("端末を開きました（{}・{cols}×{rows}）", who(actor)),
         );
-        let _ = self.console_changed.send(Some(actor));
+        let _ = self.console_changed.send_replace(Some(actor));
         Ok(ConsoleOpened::Fresh)
     }
 
@@ -901,7 +1023,7 @@ impl Engine {
                         None => format!("{}が握りました", who(actor)),
                     },
                 );
-                let _ = self.console_changed.send(Some(actor));
+                let _ = self.console_changed.send_replace(Some(actor));
                 Ok(())
             }
         }
@@ -929,7 +1051,7 @@ impl Engine {
         let Some(asked_by) = slot.request.take() else {
             // 問いが無いのに答えた。**同じ状態へ向かうので失敗にしません。**
             drop(slot);
-            let _ = self.console_request_changed.send(None);
+            let _ = self.console_request_changed.send_replace(None);
             return Ok(());
         };
         let moved = if allow {
@@ -949,9 +1071,9 @@ impl Engine {
                 format!("人が断りました。{}は握れません", who(asked_by))
             },
         );
-        let _ = self.console_request_changed.send(None);
+        let _ = self.console_request_changed.send_replace(None);
         if moved {
-            let _ = self.console_changed.send(Some(asked_by));
+            let _ = self.console_changed.send_replace(Some(asked_by));
         }
         Ok(())
     }
@@ -989,7 +1111,7 @@ impl Engine {
                     who(actor)
                 ),
             );
-            let _ = self.console_request_changed.send(Some(actor));
+            let _ = self.console_request_changed.send_replace(Some(actor));
         }
         Err(EngineError::ConsoleApprovalNeeded)
     }
@@ -1048,7 +1170,7 @@ impl Engine {
                 format!("端末を止めました（{}）", who(actor)),
             );
         }
-        let _ = self.console_changed.send(None);
+        let _ = self.console_changed.send_replace(None);
         Ok(())
     }
 

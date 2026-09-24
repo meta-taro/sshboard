@@ -322,6 +322,40 @@ impl SshboardMcp {
         .map_err(|error| ErrorData::internal_error(error.to_string(), None))
     }
 
+    /// **人が答えるまで待つ**（2026-09-24）。
+    #[tool(
+        description = "Wait until the person at the screen answers something you asked for, \
+                       instead of polling pending_status in a loop. Blocks for up to \
+                       timeout_secs (default 60, max 300) and returns as soon as any pending \
+                       question is answered - the console hold, a key passphrase, a host key, \
+                       or an operation approval. \
+                       \
+                       Three outcomes, and they mean different things. **nothingPending**: no \
+                       question was waiting when you called, so there was nothing to wait for - \
+                       do not call this before asking for something. **answered**: the person \
+                       acted; `answered` names what they answered and `waiting` what is still \
+                       open. It does NOT say whether they allowed or refused - read \
+                       pending_status or retry the operation to find that out. \
+                       **stillWaiting**: the timeout ran out and they have not answered yet, \
+                       which is not the same as being refused - you may wait again. \
+                       \
+                       Touches no remote server and shows nothing on their screen."
+    )]
+    pub async fn await_answer(
+        &self,
+        Parameters(request): Parameters<AwaitAnswer>,
+    ) -> Result<String, ErrorData> {
+        // **帯へ載せません**（`pending_status` と同じ扱い）。
+        // **待っているだけで人の画面に何も出ない**、が要点です。
+        let engine = self.engine()?;
+        let secs = request.timeout_secs.unwrap_or(60).clamp(1, 300);
+        let answered = engine
+            .wait_for_answer(std::time::Duration::from_secs(u64::from(secs)))
+            .await;
+        serde_json::to_string(&answered)
+            .map_err(|error| ErrorData::internal_error(error.to_string(), None))
+    }
+
     /// いま何が開いているか。**サーバーへは触りません。**
     #[tool(
         description = "List every connection sshboard currently holds open, where the AI may write on each, and which one file and command operations currently go to. Touches no remote server."
@@ -1048,4 +1082,15 @@ impl SshboardMcp {
             .map_err(refuse)?;
         Ok("console released".to_string())
     }
+}
+
+/// `await_answer` の引数。
+#[derive(Debug, Deserialize, rmcp::schemars::JsonSchema)]
+#[schemars(crate = "rmcp::schemars")]
+pub struct AwaitAnswer {
+    /// 何秒まで待つか。**省略したら 60。**1〜300 へ丸めます。
+    ///
+    /// **上限を置くのは、人がその場に居ないことがあるから**です。
+    /// 永久に待てる口にすると、**AI が黙って固まったのと区別が付きません。**
+    pub timeout_secs: Option<u32>,
 }

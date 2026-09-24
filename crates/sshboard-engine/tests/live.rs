@@ -1609,3 +1609,73 @@ async fn a_human_can_trust_the_host_key_they_were_asked_about() {
         .await
         .expect("承認したのに繋がらない");
 }
+
+/// **人が答えるまで待てること**（2026-09-24・運用者の指摘）。
+///
+/// > **押した時点であなたが検知できないということでしょう。
+/// > ずーっと前から指摘しています。**
+///
+/// **そのとおりでした。**`pending_status` は**聞く**ことしかできません ——
+/// **押された瞬間に AI へ何かが届くわけではない**ので、毎回こうなります。
+///
+/// ```text
+/// AI「押してください」→ 人が押す → **AI は知らない** → 人「押しました」→ AI が確かめる
+/// ```
+///
+/// **その「押しました」は、人が AI の目の代わりをしている**ということです。
+///
+/// **待てる口が在れば、往復が消えます。**
+///
+/// ```text
+/// AI「押してください」＋ **待つ** → 人が押す → **その場で AI が動き出す**
+/// ```
+///
+/// **一方通行だったものを、双方向にする。**これは #17（出先から依頼したい）とも
+/// 同じ穴で、**人が押すまで AI が止まる**のと**押しても AI に届かない**のは、
+/// 同じ片道の裏表です。
+#[tokio::test]
+async fn the_agent_can_wait_for_the_human_instead_of_asking_again() {
+    let dir = tempfile::tempdir().expect("一時ディレクトリ");
+    let engine = std::sync::Arc::new(engine_at(registry_offline(&dir)));
+
+    // **何も立っていないなら、待たずにすぐ返る。**
+    // 立っていない問いを待つと、AI は黙って固まります。
+    let nothing = engine.wait_for_answer(std::time::Duration::from_secs(5)).await;
+    assert!(
+        matches!(nothing, sshboard_engine::Answered::NothingPending),
+        "問いが無いのに待っている: {nothing:?}"
+    );
+
+    // **AI が端末を頼む → 問いが立つ。**
+    let asked = engine.console_open(Actor::Ai, 80, 24).await;
+    assert!(
+        matches!(asked, Err(EngineError::ConsoleApprovalNeeded)),
+        "許可なく開けてしまう: {asked:?}"
+    );
+
+    // **待っている間に、人が答える。**
+    let waiting = {
+        let engine = std::sync::Arc::clone(&engine);
+        tokio::spawn(async move { engine.wait_for_answer(std::time::Duration::from_secs(10)).await })
+    };
+    tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+    let _ = engine.console_answer(Actor::Human, false).await;
+
+    let answered = waiting.await.expect("待っている側が落ちた");
+    assert!(
+        matches!(answered, sshboard_engine::Answered::Answered { .. }),
+        "**人が答えたのに、待っている側へ届いていない**: {answered:?}"
+    );
+
+    // **時間切れは、答えとは別物。**
+    // 同じ顔にすると、AI は「断られた」と「まだ答えていない」を取り違えます。
+    let asked = engine.console_open(Actor::Ai, 80, 24).await;
+    assert!(matches!(asked, Err(EngineError::ConsoleApprovalNeeded)));
+    let timed_out = engine
+        .wait_for_answer(std::time::Duration::from_millis(300))
+        .await;
+    assert!(
+        matches!(timed_out, sshboard_engine::Answered::StillWaiting { .. }),
+        "時間切れが答えと同じ顔をしている: {timed_out:?}"
+    );
+}

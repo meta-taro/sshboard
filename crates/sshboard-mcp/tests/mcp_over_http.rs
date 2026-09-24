@@ -212,7 +212,7 @@ async fn the_server_advertises_only_the_phase_zero_tools() {
     // `inputSchema` は 1 本につきちょうど 1 つです。
     let counted = listed.matches("inputSchema").count();
     assert_eq!(
-        counted, 35,
+        counted, 36,
         "**MCP のツールが {counted} 本になりました。**足した／消したなら、\
          `.claude/project-status.md` の表と `CLAUDE.md` の本数も同じ commit で直してください\
          （product-baseline §10）。直したら、ここの数字も合わせてください"

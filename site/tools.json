@@ -1,5 +1,5 @@
 {
- "total": 35,
+ "total": 36,
  "groups": [
   {
    "key": "connect",
@@ -156,6 +156,10 @@
     {
      "name": "pending_status",
      "line": "Check whether the person has answered anything you asked for: the console hold, a key passphrase, a host key to confirm, or an operation approval."
+    },
+    {
+     "name": "await_answer",
+     "line": "Wait until the person at the screen answers something you asked for, instead of polling pending_status in a loop."
     },
     {
      "name": "diagnostics",
