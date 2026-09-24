@@ -609,36 +609,54 @@ claude mcp add sshboard -- "%LOCALAPPDATA%\\sshboard\\sshboard.exe" --mcp-stdio-
         briefing.
       </p>
 
-      <h2 data-t="h.family">The same idea, elsewhere</h2>
+      <h2 data-t="h.pair">Pair it with dbboard and the deploy is yours</h2>
 
-      <p data-t="family.intro">
-        Three tools, one rule: <b>the agent works where you can see it, inside a fence you drew.</b>
-        All free, all open source, all self-hosted — none of them has a service to sign up for.
+      <p data-t="pair.lede">
+        Plenty of systems are still released by hand: someone opens an SSH session, copies the
+        files up, then opens a database client and runs the migration. <b>There is no pipeline
+        to hand an agent, and building one is its own project</b> — a runner, a hosted service,
+        credentials sitting in someone else's vault.
+      </p>
+
+      <p data-t="pair.claim">
+        <b>Two desktop apps cover both halves.</b> sshboard puts the files where they go;
+        <a href="https://meta-taro.github.io/dbboard/">dbboard</a> runs what has to run against
+        the database. The agent does the steps and <b>you are in the room for all of them, on
+        both sides</b> — no CI service, no deploy platform, no secrets uploaded anywhere.
       </p>
 
       <div class="files">
         <div class="card">
-          <h3>dbboard</h3>
-          <p class="sub" data-t="family.db.sub">Databases</p>
-          <p class="fam" data-t="family.db">
-            A desktop database client with an MCP server built in — nine adapters, from
-            MySQL and PostgreSQL to Turso, D1 and Firestore. <b>Read-only unless you opt a
-            connection in,</b> and even then grants, role DDL, <code>TRUNCATE</code> and
-            <code>DROP</code> are refused whatever you set.
+          <h3 data-t="pair.here">sshboard — the server half</h3>
+          <p class="fam" data-t="pair.here.body">
+            Upload into directories you listed. Run commands from a list you wrote. Take the
+            terminal back at any time. <b>No <code>run_command</code> hole</b>, and no tool that
+            reaches back down to your own machine.
           </p>
-          <a class="get thin" href="https://meta-taro.github.io/dbboard/">meta-taro.github.io/dbboard</a>
         </div>
 
         <div class="card">
-          <h3>warifu</h3>
-          <p class="sub" data-t="family.wa.sub">Conversations</p>
-          <p class="fam" data-t="family.wa">
-            People and agents in one conversation, peer to peer. <b>No central account and no
-            server to run</b> — you hand someone a key, and that key is what lets them in.
+          <h3 data-t="pair.there">dbboard — the database half</h3>
+          <p class="fam" data-t="pair.there.body">
+            Nine engines, from MySQL and PostgreSQL to Turso, D1 and Firestore. <b>Read-only
+            until you opt a connection in</b>, and even then grants, role DDL,
+            <code>TRUNCATE</code> and <code>DROP</code> are refused whatever you set.
           </p>
-          <a class="get thin" href="https://meta-taro.github.io/warifu/">meta-taro.github.io/warifu</a>
+          <a class="get" href="https://meta-taro.github.io/dbboard/" data-t="pair.get">Get dbboard</a>
         </div>
       </div>
+
+      <div class="note" data-t="pair.watch">
+        <b>Neither is a way to leave an agent running unattended.</b> What gets automated is the
+        work, not the watching — that is the whole point of running it on your desk instead of in
+        someone's cloud.
+      </div>
+
+      <p class="note" data-t="pair.warifu">
+        There is a third one, <a href="https://meta-taro.github.io/warifu/">warifu</a>, for a
+        different question: several people and several agents in one conversation, peer to peer,
+        with no central account. It is not part of the deploy story.
+      </p>
 
       <h2 data-t="h.never">What it will not become</h2>
       <ul>
