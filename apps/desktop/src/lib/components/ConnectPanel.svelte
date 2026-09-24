@@ -48,6 +48,31 @@
 	let needsPassphrase = $state(false);
 	let failure = $state<string | null>(null);
 
+	/**
+	 * **相手を選び直したら、前の失敗は消す**（Issue #26 のコメント・2026-09-24）。
+	 *
+	 * 帯を消していたのは `connect()` の頭と、パスフレーズを［やめる］したときの
+	 * 2 か所だけでした。**選び直しても残ります。**
+	 * 帯が指している相手は、もう選ばれていないのに。
+	 *
+	 * 実機でこうなりました ——
+	 *
+	 * > 赤帯の `[object Object]` が**前の失敗の残り**として画面上部に出続けており、
+	 * > それをパスフレーズの問いだと取り違えました
+	 *
+	 * **古い帯は、人が「いま起きていること」として読みます。**
+	 * そこから誤った起票が 1 本と、訂正の往復が 2 度生まれました。
+	 */
+	let lastChosen = '';
+	$effect(() => {
+		if (chosenId === lastChosen) return;
+		lastChosen = chosenId;
+		failure = null;
+		needsPassphrase = false;
+		// **入れてもらった秘密も、相手が変わったら捨てる**（D14）。
+		passphrase = '';
+	});
+
 	async function loadRegistered() {
 		try {
 			registered = await invoke<Connection[]>('connections_list');
