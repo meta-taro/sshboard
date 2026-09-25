@@ -406,6 +406,49 @@ fn home_dir() -> Option<PathBuf> {
         .map(PathBuf::from)
 }
 
+/// **問いが出たことに、人が気づけるようにする**（Issue #30）。
+///
+/// 実機の言葉 ——
+///
+/// > パス入れるときに、アプリを前面に出せます？
+/// > **私の場合、裏で聞かれていて気づかないですね**
+///
+/// `await_answer`（#29）で **AI は待てるように**なりましたが、
+/// **人は問いが出たことに気づけません。**対になる穴でした。
+/// 実測で「今日 4 回・昨日 4 回。半分以上で『押しましたか』の往復」。
+///
+/// **前面へは出しません。**同じ人がこう言っています ——
+///
+/// > **人によっては邪魔といいますが**、私の場合、裏で聞かれていて気づかない
+///
+/// **前面強制は「気づかない」を確実に解き、「邪魔」を確実に作ります。**
+/// 後から強くするのは簡単で、**一度割り込まれた記憶は消せません。**
+fn should_nudge(question_appeared: bool, window_focused: bool) -> bool {
+    // **問いが消えたときに呼ばない。**橋は「変わった」で起きるので、
+    // **人が答え終わった瞬間にも起きます。**そこで点滅させると、
+    // **答えた直後に点滅する**という最悪の形になります。
+    //
+    // **既に窓を見ている人は、つつかない。**
+    question_appeared && !window_focused
+}
+
+/// 点滅（Windows）／ Dock を跳ねさせる（macOS）。**前面へは出しません。**
+fn nudge(app: &AppHandle) {
+    use tauri::{Manager, UserAttentionType};
+    let Some(window) = app.get_webview_window("main") else {
+        return;
+    };
+    // **焦点が読めない環境では、つつく側に倒す。**
+    // 読めないことを理由に黙ると、#30 が直らないまま静かに戻ります。
+    let focused = window.is_focused().unwrap_or(false);
+    if !should_nudge(true, focused) {
+        return;
+    }
+    if let Err(error) = window.request_user_attention(Some(UserAttentionType::Informational)) {
+        eprintln!("[sshboard] 窓へ知らせを出せません: {error}");
+    }
+}
+
 /// リモートのディレクトリとファイル名を繋ぐ。**`//` を作らない。**
 fn join_remote(dir: &str, name: &str) -> String {
     let dir = dir.trim_end_matches('/');
@@ -414,7 +457,29 @@ fn join_remote(dir: &str, name: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{join_remote, safe_local_name};
+    use super::{join_remote, safe_local_name, should_nudge};
+
+    /// **答えた直後に点滅させない**（Issue #30）。
+    ///
+    /// 橋は `watch` の「変わった」で起きるので、**人が答え終わった瞬間にも起きます。**
+    /// そこを見落とすと、**答えたご褒美に点滅する**という最悪の形になります。
+    #[test]
+    fn a_question_that_just_cleared_never_flashes() {
+        assert!(!should_nudge(false, false));
+        assert!(!should_nudge(false, true));
+    }
+
+    /// **見ている人は、つつかない。**
+    #[test]
+    fn someone_already_looking_at_the_window_is_left_alone() {
+        assert!(!should_nudge(true, true));
+    }
+
+    /// **裏に隠れているときだけ、知らせる。**これが #30 の本体。
+    #[test]
+    fn a_new_question_on_a_hidden_window_asks_for_attention() {
+        assert!(should_nudge(true, false));
+    }
 
     #[test]
     fn joining_a_directory_and_a_name_never_doubles_the_separator() {
@@ -516,6 +581,9 @@ pub fn spawn_console_request_bridge(app: AppHandle, engine: Arc<Engine>) {
         let mut watching = engine.subscribe_console_request();
         while watching.changed().await.is_ok() {
             let asked_by = holder_name(*watching.borrow()).map(|name| name.to_string());
+            if asked_by.is_some() {
+                nudge(&app);
+            }
             if let Err(error) = app.emit(CONSOLE_REQUEST_EVENT, asked_by) {
                 eprintln!("[sshboard] 端末の頼みを画面へ渡せません: {error}");
             }
@@ -569,6 +637,9 @@ pub fn spawn_operation_bridge(app: AppHandle, engine: Arc<Engine>) {
         let mut watching = engine.subscribe_operation_request();
         while watching.changed().await.is_ok() {
             let asked: Option<OperationAsk> = watching.borrow().clone().map(OperationAsk::from);
+            if asked.is_some() {
+                nudge(&app);
+            }
             if let Err(error) = app.emit(OPERATION_REQUEST_EVENT, asked) {
                 eprintln!("[sshboard] 操作の問いを画面へ渡せません: {error}");
             }
@@ -652,6 +723,9 @@ pub fn spawn_passphrase_bridge(app: AppHandle, engine: Arc<Engine>) {
         let mut watching = engine.subscribe_passphrase_request();
         while watching.changed().await.is_ok() {
             let waiting: Option<String> = watching.borrow().clone();
+            if waiting.is_some() {
+                nudge(&app);
+            }
             if let Err(error) = app.emit(PASSPHRASE_REQUEST_EVENT, waiting) {
                 eprintln!("[sshboard] パスフレーズの頼みを画面へ渡せません: {error}");
             }
@@ -688,6 +762,9 @@ pub fn spawn_host_key_bridge(app: AppHandle, engine: Arc<Engine>) {
         let mut watching = engine.subscribe_host_key_request();
         while watching.changed().await.is_ok() {
             let waiting = watching.borrow().clone();
+            if waiting.is_some() {
+                nudge(&app);
+            }
             if let Err(error) = app.emit(HOST_KEY_REQUEST_EVENT, waiting) {
                 eprintln!("[sshboard] ホスト鍵の頼みを画面へ渡せません: {error}");
             }
