@@ -38,6 +38,22 @@ import re
 import sys
 from pathlib import Path
 
+# **出力を UTF-8 に固定する。**
+#
+# 2026-09-25、この検査そのものが **Windows の CI を落としました** ——
+# Windows の Python は標準出力の既定が cp1252 で、**日本語を 1 文字出した瞬間に
+# `UnicodeEncodeError` で死にます。**macOS でしか試していませんでした。
+#
+# 手元で同じ条件を作れます —— `PYTHONIOENCODING=cp1252 python3 tools/…`
+def _force_utf8() -> None:
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is not None:
+            reconfigure(encoding="utf-8")
+
+
+_force_utf8()
+
 ROOT = Path(__file__).resolve().parent.parent
 SRC = ROOT / "apps/desktop/src"
 MIN_FILES = 10

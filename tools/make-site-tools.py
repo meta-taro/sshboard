@@ -16,6 +16,15 @@ import re
 import sys
 from pathlib import Path
 
+# **出力を UTF-8 に固定する**（2026-09-25）。
+# Windows の Python は標準出力の既定が cp1252 で、**日本語を 1 文字出した瞬間に
+# `UnicodeEncodeError` で死にます。**この道具はいま ubuntu でしか走っていませんが、
+# 同じ日に `check-css-tokens.py` が Windows の CI を落としたので、揃えておきます。
+for _stream in (sys.stdout, sys.stderr):
+    _reconfigure = getattr(_stream, "reconfigure", None)
+    if _reconfigure is not None:
+        _reconfigure(encoding="utf-8")
+
 ROOT = Path(__file__).resolve().parent.parent
 SOURCES = [
     ROOT / "crates/sshboard-mcp/src/ssh_tools.rs",

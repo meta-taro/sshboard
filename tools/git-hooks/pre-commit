@@ -31,6 +31,21 @@ if command -v python3 >/dev/null 2>&1; then
     echo "pre-commit: **使っていない色の名前があります。**上を直してください。" >&2
     exit 1
   fi
+  # **Windows の既定の文字コードで死なないか。**
+  #
+  # 2026-09-25、`check-css-tokens.py` 自身が **Windows の CI を落としました** ——
+  # あちらの Python は標準出力の既定が cp1252 で、**日本語を 1 文字出した瞬間に
+  # `UnicodeEncodeError` で死にます。**こちらは macOS でしか試していませんでした。
+  #
+  # **ここで同じ条件を作ります。**出力は捨てて、死ぬかどうかだけ見ます。
+  for _t in tools/check-css-tokens.py tools/check-css-contrast.py tools/make-site-tools.py; do
+    if ! PYTHONIOENCODING=cp1252 python3 "$_t" >/dev/null 2>&1; then
+      echo "pre-commit: **$_t が Windows の文字コードで死にます。**" >&2
+      echo "pre-commit: 確かめ方 — PYTHONIOENCODING=cp1252 python3 $_t" >&2
+      exit 1
+    fi
+  done
+
   if ! python3 tools/check-css-contrast.py >/dev/null; then
     python3 tools/check-css-contrast.py || true
     echo "" >&2
