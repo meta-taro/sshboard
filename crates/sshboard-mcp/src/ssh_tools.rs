@@ -11,6 +11,7 @@ use rmcp::handler::server::wrapper::Parameters;
 use rmcp::{tool, tool_router, ErrorData};
 use serde::Deserialize;
 use sshboard_band::Actor;
+use sshboard_connections::sudo_is_unavailable;
 use sshboard_engine::EngineError;
 
 use crate::about::{changes_since, CHANGELOG};
@@ -172,6 +173,18 @@ impl SshboardMcp {
             .await
             .map_err(refuse)?;
 
+        // **「sudo が無い」を「パスワードが違う」に見せない**（2026-09-25）。
+        //
+        // 実運用で 3 時間溶けました。`su -` で運用しているサーバーには
+        // `operations.toml` が原理的に届かないのに、返ってくる字は
+        // 「パスワードが与えられませんでした」です。**AI が入れ直しを促し、
+        // 人が何度も打ち直す**という形になりました。
+        //
+        // **stderr は 1 バイトも変えません**（サーバーが言ったことは、そのまま渡す）。
+        // 読み方の手掛かりを、別の欄として添えます。
+        let note = (!ran.succeeded() && sudo_is_unavailable(&ran.err)).then_some(
+            "This server does not appear to have sudo. This is NOT a wrong password -              re-entering it will never work. If the server is administered with `su -`,              ask the person to raise privileges from the terminal instead.",
+        );
         let (out, out_cut) = capped(ran.out);
         let (err, err_cut) = capped(ran.err);
         serde_json::to_string(&serde_json::json!({
@@ -181,6 +194,7 @@ impl SshboardMcp {
             // **返してこないサーバーもある。**分からないことを 0 と言わない。
             "exitCode": ran.status,
             "outputWasTruncated": out_cut || err_cut,
+            "note": note,
         }))
         .map_err(|error| ErrorData::internal_error(error.to_string(), None))
     }

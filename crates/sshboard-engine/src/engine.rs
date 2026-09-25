@@ -5,7 +5,9 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use sshboard_band::{Actor, Band};
-use sshboard_connections::{elevated, ConnectionEntry, Connections, Elevation};
+use sshboard_connections::{
+    elevated, sudo_is_unavailable, ConnectionEntry, Connections, Elevation,
+};
 use sshboard_credentials::SecretStore;
 use sshboard_diag::{Diagnostics, Stage};
 use sshboard_readonly::{Allowlist, Operations, ReadonlyCommand, Refusals};
@@ -1493,8 +1495,27 @@ impl Engine {
 
         // 帯へは `exec` が `$ ...` を出します。**二重に出しません。**
         // **入れたものは帯にも画面にも出ません**（`exec_with_stdin` の約束）。
-        self.exec_with_stdin(actor, &raised.command, fed.as_deref())
-            .await
+        let ran = self
+            .exec_with_stdin(actor, &raised.command, fed.as_deref())
+            .await?;
+
+        // **「sudo が無い」を「パスワードが違う」に見せない**（2026-09-25）。
+        //
+        // 実運用で 3 時間溶けました。**この製品は `sudo` しか組み立てません。**
+        // `su -` で運用しているサーバーでは `operations.toml` は届かないのに、
+        // 返ってくる字は「パスワードが与えられませんでした」です。
+        // **人も AI も入れ直しにかかり、永久に通りません。**
+        if !ran.succeeded() && sudo_is_unavailable(&ran.err) {
+            self.diag.warn(
+                Stage::Exec,
+                None,
+                format!(
+                    "{id}: このサーバーは sudo を使えないようです。                     パスワードの問題ではありません（`su -` 運用なら端末から上げてください）"
+                ),
+            );
+        }
+
+        Ok(ran)
     }
 
     /// 許可を 1 枚ぶん使う。**使い切りです**（許可 1 回につき 1 回だけ走る）。

@@ -10,7 +10,7 @@ mod mark;
 mod store;
 mod watch;
 
-pub use elevation::{elevated, Elevated, Elevation};
+pub use elevation::{elevated, sudo_is_unavailable, Elevated, Elevation};
 pub use entry::{ConnectionEntry, ConnectionSummary};
 pub use mark::{
     is_connection_color, is_connection_tag, CONNECTION_COLORS, CONNECTION_TAG_MAX_CHARS,

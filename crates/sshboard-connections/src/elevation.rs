@@ -95,3 +95,35 @@ pub fn elevated(run: &str, how: Elevation) -> Elevated {
         },
     }
 }
+
+/// **サーバーが `sudo` を持っていない形跡か**（2026-09-25）。
+///
+/// 実運用で 3 時間溶けました。**この製品は `sudo` しか組み立てません。**
+/// `sudo` を設定せず `su -` で運用しているサーバーでは、
+/// `operations.toml` は**原理的に届きません。**
+///
+/// ところが人にも AI にも、そうは見えません ——
+///
+/// ```text
+/// sudo: パスワードが与えられませんでした
+/// sudo: 1 回パスワード試行を間違えました
+/// ```
+///
+/// **「パスワードを間違えた」と読みます。**実際に、報告した席も、
+/// それを受けたこちらも、そう読みました。**入れ直しても永久に通りません。**
+///
+/// **`sudoers` という字を見ます。**英語（`is not in the sudoers file`）でも
+/// 日本語（`sudoers ファイルに…`）でも、この 1 語は残ります。
+/// 実行ファイルが無い形も拾います。
+pub fn sudo_is_unavailable(stderr: &str) -> bool {
+    let said = stderr.to_ascii_lowercase();
+    // **`sudoers` は訳されません。**どの言語でも残る 1 語。
+    said.contains("sudoers")
+        // `sudo` そのものが入っていない。訳語は当てにせず、
+        // **`sudo` と「無い」を同じ行で見ます。**
+        || (said.contains("sudo")
+            && (said.contains("command not found")
+                || said.contains("not found")
+                || said.contains("見つかりません")
+                || said.contains("no such file")))
+}

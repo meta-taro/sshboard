@@ -25,7 +25,7 @@
 //! 6. **`sudo` で始まらないものは、何も変えない・秘密も要らない**
 //! 7. **途中の `sudo` は上げない**（`sh -c '… sudo …'` を勝手に書き換えない）
 
-use sshboard_connections::{elevated, Elevation};
+use sshboard_connections::{elevated, sudo_is_unavailable, Elevation};
 
 #[test]
 fn nothing_changes_until_a_person_chooses_a_way() {
@@ -118,4 +118,39 @@ fn a_person_writes_the_way_in_the_connection_file() {
     // **書かなければ「上げない」。**
     let silent: Holder = toml::from_str("").expect("読めない");
     assert_eq!(silent.r#become, Elevation::None);
+}
+
+/// **「sudo が無い」と「パスワードが違う」を分ける**（2026-09-25）。
+///
+/// 実運用で 3 時間溶けました。`sudo` を設定せず `su -` で運用しているサーバーでは、
+/// `operations.toml` は**原理的に届きません。**なのに返ってくる字は
+/// 「パスワードが与えられませんでした」で、**人も AI も入れ直しにかかります。**
+#[test]
+fn a_server_without_sudo_is_told_apart_from_a_wrong_password() {
+    // **これが今日の実物です。**入れ直しても永久に通りません。
+    assert!(sudo_is_unavailable(
+        "probe is not in the sudoers file.  This incident will be reported."
+    ));
+    // **日本語でも `sudoers` の 1 語は残ります。**
+    assert!(sudo_is_unavailable(
+        "probe は sudoers ファイルに見つかりません。この事象は報告されます。"
+    ));
+    // 実行ファイルそのものが無い形。
+    assert!(sudo_is_unavailable("bash: sudo: command not found"));
+    assert!(sudo_is_unavailable("bash: sudo: コマンドが見つかりません"));
+}
+
+/// **ただのパスワード違いを、`sudo` が無いことにしない。**
+///
+/// ここを緩めると、**本当に打ち間違えた人に「このサーバーには sudo がありません」**
+/// と言うことになります。**入れ直せば通るのに、諦めさせます。**
+#[test]
+fn a_wrong_password_is_not_mistaken_for_a_missing_sudo() {
+    assert!(!sudo_is_unavailable(
+        "Sorry, try again.\nsudo: 1 incorrect password attempt"
+    ));
+    assert!(!sudo_is_unavailable(
+        "残念、また試してください。\nsudo: パスワードが与えられませんでした\nsudo: 1 回パスワード試行を間違えました"
+    ));
+    assert!(!sudo_is_unavailable(""));
 }
