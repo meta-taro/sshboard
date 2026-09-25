@@ -1041,11 +1041,58 @@ async fn a_root_only_log_can_be_read_once_the_person_types_the_password() {
         "中身が返っていない: {ran:?}"
     );
 
-    // 5. **使い切り。**もう一度呼んだら、また尋ねる。
+    // 5. **「渡した」が記録に残る**（2026-09-25）。
+    //
+    // **これが無いと、「届かなかった」と「通らなかった」が区別できません。**
+    // `sudo -S` は 1 回目が通らないと**もう一度読みに行き**、閉じた入力で
+    // EOF に当たるので、**空を食わせても違う字を食わせても同じ 3 行**が返ります。
+    // 実機でこれに 1 往復まるごと使いました。
+    //
+    // **長さは書きません。**診断ログは人が issue へそのまま貼る前提の物なので、
+    // 書くと**パスワードの長さが公開の場へ出ます。**
+    let said = engine
+        .diagnostics()
+        .recent(50)
+        .into_iter()
+        .map(|event| event.message)
+        .collect::<Vec<_>>();
+    assert!(
+        said.iter()
+            .any(|line| line == "read-maillog へ秘密を渡しました"),
+        "**渡したことが記録に残っていない**: {said:?}"
+    );
+    assert!(
+        !said.iter().any(|line| line.contains(PW_PASSWORD)),
+        "**入れたものが記録へ流れています**: {said:?}"
+    );
+
+    // 6. **使い切り。**もう一度呼んだら、また尋ねる。
     let again = engine.run_operation(Actor::Ai, "read-maillog").await;
     assert!(
         matches!(again, Err(EngineError::ConsoleApprovalNeeded)),
         "**秘密が残っている**: {again:?}"
+    );
+
+    // 7. **空で渡ったときは、そう言う。**
+    //
+    // 画面は空で押させない作りですが、**engine は画面だけの入口ではありません**
+    // （MCP・将来の口）。**ここで黙ると、人は sudo の返事だけを見て
+    // 「パスワードが違う」と読みます。**
+    engine
+        .answer_operation(Actor::Human, true, Some(String::new()))
+        .await
+        .expect("人が許せない");
+    let _ = engine.run_operation(Actor::Ai, "read-maillog").await;
+    let said = engine
+        .diagnostics()
+        .recent(20)
+        .into_iter()
+        .map(|event| event.message)
+        .collect::<Vec<_>>();
+    assert!(
+        said.iter()
+            .any(|line| line.contains("read-maillog へ渡す秘密が空でした")),
+        "**空で渡ったことが記録に残っていない**: {said:?}"
     );
 }
 
