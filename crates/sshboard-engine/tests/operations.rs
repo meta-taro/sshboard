@@ -401,3 +401,74 @@ async fn the_ceiling_lets_go_after_an_hour() {
         "**1 時間経っても明けていない**: {again:?}"
     );
 }
+
+// --- 操作の断り文が、読み取りの許可リストを案内していた（2026-09-27） ----------
+//
+// `run_operation` は `refuse_readonly` をそのまま呼んでいました。つまり ——
+//
+// ```
+// 知らない操作 id → 「**readonly.toml** に書いてください」
+// 実際の書く先   → **operations.toml**
+// ```
+//
+// **正しい所へ書いても直らないほうへ、人を案内していました。**
+// 断った記録も `readonly-refused.log` へ落ちていたので、
+// **どちらのファイルが足りなかったのかが、記録からも分かりません。**
+
+#[tokio::test]
+async fn an_unknown_operation_points_at_operations_toml_not_the_readonly_list() {
+    let dir = tempfile::tempdir().expect("一時ディレクトリ");
+    allow(&dir); // reload-httpd だけ在る
+    let engine = engine_in(&dir);
+
+    let refused = engine.run_operation(Actor::Ai, "restart-everything").await;
+    assert!(matches!(refused, Err(EngineError::NotAllowed { .. })));
+
+    let said = engine
+        .diagnostics()
+        .recent(20)
+        .into_iter()
+        .map(|event| format!("{} {}", event.message, event.hint.unwrap_or_default()))
+        .collect::<Vec<_>>();
+
+    assert!(
+        said.iter().any(|line| line.contains("operations.toml")),
+        "**書く先を案内していない**: {said:?}"
+    );
+    assert!(
+        !said.iter().any(|line| line.contains("readonly.toml")),
+        "**違うファイルを案内している**: {said:?}"
+    );
+    // **在るものを見せる。**打ち間違いなら、これで気づけます。
+    assert!(
+        said.iter().any(|line| line.contains("reload-httpd")),
+        "**在る id を見せていない**: {said:?}"
+    );
+}
+
+#[tokio::test]
+async fn an_empty_operations_file_says_so() {
+    let dir = tempfile::tempdir().expect("一時ディレクトリ");
+    // **1 行も書かない。**
+    let engine = engine_in(&dir);
+
+    let refused = engine.run_operation(Actor::Ai, "reload-httpd").await;
+    assert!(matches!(refused, Err(EngineError::NotAllowed { .. })));
+
+    let said = engine
+        .diagnostics()
+        .recent(20)
+        .into_iter()
+        .map(|event| format!("{} {}", event.message, event.hint.unwrap_or_default()))
+        .collect::<Vec<_>>();
+
+    assert!(
+        said.iter()
+            .any(|line| line.contains("まだ 1 本も書かれていません")),
+        "**空であることを言っていない**: {said:?}"
+    );
+    assert!(
+        said.iter().any(|line| line.contains("operations.toml")),
+        "**どこへ書けばいいかを言っていない**: {said:?}"
+    );
+}

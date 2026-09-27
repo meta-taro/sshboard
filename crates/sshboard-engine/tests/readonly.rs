@@ -191,3 +191,79 @@ async fn the_allowlist_sits_next_to_the_connection_list() {
 
     assert_eq!(engine.readonly_path(), dir.path().join("readonly.toml"));
 }
+
+// --- 「まだ誰も書いていない」と「書いてあるが、その id が無い」を分ける ---------
+//
+// **2026-09-27 に足しました。**この製品の `readonly.toml` は、7 日たっても
+// 1 行も書かれていません。設計はこう言っています（`sshboard-readonly` の注記）——
+//
+// > **推測で書けば必ず外し**、多すぎれば D3 の意味が消え、少なすぎれば作業が止まります。
+// > 代わりに、**断った事実を機械が残します。****足す判断は人**がします。
+//
+// **その順は正しい。**けれど断り文が 1 種類しか無いので、
+// **人には「次に何をすればいいか」が出ていませんでした。**
+//
+// 今日この製品で 2 回直したのと、同じ形です ——
+// 「秘密が届かなかった／通らなかった」「sudo が無い／パスワードが違う」。
+// **違う原因が同じ字になっていると、人は必ず間違った側を直します。**
+
+#[tokio::test]
+async fn an_empty_allowlist_says_so_and_names_the_file() {
+    let dir = tempfile::tempdir().expect("一時ディレクトリ");
+    let engine = engine_in(&dir);
+    // **1 行も書かれていない。**この製品のいまの状態そのもの。
+
+    let refused = engine.run_readonly(Actor::Ai, "uptime").await;
+    assert!(matches!(refused, Err(EngineError::NotAllowed { .. })));
+
+    let said = engine
+        .diagnostics()
+        .recent(20)
+        .into_iter()
+        .map(|event| format!("{} {}", event.message, event.hint.unwrap_or_default()))
+        .collect::<Vec<_>>();
+
+    assert!(
+        said.iter()
+            .any(|line| line.contains("まだ 1 本も書かれていません")),
+        "**空であることを言っていない**: {said:?}"
+    );
+    assert!(
+        said.iter().any(|line| line.contains("readonly.toml")),
+        "**どこへ書けばいいかを言っていない**: {said:?}"
+    );
+}
+
+#[tokio::test]
+async fn a_written_allowlist_says_which_ids_do_exist() {
+    let dir = tempfile::tempdir().expect("一時ディレクトリ");
+    allow(
+        &dir,
+        "version = 1\n\n[[command]]\nid = \"uptime\"\nrun = \"uptime\"\n\
+         description = \"稼働時間\"\n",
+    );
+    let engine = engine_in(&dir);
+
+    let refused = engine.run_readonly(Actor::Ai, "free").await;
+    assert!(matches!(refused, Err(EngineError::NotAllowed { .. })));
+
+    let said = engine
+        .diagnostics()
+        .recent(20)
+        .into_iter()
+        .map(|event| format!("{} {}", event.message, event.hint.unwrap_or_default()))
+        .collect::<Vec<_>>();
+
+    // **空ではないので、空とは言わない。**
+    assert!(
+        !said
+            .iter()
+            .any(|line| line.contains("まだ 1 本も書かれていません")),
+        "**書いてあるのに「空」と言っている**: {said:?}"
+    );
+    // **在るものを見せる。**打ち間違いなら、これで気づけます。
+    assert!(
+        said.iter().any(|line| line.contains("uptime")),
+        "**在る id を見せていない**: {said:?}"
+    );
+}

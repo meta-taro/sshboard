@@ -1278,6 +1278,12 @@ impl Engine {
         self.beside_connections("readonly-refused.log")
     }
 
+    /// 操作の側の、断った記録。**読み取りのものと混ぜません**（2026-09-27）。
+    /// 混ぜると、**人はどちらのファイルへ足せばよいか分かりません。**
+    pub fn operations_refusals_path(&self) -> PathBuf {
+        self.beside_connections("operations-refused.log")
+    }
+
     fn beside_connections(&self, name: &str) -> PathBuf {
         self.connections_path
             .parent()
@@ -1380,7 +1386,7 @@ impl Engine {
     pub async fn run_operation(&self, actor: Actor, id: &str) -> Result<Ran, EngineError> {
         let listed = self.operations()?;
         let Some(operation) = listed.get(id) else {
-            return Err(self.refuse_readonly(actor, id).await);
+            return Err(self.refuse_operation(actor, id, &listed).await);
         };
 
         // **どうやって権限を得るか**（D48 / Issue #19）。
@@ -1541,7 +1547,7 @@ impl Engine {
         let allowlist = self.allowlist()?;
 
         let Some(command) = allowlist.get(id) else {
-            return Err(self.refuse_readonly(actor, id).await);
+            return Err(self.refuse_readonly(actor, id, &allowlist).await);
         };
 
         // 帯へは `exec` が `$ ...` を出します。**二重に出しません。**
@@ -1557,7 +1563,47 @@ impl Engine {
     ///
     /// 記録できなくても帯へ出せなくても、**断るのは断ります。**
     /// 「記録できないから通す」が、ここでいちばんやってはいけない転び方です。
-    async fn refuse_readonly(&self, actor: Actor, id: &str) -> EngineError {
+    async fn refuse_readonly(&self, actor: Actor, id: &str, allowlist: &Allowlist) -> EngineError {
+        // **「まだ誰も書いていない」と「書いてあるが、その id が無い」を分ける**
+        // （2026-09-27）。
+        //
+        // この製品の `readonly.toml` は、7 日たっても 1 行も書かれていません。
+        // 設計の順（**推測で書かず、断った記録を見て人が足す**）は正しいのに、
+        // **断り文が 1 種類しか無いので、人には次の一手が出ていませんでした。**
+        //
+        // 今日 2 回直したのと同じ形です ——
+        // 「秘密が届かなかった／通らなかった」「sudo が無い／パスワードが違う」。
+        // **違う原因が同じ字になっていると、人は必ず違う側を直します。**
+        let where_to_write = self.readonly_path();
+        if allowlist.is_empty() {
+            self.diag.error(
+                Stage::Exec,
+                None,
+                format!("`{id}` を断りました。**許可リストには、まだ 1 本も書かれていません**"),
+                &format!(
+                    "{} に書いてください。**製品は既定を 1 本も持ちません**（D3）—— 何を許すかは、人が書いた一覧だけが決めます",
+                    where_to_write.display()
+                ),
+            );
+        } else {
+            // **在るものを見せる。**打ち間違いなら、これで気づけます。
+            let have = allowlist
+                .commands()
+                .iter()
+                .map(|command| command.id.as_str())
+                .collect::<Vec<_>>()
+                .join(" , ");
+            self.diag.error(
+                Stage::Exec,
+                None,
+                format!("`{id}` は許可リストに在りません（在るもの: {have}）"),
+                &format!(
+                    "打ち間違いでなければ、{} へ足してください",
+                    where_to_write.display()
+                ),
+            );
+        }
+
         if let Err(error) = Refusals::at(self.readonly_refusals_path()).record(actor, id) {
             // 握り潰さない。**記録が落ちたこと自体が、許可リストの育ち方に効く。**
             self.diag.error(
@@ -1572,6 +1618,67 @@ impl Engine {
             .show(
                 actor,
                 &format!("run_readonly `{id}` — 許可リストに無いので断りました"),
+            )
+            .await;
+        if let Err(error) = told {
+            self.diag
+                .warn(Stage::Exec, None, format!("帯へ出せませんでした: {error}"));
+        }
+
+        EngineError::NotAllowed { id: id.to_owned() }
+    }
+
+    /// 知らない操作を断る。**`readonly.toml` の断り文を使い回さない**（2026-09-27）。
+    ///
+    /// ここは `operations.toml` の側です。前は `refuse_readonly` をそのまま
+    /// 呼んでいたので、**書く先が違うファイルとして案内されていました** ——
+    /// 「`readonly.toml` に書いてください」と言われた人は、
+    /// **正しい所へ書いても直らない**ところへ行きます。
+    ///
+    /// 記録も `readonly-refused.log` へ落ちていました。**別のものとして残します。**
+    async fn refuse_operation(&self, actor: Actor, id: &str, listed: &Operations) -> EngineError {
+        let where_to_write = self.operations_path();
+        if listed.is_empty() {
+            self.diag.error(
+                Stage::Exec,
+                None,
+                format!("`{id}` を断りました。**操作の一覧には、まだ 1 本も書かれていません**"),
+                &format!(
+                    "{} に書いてください。**製品は既定を 1 本も持ちません**（D45）",
+                    where_to_write.display()
+                ),
+            );
+        } else {
+            let have = listed
+                .all()
+                .iter()
+                .map(|operation| operation.id.as_str())
+                .collect::<Vec<_>>()
+                .join(" , ");
+            self.diag.error(
+                Stage::Exec,
+                None,
+                format!("`{id}` は操作の一覧に在りません（在るもの: {have}）"),
+                &format!(
+                    "打ち間違いでなければ、{} へ足してください",
+                    where_to_write.display()
+                ),
+            );
+        }
+
+        if let Err(error) = Refusals::at(self.operations_refusals_path()).record(actor, id) {
+            self.diag.error(
+                Stage::Exec,
+                None,
+                format!("断った記録を残せませんでした: {error}"),
+                "operations-refused.log を置くディレクトリの権限を確かめてください",
+            );
+        }
+
+        let told = self
+            .show(
+                actor,
+                &format!("run_operation `{id}` — 操作の一覧に無いので断りました"),
             )
             .await;
         if let Err(error) = told {
