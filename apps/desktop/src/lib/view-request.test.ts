@@ -15,7 +15,7 @@
  */
 import { describe, expect, test } from 'vitest';
 
-import { canFollow, HUMAN_HOLDS_MS, isView, VIEWS } from './view-request';
+import { canFollow, HUMAN_HOLDS_MS, isView, VIEWS, viewAfterAnswered } from './view-request';
 
 /** 何も邪魔していない状態。**ここから 1 つずつ崩して確かめます。** */
 const calm = {
@@ -63,5 +63,25 @@ describe('canFollow', () => {
 		// **短すぎると奪ったのと同じ。長すぎると口が無いのと同じ。**
 		expect(HUMAN_HOLDS_MS).toBeGreaterThanOrEqual(3000);
 		expect(HUMAN_HOLDS_MS).toBeLessThanOrEqual(30000);
+	});
+});
+
+/**
+ * **許可したら、その面へ動く**（実運用の指摘・2026-09-28）。
+ *
+ * > 端末をにぎりたいとアラートがでて、**通った時点で、一緒にタブも切り替わる**
+ *
+ * **AI が `show_view` を別に呼ぶのを当てにしない。**呼び忘れたら人は見ないまま、
+ * 呼んでも `canFollow` で止まりうる。**許可したのは端末なので、
+ * AI の裁量に委ねる場面ではありません。**
+ */
+describe('答えたあとの面', () => {
+	test('**端末を許可したら、端末の面へ**', () => {
+		expect(viewAfterAnswered('console', true)).toBe('console');
+	});
+
+	test('断ったときは動かさない', () => {
+		// **断った人を端末へ連れて行くのは、押し売りです。**
+		expect(viewAfterAnswered('console', false)).toBeNull();
 	});
 });

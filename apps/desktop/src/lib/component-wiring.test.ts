@@ -191,3 +191,26 @@ describe('ホスト鍵の問い', () => {
 		expect(asking.sort()).toEqual(['HostKeyDialog.svelte']);
 	});
 });
+
+/**
+ * **端末の許可が通ったら、画面も端末へ動くこと**（実運用の指摘・2026-09-28）。
+ *
+ * > 端末をにぎりたいとアラートがでて、**通った時点で、一緒にタブも切り替わる**
+ *
+ * `viewAfterAnswered` を書いても、**`answerConsole` から呼ばなければ何も起きません。**
+ * この試験は **#10 と同じ壊れ方**（作って、繋ぎ忘れる）だけを止めます。
+ *
+ * **中身が正しいかは見ていません。**見ているのは「繋がっているか」だけです。
+ */
+describe('端末の許可と画面', () => {
+	test('**answerConsole が viewAfterAnswered を通している**', () => {
+		const page = Object.entries(sources).find(([path]) => path.endsWith('routes/+page.svelte'));
+		expect(page, '+page.svelte を読めていません').toBeTruthy();
+		const text = page![1];
+		const start = text.indexOf('async function answerConsole');
+		expect(start, 'answerConsole が見つかりません').toBeGreaterThan(-1);
+		// 関数の終わりまで（次の `\n\t}` まで）を見る。
+		const body = text.slice(start, text.indexOf('\n\t}', start));
+		expect(body).toContain('viewAfterAnswered');
+	});
+});

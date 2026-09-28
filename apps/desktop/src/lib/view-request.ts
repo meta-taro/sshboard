@@ -52,3 +52,32 @@ export function canFollow(screen: ScreenState): boolean {
 	if (screen.focusInField) return false;
 	return screen.sinceHumanSwitchMs >= HUMAN_HOLDS_MS;
 }
+
+/**
+ * **人が問いに答えたあと、画面が自分で動く先**（実運用の指摘・2026-09-28）。
+ *
+ * 実機の言葉 ——
+ *
+ * > そもそも端末をにぎりたいとアラートがでて、**通った時点で、一緒にタブも
+ * > 切り替わる実装にすべき**とつたえてください。
+ *
+ * 実際に困った所 —— 掲載停止の作業中、AI が端末を握って `php -l` や `rm` を
+ * 打っていたのに、**人の画面は別のタブのまま**でした。
+ * 「端末タブにきりかえてください」と言われて、初めて `show_view` を呼んでいます。
+ *
+ * **この製品の売りは「同じ画面を一緒に見る」ことです。**
+ * **端末を許可したのに端末が見えていないのは、その一点が抜けています。**
+ *
+ * ## `canFollow` を通しません
+ *
+ * あれは **AI の頼み**を選り分けるものです。ここは違います ——
+ * **「端末を使ってよいか」に「よい」と答えた人は、端末を見るつもりで答えています。**
+ * **人が自分で押した結果**なので、奪ったことになりません。
+ *
+ * ## 断ったときは動かしません
+ *
+ * 見る理由がないからです。**断った人を端末へ連れて行くのは、押し売り**です。
+ */
+export function viewAfterAnswered(ask: 'console', allowed: boolean): View | null {
+	return ask === 'console' && allowed ? 'console' : null;
+}

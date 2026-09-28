@@ -27,7 +27,7 @@
 	import { attachFit, attachSearch, createTerminal, writeChunk } from '$lib/terminal.svelte';
 	import { emptyBacklog, remember, replay, type Backlog } from '$lib/stream-backlog';
 	import { applyEdit, editIntent, type EditableField } from '$lib/edit-keys';
-	import { canFollow, isView, type View } from '$lib/view-request';
+	import { canFollow, isView, type View, viewAfterAnswered} from '$lib/view-request';
 	import { attachClipboard, browserClipboard, detectPlatform } from '$lib/terminal-clipboard';
 	import { isFindShortcut, type TerminalSearch } from '$lib/terminal-search';
 	import '@xterm/xterm/css/xterm.css';
@@ -223,6 +223,19 @@
 		consoleAsk = null;
 		try {
 			await invoke('console_answer', { allow });
+			// **許可したら、端末の面へ連れて行く**（実運用の指摘・2026-09-28）。
+			//
+			// > 端末をにぎりたいとアラートがでて、**通った時点で、一緒にタブも切り替わる**
+			//
+			// **`show_view` を当てにしません。**AI が呼び忘れたら人は見ないままで、
+			// 呼んでも `canFollow` で止まりうる（問いに答えた直後は `askOpen` が
+			// 落ちているとはいえ、入力欄に焦点があれば止まります）。
+			// **許可したのは端末なので、AI の裁量に委ねる場面ではありません。**
+			//
+			// `humanShows` を通します —— **これは人が押した結果**なので、
+			// 奪ったことになりません（そのあと 8 秒は AI に動かさせない、も込み）。
+			const next = viewAfterAnswered('console', allow);
+			if (next) humanShows(next);
 		} catch (error: unknown) {
 			failure = String(error);
 		}
