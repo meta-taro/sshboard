@@ -214,3 +214,42 @@ describe('端末の許可と画面', () => {
 		expect(body).toContain('viewAfterAnswered');
 	});
 });
+
+/**
+ * **構造を持った失敗を、帯へ潰さない**（実運用の指摘・Issue #26）。
+ *
+ * > 上部に全幅で出る赤系の帯に **`[object Object]`** だけが出ています。
+ *
+ * 実行体は**構造を持ったまま**失敗を返します（画面が問いとして出せるように）。
+ * それを `String(error)` で潰すと **`[object Object]`** になります。
+ *
+ * **中身が正しいかは見ていません。**見ているのは
+ * 「**構造を持ちうる所で、素の `String(error)` を使っていないか**」だけです。
+ */
+describe('繋ぎ損ねた理由', () => {
+	const page = () =>
+		Object.entries(sources).find(([path]) => path.endsWith('routes/+page.svelte'))![1];
+
+	/** **注記の中は数えない。**説明に書いた字を「使っている」と読むと、
+	    直したのに落ちたままになります（実際そうなりました）。 */
+	function withoutNotes(text: string): string {
+		return text.replace(/\/\/.*$/gm, '').replace(/\/\*[\s\S]*?\*\//g, '');
+	}
+
+	test('**answerHostKey が String(error) で潰していない**', () => {
+		const text = page();
+		const start = text.indexOf('async function answerHostKey');
+		expect(start, 'answerHostKey が見つかりません').toBeGreaterThan(-1);
+		const body = withoutNotes(text.slice(start, text.indexOf('\n\t}', start)));
+		expect(body).not.toContain('String(error)');
+		expect(body).toContain('readableFailure');
+	});
+
+	test('**承認したあとパスフレーズが要るなら、その箱を開く**', () => {
+		// **帯に落とさない。**落とすと、人は承認したのに先へ進めません。
+		const text = page();
+		const start = text.indexOf('async function answerHostKey');
+		const body = text.slice(start, text.indexOf('\n\t}', start));
+		expect(body).toContain('passphraseNeeded');
+	});
+});

@@ -27,7 +27,8 @@
 	import { attachFit, attachSearch, createTerminal, writeChunk } from '$lib/terminal.svelte';
 	import { emptyBacklog, remember, replay, type Backlog } from '$lib/stream-backlog';
 	import { applyEdit, editIntent, type EditableField } from '$lib/edit-keys';
-	import { canFollow, isView, type View, viewAfterAnswered} from '$lib/view-request';
+	import { canFollow, isView, type View, viewAfterAnswered} from '$lib/view-request'
+	import { asConnectFailure, readableFailure } from '$lib/connect-failure';;
 	import { attachClipboard, browserClipboard, detectPlatform } from '$lib/terminal-clipboard';
 	import { isFindShortcut, type TerminalSearch } from '$lib/terminal-search';
 	import '@xterm/xterm/css/xterm.css';
@@ -186,7 +187,22 @@
 			if (trust) await invoke('session_connect', { id: asked.id, passphrase: null });
 		} catch (error: unknown) {
 			// **黙って閉じない。**閉じると、人は答えたつもりで答えていない状態になります。
-			failure = String(error);
+			//
+			// **そして、構造を持った失敗を帯へ潰さない**（実運用の指摘・2026-09-28）——
+			// ここで `String(error)` を使っていたため、**上部の帯に `[object Object]`**
+			// だけが出ていました。人には何も伝わらず、**こちらにも何が起きたか
+			// 分かりませんでした**（この字だけで 2 日使っています）。
+			const why = asConnectFailure(error);
+			if (why?.kind === 'passphraseNeeded') {
+				// **承認したあと、鍵にパスフレーズが要るだけ**の場合。
+				// **帯に落とすと、人は承認したのに先へ進めません。**箱を開きます。
+				passphraseFor = asked.id;
+			} else if (why?.kind === 'untrusted') {
+				// 実行体が問いを立て直しています。**橋が画面へ運びます。**
+				// ここで帯を出すと、**問いと帯が二重に出ます。**
+			} else {
+				failure = readableFailure(error);
+			}
 		} finally {
 			hostKeyBusy = false;
 		}
