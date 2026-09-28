@@ -25,6 +25,29 @@ use crate::write_scope::{Refusal, WriteScope};
 /// （多くが 60〜120 秒）より十分短くとってあります。
 const KEEPALIVE_EVERY: Duration = Duration::from_secs(30);
 
+/// **繋ぎに行くのを諦めるまで**（実運用の指摘・2026-09-28）。
+///
+/// 実機からの報告 ——
+///
+/// > もう一度 MCP の connect を呼びました。**120 秒たっても返らず**、
+/// > そのあとに呼んだ pending_status まで 120 秒以上返りません。
+///
+/// **MCP のサーバーは詰まっていません。**別の口から `pending_status` を呼ぶと
+/// **0.0 秒で返ります**（実測）。詰まっているのは**呼んでいる側**で、
+/// **1 本の呼びを待っている間、その席は次を送れません。**
+///
+/// つまり **`connect` が返らないこと自体**が本体でした。
+/// ここには**時間切れが 1 つも設けられておらず**、OS の既定に委ねていました
+/// （macOS で実測 **75 秒**、Windows は 120 秒前後）。
+///
+/// **`inactivity_timeout: None`（D25）とは別の話**です ——
+/// あれは**繋がったあと切らない**ためのもので、正しい。
+/// **繋ぎに行く時間を区切らない理由にはなりません。**
+/// 前者を理由に後者を無くすと、**相手が居ない回に、人も AI も 2 分沈黙します。**
+///
+/// **20 秒。**遅い回線でも握手は通り、**人が「固まった」と思う前に返ります。**
+const REACH_GIVE_UP_AFTER: Duration = Duration::from_secs(20);
+
 /// 返事が来ないまま何回まで送るか。**ここを超えたら切れたと判断する。**
 ///
 /// 30 秒 × 4 = 2 分。**切れているのに繋がっているように見える時間**の上限です。
@@ -170,23 +193,45 @@ impl SshSession {
             ..Default::default()
         });
 
-        let mut handle = client::connect(
+        // **区切る**（実運用の指摘・2026-09-28）。区切らないと OS の既定まで待ち、
+        // **その間、呼んだ席は次の呼びを送れません。**
+        let reaching = client::connect(
             config,
             (target.host.as_str(), target.port),
             Watcher {
                 seen: Arc::clone(&seen),
             },
-        )
-        .await
-        .map_err(|error| {
-            diag.error(
-                Stage::Reach,
-                id,
-                format!("繋がりません: {error}"),
-                "相手が動いているか、ポート番号と経路（VPN・許可 IP）を確かめてください",
-            );
-            SshError::Connect(error.to_string())
-        })?;
+        );
+        let mut handle = match tokio::time::timeout(REACH_GIVE_UP_AFTER, reaching).await {
+            Err(_) => {
+                // **「時間切れ」と「繋がらない」を分ける**（この製品で何度も踏んだ形）。
+                // 前者は**相手が黙っている**、後者は**相手が断っている**。
+                // 同じ字にすると、人は違うほうを直しにかかります。
+                diag.error(
+                    Stage::Reach,
+                    id,
+                    format!(
+                        "{} 秒待っても返事がありません（ポート {}）",
+                        REACH_GIVE_UP_AFTER.as_secs(),
+                        target.port
+                    ),
+                    "相手が動いているか、経路（VPN・許可 IP・ファイアウォール）を確かめてください。                     **断られたのではなく、黙っています。**",
+                );
+                return Err(SshError::Connect(format!(
+                    "{} 秒待っても返事がありません",
+                    REACH_GIVE_UP_AFTER.as_secs()
+                )));
+            }
+            Ok(result) => result.map_err(|error| {
+                diag.error(
+                    Stage::Reach,
+                    id,
+                    format!("繋がりません: {error}"),
+                    "相手が動いているか、ポート番号と経路（VPN・許可 IP）を確かめてください",
+                );
+                SshError::Connect(error.to_string())
+            })?,
+        };
         diag.info(Stage::Reach, id, "繋がりました");
 
         let host_key = seen
