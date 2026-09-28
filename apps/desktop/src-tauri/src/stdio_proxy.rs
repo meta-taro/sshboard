@@ -284,10 +284,29 @@ async fn forward(
     }
 }
 
+/// 繋ぎに行って返事が無い相手を、これだけ待って諦める。
+///
+/// **呼び全体の締め切りではありません。**`read_file` や `run_operation` は
+/// 正しく何十秒もかかります。**切るのは「相手がそこに居るか」だけ**です。
+const REACH_GIVE_UP_AFTER: std::time::Duration = std::time::Duration::from_secs(3);
+
+/// 送る口を作る。
+///
+/// **TLS を持たせません**（`default-features = false`）。
+/// 宛先は 127.0.0.1 固定で、外へ出る道はありません。
+///
+/// **時間切れが 1 つも無い口は、黙って待ち続けます。**
+/// 実運用（2026-09-28）で「ローカルだけで答えられる呼びが 120 秒返らない」と
+/// 報告されました。**誰も聞いていない口なら拒否がその場で返ります**が、
+/// 繋ぎに行って返事が無いときは、待つ以外に何もしていませんでした。
+fn http_client() -> reqwest::Result<reqwest::Client> {
+    reqwest::Client::builder()
+        .connect_timeout(REACH_GIVE_UP_AFTER)
+        .build()
+}
+
 async fn relay(url: String, token: String) {
-    // **TLS を持たせません**（`default-features = false`）。
-    // 宛先は 127.0.0.1 固定で、外へ出る道はありません。
-    let client = match reqwest::Client::builder().build() {
+    let client = match http_client() {
         Ok(client) => client,
         Err(error) => {
             eprintln!("[sshboard] HTTP の口を作れません: {error}");
@@ -534,6 +553,43 @@ mod concurrency_tests {
             "**2 本目が、遅い呼びの後ろで待たされています**: 差が {gap:?}。\
              届いた順と時刻: {held:?}。\
              実機では、これが `session_status` が 120 秒返らない形になりました"
+        );
+    }
+
+    /// **返事が来ない相手を、いつまでも待たない。**
+    ///
+    /// 実運用の報告（2026-09-28）——
+    ///
+    /// > `session_status` や `list_readonly_commands` のように、ローカルだけで
+    /// > 答えられる呼び出しでも 120 秒を超えて返りませんでした
+    ///
+    /// **断られる筋は、既にその場で返っていました**（誰も聞いていない口へ繋ぐと
+    /// 拒否が返り、`NOT_RUNNING` を出します）。**無限に待てたのは、繋ぎに行って
+    /// 返事が無い筋だけ**です —— 時間切れが 1 つも付いていませんでした。
+    #[test]
+    fn a_silent_address_is_given_up_on_instead_of_waited_out() {
+        // 192.0.2.1 は TEST-NET（RFC 5737）。**外へ出ず、返事も来ません。**
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .expect("runtime");
+
+        let started = Instant::now();
+        let answer = runtime.block_on(async {
+            let client = super::http_client().expect("client");
+            client
+                .post("http://192.0.2.1:9/mcp")
+                .body("{}")
+                .send()
+                .await
+        });
+        let waited = started.elapsed();
+
+        assert!(answer.is_err(), "黒い穴から返事が来ました");
+        assert!(
+            waited < Duration::from_secs(8),
+            "**返事の無い相手を {waited:?} 待ちました。**\
+             実機では、これが 120 秒返らない形になります"
         );
     }
 }
