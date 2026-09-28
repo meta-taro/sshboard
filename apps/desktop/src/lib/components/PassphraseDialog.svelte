@@ -2,8 +2,15 @@
 	/**
 	 * 鍵のパスフレーズを、繋ぐときに正面から聞く（Issue #7 の提案 2）。
 	 *
-	 * **保存はしません**（D11 / D14）。繋ぐたびに人が入れます。
-	 * 変えたのは**聞き方だけ**です。
+	 * **既定は保存しません。**繋ぐたびに人が入れます。
+	 *
+	 * **押した人だけが預けられます**（実運用の要望・2026-09-28）——
+	 * 「パスフレーズを記憶する、の**チェックボックスつけられないですかね**」。
+	 * 1 日に 4 回以上、同じものを打っていました。**人が［接続］を押す前提なら
+	 * 1 日 1 回で済みますが、AI が呼ぶ運用だと回数が桁違いになります。**
+	 *
+	 * 預け先は **OS の資格情報ストア**（D11 が最初から指示している形）。
+	 * **自前の鍵ストアは作りません。****AI はこの値を見ません**（口が無い）。
 	 *
 	 * 以前はファイル画面のバーの中に小さな入力欄が現れる形で、
 	 * **［接続］を押して失敗するまで、その欄が存在しませんでした。**
@@ -16,12 +23,15 @@
 		/** どの接続か。**識別子だけ**を出します（ホスト名は出さない・PRD §8）。 */
 		id: string;
 		busy: boolean;
-		onSubmit: (passphrase: string) => void;
+		/** `remember` が真なら、**OS の資格情報ストアへ預けます**（D11）。 */
+		onSubmit: (passphrase: string, remember: boolean) => void;
 		onCancel: () => void;
 	}
 	let { id, busy, onSubmit, onCancel }: Props = $props();
 
 	let value = $state('');
+	/** **既定は預けない。**押した人だけが預けます。 */
+	let remember = $state(false);
 	let field: HTMLInputElement | undefined = $state();
 
 	// **開いたら、そこへ焦点を置く。**押した流れのまま打てるように。
@@ -35,9 +45,10 @@
 
 	function submit() {
 		if (value.length === 0 || busy) return;
-		onSubmit(value);
+		onSubmit(value, remember);
 		// **画面から即座に捨てる。**渡した先が使い終わるのを待たない。
 		value = '';
+		remember = false;
 	}
 </script>
 
@@ -88,6 +99,16 @@
 				aria-label={i18n.t('files.passphrase')}
 				autocomplete="off"
 			/>
+			<!--
+				**預けるかどうかは、押した人が決めます。**既定は預けません。
+				預け先は OS の資格情報ストア（D11）。**消す口は接続の編集画面**に在ります ——
+				**預けっぱなしで消せないのが、いちばん悪い形**です。
+			-->
+			<label class="remember">
+				<input type="checkbox" bind:checked={remember} disabled={busy} />
+				<span>{i18n.t('files.passphrase.remember')}</span>
+			</label>
+
 			<div class="actions">
 				<button type="submit" class="cta" disabled={busy || value.length === 0}>
 					{busy ? i18n.t('files.connecting') : i18n.t('files.connect')}
@@ -101,6 +122,21 @@
 </div>
 
 <style>
+	/* **預ける の行。**目立たせません —— 既定は預けない側です。 */
+	.remember {
+		display: flex;
+		align-items: center;
+		gap: 0.45rem;
+		font-size: 0.78rem;
+		color: var(--fg-muted);
+		cursor: pointer;
+	}
+
+	.remember input {
+		accent-color: var(--accent);
+		cursor: pointer;
+	}
+
 	.backdrop {
 		position: fixed;
 		inset: 0;

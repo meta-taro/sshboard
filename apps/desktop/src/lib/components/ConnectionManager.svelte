@@ -270,6 +270,40 @@
 	/** 既に預けてあるか。**中身は取り出しません**（あるか無いかだけ）。 */
 	let hasPassword = $state(false);
 
+	/**
+	 * **パスフレーズを預けてあるか**（実運用の要望・2026-09-28）。
+	 *
+	 * **接続ごとに持ちます。**全体で 1 つの印にしません —— 実機は接続を 2 本持っていて、
+	 * **片方だけ預ける**ことが起こります。
+	 */
+	let hasPassphrase = $state(false);
+
+	async function loadHasPassphrase(id: string) {
+		hasPassphrase = false;
+		if (!id) return;
+		try {
+			hasPassphrase = await invoke<boolean>('connection_has_passphrase', { id });
+		} catch {
+			/* 分からなければ「無い」として扱う。**あると偽らない。** */
+		}
+	}
+
+	/**
+	 * **預けたパスフレーズを消す。**
+	 *
+	 * **「預ける」より、こちらのほうが大事**です ——
+	 * 預けっぱなしで消せないのが、いちばん悪い形になります。
+	 */
+	async function forgetPassphrase() {
+		if (!selectedId) return;
+		try {
+			await invoke('connection_passphrase_save', { id: selectedId, passphrase: '' });
+			await loadHasPassphrase(selectedId);
+		} catch (error: unknown) {
+			failure = String(error);
+		}
+	}
+
 	async function loadHasPassword(id: string) {
 		hasPassword = false;
 		if (!id) return;
@@ -316,6 +350,8 @@
 		confirmingDelete = false;
 		passwordDraft = '';
 		hasPassword = false;
+		// **前の接続の「預けてある」を持ち越さない。**
+		hasPassphrase = false;
 		authMode = 'agent';
 	}
 
@@ -326,6 +362,7 @@
 		confirmingDelete = false;
 		// **前の接続のパスワードを持ち越さない。**
 		passwordDraft = '';
+		void loadHasPassphrase(item.id);
 		void loadHasPassword(item.id).then(() => {
 			authMode = authModeOf(item, hasPassword);
 		});
@@ -602,6 +639,20 @@
 					</small>
 				{:else}
 					<small>{i18n.t('conn.auth.key.help')}</small>
+				{/if}
+				<!--
+					**預けてあることが、ここで分かります**（実運用の要望・2026-09-28）。
+					**預けたこと自体を忘れるのが、いちばん困る形**なので、
+					**消す口と同じ行**に置きます。
+				-->
+				{#if hasPassphrase}
+					<small class="key-note">
+						<Icon name="check" size={11} />
+						{i18n.t('conn.passphrase.have')}
+						<button type="button" class="forget" onclick={forgetPassphrase}>
+							{i18n.t('conn.passphrase.forget')}
+						</button>
+					</small>
 				{/if}
 			{:else if selectedId === null}
 				<small>{i18n.t('conn.password.saveFirst')}</small>
@@ -955,6 +1006,19 @@
 		display: flex;
 		align-items: center;
 		gap: 0.4rem;
+	}
+
+	/* **消す口。**目立たせませんが、**探さなくても見つかる**所に置きます。 */
+	.forget {
+		margin-left: 0.4rem;
+		border: 1px solid var(--hairline-strong);
+		background: transparent;
+		border-radius: var(--r-control);
+		padding: 0.1rem 0.45rem;
+		font: inherit;
+		font-size: 0.7rem;
+		color: var(--fg-muted);
+		cursor: pointer;
 	}
 
 	.chip {

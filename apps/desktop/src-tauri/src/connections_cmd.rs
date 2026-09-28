@@ -287,6 +287,94 @@ pub fn connection_password_save(
     Ok(())
 }
 
+/// **鍵のパスフレーズ**を OS の資格情報ストアへ預ける（実運用の要望・2026-09-28）。
+///
+/// 実機の言葉 ——
+///
+/// > パスフレーズを記憶する、の**チェックボックスつけられないですかね**
+///
+/// **1 日に 4 回以上、同じものを打っていました。**人が自分で［接続］を押す前提なら
+/// 1 日 1 回で済みますが、**AI が呼ぶ運用だと回数が桁違いになります。**
+///
+/// **これは D11 が最初から指示している形**です ——
+/// 「OS 資格情報ストアと ssh-agent へ委譲する。自前の鍵ストアは作らない」。
+/// **`keyring_passphrase_ref` は、そのために作られて、人が触れる口が無かっただけ**でした。
+///
+/// **D14（AI は秘密を扱わない）は保てます** —— 預けるのは画面（人の操作）で、
+/// **MCP にこの口はありません。**AI は相変わらず値を見ません。
+///
+/// 空文字を渡すと**預けたものを消します**。
+/// **「預ける」より「消せる」ほうが大事**です —— 預けっぱなしで消せないのが、
+/// いちばん悪い形になります。
+#[tauri::command]
+pub fn connection_passphrase_save(
+    id: String,
+    passphrase: String,
+    path: State<'_, ConnectionsPath>,
+    band: State<'_, Band>,
+    watch: State<'_, Arc<ConnectionsWatch>>,
+) -> Result<(), String> {
+    let store = SecretStore::new(KEYRING_SERVICE);
+    let reference = format!("passphrase:{id}");
+
+    let mut connections = load(&path)?;
+    if !connections.connections.iter().any(|held| held.id == id) {
+        return Err(format!("そんな接続はありません: {id}"));
+    }
+
+    if passphrase.is_empty() {
+        // 消せなくても進みます。**参照を外す方が大事**です
+        // （残すと「あるはず」で繋ぎに行って失敗します）。
+        let _ = store.delete(&reference);
+    } else {
+        store
+            .put(&reference, &passphrase)
+            .map_err(|error| format!("OS の資格情報ストアへ預けられません: {error}"))?;
+    }
+
+    let next: Vec<ConnectionEntry> = connections
+        .connections
+        .into_iter()
+        .map(|mut held| {
+            if held.id == id {
+                held.keyring_passphrase_ref = (!passphrase.is_empty()).then(|| reference.clone());
+            }
+            held
+        })
+        .collect();
+    connections.connections = next;
+    connections
+        .save(&path.0)
+        .map_err(|error| error.to_string())?;
+
+    // **識別子だけを載せる。**パスフレーズも接続先も帯へ出しません（PRD §8）。
+    record(
+        &band,
+        if passphrase.is_empty() {
+            format!("接続 `{id}` のパスフレーズを消しました")
+        } else {
+            format!("接続 `{id}` のパスフレーズを預かりました")
+        },
+    );
+    watch.notify();
+    Ok(())
+}
+
+/// パスフレーズを預けてあるか。**中身は返しません**（あるか無いかだけ）。
+///
+/// **接続ごとに答えます。**全体で 1 つの印にしません —— 実機は接続を 2 本持っていて、
+/// **片方だけ預ける**ことが起こります。
+#[tauri::command]
+pub fn connection_has_passphrase(
+    id: String,
+    path: State<'_, ConnectionsPath>,
+) -> Result<bool, String> {
+    Ok(load(&path)?
+        .connections
+        .iter()
+        .any(|held| held.id == id && held.keyring_passphrase_ref.is_some()))
+}
+
 /// パスワードを預けてあるか。**中身は返しません**（あるか無いかだけ）。
 #[tauri::command]
 pub fn connection_has_password(

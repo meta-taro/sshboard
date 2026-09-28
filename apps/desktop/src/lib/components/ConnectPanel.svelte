@@ -84,6 +84,21 @@
 
 	onMount(loadRegistered);
 
+	/**
+	 * **パスフレーズを OS の資格情報ストアへ預ける**（D11・実運用の要望）。
+	 *
+	 * **失敗しても繋ぐのは止めません。**預けられないことと、繋げないことは別です ——
+	 * ここで止めると、**預けたかっただけの人が繋げなくなります。**
+	 */
+	async function keepPassphrase(id: string, value: string) {
+		try {
+			await invoke('connection_passphrase_save', { id, passphrase: value });
+		} catch (error: unknown) {
+			// **黙らない。**預かったつもりで預かっていないのが、いちばん悪い形です。
+			failure = String(error);
+		}
+	}
+
 	async function connect() {
 		if (!chosenId || session.busy) return;
 		failure = null;
@@ -196,8 +211,12 @@
 	<PassphraseDialog
 		id={chosenId}
 		busy={session.busy}
-		onSubmit={(value) => {
+		onSubmit={(value, remember) => {
 			passphrase = value;
+			// **預けるのは、押した人が決めた場合だけ**（D11）。
+			// **繋ぐ前に預けます** —— 繋いだあとにすると、
+			// 繋ぎ損ねた回だけ預からない、という分かりにくい形になります。
+			if (remember) void keepPassphrase(chosenId, value);
 			void connect();
 		}}
 		onCancel={() => {

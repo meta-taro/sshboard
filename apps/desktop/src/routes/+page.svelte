@@ -193,11 +193,26 @@
 	}
 	let passphraseBusy = $state(false);
 
-	async function answerPassphrase(passphrase: string) {
+	async function answerPassphrase(passphrase: string, remember: boolean) {
 		const id = passphraseFor;
 		if (!id) return;
 		passphraseBusy = true;
 		try {
+			// **預けるのは、押した人が決めた場合だけ**（D11・実運用の要望）。
+			//
+			// **繋ぐ前に預けます。**繋いだあとにすると、**繋ぎ損ねた回だけ
+			// 預からない**という分かりにくい形になります。
+			//
+			// **失敗しても繋ぐのは止めません** —— 預けられないことと、
+			// 繋げないことは別です。**預けたかっただけの人が繋げなくなります。**
+			if (remember) {
+				try {
+					await invoke('connection_passphrase_save', { id, passphrase });
+				} catch (error: unknown) {
+					// **黙らない。**預かったつもりで預かっていないのが、いちばん悪い形です。
+					failure = String(error);
+				}
+			}
 			// **人の経路をそのまま通す。**AI 側へ秘密を渡す道は作りません（D14）。
 			await invoke('session_connect', { id, passphrase });
 			passphraseFor = null;

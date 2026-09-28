@@ -80,7 +80,8 @@ describe('パスフレーズを聞く所（D14）', () => {
 		expect(connect.disabled).toBe(false);
 		connect.click();
 
-		expect(onSubmit).toHaveBeenCalledWith(SECRET);
+		// **既定は預けない**（2 つ目の引数が false）。
+		expect(onSubmit).toHaveBeenCalledWith(SECRET, false);
 		// **画面に残らないこと。**残ると、次に開いた人がそのまま送れます。
 		await vi.waitFor(() => expect(field.value).toBe(''));
 		expect(document.body.innerHTML.includes(SECRET)).toBe(false);
@@ -155,5 +156,49 @@ describe('背景', () => {
 		const { onCancel } = mount();
 		await fireEvent.click(screen.getByRole('button', { name: i18n.t('conn.delete.no') }));
 		expect(onCancel).toHaveBeenCalled();
+	});
+});
+
+/**
+ * **預ける、を言える所**（実運用の要望・2026-09-28）。
+ *
+ * 実機の言葉 ——
+ *
+ * > パスフレーズを記憶する、の**チェックボックスつけられないですかね**
+ *
+ * **1 日に 4 回以上、同じものを打っていました。**人が自分で［接続］を押す前提なら
+ * 1 日 1 回で済みますが、**AI が呼ぶ運用だと回数が桁違いになります。**
+ * ——背景クリックで消える件と**同じ前提の崩れ**です。
+ *
+ * **これは D11 が最初から指示している形**です（OS 資格情報ストアへ委譲する）。
+ * `keyring_passphrase_ref` は**そのために作られて、人が触れる口が無かっただけ**でした。
+ *
+ * **既定は預けません。**押した人だけが預けます。
+ */
+describe('預ける', () => {
+	test('**預けるかどうかを選べる**', () => {
+		mount();
+		expect(screen.getByLabelText(i18n.t('files.passphrase.remember'))).toBeTruthy();
+	});
+
+	test('既定では預けない', () => {
+		mount();
+		const box = screen.getByLabelText(i18n.t('files.passphrase.remember')) as HTMLInputElement;
+		expect(box.checked).toBe(false);
+	});
+
+	test('**押していなければ、預けるとは言わない**', async () => {
+		const { onSubmit, field } = mount();
+		await fireEvent.input(field, { target: { value: SECRET } });
+		await fireEvent.submit(field.closest('form') as HTMLFormElement);
+		expect(onSubmit).toHaveBeenCalledWith(SECRET, false);
+	});
+
+	test('**押したら、預けると言う**', async () => {
+		const { onSubmit, field } = mount();
+		await fireEvent.click(screen.getByLabelText(i18n.t('files.passphrase.remember')));
+		await fireEvent.input(field, { target: { value: SECRET } });
+		await fireEvent.submit(field.closest('form') as HTMLFormElement);
+		expect(onSubmit).toHaveBeenCalledWith(SECRET, true);
 	});
 });
