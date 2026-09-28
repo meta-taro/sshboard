@@ -43,13 +43,28 @@
 
 <svelte:window onkeydown={onKeydown} />
 
-<div
-	class="backdrop"
-	role="presentation"
-	onclick={(event) => {
-		if (event.target === event.currentTarget && !busy) onCancel();
-	}}
->
+<!--
+	**背景を押しても閉じません**（実運用の指摘・2026-09-28）。
+
+	> パスワードきいてたじゃないですか？で、**ほかをくりっくするときえちゃう**んですが。
+
+	前は**わざと**閉じていました。理由は「**人が自分で始めた操作の続きなので**」。
+	**その前提が崩れています** —— AI が MCP から `connect` を呼んだときは、
+	**人は何も始めていません。**箱が出ただけです。そこで背景を押すと ——
+
+	```
+	人   箱が消えた。**それだけが見える**
+	AI   `waitingForPassphrase` のまま**待ち続ける**
+	```
+
+	**Issue #30 と同じ壊れ方**です（あれは「裏にあって気づけない」、これは
+	「出ていたのに消えた」）。**どちらも、人が気づけない待ちが残ります。**
+
+	**ここは「見て判断する箱」ではなく「打ち込む箱」**です。打とうとして
+	どこかを押した拍子に落ちる余地を、残す理由がありません。
+	**閉じる道は［やめる］と Escape だけ。**
+-->
+<div class="backdrop" role="presentation">
 	<div class="dialog" role="dialog" aria-modal="true" aria-label={i18n.t('files.passphrase.title')}>
 		<header>
 			<h2><Icon name="key" size={15} /> {i18n.t('files.passphrase.title')}</h2>

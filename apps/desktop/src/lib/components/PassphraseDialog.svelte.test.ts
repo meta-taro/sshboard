@@ -116,3 +116,44 @@ describe('パスフレーズを聞く所（D14）', () => {
 		expect(onCancel).not.toHaveBeenCalled();
 	});
 });
+
+/**
+ * **背景を押しても消えない**（実運用の指摘・2026-09-28）。
+ *
+ * 実機の言葉 ——
+ *
+ * > パスワードきいてたじゃないですか？で、**ほかをくりっくするときえちゃう**んですが。
+ * > おういっかいだせます？
+ *
+ * 前は**わざと**背景で閉じていました。理由は「**人が自分で始めた操作の続きなので**」
+ * （`ConsoleRequestDialog` の試験にそう書いてあります）。
+ *
+ * **その前提が崩れています。**AI が MCP から `connect` を呼んだときは、
+ * **人は何も始めていません。**画面に箱が出ただけです。そこで背景を押して消すと ——
+ *
+ * ```
+ * 人   箱が消えた。**それだけが見える**
+ * AI   `waitingForPassphrase` のまま**待ち続ける**
+ * ```
+ *
+ * **#30 と同じ壊れ方**です。あれは「裏にあって気づけない」、これは「出ていたのに消えた」。
+ * **どちらも、人が気づけない待ちが残ります。**
+ *
+ * **ここは「見て判断する箱」ではなく「打ち込む箱」**です。
+ * 打とうとしてどこかを押した拍子に落ちる余地を、残す理由がありません。
+ * **閉じる道は［やめる］と Escape だけ**にします。
+ */
+describe('背景', () => {
+	test('**背景を押しても消えない**', () => {
+		const { onCancel } = mount();
+		const backdrop = document.querySelector('.backdrop') as HTMLElement;
+		backdrop.click();
+		expect(onCancel).not.toHaveBeenCalled();
+	});
+
+	test('［やめる］では消える', async () => {
+		const { onCancel } = mount();
+		await fireEvent.click(screen.getByRole('button', { name: i18n.t('conn.delete.no') }));
+		expect(onCancel).toHaveBeenCalled();
+	});
+});
