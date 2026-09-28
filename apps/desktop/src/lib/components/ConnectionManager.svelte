@@ -27,6 +27,7 @@
 		type KeyReport
 	} from '$lib/connections';
 	import { dropTarget, gapForPointer, moveTarget } from '$lib/connection-order';
+	import { externalConflict, type Conflict } from '$lib/connections-conflict';
 
 	let items = $state<Connection[]>([]);
 	let draft = $state<Connection>(emptyConnection());
@@ -34,6 +35,11 @@
 	let storePath = $state('');
 	let notice = $state<string | null>(null);
 	let failure = $state<string | null>(null);
+
+	// **編集を始めたときの姿。**外から書き換わったかを見るのに要る（D59）。
+	// 保存を押した瞬間に、相手の変更が下書きで消えるのを黙って通さないため。
+	let baseline = $state<Connection | null>(null);
+	let conflict = $state<Conflict>(null);
 
 	let listWidth = $state(DEFAULT_LIST_WIDTH);
 	let manager: HTMLElement | undefined = $state();
@@ -338,6 +344,7 @@
 	async function reload() {
 		try {
 			items = await invoke<Connection[]>('connections_list');
+			conflict = externalConflict(baseline, items);
 		} catch (error: unknown) {
 			failure = i18n.t('err.list', { detail: String(error) });
 		}
@@ -346,6 +353,8 @@
 	function startNew() {
 		draft = emptyConnection();
 		selectedId = null;
+		baseline = null;
+		conflict = null;
 		notice = null;
 		confirmingDelete = false;
 		passwordDraft = '';
@@ -357,6 +366,8 @@
 
 	function edit(item: Connection) {
 		draft = { ...item };
+		baseline = { ...item };
+		conflict = null;
 		selectedId = item.id;
 		notice = null;
 		confirmingDelete = false;
@@ -374,7 +385,13 @@
 			await invoke('connection_save', { entry: draft });
 			notice = i18n.t('conn.saved', { id: draft.id });
 			selectedId = draft.id;
+			// **基準は、書いた下書きではなく読み直したものにする。**
+			// Rust 側が整えた分（既定の port、空文字を null へ）を下書きと比べると、
+			// **保存した直後に「外から変わった」と出ます。**
+			baseline = null;
+			conflict = null;
 			await reload();
+			baseline = items.find((item) => item.id === draft.id) ?? null;
 		} catch (error: unknown) {
 			failure = i18n.t('err.save', { detail: String(error) });
 		}
@@ -565,6 +582,15 @@
 		     済んだことはトーストへ（見切れて気づけない、と実機で言われた）。 -->
 		{#if failure}
 			<p class="failure" role="alert">{failure}</p>
+		{/if}
+
+		<!-- **外から書き換わったことを、保存の前に知らせる。**
+		     読み直しは下書きを触らないので、画面が消されることはありません。
+		     消えるのは相手の変更の側です（D59）。 -->
+		{#if conflict}
+			<p class="conflict" role="status">
+				{conflict === 'gone' ? i18n.t('conn.goneOutside') : i18n.t('conn.changedOutside')}
+			</p>
 		{/if}
 
 		<label>
@@ -1353,6 +1379,7 @@
 	}
 
 	.failure,
+	.conflict,
 	.confirm {
 		margin: 0;
 		padding: 0.55rem 0.7rem;
@@ -1365,6 +1392,11 @@
 	.confirm {
 		background: var(--danger-soft);
 		color: var(--danger);
+	}
+	/* **失敗ではありません。**人はまだ何も間違えていない。 */
+	.conflict {
+		background: var(--warning-soft);
+		color: var(--warning);
 	}
 
 	/* 鍵の判定を出す 1 行（D28）。**普段は情報、駄目なときだけ強く。** */

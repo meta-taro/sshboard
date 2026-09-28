@@ -149,6 +149,15 @@ pub fn run() {
                 }
             };
 
+            // **外から書き換えられた一覧も拾う。**上の口が鳴るのは「この中で
+            // 書き換えたとき」だけで、人がエディタで直した場合は鳴らなかった（D59）。
+            if let Some(path) = connections_path.clone() {
+                tauri::async_runtime::spawn(sshboard_connections::look_for_external_changes(
+                    path,
+                    Arc::clone(&connections_watch),
+                ));
+            }
+
             app.manage(PendingLines::new());
             app.manage(McpUrl::default());
             app.manage(band.clone());

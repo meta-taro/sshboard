@@ -6,12 +6,14 @@
 
 mod elevation;
 mod entry;
+mod external;
 mod mark;
 mod store;
 mod watch;
 
 pub use elevation::{elevated, sudo_is_unavailable, Elevated, Elevation};
 pub use entry::{ConnectionEntry, ConnectionSummary};
+pub use external::{look_for_external_changes, look_once, FileStamp, Look};
 pub use mark::{
     is_connection_color, is_connection_tag, CONNECTION_COLORS, CONNECTION_TAG_MAX_CHARS,
 };
