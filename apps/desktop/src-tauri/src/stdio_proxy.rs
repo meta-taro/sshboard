@@ -304,7 +304,7 @@ async fn relay(url: String, token: String) {
     //
     // ここで直接読むと、**読んでいる間、裏の呼びが 1 つも進みません**
     // （走らせ方が `new_current_thread` なので）。
-    let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<String>();
+    let (tx, rx) = tokio::sync::mpsc::unbounded_channel::<String>();
     std::thread::spawn(move || {
         let stdin = std::io::stdin();
         for line in stdin.lock().lines().map_while(Result::ok) {
