@@ -60,6 +60,15 @@ class SessionState {
 	private starting: Promise<void> | null = null;
 	/** 購読していたいか。**張り終わる前に止められた分を取りこぼさない。** */
 	private wanted = false;
+	/**
+	 * 状態を書き込んだ順番。**遅れて着いた古い応答で塗り潰さないため**（Issue #8）。
+	 *
+	 * `refresh()` は呼んでから返るまでに間があります。その間に
+	 * **別の `refresh()` が返る**か、**購読が「いま起きたこと」を運んでくる**と、
+	 * 後から着いた古い返事が新しい状態を上書きできました。
+	 * 症状は「**繋がっているのに、画面の接続先が実態とずれる**」です。
+	 */
+	private wrote = 0;
 
 	/**
 	 * 変化を受け取り始める。返り値を呼ぶと購読を止める。
@@ -92,6 +101,8 @@ class SessionState {
 			const said = Array.isArray(event.payload)
 				? { open: event.payload, active: undefined }
 				: event.payload;
+			// **購読は「いま起きたこと」を運ぶ。**進行中の呼びの返事より新しい。
+			this.wrote += 1;
 			this.all = said.open;
 			// **AI が宛先を動かしたら、画面も動く**（2026-09-18 に実機で踏みました）。
 			// ここを受けていなかったので、**MCP は web-01、画面は Batch** という
@@ -113,7 +124,11 @@ class SessionState {
 
 	/** 取り直す。**起動が速いと、購読より先に流れた分を取りこぼす。** */
 	async refresh(): Promise<void> {
+		const mine = ++this.wrote;
 		const status = await invoke<{ open: Opened[]; active: string | null }>('session_status');
+		// **自分より後に誰かが書いていたら、書きません。**
+		// 古い返事で新しい状態を塗り潰すと、画面が実態とずれます（Issue #8）。
+		if (mine !== this.wrote) return;
 		this.all = status.open;
 		this.activeId = status.active;
 	}
