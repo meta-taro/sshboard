@@ -51,6 +51,26 @@ if [ "${1:-}" = "--message-file" ]; then
 fi
 
 EMAIL_RE='[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}'
+
+# 公開 IP（v4）。**外向きの番地は接続先そのもの**なので、成果物へ書かない
+# （CLAUDE.md 禁止事項 4・2026-09-30 に足した）。
+#
+# **値はログへ出しません。**CI のログは公開されるため、出すと検査が漏洩になります。
+IP_RE='\b(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])(\.(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])){3}\b'
+
+# 外向きでないもの。**ここに当たるものは通す。**
+#   127./0./255.        自分・未指定・ブロードキャスト
+#   10. 172.16-31. 192.168.   私用（RFC 1918）
+#   169.254.            リンクローカル
+#   100.64-127.         CGNAT（Tailscale の番地もここ）
+#   192.0.2. 198.51.100. 203.0.113.   文書用（RFC 5737）
+#   224-239.            マルチキャスト
+NOT_PUBLIC_RE='^(127\.|0\.|255\.|10\.|192\.168\.|169\.254\.|192\.0\.2\.|198\.51\.100\.|203\.0\.113\.|172\.(1[6-9]|2[0-9]|3[01])\.|100\.(6[4-9]|[7-9][0-9]|1[01][0-9]|12[0-7])\.|2(2[4-9]|3[0-9])\.)'
+
+# 公開 IP かどうか。**中身は返さない。**
+public_ip() {
+  printf '%s' "$1" | grep -Eqv "$NOT_PUBLIC_RE"
+}
 # 検査スクリプト自身は正規表現やドメイン例を含むため除外する
 SELF_RE='^\.github/(scripts/oss-privacy-check\.sh|workflows/oss-privacy-check\.yml)$'
 
@@ -187,6 +207,13 @@ if [ -n "$RANGE" ]; then
       fail=1
     done < <(printf '%s' "$msg" | grep -Eo "$EMAIL_RE" | sort -u)
 
+    while read -r found; do
+      [ -z "${found:-}" ] && continue
+      public_ip "$found" || continue
+      note "NG [message-ip] ${sha:0:8} : 外向きの IP らしきもの（値は出しません）"
+      fail=1
+    done < <(printf '%s' "$msg" | grep -Eo "$IP_RE" | sort -u)
+
     if [ -n "$DENY_WORDS" ]; then
       i=0
       while IFS= read -r w; do
@@ -228,6 +255,13 @@ if [ -n "$added" ]; then
       note "NG [added-email] $f:$ln : $(printf '%s' "$found" | mask_email)"
       fail=1
     done < <(printf '%s' "$content" | grep -Eo "$EMAIL_RE" | sort -u)
+
+    while read -r found; do
+      [ -z "${found:-}" ] && continue
+      public_ip "$found" || continue
+      note "NG [added-ip] $f:$ln : 外向きの IP らしきもの（値は出しません）"
+      fail=1
+    done < <(printf '%s' "$content" | grep -Eo "$IP_RE" | sort -u)
 
     if [ -n "$DENY_WORDS" ]; then
       i=0
