@@ -142,13 +142,29 @@ class SessionState {
 
 export const session = new SessionState();
 
-/** 親ディレクトリ。**`/` の親は `/`**（上へ行き過ぎない）。 */
+/**
+ * 親ディレクトリ。**`/` の親は `/`**（上へ行き過ぎない）。
+ *
+ * **相対パスを根へ落とさない**（Issue #8・2026-09-30 に実機で再現）。
+ * リモート側は `.`（入った所）から始まり、`app` へ入ると `app` になります。
+ * 以前はここで `/` が 1 つも無いことを「根に居る」と読み、
+ * **［↑］が実機の `/` へ飛んでいました**——まったく別の場所の一覧が出ます。
+ */
 export function parentOf(path: string): string {
 	const trimmed = path.replace(/\/+$/, '');
 	if (!trimmed) return '/';
+
+	// 絶対パス。**`/` より上はない。**
+	if (trimmed.startsWith('/')) {
+		const cut = trimmed.lastIndexOf('/');
+		return cut <= 0 ? '/' : trimmed.slice(0, cut);
+	}
+
+	// 相対パス。**入った所より上へも行けるが、根へは飛ばない。**
+	if (trimmed === '.') return '..';
+	if (trimmed === '..' || trimmed.endsWith('/..')) return `${trimmed}/..`;
 	const cut = trimmed.lastIndexOf('/');
-	if (cut <= 0) return '/';
-	return trimmed.slice(0, cut);
+	return cut < 0 ? '.' : trimmed.slice(0, cut);
 }
 
 /** ディレクトリと名前を繋ぐ。**`//` を作らない。** */
