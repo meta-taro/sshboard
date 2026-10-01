@@ -62,3 +62,10 @@ if ! cargo fmt --all -- --check; then
   echo "pre-commit: 直し方 — cargo fmt --all" >&2
   exit 1
 fi
+
+# **作業の記録が git に入っていないか。**語の検査とは別に要る（記録は文面が中立でも、
+# 公開リポに置く理由が無い）。`git ls-files` 1 回で **40 ミリ秒**。
+if ! bash .github/scripts/oss-placement-check.sh >/dev/null 2>&1; then
+  bash .github/scripts/oss-placement-check.sh >&2
+  exit 1
+fi

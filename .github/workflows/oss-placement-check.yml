@@ -1,0 +1,12 @@
+name: oss-placement-check
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  placement:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: bash .github/scripts/oss-placement-check.sh

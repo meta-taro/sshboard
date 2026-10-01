@@ -22,6 +22,15 @@ target/
 SECRETS.local.md
 
 # ベースルール完全版（内部事例を含むため公開しない）— commit 禁止
+/.claude/*
+!/.claude/tools/
+!/.claude/rules/
+!/.claude/templates/
+!/.claude/hooks/
+!/.claude/commands/
+!/.claude/agents/
+!/.claude/skills/
+!/.claude/settings.json
 .claude/rules/product-baseline.full.md
 
 # 手元のテスト用サーバーの使い捨て鍵 — commit 禁止

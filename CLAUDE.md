@@ -7,9 +7,10 @@
 
 - **`.claude/rules/product-baseline.md`** — 開発のベースルール。**最優先で従うこと**。
 - **`PRD.md`** — このプロダクトの方向性・仕様。
-- **`.claude/roadmap.md`** — フェーズと進め方。**Phase 0 は技術項目を抜け、Phase 1 に入っています**。
-- **`.claude/decisions.md`** — 決定と、その理由（D1〜D51）。**未決は D10 / D47 の届け先**。
-- **`.claude/issues/`** — 着手すべきローカル Issue。
+
+> **作業の記録（進め方・決定の理由・手元の Issue）は git に入れません。**
+> 公開リポに置く理由が無いためです（`.github/scripts/oss-placement-check.sh` が見張ります）。
+> 手元の `.claude/` には在ります。**無ければ、オーナーに聞いてください。**
 
 ## この製品に固有の禁止事項（最優先）
 
@@ -42,7 +43,7 @@
 - 実装前に計画を立てる。小さいフェーズで作業。**テストを後回しにしない／落ちるテストを消さない。**
 - **commit は AI、push は人間。**人間の確認なしに push しない。
 - 秘密情報（鍵・パスフレーズ・トークン）は **AI が作らない・置かない・貼らない。**
-- 進捗は `.claude/project-status.md` に随時記録。**テストが無い状態で「完了」と書かない。**
+- 進捗は手元の記録に随時書く。**テストが無い状態で「完了」と書かない。**
 - **public リポジトリです。**コード・文書・commit history に個人名・個人メールアドレスを
   残さないこと（`.github/workflows/oss-privacy-check.yml` が検出します）。
 
@@ -76,8 +77,10 @@ sh tools/test-server/up.sh
 
 ## 進捗管理
 
-- `.claude/project-status.md` … 現在フェーズ・完了/未完了・次タスク・既知問題
-- `.claude/decisions.md` … 技術的決定と、その理由
+- 手元の `.claude/project-status.md` … 現在フェーズ・完了/未完了・次タスク・既知問題
+- 手元の `.claude/decisions.md` … 技術的決定と、その理由
+  （**どちらも git には入りません。**外の人に読ませる価値のある設計理由は、
+  外の人向けに書き直して `docs/` に置く）
 
 ## 日課（AI エージェント向け）
 
@@ -112,7 +115,7 @@ sh tools/test-server/up.sh
 
 ### セッション終了時
 
-1. `.claude/project-status.md` に進捗を記録（テストが無い状態で「完了」と書かない）
+1. 手元の記録に進捗を書く（テストが無い状態で「完了」と書かない）
 2. 完了した Issue は `gh issue close <番号> --comment "..."`
 
 ### git pull の 3 タイミング
