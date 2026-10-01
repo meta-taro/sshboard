@@ -34,21 +34,21 @@ describe('whyNotSavable', () => {
 	});
 
 	test('names the missing field rather than just refusing', () => {
-		expect(whyNotSavable(usable({ id: '' }), [])).toEqual({ key: 'conn.err.id.empty' });
-		expect(whyNotSavable(usable({ host: '' }), [])).toEqual({ key: 'conn.err.host' });
-		expect(whyNotSavable(usable({ user: '' }), [])).toEqual({ key: 'conn.err.user' });
+		expect(whyNotSavable(usable({ id: '' }), [])).toEqual({ key: 'conn.err.id.empty', field: 'id' });
+		expect(whyNotSavable(usable({ host: '' }), [])).toEqual({ key: 'conn.err.host', field: 'host' });
+		expect(whyNotSavable(usable({ user: '' }), [])).toEqual({ key: 'conn.err.user', field: 'user' });
 	});
 
 	test('refuses an identifier that would not survive a file or a band line', () => {
 		// 識別子はファイルにも帯にも出る。**空白や記号を許すと読めなくなる。**
-		expect(whyNotSavable(usable({ id: 'app prod' }), [])).toEqual({ key: 'conn.err.id.chars' });
-		expect(whyNotSavable(usable({ id: 'app/prod' }), [])).toEqual({ key: 'conn.err.id.chars' });
+		expect(whyNotSavable(usable({ id: 'app prod' }), [])).toEqual({ key: 'conn.err.id.chars', field: 'id' });
+		expect(whyNotSavable(usable({ id: 'app/prod' }), [])).toEqual({ key: 'conn.err.id.chars', field: 'id' });
 		expect(whyNotSavable(usable({ id: 'app.prod_2-a' }), [])).toBeNull();
 	});
 
 	test('refuses a port outside the range', () => {
-		expect(whyNotSavable(usable({ port: 0 }), [])).toEqual({ key: 'conn.err.port' });
-		expect(whyNotSavable(usable({ port: 65536 }), [])).toEqual({ key: 'conn.err.port' });
+		expect(whyNotSavable(usable({ port: 0 }), [])).toEqual({ key: 'conn.err.port', field: 'port' });
+		expect(whyNotSavable(usable({ port: 65536 }), [])).toEqual({ key: 'conn.err.port', field: 'port' });
 		expect(whyNotSavable(usable({ port: 65535 }), [])).toBeNull();
 	});
 
@@ -56,6 +56,7 @@ describe('whyNotSavable', () => {
 		// **黙って上書きすると、人が登録したものが消える。**
 		expect(whyNotSavable(usable(), ['app-prod'])).toEqual({
 			key: 'conn.err.dup',
+			field: 'id',
 			id: 'app-prod'
 		});
 	});
@@ -64,6 +65,7 @@ describe('whyNotSavable', () => {
 		const tooLong = '本'.repeat(CONNECTION_TAG_MAX_CHARS + 1);
 		expect(whyNotSavable(usable({ tag: tooLong }), [])).toEqual({
 			key: 'conn.err.tag',
+			field: 'tag',
 			max: CONNECTION_TAG_MAX_CHARS
 		});
 	});

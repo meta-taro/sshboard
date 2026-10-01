@@ -184,6 +184,23 @@
 	/** 編集中なら、自分自身の識別子は重複扱いにしない。 */
 	const takenIds = $derived(items.map((item) => item.id).filter((id) => id !== selectedId));
 	const blocker = $derived(whyNotSavable(draft, takenIds));
+
+	/**
+	 * 一度でも離れた欄。**打ち始める前から赤くしない**ため（#32）。
+	 *
+	 * 新規の登録は全部空から始まります。**空を即座に赤くすると、
+	 * 何も間違えていないのに画面が赤だらけ**になり、本当の間違いが埋もれます。
+	 */
+	let touched = $state(new Set<string>());
+
+	/** いま赤くする欄。**止めている欄で、かつ一度は触った所。** */
+	const invalidField = $derived(
+		blocker && touched.has(blocker.field) ? blocker.field : null
+	);
+
+	function leave(field: string) {
+		touched = new Set([...touched, field]);
+	}
 	const blockerText = $derived(
 		blocker ? i18n.t(blocker.key, { ...blocker }) : ''
 	);
@@ -595,7 +612,14 @@
 
 		<label>
 			<span>{i18n.t('conn.id')}</span>
-			<input bind:value={draft.id} placeholder="web-prod" disabled={selectedId !== null} />
+			<input
+				bind:value={draft.id}
+				placeholder="web-prod"
+				disabled={selectedId !== null}
+				class:invalid={invalidField === 'id'}
+				aria-invalid={invalidField === 'id'}
+				onblur={() => leave('id')}
+			/>
 			<small>{i18n.t('conn.id.help')}</small>
 		</label>
 
@@ -607,17 +631,37 @@
 		<div class="pair">
 			<label>
 				<span><Icon name="server" size={12} />{i18n.t('conn.host')}</span>
-				<input bind:value={draft.host} spellcheck="false" />
+				<input
+					bind:value={draft.host}
+					spellcheck="false"
+					class:invalid={invalidField === 'host'}
+					aria-invalid={invalidField === 'host'}
+					onblur={() => leave('host')}
+				/>
 			</label>
 			<label>
 				<span>{i18n.t('conn.port')}</span>
-				<input type="number" bind:value={draft.port} min="1" max="65535" />
+				<input
+					type="number"
+					bind:value={draft.port}
+					min="1"
+					max="65535"
+					class:invalid={invalidField === 'port'}
+					aria-invalid={invalidField === 'port'}
+					onblur={() => leave('port')}
+				/>
 			</label>
 		</div>
 
 		<label>
 			<span><Icon name="user" size={12} />{i18n.t('conn.user')}</span>
-			<input bind:value={draft.user} spellcheck="false" />
+			<input
+				bind:value={draft.user}
+				spellcheck="false"
+				class:invalid={invalidField === 'user'}
+				aria-invalid={invalidField === 'user'}
+				onblur={() => leave('user')}
+			/>
 		</label>
 
 		<!--
@@ -761,7 +805,11 @@
 				</button>
 			{/if}
 			{#if blockerText}
-				<span class="blocker">{blockerText}</span>
+				<!-- **色だけに頼らない。**印と `role="alert"` を添える（#32）。 -->
+				<span class="blocker" role="alert">
+					<Icon name="warning" size={12} />
+					{blockerText}
+				</span>
 			{/if}
 		</div>
 
@@ -1358,11 +1406,30 @@
 		border-color: color-mix(in srgb, var(--danger) 40%, transparent);
 	}
 
-	.blocker,
 	.empty,
 	.path {
 		font-size: 0.72rem;
 		color: var(--fg-faint);
+	}
+
+	/*
+	 * **止めている理由は、エラーの色で出す**（#32・オーナーの依頼）。
+	 *
+	 * ここは `--fg-faint`（薄い灰色）でした。**文言は出ていたのに、
+	 * エラーだと一目で分からない**という報告の、直接の原因です。
+	 */
+	.blocker {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.25rem;
+		font-size: 0.72rem;
+		color: var(--danger);
+	}
+
+	/* **問題のある欄そのものを示す。**文言を探しに行かなくて済むように。 */
+	input.invalid {
+		border-color: var(--danger);
+		background: var(--danger-soft);
 	}
 
 	.path {

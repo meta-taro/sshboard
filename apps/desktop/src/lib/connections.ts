@@ -65,27 +65,33 @@ export function emptyConnection(): Connection {
  * 文言をここに書くと、言語を切り替えても変わらない場所ができます。
  * **訳は画面側で当てます。**
  */
+export type BlockedField = 'id' | 'host' | 'user' | 'port' | 'tag';
+
 export type SaveBlocker =
-	| { key: 'conn.err.id.empty' }
-	| { key: 'conn.err.id.chars' }
-	| { key: 'conn.err.host' }
-	| { key: 'conn.err.user' }
-	| { key: 'conn.err.port' }
-	| { key: 'conn.err.dup'; id: string }
-	| { key: 'conn.err.tag'; max: number }
+	| { key: 'conn.err.id.empty'; field: 'id' }
+	| { key: 'conn.err.id.chars'; field: 'id' }
+	| { key: 'conn.err.host'; field: 'host' }
+	| { key: 'conn.err.user'; field: 'user' }
+	| { key: 'conn.err.port'; field: 'port' }
+	| { key: 'conn.err.dup'; field: 'id'; id: string }
+	| { key: 'conn.err.tag'; field: 'tag'; max: number }
 	| null;
 
 export function whyNotSavable(
 	entry: Connection,
 	existingIds: readonly string[]
 ): SaveBlocker {
-	if (!entry.id.trim()) return { key: 'conn.err.id.empty' };
-	if (!/^[A-Za-z0-9._-]+$/.test(entry.id)) return { key: 'conn.err.id.chars' };
-	if (!entry.host.trim()) return { key: 'conn.err.host' };
-	if (!entry.user.trim()) return { key: 'conn.err.user' };
-	if (entry.port < 1 || entry.port > 65535) return { key: 'conn.err.port' };
-	if (existingIds.includes(entry.id)) return { key: 'conn.err.dup', id: entry.id };
-	if (!isConnectionTag(entry.tag)) return { key: 'conn.err.tag', max: CONNECTION_TAG_MAX_CHARS };
+	// **どの欄が止めているかを、必ず添える**（#32）。
+	// 画面はこれを見て、その欄に赤い枠と `aria-invalid` を付けます。
+	if (!entry.id.trim()) return { key: 'conn.err.id.empty', field: 'id' };
+	if (!/^[A-Za-z0-9._-]+$/.test(entry.id)) return { key: 'conn.err.id.chars', field: 'id' };
+	if (!entry.host.trim()) return { key: 'conn.err.host', field: 'host' };
+	if (!entry.user.trim()) return { key: 'conn.err.user', field: 'user' };
+	if (entry.port < 1 || entry.port > 65535) return { key: 'conn.err.port', field: 'port' };
+	if (existingIds.includes(entry.id)) return { key: 'conn.err.dup', field: 'id', id: entry.id };
+	if (!isConnectionTag(entry.tag)) {
+		return { key: 'conn.err.tag', field: 'tag', max: CONNECTION_TAG_MAX_CHARS };
+	}
 	return null;
 }
 
