@@ -48,6 +48,17 @@ const KEEPALIVE_EVERY: Duration = Duration::from_secs(30);
 /// **20 秒。**遅い回線でも握手は通り、**人が「固まった」と思う前に返ります。**
 const REACH_GIVE_UP_AFTER: Duration = Duration::from_secs(20);
 
+/// 相手が**何も言ってこない**まま、これだけ経ったら諦める（Issue #31）。
+///
+/// **全体の締め切りではありません。**`run_operation` は正しく何十分もかかることがあり、
+/// 一律に切ると**正しい仕事を途中で殺します。**切るのは「無音の長さ」です ——
+/// 出力が 1 行でも来れば、そこから測り直します。
+///
+/// **`inactivity_timeout: None`（D25）とは別の話**です。あれは
+/// **繋がったセッションを放っておいても切らない**ためで正しい。
+/// **1 回のコマンドを無限に待つ理由にはなりません。**
+const SILENT_GIVE_UP_AFTER: Duration = Duration::from_secs(120);
+
 /// 返事が来ないまま何回まで送るか。**ここを超えたら切れたと判断する。**
 ///
 /// 30 秒 × 4 = 2 分。**切れているのに繋がっているように見える時間**の上限です。
@@ -315,6 +326,19 @@ impl SshSession {
         self.exec_with_stdin(actor, command, None).await
     }
 
+    /// 無音の上限を指定して打つ（Issue #31）。
+    ///
+    /// **長くかかってよい仕事**は、呼ぶ側が広げられます。既定は [`SILENT_GIVE_UP_AFTER`]。
+    pub async fn exec_capped(
+        &self,
+        actor: Actor,
+        command: &str,
+        stdin: Option<&str>,
+        silent_cap: Duration,
+    ) -> Result<Ran, SshError> {
+        self.exec_inner(actor, command, stdin, silent_cap).await
+    }
+
     /// 同じものを、**標準入力を渡して**打つ（D48 / Issue #19）。
     ///
     /// `sudo -S` へパスワードを渡す道はここしかありません ——
@@ -331,6 +355,17 @@ impl SshSession {
         actor: Actor,
         command: &str,
         stdin: Option<&str>,
+    ) -> Result<Ran, SshError> {
+        self.exec_inner(actor, command, stdin, SILENT_GIVE_UP_AFTER)
+            .await
+    }
+
+    async fn exec_inner(
+        &self,
+        actor: Actor,
+        command: &str,
+        stdin: Option<&str>,
+        silent_cap: Duration,
     ) -> Result<Ran, SshError> {
         self.show(actor, &format!("$ {command}")).await?;
 
@@ -359,7 +394,20 @@ impl SshSession {
         let mut out = Vec::new();
         let mut err = Vec::new();
         let mut status = None;
-        while let Some(message) = channel.wait().await {
+        // **無音が続いたら諦める。**1 行でも来たら、そこから測り直します。
+        loop {
+            let message = match tokio::time::timeout(silent_cap, channel.wait()).await {
+                Ok(Some(message)) => message,
+                // 相手が口を閉じた。**正常な終わり。**
+                Ok(None) => break,
+                Err(_) => {
+                    let _ = channel.close().await;
+                    return Err(SshError::Command(format!(
+                        "{} 秒のあいだ、相手から何も返ってきませんでした。打ち切りました",
+                        silent_cap.as_secs()
+                    )));
+                }
+            };
             match message {
                 ChannelMsg::Data { ref data } => out.extend_from_slice(data),
                 // **ここを落としていた。**stderr は別の流れで来る。

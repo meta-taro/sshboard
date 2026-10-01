@@ -932,3 +932,72 @@ async fn a_key_with_a_passphrase_gets_us_in() {
         .expect("コマンドが通らない");
     assert_eq!(ran.out.trim(), "probe");
 }
+
+/// **返ってこないコマンドを、いつまでも待たない**（Issue #31・2026-10-01）。
+///
+/// 実運用の報告 ——
+///
+/// > リモートのコマンドに上限時間が無い。`channel.wait()` を無期限に待つ
+///
+/// 繋ぎに行く所には上限が在りました（`REACH_GIVE_UP_AFTER`）が、
+/// **実行中の待ちには無い**ので、相手が黙ったまま返さないと**永久に待ちます。**
+///
+/// ## なぜ「全体の締め切り」にしないか
+///
+/// `run_operation` は、正しく何十分もかかることがあります。
+/// **一律に切ると、正しい仕事を途中で殺します。**
+/// 切るのは「**何も言ってこない時間**」です。喋り続けている限り待ちます。
+#[tokio::test]
+async fn a_silent_command_is_given_up_on_instead_of_waited_out() {
+    if !server_is_up().await {
+        println!("テスト用サーバーが建っていません（想定内・飛ばします）");
+        return;
+    }
+
+    let session = trusted_session(Band::new()).await;
+    let started = std::time::Instant::now();
+
+    // **何も出さずに眠る。**上限は 2 秒。
+    let result = session
+        .exec_capped(Actor::Human, "sleep 30", None, Duration::from_secs(2))
+        .await;
+
+    let waited = started.elapsed();
+    assert!(
+        waited < Duration::from_secs(10),
+        "**{waited:?} 待ちました。**上限が効いていません"
+    );
+    match result {
+        Err(SshError::Command(detail)) => {
+            assert!(
+                detail.contains("2"),
+                "上限の秒数が文に入っていない: {detail}"
+            );
+        }
+        other => panic!("上限で終わっていない: {other:?}"),
+    }
+}
+
+/// **喋っている間は切らない。**上限は「無音の長さ」であって、全体の締め切りではない。
+#[tokio::test]
+async fn a_chatty_command_is_not_cut_off_even_when_it_runs_longer_than_the_cap() {
+    if !server_is_up().await {
+        println!("テスト用サーバーが建っていません（想定内・飛ばします）");
+        return;
+    }
+
+    let session = trusted_session(Band::new()).await;
+
+    // 1 秒おきに 4 回喋る（全体 4 秒）。上限は 2 秒。**切れてはいけない。**
+    let out = session
+        .exec_capped(
+            Actor::Human,
+            "for i in 1 2 3 4; do echo tick; sleep 1; done",
+            None,
+            Duration::from_secs(2),
+        )
+        .await
+        .expect("喋っているのに切られた");
+
+    assert_eq!(out.out.matches("tick").count(), 4, "実際: {out:?}");
+}
