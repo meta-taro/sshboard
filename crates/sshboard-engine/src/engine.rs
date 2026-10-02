@@ -47,6 +47,9 @@ struct Live {
 struct OpenConsole {
     console: Option<Console>,
     holder: Actor,
+    /// **この端末だけの出力**（D60 / Issue #21）。
+    /// 端末が立っていない段（許可だけ出ている）では `None`。
+    stream: Option<Arc<OutputStream>>,
 }
 
 /// 開いている端末ぜんぶ（D29 / D60）。
@@ -99,6 +102,7 @@ impl ConsoleSlot {
                     OpenConsole {
                         console: None,
                         holder: actor,
+                        stream: None,
                     },
                 );
             }
@@ -1023,6 +1027,24 @@ impl Engine {
         self.console_is_open(&target).await.then_some(target)
     }
 
+    /// **その端末だけの出力**（D60 / Issue #21）。
+    ///
+    /// 立っていなければ `None`。**空文字と区別します** ——
+    /// 空は「まだ何も出ていない」とも読めて、AI は打ち続けます。
+    ///
+    /// **接続ごとの出力（`stream_for`）とは別です。**同じ接続の中に、端末の出力と
+    /// 用途別ツール（`run_readonly` / `read_log`）の出力が両方流れます。
+    /// 分けないと、AI は**「シェルが言ったこと」と「ツールが言ったこと」を
+    /// 区別できません**（#21 で指摘された形）。
+    pub async fn console_tail(&self, on: Option<&str>) -> Option<String> {
+        let target = self.console_where(on).await?;
+        let slot = self.console.lock().await;
+        slot.held
+            .get(&target)
+            .and_then(|held| held.stream.as_ref())
+            .map(|stream| stream.plain_tail())
+    }
+
     /// 立っている端末を全部並べる（D60）。**AI もここを読みます。**
     ///
     /// 並びは接続の識別子順。**人が開いた分も含めて全部**出します ——
@@ -1140,8 +1162,16 @@ impl Engine {
         // 実機で端末が繋がらなかったとき、記録に残っていたのは接続の 4 行だけで、
         // **端末の行は 1 本もありませんでした。追えない失敗は、直せない失敗**です。
         let session = self.session_on(&target).await?;
+        // **2 か所へ配ります**（D60 / Issue #21）——
+        // この端末だけの出力と、画面が見ている接続ごとの出力。
+        let only_this = Arc::new(OutputStream::new());
         let console = session
-            .open_console(actor, cols, rows, self.stream_for(&target).await)
+            .open_console(
+                actor,
+                cols,
+                rows,
+                vec![Arc::clone(&only_this), self.stream_for(&target).await],
+            )
             .await?;
 
         let mut slot = self.console.lock().await;
@@ -1159,6 +1189,7 @@ impl Engine {
             OpenConsole {
                 console: Some(console),
                 holder: actor,
+                stream: Some(only_this),
             },
         );
         drop(slot);

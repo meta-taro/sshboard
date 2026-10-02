@@ -720,7 +720,7 @@ async fn a_console_runs_a_real_shell_and_answers_what_is_typed() {
     let stream = Arc::new(OutputStream::new());
 
     let console = session
-        .open_console(Actor::Human, 80, 24, Arc::clone(&stream))
+        .open_console(Actor::Human, 80, 24, vec![Arc::clone(&stream)])
         .await
         .expect("シェルが開けない");
 
@@ -757,7 +757,7 @@ async fn closing_a_console_stops_it_answering() {
     let session = trusted_session(Band::new()).await;
     let stream = Arc::new(OutputStream::new());
     let console = session
-        .open_console(Actor::Human, 80, 24, Arc::clone(&stream))
+        .open_console(Actor::Human, 80, 24, vec![Arc::clone(&stream)])
         .await
         .expect("シェルが開けない");
 

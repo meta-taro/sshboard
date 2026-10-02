@@ -1161,10 +1161,13 @@ impl SshboardMcp {
     /// `read_stream` は「いまの宛先」を返します。**どれが宛先かに関わらず
     /// 名前で読める口**が無いと、AI は人にタブを動かしてもらうしかありません。
     #[tool(
-        description = "Read the plain-text tail of one connection's console output, by connection \
-                       id - including a console the person opened and is using. Never contains \
-                       ANSI escapes. Use list_consoles first to see what is open. This does not \
-                       move the person's screen and does not take the console."
+        description = "Read the plain-text tail of ONE console's output, by connection id - \
+                       including a console the person opened and is using. **Only what that \
+                       shell said**: output from run_readonly, read_log and the other \
+                       purpose-built tools does not appear here, so you can tell the shell \
+                       apart from the tools. Never contains ANSI escapes. Use list_consoles \
+                       first to see what is open. This does not move the person's screen and \
+                       does not take the console."
     )]
     pub async fn read_console(
         &self,
@@ -1186,7 +1189,21 @@ impl SshboardMcp {
                 None,
             ));
         }
-        Ok(engine.stream_for(&request.connection_id).await.plain_tail())
+        // **端末だけの出力**（Issue #21）。接続ごとの出力を返すと、
+        // 用途別ツールの出力が混ざり、「シェルが言ったこと」と区別できません。
+        engine
+            .console_tail(Some(&request.connection_id))
+            .await
+            .ok_or_else(|| {
+                ErrorData::invalid_params(
+                    format!(
+                        "no console is open on {}. Open one with console_open, \
+                         or read the whole connection's output with read_stream.",
+                        request.connection_id
+                    ),
+                    None,
+                )
+            })
     }
 
     /// 手を離す（D29）。**握ったまま離さない、を作らない。**

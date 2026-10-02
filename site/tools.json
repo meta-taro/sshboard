@@ -146,7 +146,7 @@
     },
     {
      "name": "read_console",
-     "line": "Read the plain-text tail of one connection's console output, by connection id - including a console the person opened and is using."
+     "line": "Read the plain-text tail of ONE console's output, by connection id - including a console the person opened and is using."
     }
    ]
   },

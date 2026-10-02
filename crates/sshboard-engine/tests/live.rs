@@ -2031,3 +2031,70 @@ async fn two_consoles_never_mix_their_output() {
     engine.focus("second").await.expect("向けられない");
     let _ = engine.console_stop(Actor::Human, None).await;
 }
+
+#[tokio::test]
+async fn reading_one_console_shows_only_that_console() {
+    // **#21 の②で約束したこと**（2026-10-02 のコメント）——
+    //
+    // > **`run_readonly` や `read_log` の出力は `read_console` に出ません。**
+    // > 逆に、画面が見ている共有の出力（`read_stream`）はそのままです
+    //
+    // 接続ごとに分けるだけでは足りません。**同じ接続の中に、端末の出力と
+    // 用途別ツールの出力が両方流れます。**端末だけを読む口が無いと、
+    // AI は「シェルが言ったこと」と「ツールが言ったこと」を区別できません。
+    if !server_is_up().await {
+        println!("テスト用サーバーが建っていません（想定内・飛ばします）");
+        return;
+    }
+    let dir = tempfile::tempdir().expect("一時ディレクトリ");
+    let engine = engine_connected(&dir).await;
+
+    engine
+        .console_open(Actor::Human, None, 80, 24)
+        .await
+        .expect("開けない");
+    engine
+        .console_type(Actor::Human, None, b"echo FROM_THE_SHELL\n")
+        .await
+        .expect("打てない");
+
+    // 用途別ツールを 1 本走らせる。**これは端末ではありません。**
+    let _ = engine.disk_usage(Actor::Human).await;
+
+    for _ in 0..50 {
+        if engine
+            .console_tail(None)
+            .await
+            .is_some_and(|tail| tail.contains("FROM_THE_SHELL"))
+        {
+            break;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+    }
+
+    let only_console = engine.console_tail(None).await.expect("端末の出力が無い");
+    let shared = engine.stream().await.plain_tail();
+
+    assert!(
+        only_console.contains("FROM_THE_SHELL"),
+        "端末が言ったことが端末の出力に無い: {only_console:?}"
+    );
+    assert!(
+        !only_console.contains("$ df"),
+        "**用途別ツールの出力が端末の出力へ混ざった**: {only_console:?}"
+    );
+    // **画面の側は、そのまま両方見えます。**ここは 1 ミリも変えません。
+    assert!(
+        shared.contains("FROM_THE_SHELL"),
+        "画面の側に端末の出力が来ていない: {shared:?}"
+    );
+    assert!(
+        shared.contains("df"),
+        "画面の側に用途別ツールの出力が来ていない: {shared:?}"
+    );
+
+    let _ = engine.console_stop(Actor::Human, None).await;
+    // **止めたら、その端末の出力も残しません。**番号を使い回さないのと同じ理由 ——
+    // 閉じた端末を読めると、AI は「まだ生きている」と読みます。
+    assert_eq!(engine.console_tail(None).await, None, "止めたのに読めた");
+}
