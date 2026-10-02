@@ -197,3 +197,53 @@ async fn resuming_a_stream_that_was_never_stopped_changes_nothing() {
     assert!(!stream.is_stopped());
     assert!(stream.push(b"ok\n").is_ok());
 }
+
+#[tokio::test]
+async fn the_raw_tail_keeps_the_escapes_so_a_screen_can_be_drawn_again() {
+    // **なぜ要るか**（D60・2026-10-02）: 端末が接続ごとに持てるようになったので、
+    // 人がタブを戻したとき、**画面はその接続の続きを描き直さなければなりません。**
+    //
+    // 素（`plain_tail`）では描き直せません。色も、カーソルの位置も落ちています。
+    // **生の控えが無いと、タブを戻した瞬間に画面が白紙になります。**
+    let stream = OutputStream::new();
+    stream
+        .push(b"\x1b[31mERROR\x1b[0m disk full\n")
+        .expect("流せない");
+    stream.push(b"$ ").expect("流せない");
+
+    assert_eq!(
+        stream.raw_tail(),
+        b"\x1b[31mERROR\x1b[0m disk full\n$ ".to_vec(),
+        "生の控えが残っていない（タブを戻すと白紙になる）"
+    );
+}
+
+#[tokio::test]
+async fn the_raw_tail_is_bounded_and_drops_the_oldest() {
+    // `tail -f` は何時間も流れます。**上限が無いと、ここが際限なく膨らみます。**
+    let stream = OutputStream::new();
+    let chunk = vec![b'x'; 8 * 1024];
+    for _ in 0..40 {
+        stream.push(&chunk).expect("流せない");
+    }
+
+    let tail = stream.raw_tail();
+    assert!(
+        tail.len() <= sshboard_stream::RAW_TAIL_LIMIT,
+        "生の控えに上限が無い: {} バイト",
+        tail.len()
+    );
+    assert!(!tail.is_empty(), "全部捨ててしまった");
+}
+
+#[tokio::test]
+async fn resuming_keeps_the_raw_tail_too() {
+    // 止めても、**既に流れた分は消しません**（消すと何が起きたか追えません）。
+    let stream = OutputStream::new();
+    stream.push(b"before\n").expect("流せない");
+    stream.stop();
+    stream.resume();
+    stream.push(b"after\n").expect("流せない");
+
+    assert_eq!(stream.raw_tail(), b"before\nafter\n".to_vec());
+}

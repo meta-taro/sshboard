@@ -49,7 +49,7 @@ async fn failing_to_open_the_console_is_written_down() {
     let engine = engine_in(&dir);
 
     // Act — **繋がっていないのに開こうとする。**
-    let refused = engine.console_open(Actor::Human, 80, 24).await;
+    let refused = engine.console_open(Actor::Human, None, 80, 24).await;
 
     // Assert
     assert!(
@@ -87,7 +87,7 @@ async fn refusing_a_keystroke_is_written_down() {
     let engine = engine_in(&dir);
 
     // Act — **開いていない端末へ打つ。**
-    let refused = engine.console_type(Actor::Human, b"ls\n").await;
+    let refused = engine.console_type(Actor::Human, None, b"ls\n").await;
 
     // Assert
     assert!(
@@ -114,9 +114,9 @@ async fn the_console_record_never_carries_the_destination() {
     let engine = engine_in(&dir);
 
     // Act
-    let _ = engine.console_open(Actor::Human, 80, 24).await;
-    let _ = engine.console_type(Actor::Human, b"whoami\n").await;
-    let _ = engine.console_stop(Actor::Human).await;
+    let _ = engine.console_open(Actor::Human, None, 80, 24).await;
+    let _ = engine.console_type(Actor::Human, None, b"whoami\n").await;
+    let _ = engine.console_stop(Actor::Human, None).await;
 
     // Assert
     let written = rendered(&engine);

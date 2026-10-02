@@ -809,7 +809,7 @@ pub async fn console_open(
     // **黙って別のシェルになるのが一番危ない** —— 人が `su -` した状態も、
     // カレントディレクトリも、実行中のジョブも消えるためです。
     let opened = engine
-        .console_open(Actor::Human, cols.max(20), rows.max(5))
+        .console_open(Actor::Human, None, cols.max(20), rows.max(5))
         .await
         .map_err(|error| error.to_string())?;
     Ok(matches!(opened, sshboard_engine::ConsoleOpened::Fresh))
@@ -822,7 +822,7 @@ pub async fn console_open(
 #[tauri::command]
 pub async fn console_type(bytes: Vec<u8>, engine: State<'_, Arc<Engine>>) -> Result<(), String> {
     engine
-        .console_type(Actor::Human, &bytes)
+        .console_type(Actor::Human, None, &bytes)
         .await
         .map_err(|error| error.to_string())
 }
@@ -834,7 +834,7 @@ pub async fn console_resize(
     engine: State<'_, Arc<Engine>>,
 ) -> Result<(), String> {
     engine
-        .console_resize(cols.max(20), rows.max(5))
+        .console_resize(None, cols.max(20), rows.max(5))
         .await
         .map_err(|error| error.to_string())
 }
@@ -843,7 +843,7 @@ pub async fn console_resize(
 #[tauri::command]
 pub async fn console_take(engine: State<'_, Arc<Engine>>) -> Result<(), String> {
     engine
-        .console_take(Actor::Human)
+        .console_take(Actor::Human, None)
         .await
         .map_err(|error| error.to_string())
 }
@@ -853,7 +853,7 @@ pub async fn console_take(engine: State<'_, Arc<Engine>>) -> Result<(), String> 
 pub async fn console_stop(engine: State<'_, Arc<Engine>>) -> Result<(), String> {
     // **人は常に勝つ**（D29）。握っているのが AI でも止められます。
     engine
-        .console_stop(Actor::Human)
+        .console_stop(Actor::Human, None)
         .await
         .map_err(|error| error.to_string())?;
     Ok(())
@@ -875,7 +875,8 @@ pub struct ConsoleState {
 #[tauri::command]
 pub async fn console_holder(engine: State<'_, Arc<Engine>>) -> Result<ConsoleState, String> {
     Ok(ConsoleState {
-        holder: holder_name(engine.console_holder().await).map(|name| name.to_string()),
+        // **宛先の端末の話だけ**をします（D60）。
+        holder: holder_name(engine.console_holder_active().await).map(|name| name.to_string()),
         connection: engine.console_connection().await,
     })
 }

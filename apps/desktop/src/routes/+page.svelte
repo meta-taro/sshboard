@@ -25,10 +25,16 @@
 	import { textSize } from '$lib/text-size/text-size.svelte';
 	import { theme, type ThemeMode } from '$lib/theme/theme.svelte';
 	import { attachFit, attachSearch, createTerminal, writeChunk } from '$lib/terminal.svelte';
-	import { emptyBacklog, remember, replay, type Backlog } from '$lib/stream-backlog';
+	import {
+		BEFORE_CONNECTING,
+		emptyBacklogs,
+		keyFor,
+		rememberFor,
+		replayFor,
+		type Backlogs
+	} from '$lib/stream-backlog';
 	import { applyEdit, editIntent, type EditableField } from '$lib/edit-keys';
 	import { canFollow, isView, type View, viewAfterAnswered} from '$lib/view-request'
-	import { consoleElsewhere } from '$lib/console-place';
 	import { asConnectFailure, readableFailure } from '$lib/connect-failure';;
 	import { attachClipboard, browserClipboard, detectPlatform } from '$lib/terminal-clipboard';
 	import { isFindShortcut, type TerminalSearch } from '$lib/terminal-search';
@@ -111,7 +117,9 @@
 	 * 承認のダイアログは「打った内容は画面にそのまま出ます」と約束しているのに、
 	 * **出ていませんでした。**面ができた時点で、ここから書き戻します。
 	 */
-	let backlog: Backlog = emptyBacklog();
+	// **接続ごとに覚えます**（D60）。1 本で持つと、タブを戻したときに
+	// **別のサーバーの出力が出ます。**
+	let backlogs: Backlogs = emptyBacklogs();
 	/** 誰が握っているか。`null` は誰も握っていない。 */
 	let holder = $state<'human' | 'ai' | null>(null);
 	/** **どの接続の端末か。**タブを移しても端末は付いてこない（D25）。 */
@@ -275,15 +283,25 @@
 	const iHold = $derived(holder === 'human');
 
 	/**
-	 * **端末が「いまここに無い」とき、相手の名前**（2026-10-02・実機の指摘）。
+	 * **いま面に映っている接続**（D60・2026-10-02）。
 	 *
-	 * > ヘラけるのかさえわからないよ
-	 *
-	 * 端末の面には接続のタブが並ぶので、**押せばその接続の端末が開くように見えます。**
-	 * 実際は**全体で 1 本**（D29）で、タブを移しても端末は付いてきません。
-	 * **そのことが、どこにも書いてありませんでした。**
+	 * 出力は接続ごとに分かれているので、**どの接続の分を映すのか**を
+	 * 1 か所で決めます。繋がっていない間は、繋ぐ前の分（接続の失敗など）。
 	 */
-	const consoleAway = $derived(consoleElsewhere(consoleOn, session.open?.name ?? null));
+	const shownConnection = $derived(session.open?.id ?? BEFORE_CONNECTING);
+
+	/*
+	 * **ここに在った「端末はいまここに無い」の帯は、2026-10-02 に外しました**（D60）。
+	 *
+	 * 帯が言っていたのは「端末は全体で 1 本なので、タブを移しても付いてこない」で、
+	 * **端末を接続ごとに持てるようにしたので、その状態は起こりません。**
+	 * `consoleOn` は宛先の端末を指すので、見ている接続と食い違いません。
+	 *
+	 * **まだ出していないもの**: AI が別の接続の端末を握っているとき、
+	 * どこを握っているか。`console_list` は実行体に在りますが、画面へは出していません
+	 * （D60 の次の一手 ——「人がどの面を見ているか」と一緒にやります）。
+	 */
+
 	let diag = $state<DiagEvent[]>([]);
 
 	// --- コピー & ペースト --------------------------------------------------------
@@ -421,7 +439,7 @@
 			consoleTerm = createTerminal(host, textSize.terminalPx, true);
 			// **作った端に書き戻す**（Issue #14 / #11）。
 			// タブを行き来しても消えず、見ていない間の分も出ます。
-			writeChunk(consoleTerm, replay(backlog));
+			writeChunk(consoleTerm, replayFor(backlogs, shownConnection));
 			consoleTerm.onData((data) => {
 				// **握っていなければ打たない。**往復させて断られるより、
 				// 画面で止める方が速い（Rust 側でも同じ判断をしている）。
@@ -468,7 +486,7 @@
 			terminal = createTerminal(host, textSize.terminalPx);
 			// **こちらも書き戻す。**同じ 1 本の出力を見ている面なので、
 			// 片方だけ戻ると「どちらが本当か」が分からなくなります。
-			writeChunk(terminal, replay(backlog));
+			writeChunk(terminal, replayFor(backlogs, shownConnection));
 			detachOutput.push(attachFit(terminal, host));
 			// **見るだけの面でも、なぞればコピーできます。**ログを拾うのはここ。
 			// 貼り付けは付けません（`disableStdin` の面から文字が出ると嘘になる）。
@@ -513,6 +531,26 @@
 	// 切って繋いだ人が押す所を探すことになります。
 	$effect(() => {
 		if (session.open === null) autoOpenTried = false;
+	});
+
+	/**
+	 * **宛先が変わったら、面を描き直す**（D60・2026-10-02）。
+	 *
+	 * 描き直さないと、**前の接続の出力の下に次の接続の出力が続いて**出ます。
+	 * 人は境目が分からず、**どの台で打ったのかを取り違えます** ——
+	 * `rm` を打つ相手を取り違えるのが、この製品で一番怖い事故です。
+	 *
+	 * 消してから、その接続の控えを書き戻します。**消すだけにしません** ——
+	 * 戻ってきたタブが白紙だと、人は「落ちた」と読みます。
+	 */
+	$effect(() => {
+		const on = shownConnection;
+		const back = replayFor(backlogs, on);
+		for (const term of [consoleTerm, terminal]) {
+			if (!term) continue;
+			term.reset();
+			writeChunk(term, back);
+		}
 	});
 
 	$effect(() => {
@@ -841,7 +879,7 @@
 
 
 		// **ANSI を落とさずに渡す。**色は人の側にだけ残す（Issue 005）。
-		listen<number[]>('stream://raw', (event) => {
+		listen<{ connection: string | null; chunk: number[] }>('stream://raw', (event) => {
 			// **端末の面へも書く**（Issue #10）。
 			//
 			// ここは長らく `terminal`（*出力* の面）にしか書いていませんでした。
@@ -850,15 +888,21 @@
 			// しかも `terminal` は *出力* の面が開かれるまで作られないので、
 			// 端末タブだけを開いている間は `if (terminal)` が毎回素通りします。
 			//
-			// **出力は MCP と共有する 1 本**なので（PRD §4-1）、`tail -f` を
+			// **出力は MCP と共有するもの**なので（PRD §4-1）、`tail -f` を
 			// 走らせている間はその出力も端末の面に混ざります。**まず映すこと**を
 			// 採りました — 混ざるより、何も出ない方が悪い。
 			// 出どころで振り分ける案は `decisions.md` に出してあります。
+			//
+			// **接続ごとに分かれています**（D60）。どの接続の出力かが添えてあり、
+			// **いま見ている接続の分だけ**を面へ書きます。
+			// 書き分けないと、2 台の出力が 1 つの面で混ざります。
+			const from = keyFor(event.payload.connection);
 			// **面が無くても覚えておく**（Issue #14）。
 			// ここを通らないと、別のタブに居る間の分が丸ごと消えます。
-			backlog = remember(backlog, event.payload);
-			if (terminal) writeChunk(terminal, event.payload);
-			if (consoleTerm) writeChunk(consoleTerm, event.payload);
+			backlogs = rememberFor(backlogs, from, event.payload.chunk);
+			if (from !== shownConnection) return;
+			if (terminal) writeChunk(terminal, event.payload.chunk);
+			if (consoleTerm) writeChunk(consoleTerm, event.payload.chunk);
 		})
 			.then((stop) => stops.push(stop))
 			.catch((error: unknown) => {
@@ -1418,12 +1462,6 @@
 				     タブを移しても端末は付いてこないので、書いていないと迷子になる。 -->
 				{#if consoleOn}
 					<span class="on" data-secret>{consoleOn}</span>
-				{/if}
-				{#if consoleAway}
-					<!-- **端末は付いてこない。**どこに在るかと、どうすれば開けるかを言う。 -->
-					<span class="onlyone" data-secret>
-						{i18n.t('console.elsewhere', { name: consoleAway })}
-					</span>
 				{/if}
 				<span class="holder" class:ai={holder === 'ai'} class:mine={iHold}>
 					<Icon name={holder ? 'lock' : 'terminal'} size={12} />

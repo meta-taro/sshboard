@@ -21,7 +21,18 @@
  */
 import { describe, expect, test } from 'vitest';
 
-import { emptyBacklog, MAX_BACKLOG_BYTES, remember, replay, type Backlog } from './stream-backlog';
+import {
+	BEFORE_CONNECTING,
+	emptyBacklog,
+	emptyBacklogs,
+	forget,
+	MAX_BACKLOG_BYTES,
+	remember,
+	rememberFor,
+	replay,
+	replayFor,
+	type Backlog
+} from './stream-backlog';
 
 /** `size` バイトの塊。中身は何でもよいので、位置が分かる値を入れる。 */
 function chunk(size: number, fill: number): number[] {
@@ -83,5 +94,57 @@ describe('stream-backlog', () => {
 	test('replays nothing when nothing has arrived', () => {
 		// **空を書き戻して、画面を汚さない。**
 		expect(replay(emptyBacklog())).toEqual([]);
+	});
+});
+
+describe('接続ごとの控え（D60）', () => {
+	test('keeps each connection apart', () => {
+		// **一番危ない食い違い。**端末が接続ごとに持てるようになったので（D60）、
+		// 控えを 1 本で持つと、タブを戻したとき**別のサーバーの出力が出ます。**
+		let all = emptyBacklogs();
+		all = rememberFor(all, 'first', [65]);
+		all = rememberFor(all, 'second', [66]);
+
+		expect(replayFor(all, 'first')).toEqual([65]);
+		expect(replayFor(all, 'second')).toEqual([66]);
+	});
+
+	test('returns nothing for a connection it never saw', () => {
+		// **空を返す。**別の接続の分で埋めない。
+		expect(replayFor(emptyBacklogs(), 'nobody')).toEqual([]);
+		expect(replayFor(emptyBacklogs(), null)).toEqual([]);
+	});
+
+	test('does not change the map it was given', () => {
+		const before = emptyBacklogs();
+		const after = rememberFor(before, 'first', [65]);
+
+		expect(before.size).toBe(0);
+		expect(after.size).toBe(1);
+	});
+
+	test('forgets a connection that was closed', () => {
+		// **残すと、繋ぎ直したときに前回の出力が混ざって出ます。**
+		// 人は「いま打ったもの」と「前に打ったもの」を見分けられません。
+		let all = rememberFor(emptyBacklogs(), 'first', [65]);
+		all = forget(all, 'first');
+
+		expect(replayFor(all, 'first')).toEqual([]);
+	});
+
+	test('keeps the output from before anything was connected', () => {
+		// 繋ぐ前にも出るものがあります（接続の失敗など）。**捨てません。**
+		const all = rememberFor(emptyBacklogs(), BEFORE_CONNECTING, [65]);
+
+		expect(replayFor(all, BEFORE_CONNECTING)).toEqual([65]);
+	});
+
+	test('the per-connection tail is bounded just like the single one', () => {
+		let all = emptyBacklogs();
+		const chunk = Array.from({ length: 1024 }, () => 65);
+		for (let i = 0; i < 400; i += 1) all = rememberFor(all, 'first', chunk);
+
+		expect(replayFor(all, 'first').length).toBeLessThanOrEqual(MAX_BACKLOG_BYTES);
+		expect(replayFor(all, 'first').length).toBeGreaterThan(0);
 	});
 });

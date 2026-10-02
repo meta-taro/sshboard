@@ -19,6 +19,15 @@ const CHANNEL_CAPACITY: usize = 1024;
 /// `read_log` が空を返す。**なぜ上限が要るか**: `tail -f` は何時間も流れる。
 pub const PLAIN_TAIL_LIMIT: usize = 64 * 1024;
 
+/// 直近の生の出力を保持しておく上限（バイト）。
+///
+/// **なぜ要るか**（D60・2026-10-02）: 端末が接続ごとに持てるようになったので、
+/// 人がタブを戻したとき、**画面はその接続の続きを描き直さなければなりません。**
+/// 素（`PLAIN_TAIL_LIMIT`）では色もカーソルも落ちていて、描き直せません。
+///
+/// **なぜ素より大きいか**: エスケープが混ざるので、同じ見た目でも嵩みます。
+pub const RAW_TAIL_LIMIT: usize = 256 * 1024;
+
 /// 止まっているのに流そうとした。
 #[derive(Debug, PartialEq, Eq)]
 pub struct StreamStopped;
@@ -38,6 +47,8 @@ pub struct OutputStream {
     filter: Mutex<PlainFilter>,
     /// 直近の素のテキスト。**上限を超えたら古い方から捨てる。**
     plain_tail: Mutex<String>,
+    /// 直近の生の出力。**画面を描き直すためだけに持ちます。**
+    raw_tail: Mutex<Vec<u8>>,
     stopped: AtomicBool,
 }
 
@@ -50,6 +61,7 @@ impl OutputStream {
             plain,
             filter: Mutex::new(PlainFilter::new()),
             plain_tail: Mutex::new(String::new()),
+            raw_tail: Mutex::new(Vec::new()),
             stopped: AtomicBool::new(false),
         }
     }
@@ -74,6 +86,7 @@ impl OutputStream {
 
         // 生を先に出す。人が見ている面を待たせない。
         let _ = self.raw.send(chunk.to_vec());
+        self.remember_raw(chunk);
 
         // フィルタが panic することは無いが、仮に毒されても止めない。
         // ここで諦めると、以後 MCP 側だけが黙って死ぬ。
@@ -117,6 +130,33 @@ impl OutputStream {
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner())
             .clone()
+    }
+
+    /// 直近の生の出力。**エスケープがそのまま入っています。**
+    ///
+    /// 画面を描き直すためのものです。**AI へ渡すのは素（`plain_tail`）の方**で、
+    /// 生を渡すと、読む側がエスケープを解く羽目になります。
+    pub fn raw_tail(&self) -> Vec<u8> {
+        self.raw_tail
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .clone()
+    }
+
+    fn remember_raw(&self, chunk: &[u8]) {
+        let mut tail = self
+            .raw_tail
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        tail.extend_from_slice(chunk);
+
+        if tail.len() <= RAW_TAIL_LIMIT {
+            return;
+        }
+        // **バイト列なので、文字の境目は見ません。**
+        // 途中で切れたエスケープは xterm.js が読み飛ばします（1 行崩れるだけ）。
+        let cut = tail.len() - RAW_TAIL_LIMIT;
+        tail.drain(..cut);
     }
 
     fn remember(&self, text: &str) {

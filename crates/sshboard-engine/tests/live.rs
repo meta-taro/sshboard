@@ -113,7 +113,7 @@ fn engine_at(path: PathBuf) -> Engine {
 
 /// AI に端末を開かせる。**D42 が入ったので、頼んで人が許すまで開けません。**
 async fn ai_console_open(engine: &Engine) {
-    let asked = engine.console_open(Actor::Ai, 80, 24).await;
+    let asked = engine.console_open(Actor::Ai, None, 80, 24).await;
     assert!(
         matches!(asked, Err(EngineError::ConsoleApprovalNeeded)),
         "AI が許可なく端末を開けてしまう: {asked:?}"
@@ -123,10 +123,10 @@ async fn ai_console_open(engine: &Engine) {
         .await
         .expect("人が許せない");
     engine
-        .console_open(Actor::Ai, 80, 24)
+        .console_open(Actor::Ai, None, 80, 24)
         .await
         .expect("許可したのに開けない");
-    assert_eq!(engine.console_holder().await, Some(Actor::Ai));
+    assert_eq!(engine.console_holder_active().await, Some(Actor::Ai));
 }
 
 #[tokio::test]
@@ -1153,7 +1153,7 @@ async fn the_password_never_reaches_the_screen() {
         .await
         .expect("繋がらない");
 
-    let mut watching = engine.stream().subscribe_raw();
+    let mut watching = engine.stream().await.subscribe_raw();
 
     let _ = engine.run_operation(Actor::Ai, "read-maillog").await;
     engine
@@ -1206,19 +1206,19 @@ async fn only_the_side_holding_the_console_can_type_into_it() {
     let engine = engine_connected(&dir).await;
 
     engine
-        .console_open(Actor::Human, 80, 24)
+        .console_open(Actor::Human, None, 80, 24)
         .await
         .expect("開けない");
-    assert_eq!(engine.console_holder().await, Some(Actor::Human));
+    assert_eq!(engine.console_holder_active().await, Some(Actor::Human));
 
-    let refused = engine.console_type(Actor::Ai, b"echo nope\n").await;
+    let refused = engine.console_type(Actor::Ai, None, b"echo nope\n").await;
     assert!(
         matches!(refused, Err(EngineError::ConsoleHeldByOther { .. })),
         "**握っていない側が打ててしまう**: {refused:?}"
     );
 
     engine
-        .console_type(Actor::Human, b"echo mine\n")
+        .console_type(Actor::Human, None, b"echo mine\n")
         .await
         .expect("握っている側が打てない");
 }
@@ -1237,24 +1237,24 @@ async fn a_person_can_always_take_the_console_back() {
 
     // AI が握っていても、人は取り返せる。
     engine
-        .console_take(Actor::Human)
+        .console_take(Actor::Human, None)
         .await
         .expect("取り返せない");
-    assert_eq!(engine.console_holder().await, Some(Actor::Human));
+    assert_eq!(engine.console_holder_active().await, Some(Actor::Human));
     engine
-        .console_type(Actor::Human, b"echo taken\n")
+        .console_type(Actor::Human, None, b"echo taken\n")
         .await
         .expect("取り返したのに打てない");
 
     // **逆は勝たない。**AI は人から奪えない。
     // **D42 以降、AI にできるのは「頼む」ことだけ**です（人が答えるまで握れません）。
-    let refused = engine.console_take(Actor::Ai).await;
+    let refused = engine.console_take(Actor::Ai, None).await;
     assert!(
         matches!(refused, Err(EngineError::ConsoleApprovalNeeded)),
         "**AI が人から奪えてしまう**: {refused:?}"
     );
     assert_eq!(
-        engine.console_holder().await,
+        engine.console_holder_active().await,
         Some(Actor::Human),
         "頼んだだけで握りが動いている"
     );
@@ -1271,20 +1271,20 @@ async fn stopping_the_console_always_works_and_frees_it() {
     let engine = engine_connected(&dir).await;
 
     ai_console_open(&engine).await;
-    let _ = engine.console_stop(Actor::Human).await;
+    let _ = engine.console_stop(Actor::Human, None).await;
     assert_eq!(
-        engine.console_holder().await,
+        engine.console_holder_active().await,
         None,
         "止めたのに握られたまま"
     );
 
     // 止めたあとは、誰でも開き直せる。**止めたら二度と使えない、にしない。**
     engine
-        .console_open(Actor::Human, 80, 24)
+        .console_open(Actor::Human, None, 80, 24)
         .await
         .expect("止めたあとに開けない");
-    assert_eq!(engine.console_holder().await, Some(Actor::Human));
-    let _ = engine.console_stop(Actor::Human).await;
+    assert_eq!(engine.console_holder_active().await, Some(Actor::Human));
+    let _ = engine.console_stop(Actor::Human, None).await;
 }
 
 #[tokio::test]
@@ -1311,7 +1311,7 @@ async fn a_console_says_which_connection_it_belongs_to() {
     // いまの宛先は second。**first を宛先にしてから端末を開く。**
     engine.focus("first").await.expect("向けられない");
     engine
-        .console_open(Actor::Human, 80, 24)
+        .console_open(Actor::Human, None, 80, 24)
         .await
         .expect("開けない");
     assert_eq!(
@@ -1320,29 +1320,62 @@ async fn a_console_says_which_connection_it_belongs_to() {
         "端末がどの接続のものか覚えていない"
     );
 
-    // タブを second へ移す。**端末は first のまま**でなければならない。
+    // タブを second へ移す。**second にはまだ端末が無い**ので、何も指しません。
+    //
+    // **ここが一番危ない食い違いの出口でした。**以前は端末が全体で 1 本だったので、
+    // 「画面は second、打鍵は first のシェルへ」が起こり得ました。
+    // 接続ごとに 1 本（D60）にしたので、**宛先に端末が無ければ打てません**
+    // （`console_type` は `ConsoleNotOpen` を返します）。
     engine.focus("second").await.expect("向けられない");
+    assert_eq!(
+        engine.console_connection().await,
+        None,
+        "端末が無い接続なのに、別の接続の端末を指してしまった"
+    );
+    assert!(
+        matches!(
+            engine.console_type(Actor::Human, None, b"echo x\n").await,
+            Err(EngineError::ConsoleNotOpen)
+        ),
+        "端末が無い宛先で打ててしまった（別の接続のシェルへ行く）"
+    );
+
+    // **second でも開ける**（D60・2026-10-02）。
+    //
+    // 以前はここで断っていました（`ConsoleOnOtherConnection`）。
+    // **端末が全体で 1 本**だったためです。実運用はこうでした ——
+    //
+    // > レッツエンクリプトで、マルチドメインで、**３台同時に延長申請とか作業するから、
+    // > テラターム最低２画面はいつも開いている**
+    //
+    // **接続ごとに 1 本**持てるようにしました。
+    engine
+        .console_open(Actor::Human, None, 80, 24)
+        .await
+        .expect("別の接続で開けない");
+    assert_eq!(engine.console_connection().await.as_deref(), Some("second"));
+
+    // **first の端末は生きたまま。**second を開いても落ちない。
+    engine.focus("first").await.expect("向けられない");
     assert_eq!(
         engine.console_connection().await.as_deref(),
         Some("first"),
-        "宛先を変えたら端末まで別の接続を指してしまった"
+        "second を開いたら first の端末が消えた"
     );
 
-    // **黙って乗り換えない。**別の接続で開こうとしたら、どこで開いているかを言って断る。
-    let refused = engine.console_open(Actor::Human, 80, 24).await;
-    assert!(
-        matches!(refused, Err(EngineError::ConsoleOnOtherConnection { ref id }) if id == "first"),
-        "別の接続へ黙って乗り換えた: {refused:?}"
-    );
+    // **2 本とも一覧に出る。**
+    let open = engine.console_list().await;
+    assert_eq!(open.len(), 2, "開いている端末が 2 本に見えない: {open:?}");
+    assert!(open.iter().any(|held| held.connection == "first"));
+    assert!(open.iter().any(|held| held.connection == "second"));
 
-    let _ = engine.console_stop(Actor::Human).await;
-    // 止めたあとは、いまの宛先で開ける。
-    engine
-        .console_open(Actor::Human, 80, 24)
-        .await
-        .expect("止めたあとに開けない");
+    // 片方を止めても、もう片方は残る。
+    let _ = engine.console_stop(Actor::Human, None).await;
+    assert_eq!(engine.console_list().await.len(), 1, "両方止まってしまった");
+    engine.focus("second").await.expect("向けられない");
     assert_eq!(engine.console_connection().await.as_deref(), Some("second"));
-    let _ = engine.console_stop(Actor::Human).await;
+    let _ = engine.console_stop(Actor::Human, None).await;
+    assert!(engine.console_list().await.is_empty());
 }
 
 /// 移動しても宛先が落ちないこと（Issue #8）。
@@ -1409,7 +1442,7 @@ async fn what_a_purpose_built_tool_runs_shows_up_on_the_screen() {
         .expect("繋がらない");
 
     // **画面の側で待ち受けてから走らせる。**
-    let mut watching = engine.stream().subscribe_raw();
+    let mut watching = engine.stream().await.subscribe_raw();
 
     let ran = engine
         .runtime_versions(Actor::Ai)
@@ -1451,13 +1484,13 @@ async fn handing_the_console_over_keeps_the_same_shell() {
 
     // 人が開いて、下ごしらえをする。
     let first = engine
-        .console_open(Actor::Human, 80, 24)
+        .console_open(Actor::Human, None, 80, 24)
         .await
         .expect("人が開けない");
     assert_eq!(first, sshboard_engine::ConsoleOpened::Fresh);
 
     // AI が握る（D42 の承認を通す）。
-    let asked = engine.console_open(Actor::Ai, 80, 24).await;
+    let asked = engine.console_open(Actor::Ai, None, 80, 24).await;
     assert!(
         matches!(asked, Err(EngineError::ConsoleApprovalNeeded)),
         "許可なく握れてしまう: {asked:?}"
@@ -1468,7 +1501,7 @@ async fn handing_the_console_over_keeps_the_same_shell() {
         .expect("人が許せない");
 
     let second = engine
-        .console_open(Actor::Ai, 80, 24)
+        .console_open(Actor::Ai, None, 80, 24)
         .await
         .expect("許可したのに開けない");
 
@@ -1479,7 +1512,7 @@ async fn handing_the_console_over_keeps_the_same_shell() {
         "**握りを渡したのに、別のシェルが開いている。**\
          人が `su -` した状態も、カレントディレクトリも消えます"
     );
-    assert_eq!(engine.console_holder().await, Some(Actor::Ai));
+    assert_eq!(engine.console_holder_active().await, Some(Actor::Ai));
 }
 
 /// **断ったことを記録に残す**（Issue #8）。
@@ -1696,7 +1729,13 @@ async fn the_agent_can_wait_for_the_human_instead_of_asking_again() {
     );
 
     // **AI が端末を頼む → 問いが立つ。**
-    let asked = engine.console_open(Actor::Ai, 80, 24).await;
+    //
+    // 接続を名前で指します（D60）。**繋がっていなくても問いは立ちます** ——
+    // D42 の要点は「AI が触りたがっていることを人が知る」で、
+    // それは繋がっているかとは別の話です。
+    let asked = engine
+        .console_open(Actor::Ai, Some("nowhere"), 80, 24)
+        .await;
     assert!(
         matches!(asked, Err(EngineError::ConsoleApprovalNeeded)),
         "許可なく開けてしまう: {asked:?}"
@@ -1722,7 +1761,9 @@ async fn the_agent_can_wait_for_the_human_instead_of_asking_again() {
 
     // **時間切れは、答えとは別物。**
     // 同じ顔にすると、AI は「断られた」と「まだ答えていない」を取り違えます。
-    let asked = engine.console_open(Actor::Ai, 80, 24).await;
+    let asked = engine
+        .console_open(Actor::Ai, Some("nowhere"), 80, 24)
+        .await;
     assert!(matches!(asked, Err(EngineError::ConsoleApprovalNeeded)));
     let timed_out = engine
         .wait_for_answer(std::time::Duration::from_millis(300))
@@ -1731,4 +1772,262 @@ async fn the_agent_can_wait_for_the_human_instead_of_asking_again() {
         matches!(timed_out, sshboard_engine::Answered::StillWaiting { .. }),
         "時間切れが答えと同じ顔をしている: {timed_out:?}"
     );
+}
+
+#[tokio::test]
+async fn once_the_person_takes_the_console_back_the_agent_must_ask_again() {
+    // **人が取り返したあとに、AI が黙って開き直せてはいけない**（D29・人は常に勝つ）。
+    //
+    // 2026-10-02 に、端末を接続ごとに持つようにしたとき（D60）、
+    // 許可の置き場を端末の中（握り）から外へ出しました。
+    // **外へ出した許可を落とし忘れると、取り返した 1 秒後に AI が戻ってきます。**
+    if !server_is_up().await {
+        println!("テスト用サーバーが建っていません（想定内・飛ばします）");
+        return;
+    }
+    let dir = tempfile::tempdir().expect("一時ディレクトリ");
+    let engine = engine_connected(&dir).await;
+
+    ai_console_open(&engine).await;
+
+    // 人が取り返す。
+    engine
+        .console_take(Actor::Human, None)
+        .await
+        .expect("人が取り返せない");
+    assert_eq!(engine.console_holder_active().await, Some(Actor::Human));
+
+    // **AI は、もう一度頼むところから。**
+    let again = engine.console_type(Actor::Ai, None, b"echo x\n").await;
+    assert!(
+        matches!(again, Err(EngineError::ConsoleHeldByOther { .. })),
+        "取り返したのに AI が打てた: {again:?}"
+    );
+    let reopen = engine.console_open(Actor::Ai, None, 80, 24).await;
+    assert!(
+        matches!(reopen, Err(EngineError::ConsoleApprovalNeeded)),
+        "取り返したのに AI が頼まず開き直せた: {reopen:?}"
+    );
+    assert_eq!(
+        engine.console_holder_active().await,
+        Some(Actor::Human),
+        "人の握りが外れた"
+    );
+    let _ = engine.console_stop(Actor::Human, None).await;
+}
+
+#[tokio::test]
+async fn an_approval_only_opens_the_console_it_was_asked_for() {
+    // **人が答えるまでに宛先が動くことがあります。**
+    // そのとき、人が見て許したのは「頼まれた接続」で、**いまの宛先ではありません。**
+    //
+    // 許可を「いまの宛先」へ当てると、**人が許していない接続の端末が AI へ渡ります。**
+    // 接続ごとに端末を持つようにした（D60）時点から起こり得ます。
+    if !server_is_up().await {
+        println!("テスト用サーバーが建っていません（想定内・飛ばします）");
+        return;
+    }
+    let dir = tempfile::tempdir().expect("一時ディレクトリ");
+    let engine = engine_at(registry_pair(&dir).await);
+    engine
+        .connect(Actor::Human, "first", None)
+        .await
+        .expect("繋がらない");
+    engine
+        .connect(Actor::Human, "second", None)
+        .await
+        .expect("繋がらない");
+
+    // AI は first について頼む。
+    engine.focus("first").await.expect("向けられない");
+    let asked = engine.console_open(Actor::Ai, None, 80, 24).await;
+    assert!(matches!(asked, Err(EngineError::ConsoleApprovalNeeded)));
+
+    // 人が答える前に、宛先が second へ動いた。
+    engine.focus("second").await.expect("向けられない");
+    engine
+        .console_answer(Actor::Human, true)
+        .await
+        .expect("人が許せない");
+
+    // **second は許されていない。**
+    let wrong = engine.console_open(Actor::Ai, None, 80, 24).await;
+    assert!(
+        matches!(wrong, Err(EngineError::ConsoleApprovalNeeded)),
+        "頼んでいない接続で開けてしまった: {wrong:?}"
+    );
+
+    // **first は許されている。**
+    engine.focus("first").await.expect("向けられない");
+    engine
+        .console_open(Actor::Ai, None, 80, 24)
+        .await
+        .expect("許可された接続で開けない");
+    assert_eq!(engine.console_holder_active().await, Some(Actor::Ai));
+    let _ = engine.console_stop(Actor::Human, None).await;
+}
+
+#[tokio::test]
+async fn the_agent_holds_one_console_while_the_person_holds_many() {
+    // **人は何本でも、AI は 1 本だけ**（D60）。
+    //
+    // 本数を縛る理由は本数そのものではなく、
+    // **人が「AI がいまどこで打っているか」を 1 つに決められる**ようにするため。
+    if !server_is_up().await {
+        println!("テスト用サーバーが建っていません（想定内・飛ばします）");
+        return;
+    }
+    let dir = tempfile::tempdir().expect("一時ディレクトリ");
+    let engine = engine_at(registry_pair(&dir).await);
+    engine
+        .connect(Actor::Human, "first", None)
+        .await
+        .expect("繋がらない");
+    engine
+        .connect(Actor::Human, "second", None)
+        .await
+        .expect("繋がらない");
+
+    // AI が first を握る。
+    engine.focus("first").await.expect("向けられない");
+    ai_console_open(&engine).await;
+
+    // second でも人は開ける。**AI の 1 本が、人の邪魔をしない。**
+    engine.focus("second").await.expect("向けられない");
+    engine
+        .console_open(Actor::Human, None, 80, 24)
+        .await
+        .expect("人が 2 本目を開けない");
+    assert_eq!(engine.console_list().await.len(), 2);
+
+    // **AI は 2 本目を握れない。**
+    //
+    // **しかも、人に問う前に断ります。**許可を取ってから断ると、
+    // 人は押しても通らない問いを押させられます。
+    let second = engine.console_open(Actor::Ai, None, 80, 24).await;
+    assert!(
+        matches!(
+            second,
+            Err(EngineError::ConsoleOnOtherConnection { ref id }) if id == "first"
+        ),
+        "AI が 2 本目を握れてしまった: {second:?}"
+    );
+    assert_eq!(
+        engine.console_request().await,
+        None,
+        "通らない頼みで人に問いを出した"
+    );
+
+    // **一覧には、人が開いた分も含めて全部出る**（AI がここを読みます）。
+    let open = engine.console_list().await;
+    assert_eq!(open.len(), 2, "{open:?}");
+    assert_eq!(
+        open.iter()
+            .find(|held| held.connection == "first")
+            .map(|held| held.holder),
+        Some(Actor::Ai)
+    );
+    assert_eq!(
+        open.iter()
+            .find(|held| held.connection == "second")
+            .map(|held| held.holder),
+        Some(Actor::Human)
+    );
+
+    let _ = engine.console_stop(Actor::Human, None).await;
+    engine.focus("first").await.expect("向けられない");
+    let _ = engine.console_stop(Actor::Human, None).await;
+}
+
+#[tokio::test]
+async fn two_consoles_never_mix_their_output() {
+    // **ここが D60 で一番危ない所です。**
+    //
+    // 端末を接続ごとに持てるようにしても、**出力の口が 1 本のままだと、
+    // 2 台のサーバーの出力が区切り無しに 1 本へ混ざります。**
+    // 混ざったものは人も AI も読めません。engine.rs には前からこう書いてあります ——
+    //
+    // > `read_stream` は 2 本の出力を区切り無しに 1 本に見せます。
+    // > 「root だと思っていない AI が実は root」の並びがあれば事故になります。
+    if !server_is_up().await {
+        println!("テスト用サーバーが建っていません（想定内・飛ばします）");
+        return;
+    }
+    let dir = tempfile::tempdir().expect("一時ディレクトリ");
+    let engine = engine_at(registry_pair(&dir).await);
+    engine
+        .connect(Actor::Human, "first", None)
+        .await
+        .expect("繋がらない");
+    engine
+        .connect(Actor::Human, "second", None)
+        .await
+        .expect("繋がらない");
+
+    // first で端末を開いて、first だけに分かる印を打つ。
+    engine.focus("first").await.expect("向けられない");
+    engine
+        .console_open(Actor::Human, None, 80, 24)
+        .await
+        .expect("開けない");
+    engine
+        .console_type(Actor::Human, None, b"echo MARK_FIRST\n")
+        .await
+        .expect("打てない");
+
+    // second でも端末を開いて、second だけに分かる印を打つ。
+    engine.focus("second").await.expect("向けられない");
+    engine
+        .console_open(Actor::Human, None, 80, 24)
+        .await
+        .expect("開けない");
+    engine
+        .console_type(Actor::Human, None, b"echo MARK_SECOND\n")
+        .await
+        .expect("打てない");
+
+    // シェルが返すのを待つ。**空を成功と読まない**ので、出るまで待ちます。
+    for _ in 0..50 {
+        let a = engine.stream_for("first").await.plain_tail();
+        let b = engine.stream_for("second").await.plain_tail();
+        if a.contains("MARK_FIRST") && b.contains("MARK_SECOND") {
+            break;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+    }
+
+    let first = engine.stream_for("first").await.plain_tail();
+    let second = engine.stream_for("second").await.plain_tail();
+
+    assert!(
+        first.contains("MARK_FIRST"),
+        "first の出力が first へ来ていない: {first:?}"
+    );
+    assert!(
+        second.contains("MARK_SECOND"),
+        "second の出力が second へ来ていない: {second:?}"
+    );
+    assert!(
+        !first.contains("MARK_SECOND"),
+        "**second の出力が first へ混ざった**: {first:?}"
+    );
+    assert!(
+        !second.contains("MARK_FIRST"),
+        "**first の出力が second へ混ざった**: {second:?}"
+    );
+
+    // **宛先の出力を指す。**画面はこれを見て描きます。
+    assert!(
+        engine.stream().await.plain_tail().contains("MARK_SECOND"),
+        "宛先は second なのに、second の出力を指していない"
+    );
+    engine.focus("first").await.expect("向けられない");
+    assert!(
+        engine.stream().await.plain_tail().contains("MARK_FIRST"),
+        "宛先を first へ戻したのに、first の出力を指していない"
+    );
+
+    let _ = engine.console_stop(Actor::Human, None).await;
+    engine.focus("second").await.expect("向けられない");
+    let _ = engine.console_stop(Actor::Human, None).await;
 }

@@ -903,9 +903,22 @@ async fn a_key_with_a_passphrase_gets_us_in() {
     }
 
     // **元の鍵を書き換えない。**複製にパスフレーズを掛けます。
+    //
+    // **中身だけを写します。**`fs::copy` は macOS では拡張属性まで写そうとし、
+    // `com.apple.provenance` が付いたファイルで `Operation not permitted` に
+    // なります（2026-10-02 にこの環境で踏みました）。
+    // ここで見たいのはパスフレーズの扱いで、**属性の複写ではありません。**
     let dir = tempfile::tempdir().expect("一時ディレクトリ");
     let copy = dir.path().join("with-pass");
-    std::fs::copy(source, &copy).expect("複製できない");
+    let bytes = std::fs::read(source).expect("鍵を読めない");
+    std::fs::write(&copy, bytes).expect("複製できない");
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        // **ssh-keygen は緩い権限の鍵を拒みます。**
+        std::fs::set_permissions(&copy, std::fs::Permissions::from_mode(0o600))
+            .expect("権限を絞れない");
+    }
     let done = std::process::Command::new("ssh-keygen")
         .args(["-p", "-P", "", "-N", "sshboard-pass", "-f"])
         .arg(&copy)

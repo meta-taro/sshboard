@@ -43,7 +43,8 @@ GROUPS = [
     ("write", ["make_directory", "upload_file", "write_file"]),
     ("cmds", ["list_readonly_commands", "run_readonly", "list_operations",
               "run_operation"]),
-    ("console", ["console_open", "console_type", "console_stop", "read_stream"]),
+    ("console", ["console_open", "console_type", "console_stop", "read_stream",
+                 "list_consoles", "read_console"]),
     ("screen", ["show_view", "capture_window", "pending_status", "await_answer", "diagnostics"]),
     ("itself", ["about_sshboard", "ping"]),
 ]

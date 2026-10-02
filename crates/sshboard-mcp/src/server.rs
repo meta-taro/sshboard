@@ -213,7 +213,12 @@ impl SshboardMcp {
     )]
     pub async fn read_stream(&self) -> Result<String, ErrorData> {
         self.show("read_stream").await?;
-        Ok(self.stream.plain_tail())
+        // **出力は接続ごと**（D60）。いまの宛先の面を返します。
+        // 実行体が無い（ヘッドレス）ときだけ、繋ぐ前の口を返します。
+        match self.engine.as_ref() {
+            Some(engine) => Ok(engine.stream().await.plain_tail()),
+            None => Ok(self.stream.plain_tail()),
+        }
     }
 
     /// 接続を 1 件登録する。**ローカルの設定ファイルにだけ書きます。**

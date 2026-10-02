@@ -64,3 +64,58 @@ export function remember(backlog: Backlog, chunk: readonly number[]): Backlog {
 export function replay(backlog: Backlog): number[] {
 	return backlog.chunks.flatMap((chunk) => [...chunk]);
 }
+
+/**
+ * まだ 1 本も繋いでいない間の出力の置き場。
+ *
+ * **捨てません。**繋ぐ前にも出るものがあります（繋げなかった理由など）。
+ */
+export const BEFORE_CONNECTING = '';
+
+/**
+ * 接続ごとの控え（D60・2026-10-02）。
+ *
+ * **なぜ分けたか**: 端末が接続ごとに持てるようになったので、控えを 1 本で持つと
+ * **タブを戻したときに別のサーバーの出力が出ます。**
+ * 人は「いま打ったもの」と「別の台で打ったもの」を見分けられません。
+ */
+export type Backlogs = ReadonlyMap<string, Backlog>;
+
+export function emptyBacklogs(): Backlogs {
+	return new Map();
+}
+
+/** イベントの `connection`（繋ぐ前は `null`）を鍵にする。 */
+export function keyFor(connection: string | null | undefined): string {
+	return connection ?? BEFORE_CONNECTING;
+}
+
+/** 1 つ覚える。**渡された地図は書き換えません**（coding-style）。 */
+export function rememberFor(
+	all: Backlogs,
+	connection: string,
+	chunk: readonly number[]
+): Backlogs {
+	const next = new Map(all);
+	next.set(connection, remember(all.get(connection) ?? emptyBacklog(), chunk));
+	return next;
+}
+
+/** その接続の分だけを書き戻す 1 本。**知らない接続なら空**（別の分で埋めない）。 */
+export function replayFor(all: Backlogs, connection: string | null): number[] {
+	if (connection === null) return [];
+	const held = all.get(connection);
+	return held ? replay(held) : [];
+}
+
+/**
+ * 切れた接続の分を捨てる。
+ *
+ * **残すと、繋ぎ直したときに前回の出力が混ざって出ます。**
+ */
+export function forget(all: Backlogs, connection: string): Backlogs {
+	if (!all.has(connection)) return all;
+	const next = new Map(all);
+	next.delete(connection);
+	return next;
+}

@@ -76,6 +76,9 @@ struct Harness {
     endpoint: McpEndpoint,
     client: reqwest::Client,
     session: Option<String>,
+    /// **人の役**。端末の許可（D42）は人しか出せないので、テストでは
+    /// ここを通して押します。**AI 側の口から許可は出せません。**
+    engine: Arc<Engine>,
     _dir: tempfile::TempDir,
 }
 
@@ -145,7 +148,7 @@ async fn harness(band: Band, write_roots: &[&str]) -> Harness {
         band,
         stream: Arc::new(OutputStream::new()),
         connections_watch: Arc::new(ConnectionsWatch::new()),
-        engine: Some(engine),
+        engine: Some(Arc::clone(&engine)),
         view: None,
         capture: // 画面は無い（ヘッドレス）。**`capture_window` は正直に断るだけ。**
         None,
@@ -178,6 +181,7 @@ async fn harness(band: Band, write_roots: &[&str]) -> Harness {
         endpoint,
         client,
         session,
+        engine,
         _dir: dir,
     };
     harness.post(INITIALIZED.to_string()).await;
@@ -378,4 +382,98 @@ async fn the_band_shows_who_did_it_even_when_the_ai_drives_everything() {
         rendered.iter().any(|line| line.starts_with("[AI]")),
         "AI の行が無い: {rendered:?}"
     );
+}
+
+#[tokio::test]
+async fn an_agent_can_see_every_console_and_read_each_one_on_its_own() {
+    // **これが D60 の要点です。**端末が増えても、
+    // **AI が人と同じものを見られなければ、増やした意味がありません。**
+    //
+    // > 繋いだタブ、画面分割、どれも MCP でエージェントが見れるのが望ましい
+    //
+    // 見られるとは、**どれが開いているか**と**それぞれの中身**の両方です。
+    // 一覧だけでは読めず、1 本分の出力だけでは「他に何が開いているか」が分かりません。
+    if !server_is_up().await {
+        println!("テスト用サーバーが建っていません（想定内・飛ばします）");
+        return;
+    }
+
+    let band = Band::new();
+    let _screen = fake_screen(&band);
+    let harness = harness(band, &[]).await;
+
+    harness
+        .call("connect", serde_json::json!({ "connection_id": "local" }))
+        .await;
+
+    // **まだ 1 本も開いていない。**空を「壊れている」と読ませない。
+    let empty = harness.call("list_consoles", serde_json::json!({})).await;
+    assert!(
+        empty.contains(r#"\"open\":[]"#),
+        "端末が 0 本のときに空だと言えていない: {empty}"
+    );
+
+    // 人が開く。**AI が開いたのではありません。**
+    harness
+        .engine
+        .console_open(Actor::Human, Some("local"), 80, 24)
+        .await
+        .expect("人が開けない");
+
+    // **人が開いた端末が、AI から見える。**ここが「同じ視点」です。
+    let listed = harness.call("list_consoles", serde_json::json!({})).await;
+    assert!(
+        listed.contains(r#"\"connection\":\"local\""#),
+        "人が開いた端末が AI から見えない: {listed}"
+    );
+    assert!(
+        listed.contains(r#"\"holder\":\"human\""#),
+        "誰が握っているかが見えない: {listed}"
+    );
+
+    // 人が打ったものも読める。
+    harness
+        .engine
+        .console_type(Actor::Human, Some("local"), b"echo SEEN_BY_THE_AGENT\n")
+        .await
+        .expect("人が打てない");
+
+    let mut seen = String::new();
+    for _ in 0..50 {
+        seen = harness
+            .call(
+                "read_console",
+                serde_json::json!({ "connection_id": "local" }),
+            )
+            .await;
+        if seen.contains("SEEN_BY_THE_AGENT") {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
+    assert!(
+        seen.contains("SEEN_BY_THE_AGENT"),
+        "人が打った端末の中身が AI から読めない: {seen}"
+    );
+
+    // **繋がっていない接続を尋ねたら、正直に断る。**空を返さない。
+    let nowhere = harness
+        .call(
+            "read_console",
+            serde_json::json!({ "connection_id": "not-a-connection" }),
+        )
+        .await;
+    assert!(
+        nowhere.contains("not-a-connection"),
+        "知らない接続を尋ねたのに、何が悪いか言っていない: {nowhere}"
+    );
+
+    // **`read_stream` も、宛先の出力を指したまま**（D60 で口を分けた取り落ち防止）。
+    let stream = harness.call("read_stream", serde_json::json!({})).await;
+    assert!(
+        stream.contains("SEEN_BY_THE_AGENT"),
+        "read_stream が宛先の出力を指していない: {stream}"
+    );
+
+    harness.endpoint.shutdown();
 }

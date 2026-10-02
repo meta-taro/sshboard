@@ -1,5 +1,5 @@
 {
- "total": 36,
+ "total": 38,
  "groups": [
   {
    "key": "connect",
@@ -139,6 +139,14 @@
     {
      "name": "read_stream",
      "line": "Read the plain-text tail of the output sshboard is following."
+    },
+    {
+     "name": "list_consoles",
+     "line": "List every console currently open, including the ones the person opened themselves: which connection each is on, who is holding it, and which one the person's s…"
+    },
+    {
+     "name": "read_console",
+     "line": "Read the plain-text tail of one connection's console output, by connection id - including a console the person opened and is using."
     }
    ]
   },

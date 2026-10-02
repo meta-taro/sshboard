@@ -182,6 +182,9 @@ pub fn run() {
             ));
             app.manage(Arc::clone(&engine));
             session_cmd::spawn_bridge(app.handle().clone(), Arc::clone(&engine));
+            // **接続ごとの出力を画面へ**（D60）。繋ぎ忘れると、
+            // その接続の端末だけが無言になります（Issue #10 の形）。
+            stream_host::spawn_connection_bridges(app.handle().clone(), Arc::clone(&engine));
             // **AI が握った瞬間に、人の側の入力が締まる**必要がある（D29）。
             session_cmd::spawn_console_bridge(app.handle().clone(), Arc::clone(&engine));
             // **AI からの頼みを画面へ**（D42）。出せない問いは無いのと同じ。

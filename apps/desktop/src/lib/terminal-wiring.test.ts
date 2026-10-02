@@ -52,7 +52,7 @@ describe('端末の配線', () => {
 		// **消えると、同意の前提が実態と違うことになります。**
 		const created = terminalsCreatedIn(source);
 		const unseeded = created.filter(
-			(name) => !source.includes(`writeChunk(${name}, replay(`)
+			(name) => !source.includes(`writeChunk(${name}, replayFor(`)
 		);
 
 		expect(
@@ -64,7 +64,18 @@ describe('端末の配線', () => {
 	test('remembers the stream even when no terminal exists', () => {
 		// **面が無い間も覚えておく。**ここを通らないと、
 		// 書き戻す中身がそもそも溜まりません。
-		expect(source).toContain('backlog = remember(backlog,');
+		expect(source).toContain('backlogs = rememberFor(backlogs,');
+	});
+
+	test('keeps each connection apart and redraws when the focus moves', () => {
+		// **D60（2026-10-02）**: 端末が接続ごとに持てるようになったので、
+		// 面へ書く前に**どの接続の出力か**を見なければなりません。
+		// 見ないと、2 台の出力が 1 つの面で混ざります。
+		expect(source).toContain('if (from !== shownConnection) return;');
+
+		// **宛先が変わったら消して描き直す。**続けて出すと、人は境目が分からず、
+		// **どの台で打ったのかを取り違えます。**
+		expect(source).toContain('term.reset();');
 	});
 
 	test('writes the incoming stream into every terminal it creates', () => {

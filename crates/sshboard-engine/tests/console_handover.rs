@@ -23,6 +23,15 @@
 //! > 「AI が操作をするために許可しますか」みたいなアラートで人に気づかせないと。
 //!
 //! **分からないどころか、止められません。**ここを先に塞ぎます。
+//!
+//! **2026-10-02（D60）**: 端末を接続ごとに持てるようにしたので、
+//! どの接続の握りなのかを**名前で**渡します。渡せる形にしたのは、
+//! **ここをサーバー無しで確かめ続けられる**ようにするためです ——
+//! D29 は「人の解除が常に勝つ」で、これは SSH とは無関係の規則です。
+//! 繋がないと確かめられない形にすると、**規則のテストが環境に依存します。**
+
+/// どの接続の端末の話か。**繋ぎません**（握りの規則は SSH と無関係）。
+const ON: Option<&str> = Some("test-connection");
 
 use std::sync::Arc;
 
@@ -39,7 +48,7 @@ fn engine_in(dir: &tempfile::TempDir) -> Engine {
 
 /// AI に握らせる。**D42 が入ったので、頼んで人が許すまで握れません。**
 async fn ai_holding(engine: &Engine) {
-    let asked = engine.console_take(Actor::Ai).await;
+    let asked = engine.console_take(Actor::Ai, ON).await;
     assert!(
         matches!(asked, Err(EngineError::ConsoleApprovalNeeded)),
         "AI が許可なく握れてしまう: {asked:?}"
@@ -48,7 +57,10 @@ async fn ai_holding(engine: &Engine) {
         .console_answer(Actor::Human, true)
         .await
         .expect("人が許せない");
-    assert_eq!(engine.console_holder().await, Some(Actor::Ai));
+    assert_eq!(
+        engine.console_holder("test-connection").await,
+        Some(Actor::Ai)
+    );
 }
 
 #[tokio::test]
@@ -59,12 +71,12 @@ async fn the_ai_cannot_stop_a_console_the_human_is_holding() {
     let dir = tempfile::tempdir().expect("一時ディレクトリが作れない");
     let engine = engine_in(&dir);
     engine
-        .console_take(Actor::Human)
+        .console_take(Actor::Human, ON)
         .await
         .expect("人が握れない");
 
     // Act
-    let refused = engine.console_stop(Actor::Ai).await;
+    let refused = engine.console_stop(Actor::Ai, ON).await;
 
     // Assert
     assert!(
@@ -72,7 +84,7 @@ async fn the_ai_cannot_stop_a_console_the_human_is_holding() {
         "AI が人の端末を止められてしまう: {refused:?}"
     );
     assert_eq!(
-        engine.console_holder().await,
+        engine.console_holder("test-connection").await,
         Some(Actor::Human),
         "握りが人から外れている"
     );
@@ -87,12 +99,12 @@ async fn the_human_can_always_stop_it_even_when_the_ai_holds_it() {
     ai_holding(&engine).await;
 
     // Act
-    let stopped = engine.console_stop(Actor::Human).await;
+    let stopped = engine.console_stop(Actor::Human, ON).await;
 
     // Assert
     assert!(stopped.is_ok(), "人が止められない: {stopped:?}");
     assert_eq!(
-        engine.console_holder().await,
+        engine.console_holder("test-connection").await,
         None,
         "止めたのに握りが残っている"
     );
@@ -108,11 +120,11 @@ async fn the_ai_can_let_go_of_what_it_holds_itself() {
     ai_holding(&engine).await;
 
     // Act
-    let stopped = engine.console_stop(Actor::Ai).await;
+    let stopped = engine.console_stop(Actor::Ai, ON).await;
 
     // Assert
     assert!(stopped.is_ok(), "AI が自分の分を畳めない: {stopped:?}");
-    assert_eq!(engine.console_holder().await, None);
+    assert_eq!(engine.console_holder("test-connection").await, None);
 }
 
 #[tokio::test]
@@ -123,8 +135,8 @@ async fn stopping_a_console_nobody_holds_is_not_an_error() {
     let engine = engine_in(&dir);
 
     // Act & Assert
-    assert!(engine.console_stop(Actor::Ai).await.is_ok());
-    assert!(engine.console_stop(Actor::Human).await.is_ok());
+    assert!(engine.console_stop(Actor::Ai, ON).await.is_ok());
+    assert!(engine.console_stop(Actor::Human, ON).await.is_ok());
 }
 
 // --- D42: AI が握るには人の許可が要る ------------------------------------
@@ -147,14 +159,14 @@ async fn the_ai_cannot_take_the_console_without_being_allowed() {
     let engine = engine_in(&dir);
 
     // Act
-    let refused = engine.console_take(Actor::Ai).await;
+    let refused = engine.console_take(Actor::Ai, ON).await;
 
     // Assert
     assert!(
         matches!(refused, Err(EngineError::ConsoleApprovalNeeded)),
         "AI が黙って握れてしまう: {refused:?}"
     );
-    assert_eq!(engine.console_holder().await, None);
+    assert_eq!(engine.console_holder("test-connection").await, None);
 }
 
 #[tokio::test]
@@ -165,7 +177,7 @@ async fn asking_leaves_a_request_the_screen_can_show() {
     let engine = engine_in(&dir);
 
     // Act
-    let _ = engine.console_take(Actor::Ai).await;
+    let _ = engine.console_take(Actor::Ai, ON).await;
 
     // Assert
     assert_eq!(
@@ -184,7 +196,7 @@ async fn asking_twice_does_not_stack_up_into_nagging() {
 
     // Act
     for _ in 0..5 {
-        let _ = engine.console_take(Actor::Ai).await;
+        let _ = engine.console_take(Actor::Ai, ON).await;
     }
 
     // Assert
@@ -196,7 +208,7 @@ async fn the_human_allowing_it_hands_the_console_over() {
     // Arrange
     let dir = tempfile::tempdir().expect("一時ディレクトリが作れない");
     let engine = engine_in(&dir);
-    let _ = engine.console_take(Actor::Ai).await;
+    let _ = engine.console_take(Actor::Ai, ON).await;
 
     // Act
     engine
@@ -205,7 +217,10 @@ async fn the_human_allowing_it_hands_the_console_over() {
         .expect("人が許せない");
 
     // Assert
-    assert_eq!(engine.console_holder().await, Some(Actor::Ai));
+    assert_eq!(
+        engine.console_holder("test-connection").await,
+        Some(Actor::Ai)
+    );
     assert_eq!(engine.console_request().await, None, "問いが残っている");
 }
 
@@ -215,10 +230,10 @@ async fn the_human_refusing_it_leaves_the_console_where_it_was() {
     let dir = tempfile::tempdir().expect("一時ディレクトリが作れない");
     let engine = engine_in(&dir);
     engine
-        .console_take(Actor::Human)
+        .console_take(Actor::Human, ON)
         .await
         .expect("人が握れない");
-    let _ = engine.console_take(Actor::Ai).await;
+    let _ = engine.console_take(Actor::Ai, ON).await;
 
     // Act
     engine
@@ -228,7 +243,7 @@ async fn the_human_refusing_it_leaves_the_console_where_it_was() {
 
     // Assert
     assert_eq!(
-        engine.console_holder().await,
+        engine.console_holder("test-connection").await,
         Some(Actor::Human),
         "断ったのに握りが動いている"
     );
@@ -241,14 +256,14 @@ async fn the_ai_cannot_answer_its_own_request() {
     // Arrange
     let dir = tempfile::tempdir().expect("一時ディレクトリが作れない");
     let engine = engine_in(&dir);
-    let _ = engine.console_take(Actor::Ai).await;
+    let _ = engine.console_take(Actor::Ai, ON).await;
 
     // Act
     let refused = engine.console_answer(Actor::Ai, true).await;
 
     // Assert
     assert!(refused.is_err(), "AI が自分で許可できてしまう: {refused:?}");
-    assert_eq!(engine.console_holder().await, None);
+    assert_eq!(engine.console_holder("test-connection").await, None);
     assert_eq!(engine.console_request().await, Some(Actor::Ai));
 }
 
@@ -260,7 +275,10 @@ async fn the_human_never_has_to_ask_anyone() {
     let engine = engine_in(&dir);
 
     // Act & Assert
-    assert!(engine.console_take(Actor::Human).await.is_ok());
-    assert_eq!(engine.console_holder().await, Some(Actor::Human));
+    assert!(engine.console_take(Actor::Human, ON).await.is_ok());
+    assert_eq!(
+        engine.console_holder("test-connection").await,
+        Some(Actor::Human)
+    );
     assert_eq!(engine.console_request().await, None);
 }

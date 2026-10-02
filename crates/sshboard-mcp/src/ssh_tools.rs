@@ -293,17 +293,32 @@ impl SshboardMcp {
         // **帯へ載せません。**何度呼んでも人の画面に何も出ない、が要点です。
         // 載せると、ポーリングのたびに帯が埋まります。
         let engine = self.engine()?;
-        let holder = match engine.console_holder().await {
-            Some(Actor::Human) => "human",
-            Some(Actor::Ai) => "ai",
-            None => "none",
+        // **あなたが握っている 1 本について答えます**（D60）。
+        // 端末は接続ごとに持てるようになったので、「握っているか」だけでは
+        // **どこを握っているのか**が言えません。
+        let mine = engine
+            .console_list()
+            .await
+            .into_iter()
+            .find(|held| held.holder == Actor::Ai)
+            .map(|held| held.connection);
+        let holder = match &mine {
+            Some(_) => "ai",
+            None => match engine.console_connection().await {
+                Some(_) => "human",
+                None => "none",
+            },
         };
         serde_json::to_string(&serde_json::json!({
             "console": {
                 "holder": holder,
-                "onConnection": engine.console_connection().await,
+                // **あなたが握っている接続。**握っていなければ、人の画面が向いている接続。
+                "onConnection": mine.clone().or(engine.console_connection().await),
+                "youHold": mine,
                 // **人の答え待ちか。**true の間は、頼み直さないこと。
                 "waitingForTheHuman": engine.console_request().await.is_some(),
+                // **どの接続について答え待ちか**（D60）。
+                "waitingOnConnection": engine.console_request_on().await,
             },
             // 鍵のパスフレーズ待ちの接続（識別子だけ）。
             "waitingForPassphrase": engine.passphrase_request(),
@@ -990,6 +1005,8 @@ pub struct ShowViewRequest {
 #[derive(Debug, Deserialize, rmcp::schemars::JsonSchema)]
 #[schemars(crate = "rmcp::schemars")]
 pub struct OpenConsole {
+    /// どの接続で開くか。**省略すると、人の画面が向いている接続**（D60）。
+    pub connection_id: Option<String>,
     /// 桁数。**省略すると 80。**
     pub cols: Option<u32>,
     /// 行数。**省略すると 24。**
@@ -1002,6 +1019,11 @@ pub struct OpenConsole {
 pub struct TypeIntoConsole {
     /// 打ち込む文字列。**改行を入れないと実行されません**（本物の端末と同じ）。
     pub text: String,
+    /// どの接続の端末へ打つか。**省略すると、人の画面が向いている接続**（D60）。
+    ///
+    /// **あなたが握っていない端末へは打てません。**人が握っている面へ
+    /// 打とうとすると断られます（D29）。
+    pub connection_id: Option<String>,
 }
 
 #[tool_router(router = console_tool_router, vis = "pub")]
@@ -1026,18 +1048,16 @@ impl SshboardMcp {
     ) -> Result<String, ErrorData> {
         let cols = request.cols.unwrap_or(80).clamp(20, 500);
         let rows = request.rows.unwrap_or(24).clamp(5, 200);
-        let opened = self
-            .engine()?
-            .console_open(Actor::Ai, cols, rows)
+        let engine = self.engine()?;
+        // **名前で指せます**（D60）。言わなければ、人の画面が向いている接続。
+        let on = engine
+            .console_where(request.connection_id.as_deref())
+            .await
+            .ok_or_else(|| refuse(sshboard_engine::EngineError::NotConnected))?;
+        let opened = engine
+            .console_open(Actor::Ai, Some(&on), cols, rows)
             .await
             .map_err(refuse)?;
-        // **どの接続の端末かを必ず添える**（D25）。
-        // 添えないと、タブを移したあとに「どこへ打っているのか」が分からなくなる。
-        let on = self
-            .engine()?
-            .console_connection()
-            .await
-            .unwrap_or_else(|| "?".to_string());
         // **黙って別のシェルになるのが一番危ない**（Issue #21）。
         // 受け取ったのか、新しく立てたのかを必ず言います。
         let how = match opened {
@@ -1073,14 +1093,100 @@ impl SshboardMcp {
                 None,
             ));
         }
-        self.engine()?
-            .console_type(Actor::Ai, bytes)
+        let engine = self.engine()?;
+        let on = engine
+            .console_where(request.connection_id.as_deref())
+            .await
+            .ok_or_else(|| refuse(sshboard_engine::EngineError::ConsoleNotOpen))?;
+        engine
+            .console_type(Actor::Ai, Some(&on), bytes)
             .await
             .map_err(refuse)?;
         Ok(format!(
-            "typed {} bytes. Read the output with read_stream.",
+            "typed {} bytes into the console on {on}. \
+             Read what came back with read_console on {on}.",
             bytes.len()
         ))
+    }
+
+    /// **開いている端末ぜんぶ**（D60）。人が開いた分も含めて出す。
+    ///
+    /// **ここが「人と同じ視点に立つ」の入口です**（PRD §4-0）。
+    /// 人は 2 画面・3 画面を目で見て作業しています。AI がそれを見られなければ、
+    /// 「端末が増えた」だけで、見えているものは増えていません。
+    #[tool(
+        description = "List every console currently open, including the ones the person opened \
+                       themselves: which connection each is on, who is holding it, and which one \
+                       the person's screen is pointed at. Read any of them with read_console. \
+                       Touches no remote server and shows nothing on their screen."
+    )]
+    pub async fn list_consoles(&self) -> Result<String, ErrorData> {
+        self.show("list_consoles").await?;
+
+        let engine = self.engine()?;
+        let open = engine.console_list().await;
+        let focused = engine.active().await.map(|open| open.id);
+        let mine = open
+            .iter()
+            .find(|held| held.holder == Actor::Ai)
+            .map(|held| held.connection.clone());
+
+        let rows: Vec<serde_json::Value> = open
+            .iter()
+            .map(|held| {
+                serde_json::json!({
+                    "connection": held.connection,
+                    "holder": match held.holder {
+                        Actor::Human => "human",
+                        Actor::Ai => "ai",
+                    },
+                    // **人の画面がどれを向いているか。**人が見ていない面へ打つと、
+                    // 「人が見ている前で動く」という前提が崩れます（D29）。
+                    "personIsLookingAtIt": Some(&held.connection) == focused.as_ref(),
+                })
+            })
+            .collect();
+
+        serde_json::to_string(&serde_json::json!({
+            "open": rows,
+            // **あなたが握っているのは 1 本だけ**（D60）。
+            "youHold": mine,
+            "personIsLookingAt": focused,
+        }))
+        .map_err(|error| ErrorData::internal_error(error.to_string(), None))
+    }
+
+    /// **1 本分の出力だけ**を読む（D60）。
+    ///
+    /// `read_stream` は「いまの宛先」を返します。**どれが宛先かに関わらず
+    /// 名前で読める口**が無いと、AI は人にタブを動かしてもらうしかありません。
+    #[tool(
+        description = "Read the plain-text tail of one connection's console output, by connection \
+                       id - including a console the person opened and is using. Never contains \
+                       ANSI escapes. Use list_consoles first to see what is open. This does not \
+                       move the person's screen and does not take the console."
+    )]
+    pub async fn read_console(
+        &self,
+        Parameters(request): Parameters<ReadConsole>,
+    ) -> Result<String, ErrorData> {
+        self.show(&format!("read_console {}", request.connection_id))
+            .await?;
+
+        let engine = self.engine()?;
+        // **知らない接続に空を返さない。**空は「何も出ていない」とも読めてしまい、
+        // AI は打ち続けます。**開いていないなら、開いていないと言います。**
+        let open = engine.open_connections().await;
+        if !open.iter().any(|held| held.id == request.connection_id) {
+            return Err(ErrorData::invalid_params(
+                format!(
+                    "{} is not open. Call session_status to see what is.",
+                    request.connection_id
+                ),
+                None,
+            ));
+        }
+        Ok(engine.stream_for(&request.connection_id).await.plain_tail())
     }
 
     /// 手を離す（D29）。**握ったまま離さない、を作らない。**
@@ -1090,12 +1196,33 @@ impl SshboardMcp {
     )]
     pub async fn console_stop(&self) -> Result<String, ErrorData> {
         // **自分が握っている分だけ**（D29）。人の端末は止められません。
-        self.engine()?
-            .console_stop(Actor::Ai)
+        let engine = self.engine()?;
+        // **自分が握っている 1 本**を止めます（D60）。宛先が別の接続へ
+        // 動いていても、**自分の握りを離せる**ようにします ——
+        // 離せないと、AI が握ったまま人が締め出されます。
+        let mine = engine
+            .console_list()
+            .await
+            .into_iter()
+            .find(|held| held.holder == Actor::Ai)
+            .map(|held| held.connection);
+        engine
+            .console_stop(Actor::Ai, mine.as_deref())
             .await
             .map_err(refuse)?;
-        Ok("console released".to_string())
+        Ok(match mine {
+            Some(on) => format!("console on {on} released"),
+            None => "no console was held".to_string(),
+        })
     }
+}
+
+/// `read_console` の引数。
+#[derive(Debug, Deserialize, rmcp::schemars::JsonSchema)]
+#[schemars(crate = "rmcp::schemars")]
+pub struct ReadConsole {
+    /// どの接続の面を読むか。**識別子だけ**（ホスト名は受け取りません）。
+    pub connection_id: String,
 }
 
 /// `await_answer` の引数。

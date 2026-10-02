@@ -39,8 +39,12 @@ if command -v python3 >/dev/null 2>&1; then
   #
   # **ここで同じ条件を作ります。**出力は捨てて、死ぬかどうかだけ見ます。
   for _t in tools/check-css-tokens.py tools/check-css-contrast.py tools/make-site-tools.py; do
-    if ! PYTHONIOENCODING=cp1252 python3 "$_t" >/dev/null 2>&1; then
-      echo "pre-commit: **$_t が Windows の文字コードで死にます。**" >&2
+    # **検査の言い分を捨てない**（§8）。捨てていたので、
+    # 「道具の分類漏れ」を**「Windows の文字コードで死にます」と言っていました** ——
+    # 嘘の理由は、理由が無いより悪い（2026-10-02 に実際に迷いました）。
+    if ! _said=$(PYTHONIOENCODING=cp1252 python3 "$_t" 2>&1); then
+      echo "pre-commit: **$_t が止めました。**" >&2
+      echo "$_said" >&2
       echo "pre-commit: 確かめ方 — PYTHONIOENCODING=cp1252 python3 $_t" >&2
       exit 1
     fi
