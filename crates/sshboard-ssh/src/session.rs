@@ -932,7 +932,7 @@ impl SshSession {
         actor: Actor,
         cols: u32,
         rows: u32,
-        into: Arc<sshboard_stream::OutputStream>,
+        into: Vec<Arc<sshboard_stream::OutputStream>>,
     ) -> Result<Console, SshError> {
         // **握ったことは帯に出す**（D29）。打鍵は出さないが、開始は出す。
         self.show(actor, "console opened").await?;
@@ -957,6 +957,11 @@ impl SshSession {
 
         // 読む側は回しっぱなしにする。**stderr も同じ流れへ入れる**
         // （端末では区別せずに見えるのが正しい）。
+        //
+        // **流し先が複数あります**（D29 の書き換え）——
+        // この端末だけの出力と、画面が見ている共有の出力。
+        // **同じチャネルを 2 回読むのではありません**（PRD §4-1）。
+        // 1 回読んだものを両方へ配るだけです。
         tokio::spawn(async move {
             while let Some(message) = read.wait().await {
                 let chunk = match message {
@@ -966,7 +971,9 @@ impl SshSession {
                     _ => continue,
                 };
                 // 人が止めたら、そこで終わり（PRD §4-3）。
-                if into.push(&chunk).is_err() {
+                // **1 つでも止まっていたら止めます** —— 止める相手を選ばせると、
+                // 「［止める］を押したのに流れ続ける面がある」が起きます。
+                if into.iter().any(|out| out.push(&chunk).is_err()) {
                     break;
                 }
             }

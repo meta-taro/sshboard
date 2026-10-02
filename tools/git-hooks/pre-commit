@@ -37,13 +37,23 @@ if command -v python3 >/dev/null 2>&1; then
   # あちらの Python は標準出力の既定が cp1252 で、**日本語を 1 文字出した瞬間に
   # `UnicodeEncodeError` で死にます。**こちらは macOS でしか試していませんでした。
   #
-  # **ここで同じ条件を作ります。**出力は捨てて、死ぬかどうかだけ見ます。
+  # **ここで同じ条件を作ります。**ただし**本人の言い分を捨てません。**
+  #
+  # 2026-10-02、ここが嘘をつきました —— MCP を 2 本足して
+  # `make-site-tools.py` の分類へ入れ忘れたとき、**「Windows の文字コードで
+  # 死にます」と言われました。**原因は分類漏れで、文字コードは無関係です。
+  # `>/dev/null 2>&1` で**言い分を捨てていた**のが理由です（§8）。
   for _t in tools/check-css-tokens.py tools/check-css-contrast.py tools/make-site-tools.py; do
-    if ! PYTHONIOENCODING=cp1252 python3 "$_t" >/dev/null 2>&1; then
-      echo "pre-commit: **$_t が Windows の文字コードで死にます。**" >&2
+    _said=$(PYTHONIOENCODING=cp1252 python3 "$_t" 2>&1) || {
+      if printf '%s' "$_said" | grep -q "UnicodeEncodeError"; then
+        echo "pre-commit: **$_t が Windows の文字コードで死にます。**" >&2
+      else
+        echo "pre-commit: **$_t が落ちました**（文字コードではありません）。" >&2
+      fi
+      printf '%s\n' "$_said" >&2
       echo "pre-commit: 確かめ方 — PYTHONIOENCODING=cp1252 python3 $_t" >&2
       exit 1
-    fi
+    }
   done
 
   if ! python3 tools/check-css-contrast.py >/dev/null; then

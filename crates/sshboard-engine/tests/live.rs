@@ -1732,3 +1732,166 @@ async fn the_agent_can_wait_for_the_human_instead_of_asking_again() {
         "時間切れが答えと同じ顔をしている: {timed_out:?}"
     );
 }
+
+/// 端末の出力が**溢れてくるまで**少し待つ。
+///
+/// **固定で眠りません。**シェルの反応はサーバーの機嫌で数十 ms から数百 ms まで
+/// 揺れ、固定値にすると**たまに落ちるテスト**になります。
+/// 落ちるテストは、やがて消されます。
+async fn tail_until(
+    engine: &Engine,
+    id: u64,
+    wanted: &str,
+    give_up_after: std::time::Duration,
+) -> String {
+    let deadline = tokio::time::Instant::now() + give_up_after;
+    loop {
+        let tail = engine.console_tail(id).await.unwrap_or_default();
+        if tail.contains(wanted) || tokio::time::Instant::now() >= deadline {
+            return tail;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+    }
+}
+
+/// **AI が端末を 1 本ずつ読める**（D29 の書き換え・作る順番の 2）。
+///
+/// それまで AI が端末を読む手段は `read_stream` だけで、そこには
+/// 端末も `exec` も `tail -f` も**同じ 1 本に混ざって**いました（Issue #21）——
+///
+/// > `read_stream` で見分けられない
+///
+/// **端末が増えた日に「どちらが喋ったのか言えない」が確定します。**
+/// 増やす前に、1 本ずつ読めるようにしておきます。
+#[tokio::test]
+async fn an_open_console_can_be_read_on_its_own() {
+    if !server_is_up().await {
+        println!("テスト用サーバーが建っていません（想定内・飛ばします）");
+        return;
+    }
+    // Arrange
+    let dir = tempfile::tempdir().expect("一時ディレクトリ");
+    let engine = engine_connected(&dir).await;
+    engine
+        .console_open(Actor::Human, 80, 24)
+        .await
+        .expect("開けない");
+
+    // **一覧に出ること。**出ない端末は、AI から見て存在しません。
+    let open = engine.consoles().await;
+    assert_eq!(open.len(), 1, "開いた端末が一覧に出ない: {open:?}");
+    assert_eq!(open[0].connection, "local", "どの接続のものか言えていない");
+    assert_eq!(open[0].holder, Some(Actor::Human));
+    let id = open[0].id;
+
+    // Act
+    engine
+        .console_type(Actor::Human, b"echo konsole-marker\n")
+        .await
+        .expect("打てない");
+    let tail = tail_until(
+        &engine,
+        id,
+        "konsole-marker",
+        std::time::Duration::from_secs(5),
+    )
+    .await;
+
+    // Assert
+    assert!(
+        tail.contains("konsole-marker"),
+        "**端末の出力が、その端末から読めない。**読めたもの: {tail:?}"
+    );
+    // **ANSI が 1 つも混ざらないこと**（MCP へ渡すのはこちら）。
+    assert!(
+        !tail.contains('\u{1b}'),
+        "素のテキストに ANSI が混ざっている: {tail:?}"
+    );
+}
+
+/// **コマンドの出力が、端末の出力へ混ざらない**（Issue #21 の核）。
+///
+/// 混ざると、AI は「人が端末で打った」と「AI がコマンドを走らせた」を
+/// 区別できません。**root になっているのに気づかない**並びが作れます。
+#[tokio::test]
+async fn what_a_command_prints_does_not_leak_into_the_console() {
+    if !server_is_up().await {
+        println!("テスト用サーバーが建っていません（想定内・飛ばします）");
+        return;
+    }
+    // Arrange
+    let dir = tempfile::tempdir().expect("一時ディレクトリ");
+    let engine = engine_connected(&dir).await;
+    engine
+        .console_open(Actor::Human, 80, 24)
+        .await
+        .expect("開けない");
+    let id = engine.consoles().await[0].id;
+    // 端末が喋り終わるのを待つ（プロンプトが出るまで）。
+    let _ = tail_until(&engine, id, "$", std::time::Duration::from_secs(5)).await;
+
+    // Act —— **端末ではなく `exec` で**走らせる。
+    engine
+        .exec(Actor::Human, "echo exec-marker")
+        .await
+        .expect("走らない");
+    tokio::time::sleep(std::time::Duration::from_millis(300)).await;
+
+    // Assert
+    let console_tail = engine.console_tail(id).await.expect("端末が消えた");
+    assert!(
+        !console_tail.contains("exec-marker"),
+        "**コマンドの出力が端末の出力へ混ざった**: {console_tail:?}"
+    );
+    // **共有の出力には出ること**（画面はこちらを見ています）。
+    assert!(
+        engine.stream().plain_tail().contains("exec-marker"),
+        "共有の出力にコマンドの結果が出ていない: {:?}",
+        engine.stream().plain_tail()
+    );
+}
+
+/// **閉じた端末の番号を、二度と出さない。**
+///
+/// 使い回すと、古い番号を覚えていた `read_console` が
+/// **黙って別の端末を読みます。**気づく手段がありません。
+#[tokio::test]
+async fn the_number_of_a_console_is_never_handed_out_twice() {
+    if !server_is_up().await {
+        println!("テスト用サーバーが建っていません（想定内・飛ばします）");
+        return;
+    }
+    // Arrange
+    let dir = tempfile::tempdir().expect("一時ディレクトリ");
+    let engine = engine_connected(&dir).await;
+    engine
+        .console_open(Actor::Human, 80, 24)
+        .await
+        .expect("開けない");
+    let first = engine.consoles().await[0].id;
+
+    // Act
+    engine
+        .console_stop(Actor::Human)
+        .await
+        .expect("止められない");
+    assert!(
+        engine.consoles().await.is_empty(),
+        "止めたのに一覧に残っている"
+    );
+    assert!(
+        engine.console_tail(first).await.is_none(),
+        "止めた端末の出力がまだ読める"
+    );
+    engine
+        .console_open(Actor::Human, 80, 24)
+        .await
+        .expect("開き直せない");
+
+    // Assert
+    let second = engine.consoles().await[0].id;
+    assert_ne!(
+        first, second,
+        "**閉じた端末の番号が、また出た。**古い番号で別の端末が読めます"
+    );
+}

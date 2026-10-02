@@ -192,6 +192,10 @@ async fn the_server_advertises_only_the_phase_zero_tools() {
         // **この道具が何なのかを名乗る口**（実機の要望・2026-09-09）。
         // 初めて繋いだ AI が、何をしてよくて何が駄目かをここで読めます。
         "about_sshboard",
+        // **人が開いた端末も AI から見える**（D29 の書き換え・作る順番の 2）。
+        // ここが無いと「端末が増えたが AI からは見えない」が生まれます。
+        "list_consoles",
+        "read_console",
     ] {
         assert!(
             listed.contains(expected),
@@ -212,7 +216,7 @@ async fn the_server_advertises_only_the_phase_zero_tools() {
     // `inputSchema` は 1 本につきちょうど 1 つです。
     let counted = listed.matches("inputSchema").count();
     assert_eq!(
-        counted, 36,
+        counted, 38,
         "**MCP のツールが {counted} 本になりました。**足した／消したなら、\
          手元の記録の表と `CLAUDE.md` の本数も同じ commit で直してください\
          （product-baseline §10）。直したら、ここの数字も合わせてください"

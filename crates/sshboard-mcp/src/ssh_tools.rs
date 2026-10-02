@@ -1004,6 +1004,14 @@ pub struct TypeIntoConsole {
     pub text: String,
 }
 
+/// `read_console` の引数。
+#[derive(Debug, Deserialize, rmcp::schemars::JsonSchema)]
+#[schemars(crate = "rmcp::schemars")]
+pub struct ReadConsole {
+    /// どの端末か。**`list_consoles` が返す番号**です。
+    pub id: u64,
+}
+
 #[tool_router(router = console_tool_router, vis = "pub")]
 impl SshboardMcp {
     /// 端末を握る（D29）。
@@ -1081,6 +1089,92 @@ impl SshboardMcp {
             "typed {} bytes. Read the output with read_stream.",
             bytes.len()
         ))
+    }
+
+    /// **開いている端末を全部数える**（D29 の書き換え・作る順番の 2）。
+    ///
+    /// **人が開いた端末も出ます。**AI が握っていない端末も、読むことはできます。
+    /// 「端末が増えたが AI からは見えない」を一度も作らないためです。
+    #[tool(
+        description = "List every interactive console that is open right now - the ones the \
+                       person opened as well as the one you hold. **You may read all of them** \
+                       (read_console), but you may only type into the one you hold. Each entry \
+                       gives its number, which connection it belongs to, and who is holding it. \
+                       `limit` is how many consoles may be open at once on this build: when \
+                       `open` has reached it, nothing new can be opened until one is stopped. \
+                       This asks nothing of the person and shows nothing on their screen."
+    )]
+    pub async fn list_consoles(&self) -> Result<String, ErrorData> {
+        let engine = self.engine()?;
+        let open: Vec<serde_json::Value> = engine
+            .consoles()
+            .await
+            .into_iter()
+            .map(|facts| {
+                serde_json::json!({
+                    "id": facts.id,
+                    // **識別子だけ。**ホスト名も利用者名も出しません
+                    // （CLAUDE.md 禁止事項 4）。
+                    "onConnection": facts.connection,
+                    "heldBy": match facts.holder {
+                        Some(Actor::Human) => "human",
+                        Some(Actor::Ai) => "ai",
+                        None => "none",
+                    },
+                })
+            })
+            .collect();
+        serde_json::to_string(&serde_json::json!({
+            "open": open,
+            // **何本開けるかを言う。**実機で「開けるのかさえ分からない」で
+            // 止まりました（2026-10-02）。**数を伏せない。**
+            "limit": sshboard_engine::CONSOLE_LIMIT,
+        }))
+        .map_err(|error| ErrorData::internal_error(error.to_string(), None))
+    }
+
+    /// **端末 1 本の出力を読む**（Issue #21）。
+    ///
+    /// `read_stream` はまとめた 1 本しか返さず、
+    /// **端末と `exec` と `tail -f` が混ざっていました。**
+    #[tool(
+        description = "Read what one console has printed, by its number from list_consoles. \
+                       Returns plain text with no ANSI escapes. **This is per console** - what \
+                       `run_readonly`, `run_operation` or `read_log` printed does not appear \
+                       here, and neither does another console's output. You may read a console \
+                       the person is holding: reading never takes it from them and never shows \
+                       anything on their screen. Only the most recent output is kept, so poll \
+                       this rather than expecting the whole history. Refused if that number is \
+                       not open - call list_consoles to see what is."
+    )]
+    pub async fn read_console(
+        &self,
+        Parameters(request): Parameters<ReadConsole>,
+    ) -> Result<String, ErrorData> {
+        let engine = self.engine()?;
+        match engine.console_tail(request.id).await {
+            Some(tail) => Ok(tail),
+            // **空を返さない。**空だと「開いているが何も喋っていない」と
+            // 区別できず、**AI は待ち続けます。**
+            None => {
+                let open = engine.consoles().await;
+                let ids = if open.is_empty() {
+                    "none are open".to_string()
+                } else {
+                    open.iter()
+                        .map(|facts| facts.id.to_string())
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                };
+                Err(ErrorData::invalid_params(
+                    format!(
+                        "端末 #{} は開いていません（開いているもの: {ids}）",
+                        request.id
+                    ),
+                    None,
+                ))
+            }
+        }
     }
 
     /// 手を離す（D29）。**握ったまま離さない、を作らない。**

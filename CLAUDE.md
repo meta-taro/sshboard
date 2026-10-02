@@ -67,7 +67,12 @@
 
 > **用途別の読み取りツールは書き終わりました**（`stat` / `search` / `disk_usage` /
 > `process_list` / `service_status` / `read_log` / `network_listen` / `runtime_versions`）。
-> MCP は **35 本**です（`grep -rho '#\[tool(' crates/sshboard-mcp/src/ | wc -l` で数えられます）。
+> **人が開いた端末を AI が読む口も入りました**（`list_consoles` / `read_console`・
+> D29 の書き換え・作る順番の 2）。**書けるのは握っている 1 本だけ**です。
+>
+> MCP は **38 本**です（`grep -rho '#\[tool(' crates/sshboard-mcp/src/ | wc -l` で数えられます）。
+> **この行は 2026-10-02 まで 35 のままで、実物は 36 でした。**数える口があるのに
+> 読まずに書いたのが原因です。見張りは `crates/sshboard-mcp/tests/mcp_over_http.rs`。
 
 **手元のテスト用サーバー**を先に建てること。実機に触らずに全部確かめられます。
 

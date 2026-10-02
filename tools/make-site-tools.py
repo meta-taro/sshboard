@@ -43,7 +43,9 @@ GROUPS = [
     ("write", ["make_directory", "upload_file", "write_file"]),
     ("cmds", ["list_readonly_commands", "run_readonly", "list_operations",
               "run_operation"]),
-    ("console", ["console_open", "console_type", "console_stop", "read_stream"]),
+    ("console", ["console_open", "console_type", "console_stop",
+                 # **人が開いた端末も AI から見える**（D29 の書き換え）。
+                 "list_consoles", "read_console", "read_stream"]),
     ("screen", ["show_view", "capture_window", "pending_status", "await_answer", "diagnostics"]),
     ("itself", ["about_sshboard", "ping"]),
 ]

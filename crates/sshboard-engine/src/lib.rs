@@ -10,6 +10,7 @@
 //! - **手元へ落とす側**（`download_file`）に囲いはかかりません。守る相手が
 //!   サーバーではなく手元なので、**黙って上書きしない**ことで守ります。
 
+mod console;
 mod engine;
 mod error;
 mod open;
@@ -20,6 +21,11 @@ mod open;
 /// 引数は例外なく囲われます（`tests/probes.rs` が見張っています）。
 pub mod probes;
 
+/// 端末を**何本でも**持てる入れ物と、**同時に開ける本数の方針**（D29 の書き換え）。
+///
+/// `CONSOLE_LIMIT` は**方針であって構造ではありません。**画面も MCP も
+/// この数を読んで人へ言えるようにします（「何本開けるか」が分からず止まった・2026-10-02）。
+pub use console::{ConsoleFacts, CONSOLE_LIMIT};
 pub use engine::{Answered, ConsoleOpened, Engine, HostKeyAsk, OnConflict, OperationAsk};
 pub use error::EngineError;
 pub use open::{Opened, WriteAccess};

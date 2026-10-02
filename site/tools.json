@@ -1,5 +1,5 @@
 {
- "total": 36,
+ "total": 38,
  "groups": [
   {
    "key": "connect",
@@ -135,6 +135,14 @@
     {
      "name": "console_stop",
      "line": "Let go of the console and close the shell."
+    },
+    {
+     "name": "list_consoles",
+     "line": "List every interactive console that is open right now - the ones the person opened as well as the one you hold."
+    },
+    {
+     "name": "read_console",
+     "line": "Read what one console has printed, by its number from list_consoles."
     },
     {
      "name": "read_stream",
