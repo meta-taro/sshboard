@@ -28,6 +28,7 @@
 	import { emptyBacklog, remember, replay, type Backlog } from '$lib/stream-backlog';
 	import { applyEdit, editIntent, type EditableField } from '$lib/edit-keys';
 	import { canFollow, isView, type View, viewAfterAnswered} from '$lib/view-request'
+	import { consoleElsewhere } from '$lib/console-place';
 	import { asConnectFailure, readableFailure } from '$lib/connect-failure';;
 	import { attachClipboard, browserClipboard, detectPlatform } from '$lib/terminal-clipboard';
 	import { isFindShortcut, type TerminalSearch } from '$lib/terminal-search';
@@ -272,6 +273,17 @@
 		}
 	}
 	const iHold = $derived(holder === 'human');
+
+	/**
+	 * **端末が「いまここに無い」とき、相手の名前**（2026-10-02・実機の指摘）。
+	 *
+	 * > ヘラけるのかさえわからないよ
+	 *
+	 * 端末の面には接続のタブが並ぶので、**押せばその接続の端末が開くように見えます。**
+	 * 実際は**全体で 1 本**（D29）で、タブを移しても端末は付いてきません。
+	 * **そのことが、どこにも書いてありませんでした。**
+	 */
+	const consoleAway = $derived(consoleElsewhere(consoleOn, session.open?.name ?? null));
 	let diag = $state<DiagEvent[]>([]);
 
 	// --- コピー & ペースト --------------------------------------------------------
@@ -1407,6 +1419,12 @@
 				{#if consoleOn}
 					<span class="on" data-secret>{consoleOn}</span>
 				{/if}
+				{#if consoleAway}
+					<!-- **端末は付いてこない。**どこに在るかと、どうすれば開けるかを言う。 -->
+					<span class="onlyone" data-secret>
+						{i18n.t('console.elsewhere', { name: consoleAway })}
+					</span>
+				{/if}
 				<span class="holder" class:ai={holder === 'ai'} class:mine={iHold}>
 					<Icon name={holder ? 'lock' : 'terminal'} size={12} />
 					{holder === 'ai'
@@ -1426,6 +1444,8 @@
 						<Icon name="terminal" />
 						{i18n.t('console.open')}
 					</button>
+					<!-- **「何本開けるか」を、押す前に言う。**使う人が機能の有無を判断できるように。 -->
+					<span class="onlyone">{i18n.t('console.onlyone')}</span>
 				{:else if holder && !iHold}
 					<!-- **人はいつでも取り返せる**（D29）。 -->
 					<button type="button" class="primary" onclick={takeConsole}>
@@ -2138,6 +2158,12 @@
 	   端末の上に大きな空白ができていた（実際にそうなった）。 */
 	.console .what {
 		flex: 0 0 auto;
+	}
+
+	/* **「何本開けるか」を言う文。**釦の隣に、控えめに置く（注意書きであって警告ではない）。 */
+	.onlyone {
+		font-size: 0.72rem;
+		color: var(--fg-faint);
 	}
 
 	.console-head {
