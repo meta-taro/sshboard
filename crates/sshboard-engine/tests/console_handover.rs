@@ -282,3 +282,97 @@ async fn the_human_never_has_to_ask_anyone() {
     );
     assert_eq!(engine.console_request().await, None);
 }
+
+#[tokio::test]
+async fn an_allowed_agent_can_tell_that_it_may_open_now() {
+    // **別のセッションからの報告**（2026-09-29・RC で届いた）——
+    //
+    // > 1回目 console_open → 「いま人に尋ねています」／人が許可
+    // > 2回目 console_open → 同じエラー文／人がもう一度許可
+    // > 3回目 console_open → 同じエラー文
+    //
+    // オーナーの言葉 ——
+    //
+    // > 「したって。わからないの？もうなんべんもしてるけど
+    // > **きづけないなら MCP 改善を rc でつたえて**」
+    //
+    // **`pending_status` では 2 つの状態が区別できませんでした。**
+    //
+    // ```
+    // (a) 人がいま使っている（打鍵中。待つべき）
+    // (b) 許可は出たが、AI がまだ握っていない（呼べば取れる）
+    // ```
+    //
+    // どちらも `holder: "human"` に見えます。**気づけないのは当然でした。**
+    // `waitingForPassphrase` には専用の枠があるのに、端末の許可には無かった。
+    let dir = tempfile::tempdir().expect("一時ディレクトリが作れない");
+    let engine = engine_in(&dir);
+
+    // **まだ何も頼んでいない。**「呼べば取れる」も無い。
+    assert_eq!(engine.console_may_open(Actor::Ai).await, None);
+
+    // AI が頼む。
+    let asked = engine.console_take(Actor::Ai, ON).await;
+    assert!(matches!(asked, Err(EngineError::ConsoleApprovalNeeded)));
+    // **頼んでいる間は、まだ「呼べば取れる」ではない。**
+    assert_eq!(
+        engine.console_may_open(Actor::Ai).await,
+        None,
+        "答えが出る前に「取れる」と言ってしまった"
+    );
+    assert_eq!(
+        engine.console_asked_on().await.as_deref(),
+        Some("test-connection"),
+        "どの接続について尋ねているかが言えない"
+    );
+
+    // 人が許す。
+    engine
+        .console_answer(Actor::Human, true)
+        .await
+        .expect("人が許せない");
+
+    // **ここが報告の本体。**許可が出たことを、AI が自分で知れる。
+    assert_eq!(
+        engine.console_may_open(Actor::Ai).await.as_deref(),
+        Some("test-connection"),
+        "**許可が出たのに、AI から見えない**（報告の形）"
+    );
+    // **尋ねているものは、もう無い。**
+    assert_eq!(engine.console_asked_on().await, None);
+}
+
+#[tokio::test]
+async fn a_refusal_leaves_nothing_that_looks_like_permission() {
+    // **断られたのに「取れる」と見えたら、AI は呼び続けます。**
+    let dir = tempfile::tempdir().expect("一時ディレクトリが作れない");
+    let engine = engine_in(&dir);
+
+    let _ = engine.console_take(Actor::Ai, ON).await;
+    engine
+        .console_answer(Actor::Human, false)
+        .await
+        .expect("人が断れない");
+
+    assert_eq!(engine.console_may_open(Actor::Ai).await, None);
+    assert_eq!(engine.console_asked_on().await, None);
+}
+
+#[tokio::test]
+async fn once_it_is_actually_open_it_is_no_longer_merely_allowed() {
+    // **「呼べば取れる」と「もう握っている」を混ぜない。**
+    // 混ぜると、AI は握ったあとも開き直し続けます。
+    let dir = tempfile::tempdir().expect("一時ディレクトリが作れない");
+    let engine = engine_in(&dir);
+
+    ai_holding(&engine).await;
+    // **握りは在るが、端末（PTY）は立っていない**ので、まだ「呼べば取れる」。
+    assert_eq!(
+        engine.console_may_open(Actor::Ai).await.as_deref(),
+        Some("test-connection")
+    );
+    assert_eq!(
+        engine.console_holder("test-connection").await,
+        Some(Actor::Ai)
+    );
+}

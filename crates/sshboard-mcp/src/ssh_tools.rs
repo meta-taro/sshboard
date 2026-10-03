@@ -287,7 +287,12 @@ impl SshboardMcp {
                        succeeded - ask session_status for that. When a connect stops, the \
                        thing that is now blocking moves between waitingForPassphrase and \
                        waitingForHostKey, so read whichever is non-null rather than assuming \
-                       the first one you saw still holds."
+                       the first one you saw still holds. For the console, \
+                       `waitingForConsole.granted` being true means **the person has already \
+                       said yes and you have not opened it yet** - call console_open once \
+                       instead of waiting, and do not ask them again. \
+                       `console.holder` is \"allowedToYou\" in that state; \"human\" means they \
+                       are actually using it."
     )]
     pub async fn pending_status(&self) -> Result<String, ErrorData> {
         // **帯へ載せません。**何度呼んでも人の画面に何も出ない、が要点です。
@@ -302,9 +307,20 @@ impl SshboardMcp {
             .into_iter()
             .find(|held| held.holder == Actor::Ai)
             .map(|held| held.connection);
-        let holder = match &mine {
-            Some(_) => "ai",
-            None => match engine.console_connection().await {
+        // **許可は出たが、まだ開いていない**（別セッションの報告・2026-09-29）。
+        //
+        // これが無かったので、AI は 2 つの状態を区別できませんでした ——
+        // 「人がいま打っている（待つべき）」と
+        // 「許可は出た（呼べば取れる）」が、どちらも `holder: "human"` に見えた。
+        // **人が何度許可を押しても、AI は気づけませんでした。**
+        let may_open = engine.console_may_open(Actor::Ai).await;
+        let asked_on = engine.console_request_on().await;
+        let holder = match (&mine, &may_open) {
+            (Some(_), _) => "ai",
+            // **握りはこちらに在るが、端末はまだ立っていない。**
+            // 「人が使っている」と言ってはいけません。
+            (None, Some(_)) => "allowedToYou",
+            (None, None) => match engine.console_connection().await {
                 Some(_) => "human",
                 None => "none",
             },
@@ -316,10 +332,27 @@ impl SshboardMcp {
                 "onConnection": mine.clone().or(engine.console_connection().await),
                 "youHold": mine,
                 // **人の答え待ちか。**true の間は、頼み直さないこと。
-                "waitingForTheHuman": engine.console_request().await.is_some(),
+                "waitingForTheHuman": asked_on.is_some(),
                 // **どの接続について答え待ちか**（D60）。
-                "waitingOnConnection": engine.console_request_on().await,
+                "waitingOnConnection": asked_on.clone(),
+                // **許可は出ている。console_open を呼べば握れます。**
+                // null なら、呼んでも許可を尋ね直されます。
+                "youMayOpen": may_open.clone(),
             },
+            // **端末の許可の待ち**（別セッションの報告・2026-09-29）。
+            //
+            // 他の `waitingForXxx` と**並びを揃えます。**揃っていなかったので、
+            // 使う側は `console` の中を覗かないと分からず、
+            // **「もう押したのに気づかない」が起きました。**
+            //
+            // `granted` が真なら、**待つのをやめて `console_open` を呼ぶ**。
+            "waitingForConsole": (asked_on.is_some() || may_open.is_some()).then(|| {
+                serde_json::json!({
+                    "onConnection": asked_on.clone().or_else(|| may_open.clone()),
+                    // 人がまだ答えていない。**押し直させない。**
+                    "granted": asked_on.is_none() && may_open.is_some(),
+                })
+            }),
             // 鍵のパスフレーズ待ちの接続（識別子だけ）。
             "waitingForPassphrase": engine.passphrase_request(),
             // **ホスト鍵の確認待ち**（Issue #24）。

@@ -477,3 +477,80 @@ async fn an_agent_can_see_every_console_and_read_each_one_on_its_own() {
 
     harness.endpoint.shutdown();
 }
+
+#[tokio::test]
+async fn an_agent_is_told_when_its_console_request_was_already_allowed() {
+    // **別のセッションからの報告**（2026-09-29・RC で届いた）——
+    //
+    // > 1回目 console_open → 「いま人に尋ねています」／人が許可
+    // > 2回目 console_open → 同じエラー文／人がもう一度許可
+    // > 3回目 console_open → 同じエラー文
+    //
+    // オーナーの言葉 ——「したって。わからないの？もうなんべんもしてる」
+    //
+    // `pending_status` が返していたのはこれで、**2 つの状態が区別できません。**
+    //
+    // ```json
+    // {"console":{"holder":"human","waitingForTheHuman":false}}
+    // ```
+    //
+    // (a) 人がいま打っている（待つべき）／(b) 許可は出た（呼べば取れる）
+    //
+    // **`waitingForPassphrase` には専用の枠があるのに、端末には無かった。**
+    if !server_is_up().await {
+        println!("テスト用サーバーが建っていません（想定内・飛ばします）");
+        return;
+    }
+
+    let band = Band::new();
+    let _screen = fake_screen(&band);
+    let harness = harness(band, &[]).await;
+    harness
+        .call("connect", serde_json::json!({ "connection_id": "local" }))
+        .await;
+
+    // AI が頼む。**握れないのが正しい。**
+    let asked = harness.call("console_open", serde_json::json!({})).await;
+    assert!(
+        asked.contains("人に尋ねています"),
+        "許可なく開けてしまった: {asked}"
+    );
+
+    // **人の答え待ちだと言えている。**
+    let waiting = harness.call("pending_status", serde_json::json!({})).await;
+    assert!(
+        waiting.contains(r#"\"granted\":false"#),
+        "答え待ちなのに、そう言えていない: {waiting}"
+    );
+
+    // 人が許す（画面の役）。
+    harness
+        .engine
+        .console_answer(Actor::Human, true)
+        .await
+        .expect("人が許せない");
+
+    // **ここが報告の本体。**呼び直さずに「許可が出た」と分かる。
+    let granted = harness.call("pending_status", serde_json::json!({})).await;
+    assert!(
+        granted.contains(r#"\"granted\":true"#),
+        "**許可が出たのに、AI へ伝わっていない**（報告の形）: {granted}"
+    );
+    assert!(
+        granted.contains(r#"\"youMayOpen\":\"local\""#),
+        "どの接続を開けるのかが言えていない: {granted}"
+    );
+    assert!(
+        granted.contains(r#"\"holder\":\"allowedToYou\""#),
+        "**人が使っていると言い続けている**（これが「気づけない」の正体）: {granted}"
+    );
+
+    // そして 1 回で開ける。
+    let opened = harness.call("console_open", serde_json::json!({})).await;
+    assert!(
+        opened.contains("console opened"),
+        "許可が出たのに開けない: {opened}"
+    );
+
+    harness.endpoint.shutdown();
+}

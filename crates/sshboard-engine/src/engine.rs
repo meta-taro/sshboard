@@ -1027,6 +1027,43 @@ impl Engine {
         self.console_is_open(&target).await.then_some(target)
     }
 
+    /// **許可は出ているが、まだ端末を立てていない接続**（別セッションの報告・2026-09-29）。
+    ///
+    /// **なぜ要るか**: `console_holder` だけでは、AI は 2 つの状態を区別できません。
+    ///
+    /// ```text
+    /// (a) 人がいま使っている（打鍵中。待つべき）
+    /// (b) 許可は出たが、AI がまだ握っていない（呼べば取れる）
+    /// ```
+    ///
+    /// どちらも「人が握っている」に見えたので、**人が何度許可を押しても
+    /// AI は気づけませんでした。**オーナーの言葉 ——
+    ///
+    /// > 「したって。わからないの？もうなんべんもしてるけど
+    /// > **きづけないなら MCP 改善を rc でつたえて**」
+    ///
+    /// `waitingForPassphrase` には専用の枠があるのに、端末の許可には無かった。
+    pub async fn console_may_open(&self, actor: Actor) -> Option<String> {
+        let slot = self.console.lock().await;
+        slot.held
+            .iter()
+            .find(|(_, held)| held.holder == actor && held.console.is_none())
+            .map(|(id, _)| id.clone())
+    }
+
+    /// **いま人に尋ねている接続**（D42 / D60）。答えが出たら `None`。
+    ///
+    /// `console_request` が「誰が頼んだか」で、こちらが「どこについて」です。
+    /// **どちらも要ります** —— 人は「どの接続を許したのか」を知らずに押せません。
+    pub async fn console_asked_on(&self) -> Option<String> {
+        self.console
+            .lock()
+            .await
+            .request
+            .as_ref()
+            .map(|asked| asked.on.clone())
+    }
+
     /// **その端末だけの出力**（D60 / Issue #21）。
     ///
     /// 立っていなければ `None`。**空文字と区別します** ——

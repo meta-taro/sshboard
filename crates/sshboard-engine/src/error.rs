@@ -153,7 +153,9 @@ impl fmt::Display for EngineError {
                 f,
                 "端末を使ってよいか、いま人に尋ねています。\
                  **人が画面で許可するまで握れません**（D42）。\
-                 少し待ってから開き直してください"
+                 **呼び直して確かめないでください** —— `await_answer` で待つか、\
+                 `pending_status` の `waitingForConsole.granted` を見てください。\
+                 真になったら、`console_open` を 1 回呼べば握れます"
             ),
             EngineError::ConsoleNotOpen => write!(
                 f,
