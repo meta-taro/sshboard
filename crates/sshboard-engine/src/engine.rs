@@ -2192,14 +2192,56 @@ impl Engine {
     ///
     /// **人がその場で入れたものが最優先。**鍵のパスフレーズと同じ扱いです。
     /// **製品はパスワードを持ちません**（D11）。ここは通り抜けるだけです。
-    fn password_for(entry: &ConnectionEntry, typed: Option<&str>) -> Option<String> {
+    fn password_for(&self, entry: &ConnectionEntry, typed: Option<&str>) -> Option<String> {
         if let Some(typed) = typed {
             if !typed.is_empty() {
                 return Some(typed.to_string());
             }
         }
         let reference = entry.keyring_password_ref.as_ref()?;
-        SecretStore::new(KEYRING_SERVICE).get(reference).ok()
+        self.stored_secret(&entry.id, "パスワード", reference)
+    }
+
+    /// **預けた秘密を引く。引けなかったら、そう書く**（2026-10-04）。
+    ///
+    /// ここは `.ok()` で握り潰していました。**OS のストアが拒んでも、
+    /// 項目が消えていても、何も残らずに人へ問いが出ます。**
+    /// 人から見れば「チェックを入れたのに毎回聞かれる」で、**理由がどこにも無い。**
+    ///
+    /// 実運用の報告（2026-10-04）——
+    ///
+    /// > doko005 に繋ぐたびに鍵のパスフレーズを手で入れています
+    ///
+    /// 預ける口も引く口も v0.1.16 から在ります。**引けていないなら、
+    /// それが分かるようにしておく**のが先です（Issue #10 の教訓）。
+    ///
+    /// **値は 1 バイトも記録しません**（D14）。出すのは識別子と参照名だけ ——
+    /// 参照名は `passphrase:<識別子>` の形で、**接続先は入りません**（PRD §8）。
+    fn stored_secret(&self, id: &str, kind: &str, reference: &str) -> Option<String> {
+        match SecretStore::new(KEYRING_SERVICE).get(reference) {
+            Ok(value) if !value.is_empty() => Some(value),
+            Ok(_) => {
+                self.diag.error(
+                    Stage::Auth,
+                    Some(id),
+                    format!("預けた{kind}が空でした（{reference}）"),
+                    "画面で預け直してください（空のまま預けると、参照だけが残ります）",
+                );
+                None
+            }
+            Err(error) => {
+                self.diag.error(
+                    Stage::Auth,
+                    Some(id),
+                    format!(
+                        "預けた{kind}を OS の資格情報ストアから引けません（{reference}・{error}）"
+                    ),
+                    "画面で預け直してください。別の PC で書き出した接続一覧を読み込むと、\
+                     参照だけが来て中身はこの PC に無い、という形になります",
+                );
+                None
+            }
+        }
     }
 
     /// 認証のやり方を決める。**秘密はここでしか触りません**（D11 / D14）。
@@ -2215,16 +2257,18 @@ impl Engine {
             // **agent に該当の鍵が無いと、そこで行き止まり**でした（実機で踏んだ）。
             // 鍵より弱くても、**この製品が置き換える相手（WinSCP / Tera Term）の
             // 利用者の多くはパスワードで繋いでいます**（PRD §0-4）。
-            if let Some(password) = Self::password_for(entry, passphrase.as_deref()) {
+            if let Some(password) = self.password_for(entry, passphrase.as_deref()) {
                 return Ok(Auth::Password { password });
             }
             return Ok(Auth::Agent);
         };
 
         // 人がその場で入れたものが最優先。無ければ OS ストアの参照名から引く。
+        // **引けなかったら記録に残します** —— 黙って人へ問い直すと、
+        // 「チェックを入れたのに毎回聞かれる」の理由がどこにも無くなります。
         let stored = match (&passphrase, &entry.keyring_passphrase_ref) {
             (Some(_), _) => None,
-            (None, Some(reference)) => SecretStore::new(KEYRING_SERVICE).get(reference).ok(),
+            (None, Some(reference)) => self.stored_secret(&entry.id, "パスフレーズ", reference),
             (None, None) => None,
         };
 

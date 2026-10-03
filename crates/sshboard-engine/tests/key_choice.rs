@@ -280,3 +280,63 @@ async fn the_record_never_carries_the_host_or_the_user() {
         );
     }
 }
+
+/// 預けたパスフレーズが置いてあるはずの接続。**実在しない参照名**を書きます。
+fn registry_with_a_stored_passphrase(dir: &tempfile::TempDir, key: &Path) -> PathBuf {
+    let path = dir.path().join("connections.toml");
+    let toml = format!(
+        "version = 1\n\n[[connections]]\nid = \"pending\"\nname = \"Pending\"\n\
+         host = \"127.0.0.1\"\nport = 65000\nuser = \"nobody\"\n\
+         key_path = \"{}\"\n\
+         keyring_passphrase_ref = \"passphrase:this-was-never-stored\"\n",
+        toml_string(key)
+    );
+    std::fs::write(&path, toml).expect("接続一覧を書けない");
+    path
+}
+
+#[tokio::test]
+async fn a_stored_passphrase_that_cannot_be_read_is_written_down() {
+    // **別セッションからの報告**（2026-10-04）——
+    //
+    // > doko005 に繋ぐたびに鍵のパスフレーズを手で入れています
+    //
+    // 預ける口（`connection_passphrase_save`）も、引く口（`auth_for`）も
+    // **v0.1.16 から在ります。**それでも毎回聞かれるなら、
+    // **引けていない**ということです。
+    //
+    // ところが引く側はこう書いてありました ——
+    //
+    // ```rust
+    // SecretStore::new(KEYRING_SERVICE).get(reference).ok()
+    // ```
+    //
+    // **`.ok()` で握り潰しています。**OS のストアが拒んでも、項目が消えていても、
+    // **何も残らずに人へ問いが出ます。**人から見れば「チェックを入れたのに毎回聞かれる」で、
+    // **理由がどこにも無い。**追えない失敗は、直せない失敗です（Issue #10 の教訓）。
+    let dir = tempfile::tempdir().expect("一時ディレクトリ");
+    let key = key_file(
+        &dir,
+        "enc.pem",
+        "-----BEGIN OPENSSH PRIVATE KEY-----\nnot-a-real-key\n-----END OPENSSH PRIVATE KEY-----\n",
+    );
+    let engine = engine_at(registry_with_a_stored_passphrase(&dir, &key));
+
+    // 繋がりません（相手も居ないし、鍵も本物ではない）。**見たいのは記録です。**
+    let _ = engine.connect(Actor::Human, "pending", None).await;
+
+    let said = rendered(&engine);
+    assert!(
+        said.contains("預けたパスフレーズ"),
+        "**預けたものが引けなかったことが、どこにも残っていない**\n{said}"
+    );
+    // **接続先も秘密も残しません**（PRD §8）。残すのは識別子と、引けなかった事実。
+    assert!(
+        !said.contains("127.0.0.1"),
+        "記録に接続先が入っている\n{said}"
+    );
+    assert!(
+        !said.contains("nobody"),
+        "記録に利用者名が入っている\n{said}"
+    );
+}
