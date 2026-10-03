@@ -302,6 +302,19 @@
 	 * （D60 の次の一手 ——「人がどの面を見ているか」と一緒にやります）。
 	 */
 
+	/**
+	 * **端末の面から、別の接続を開く**（実機の指摘・2026-10-04）。
+	 *
+	 * > **端末画面に、別の接続を開くがないです。**
+	 *
+	 * ファイルの面には在って、端末の面には無かった。端末の面に並ぶのは
+	 * **既に繋がっているもの**だけで、1 本繋いだ時点で選ぶ所が消えます ——
+	 * **2 台目へ繋ぐには、いちど別の面へ移るしかありませんでした。**
+	 *
+	 * Issue #9 と同じ壊れ方です。**「できるようになった後にだけ現れる案内」**は、
+	 * 探している人には見えません。
+	 */
+	let consoleAddingAnother = $state(false);
 	let diag = $state<DiagEvent[]>([]);
 
 	// --- コピー & ペースト --------------------------------------------------------
@@ -1439,21 +1452,51 @@
 					1 本でも出せば、どのサーバーの端末なのかが常に見えます。
 				-->
 			{:else if session.all.length > 0}
-				<div class="console-conns" role="tablist" aria-label={i18n.t('tab.connections')}>
-					{#each session.all as held (held.id)}
-						<button
-							type="button"
-							role="tab"
-							class="console-conn"
-							class:active={held.id === session.activeId}
-							aria-selected={held.id === session.activeId}
-							onclick={() => session.focus(held.id)}
-						>
-							<span data-secret>{held.name}</span>
-							{#if held.tag}<span class="tag" data-secret>{held.tag}</span>{/if}
-						</button>
-					{/each}
+				<div class="console-tabs">
+					<div class="console-conns" role="tablist" aria-label={i18n.t('tab.connections')}>
+						{#each session.all as held (held.id)}
+							<button
+								type="button"
+								role="tab"
+								class="console-conn"
+								class:active={held.id === session.activeId}
+								aria-selected={held.id === session.activeId}
+								onclick={() => session.focus(held.id)}
+							>
+								<span data-secret>{held.name}</span>
+								{#if held.tag}<span class="tag" data-secret>{held.tag}</span>{/if}
+							</button>
+						{/each}
+					</div>
+					<!--
+						**別の接続を開く**（実機の指摘・2026-10-04）。
+						ファイルの面と**同じ鍵の文言**を使います（11 言語ぶん訳が揃っている）。
+						**言葉を出します** —— アイコンだけだと、触れる前の人には存在しません
+						（Issue #9 で一度やった失敗）。
+					-->
+					<button
+						type="button"
+						class="ghost add"
+						onclick={() => (consoleAddingAnother = !consoleAddingAnother)}
+						title={i18n.t('files.another')}
+					>
+						<Icon name="plus" size={13} />
+						{i18n.t('files.another')}
+					</button>
 				</div>
+				<!--
+					**繋ぐ所は 1 つの部品**（`ConnectPanel`）。
+					写して 2 か所に置くと、**片方だけ直る日**が来ます（D39）。
+				-->
+				{#if consoleAddingAnother}
+					<ConnectPanel
+						onconnected={() => (consoleAddingAnother = false)}
+						onregister={() => {
+							consoleAddingAnother = false;
+							view = 'connections';
+						}}
+					/>
+				{/if}
 			{/if}
 
 			<div class="console-head">
@@ -1744,11 +1787,29 @@
 
 	/* --- 「表示」メニュー（自前タイトルバーで OS のメニューを失った分） --- */
 
+	.console-tabs {
+		display: flex;
+		align-items: flex-start;
+		justify-content: space-between;
+		gap: 0.5rem;
+		flex-wrap: wrap;
+	}
+
 	.console-conns {
 		display: flex;
 		gap: 0.3rem;
 		flex-wrap: wrap;
 		padding-bottom: 0.35rem;
+	}
+
+	/* **別の接続を開く。**ファイルの面と同じ見え方に揃えます。 */
+	.console-tabs .add {
+		font-size: 0.75rem;
+		padding: 0.2rem 0.55rem;
+		display: inline-flex;
+		align-items: center;
+		gap: 0.3rem;
+		flex: 0 0 auto;
 	}
 
 	.console-conn {

@@ -253,3 +253,60 @@ describe('繋ぎ損ねた理由', () => {
 		expect(body).toContain('passphraseNeeded');
 	});
 });
+
+/**
+ * **繋ぐ道は、どの面にも同じだけ在ること**（実機の指摘・2026-10-04）。
+ *
+ * > **端末画面に、別の接続を開くがないです。**
+ *
+ * **そのとおりでした。**ファイルの面には「別の接続を開く」（`files.another`）が
+ * 在り、端末の面には**在りませんでした。**端末の面に並ぶのは
+ * **既に繋がっているもの**だけで、1 本繋いだ時点で `ConnectPanel` が消えます。
+ * つまり **2 台目へ繋ぐには、いちどファイルの面か接続の面へ移るしかなかった。**
+ *
+ * これは Issue #9 と同じ壊れ方です ——
+ * **「できるようになった後にだけ現れる案内」**で、探している人には見えない。
+ *
+ * **3 台同時に作業する人が、端末の面から出られない形**にしません。
+ */
+/** `+page.svelte` のソース。**glob の鍵が変わった日に黙って空振りしないこと。** */
+function pageSource(): string {
+	const found = Object.entries(sources).find(([path]) => path.endsWith('/routes/+page.svelte'));
+	if (!found) throw new Error('+page.svelte が読めていません（glob の鍵が変わった？）');
+	return found[1];
+}
+
+describe('繋ぐ道', () => {
+	test('offers "open another connection" on the console screen too', () => {
+		const page = pageSource();
+
+		// **端末の面の中に在ること。**文言は既にある鍵を使う（11 言語ぶん訳が揃っている）。
+		const console_view = page.slice(page.indexOf("{#if view === 'console'}"));
+		expect(console_view).toContain("i18n.t('files.another')");
+
+		// **押したら繋ぐ所が出ること。**釦だけ置いて中身が無い、を作らない。
+		expect(console_view).toContain('<ConnectPanel');
+	});
+
+	test('uses the same picker on both screens rather than a copy of it', () => {
+		// **繋ぐ所を写して 2 か所に置くと、片方だけ直る日が来ます**（D39）。
+		// 選ぶ部品は `ConnectPanel` 1 つで、面はそれを描くだけ。
+		//
+		// **「繋ぐ呼び出しが 1 か所」ではありません。**`+page.svelte` も
+		// ホスト鍵とパスフレーズの答えから繋ぎ直します（問いは画面に 1 つ・D39）。
+		// 見ているのは**選ぶ画面を自前で持っていないこと**です。
+		const pickers = Object.entries(sources)
+			.filter(([path]) => /\.svelte$/.test(path) && !/\.test\./.test(path))
+			.filter(([, source]) => /connections_list/.test(source))
+			.map(([path]) => path.slice(path.lastIndexOf('/') + 1));
+
+		// `FileBrowser` も一覧を読みますが、**印の色をタブへ出すためだけ**です
+		// （そう書いてあります）。`ConnectionManager` は登録の面。
+		// **4 つ目が増えたら、それは写した疑いです。**
+		expect(pickers.sort()).toEqual([
+			'ConnectPanel.svelte',
+			'ConnectionManager.svelte',
+			'FileBrowser.svelte'
+		]);
+	});
+});
