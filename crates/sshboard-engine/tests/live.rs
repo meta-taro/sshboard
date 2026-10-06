@@ -2108,3 +2108,97 @@ async fn reading_one_console_shows_only_that_console() {
         "止めたのに読めた"
     );
 }
+
+#[tokio::test]
+async fn two_consoles_on_the_same_server_never_mix_their_output() {
+    // **実運用の言葉**（2026-10-02）——
+    //
+    // > **同じサーバに２画面入る場合もある。**タブとか、画面分割できると尚良い
+    //
+    // 接続を鍵にしていた間は、これが表せませんでした。番号で持つようにしたので
+    // 立てられますが、**出力が混ざったら意味がありません** ——
+    // 人は左右の面を見比べて作業するので、両方に同じものが出ると
+    // **どちらで打ったのか分かりません。**
+    if !server_is_up().await {
+        println!("テスト用サーバーが建っていません（想定内・飛ばします）");
+        return;
+    }
+    let dir = tempfile::tempdir().expect("一時ディレクトリ");
+    let engine = engine_connected(&dir).await;
+    let on = engine.active().await.expect("繋がっていない").id;
+
+    let first = engine
+        .console_open_new(Actor::Human, &on, 80, 24)
+        .await
+        .expect("1 枚目が開けない");
+    let second = engine
+        .console_open_new(Actor::Human, &on, 80, 24)
+        .await
+        .expect("**同じサーバに 2 枚目が開けない**");
+    assert_ne!(first, second, "番号が同じ");
+
+    // **別のシェルであること。**同じ PTY を 2 回見せているなら、印が両方に出ます。
+    engine
+        .console_type_into(Actor::Human, first, b"echo IN_THE_FIRST\n")
+        .await
+        .expect("1 枚目に打てない");
+    engine
+        .console_type_into(Actor::Human, second, b"echo IN_THE_SECOND\n")
+        .await
+        .expect("2 枚目に打てない");
+
+    for _ in 0..50 {
+        let a = engine.console_tail_of(first).await.unwrap_or_default();
+        let b = engine.console_tail_of(second).await.unwrap_or_default();
+        if a.contains("IN_THE_FIRST") && b.contains("IN_THE_SECOND") {
+            break;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+    }
+
+    let a = engine
+        .console_tail_of(first)
+        .await
+        .expect("1 枚目の出力が無い");
+    let b = engine
+        .console_tail_of(second)
+        .await
+        .expect("2 枚目の出力が無い");
+
+    assert!(a.contains("IN_THE_FIRST"), "1 枚目に出ていない: {a:?}");
+    assert!(b.contains("IN_THE_SECOND"), "2 枚目に出ていない: {b:?}");
+    assert!(
+        !a.contains("IN_THE_SECOND"),
+        "**2 枚目の出力が 1 枚目へ混ざった**: {a:?}"
+    );
+    assert!(
+        !b.contains("IN_THE_FIRST"),
+        "**1 枚目の出力が 2 枚目へ混ざった**: {b:?}"
+    );
+
+    // **一覧に 2 本出る。**番号で見分けられる。
+    let open = engine.console_list().await;
+    assert_eq!(open.len(), 2, "{open:?}");
+    assert!(open.iter().all(|held| held.connection == on));
+
+    // **接続の名前で指すと断る。**勝手に 1 本選ばない。
+    let guessed = engine
+        .console_type(Actor::Human, Some(&on), b"echo X\n")
+        .await;
+    assert!(
+        matches!(guessed, Err(EngineError::ConsoleAmbiguous { open: 2 })),
+        "2 本あるのに名前で打てた: {guessed:?}"
+    );
+
+    // 片方を止めても、もう片方は残る。
+    engine
+        .console_stop_of(Actor::Human, first)
+        .await
+        .expect("止められない");
+    assert_eq!(engine.console_list().await.len(), 1);
+    assert!(
+        engine.console_tail_of(second).await.is_some(),
+        "残った方が消えた"
+    );
+    let _ = engine.console_stop_of(Actor::Human, second).await;
+}

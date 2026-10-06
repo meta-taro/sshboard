@@ -353,7 +353,7 @@
         <span class="tag alpha" data-t="tag.alpha">Alpha</span>
         <span class="tag" id="ver">…</span>
         <span class="tag" data-t="tag.mac">macOS (Apple Silicon)</span>
-        <span class="tag" data-t="tag.win">Windows x64</span>
+        <span class="tag" data-t="tag.win">Windows x64 / ARM64</span>
         <span class="tag" data-t="tag.langs">11 languages</span>
         <span class="tag">MIT</span>
       </div>
@@ -382,11 +382,31 @@
           <span class="size" id="size-win"></span>
         </div>
 
+        <!--
+          **ARM64 を分けて出す**（2026-10-06・人の決定）。
+          ARM の Windows（Snapdragon など）の席で入れられず、作業が止まった実例が出ています。
+          **「Windows」1 つに見せて中身が x64 だけ**だと、ARM の人は
+          落として入れて初めて分かります。
+        -->
+        <div class="card">
+          <h3>Windows (ARM64)</h3>
+          <p class="sub">arm64 · installer (NSIS)</p>
+          <a class="get" id="dl-win-arm" data-t="dl.button" href="https://github.com/meta-taro/sshboard/releases">Download</a>
+          <span class="size" id="size-win-arm"></span>
+        </div>
+
         <div class="card">
           <h3 data-t="dl.msi.title">Windows (MSI)</h3>
           <p class="sub" data-t="dl.msi.sub">If your organisation deploys by MSI</p>
           <a class="get thin" id="dl-msi" data-t="dl.button" href="https://github.com/meta-taro/sshboard/releases">Download</a>
           <span class="size" id="size-msi"></span>
+        </div>
+
+        <div class="card">
+          <h3>Windows (MSI · ARM64)</h3>
+          <p class="sub" data-t="dl.msi.sub">If your organisation deploys by MSI</p>
+          <a class="get thin" id="dl-msi-arm" data-t="dl.button" href="https://github.com/meta-taro/sshboard/releases">Download</a>
+          <span class="size" id="size-msi-arm"></span>
         </div>
 
         <div class="card">

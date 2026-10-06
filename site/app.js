@@ -163,8 +163,28 @@
       'size-mac',
       find((x) => x.name.endsWith('.dmg')) ?? find((x) => x.name.endsWith('.app.tar.gz'))
     );
-    wire('dl-win', 'size-win', find((x) => x.name.endsWith('-setup.exe')));
-    wire('dl-msi', 'size-msi', find((x) => x.name.endsWith('.msi')));
+    // **形ごとに名前で分ける**（2026-10-06）。
+    //
+    // `endsWith('-setup.exe')` は、**x64 と ARM64 が並んだ日に
+    // 先に見つかった方**を採ります。git-qa は同じ形で
+    // **x64 と ARM64 を取り違えました。**
+    const arch = (name, want) => name.toLowerCase().includes(want);
+    wire(
+      'dl-win',
+      'size-win',
+      find((x) => x.name.endsWith('-setup.exe') && arch(x.name, 'x64'))
+    );
+    wire(
+      'dl-win-arm',
+      'size-win-arm',
+      find((x) => x.name.endsWith('-setup.exe') && arch(x.name, 'arm64'))
+    );
+    wire('dl-msi', 'size-msi', find((x) => x.name.endsWith('.msi') && arch(x.name, 'x64')));
+    wire(
+      'dl-msi-arm',
+      'size-msi-arm',
+      find((x) => x.name.endsWith('.msi') && arch(x.name, 'arm64'))
+    );
   } catch {
     // **黙って古い物を配らない。**読めなかったことを出す
     put('ver', 'see Releases');

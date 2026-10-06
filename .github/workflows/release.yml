@@ -34,7 +34,14 @@ jobs:
       fail-fast: false
       matrix:
         # 配布対象は Windows と macOS（PRD §7）。Linux は対象外。
-        os: [macos-latest, windows-latest]
+        #
+        # **Windows は x64 と ARM64 の 2 本**（2026-10-06・人の決定）。
+        # 理由は「ARM のほうが未来だから」。**交差ビルドにしません** ——
+        # その機械で建てます（git-qa が同じ形で直しました）。
+        #
+        # ARM の Windows（Snapdragon など）の席で入れられず、
+        # **作業が止まった**実例が出ています。
+        os: [macos-latest, windows-latest, windows-11-arm]
     steps:
       - uses: actions/checkout@v7
 
@@ -56,6 +63,17 @@ jobs:
 
       - name: 依存を入れる
         run: pnpm install --frozen-lockfile
+
+      # **ARM の Windows で、ARM 用の部品が入らないことがある**
+      # （`@rollup/rollup-win32-arm64-msvc` / `@tauri-apps/cli-win32-arm64-msvc`）。
+      # lockfile には入っているのに、入り直さないと解決しない形です。
+      #
+      # **git-qa が踏んだ穴の 1 つ**（2026-10-06 に報告を受けました）。
+      # **こちらではまだ踏んでいません** —— 先に置いておきます。
+      # 要らなければ空振りするだけで、**要るときに 10 分ビルドの末に落ちる**より良い。
+      - name: ARM 用の部品を入れ直す（git-qa の報告・未確認）
+        if: matrix.os == 'windows-11-arm'
+        run: pnpm install --force
 
       # **タグとアプリの番号が合っているか、いちばん先に見る**（D34 追記）。
       #
@@ -209,8 +227,24 @@ jobs:
 
           BASE="https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}"
 
-          win_exe="$(cd upload && ls *-setup.exe 2>/dev/null | head -1 || true)"
+          # **形ごとに名前で分ける**（2026-10-06）。
+          #
+          # `ls *-setup.exe | head -1` は、**x64 と ARM64 が並んだ日に
+          # どちらが来るか分かりません。**git-qa は配布ページで同じ穴を踏み、
+          # **x64 と ARM64 を取り違えました。**
+          win_x64="$(cd upload && ls *x64*-setup.exe 2>/dev/null | head -1 || true)"
+          win_arm="$(cd upload && ls *arm64*-setup.exe 2>/dev/null | head -1 || true)"
           mac_tar="$(cd upload && ls *.app.tar.gz 2>/dev/null | head -1 || true)"
+
+          # **どちらにも当てはまらない setup.exe が在ったら止める。**
+          # tauri が名前の付け方を変えた日に、**黙って 1 つのアーキテクチャが
+          # 配布から落ちる**のを防ぎます。
+          for f in $(cd upload && ls *-setup.exe 2>/dev/null || true); do
+            case "$f" in
+              *x64*|*arm64*) ;;
+              *) echo "::error::アーキテクチャが読めない成果物があります: $f"; exit 1 ;;
+            esac
+          done
 
           platforms=""
           add() {
@@ -221,7 +255,8 @@ jobs:
             if [ -z "$platforms" ]; then platforms="$entry"; else platforms="$platforms,$entry"; fi
           }
 
-          [ -n "$win_exe" ] && [ -f "upload/$win_exe.sig" ] && add "windows-x86_64" "$win_exe"
+          [ -n "$win_x64" ] && [ -f "upload/$win_x64.sig" ] && add "windows-x86_64" "$win_x64"
+          [ -n "$win_arm" ] && [ -f "upload/$win_arm.sig" ] && add "windows-aarch64" "$win_arm"
           [ -n "$mac_tar" ] && [ -f "upload/$mac_tar.sig" ] && add "darwin-aarch64" "$mac_tar"
 
           # **1 つも組めなければ止める。**空の目録を配ると、更新が静かに死にます。

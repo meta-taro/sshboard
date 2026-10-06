@@ -177,6 +177,12 @@ pub struct Engine {
     console: Mutex<Consoles>,
     /// 誰が握っているかを配る。**画面が知らないまま AI が打っている、を作らない。**
     console_changed: watch::Sender<Option<Actor>>,
+    /// **開いている端末ぜんぶの変化**を配る（D60 の分割）。
+    ///
+    /// 握っている側だけでは、**画面は「何枚描けばよいか」が分かりません。**
+    /// 同じ接続に 2 本開いた日に、片方が画面に出ないと
+    /// 「AI からは見えて人からは見えない端末」ができます（D29 を壊します）。
+    consoles_changed: watch::Sender<Vec<ConsoleFacts>>,
     /// **AI からの頼みを画面へ押し出す**（D42）。
     /// 出せない問いは、無いのと同じです。
     console_request_changed: watch::Sender<Option<Actor>>,
@@ -223,6 +229,7 @@ impl Engine {
     ) -> Self {
         let (changed, _) = watch::channel(Vec::new());
         let (console_changed, _) = watch::channel(None);
+        let (consoles_changed, _) = watch::channel(Vec::new());
         let (console_request_changed, _) = watch::channel(None);
         let (passphrase_request, _) = watch::channel(None);
         let (host_key_request, _) = watch::channel(None);
@@ -236,6 +243,7 @@ impl Engine {
             held: Mutex::new(Held::default()),
             console: Mutex::new(Consoles::default()),
             console_changed,
+            consoles_changed,
             console_request_changed,
             passphrase_request,
             host_key_request,
@@ -751,6 +759,7 @@ impl Engine {
                     console.close().await;
                 }
             }
+            self.publish_consoles().await;
         }
 
         if let Some(open) = closed.as_ref() {
@@ -1019,6 +1028,29 @@ impl Engine {
         self.console_changed.subscribe()
     }
 
+    /// **開いている端末ぜんぶ**の変化を受け取る口（D60 の分割）。
+    pub fn subscribe_consoles(&self) -> watch::Receiver<Vec<ConsoleFacts>> {
+        self.consoles_changed.subscribe()
+    }
+
+    /// **その端末だけの出力の口**（D60）。画面は端末ごとにここを見ます。
+    ///
+    /// 接続ごとの出力を見せると、**同じサーバに 2 枚開いた日に
+    /// 両方へ同じものが映ります。**
+    pub async fn console_stream(&self, id: u64) -> Option<Arc<OutputStream>> {
+        self.console
+            .lock()
+            .await
+            .by_id(id)
+            .and_then(|open| open.stream.clone())
+    }
+
+    /// 一覧が変わったことを押し出す。**変わったあとに必ず呼びます。**
+    async fn publish_consoles(&self) {
+        let all = self.console.lock().await.facts();
+        let _ = self.consoles_changed.send_replace(all);
+    }
+
     /// 端末を開いて握る（D29 / D60）。**その接続を既に誰かが握っていれば断ります。**
     pub async fn console_open(
         &self,
@@ -1099,6 +1131,7 @@ impl Engine {
                         format!("握りが{}へ移りました（同じシェルのまま）", who(actor)),
                     );
                     let _ = self.console_changed.send_replace(Some(actor));
+                    self.publish_consoles().await;
                     return Ok(ConsoleOpened::TookOver);
                 }
             }
@@ -1161,7 +1194,89 @@ impl Engine {
             format!("端末を開きました（#{id}・{}・{cols}×{rows}）", who(actor)),
         );
         let _ = self.console_changed.send_replace(Some(actor));
+        self.publish_consoles().await;
         Ok(ConsoleOpened::Fresh)
+    }
+
+    /// **もう 1 枚、新しく立てる**（D60 の分割・2026-10-06）。
+    ///
+    /// `console_open` は「既に在るなら握り直す」です（Issue #21 ——
+    /// 握りを渡すたびに PTY を立て直すと、人の `su -` が消えます）。
+    /// **同じサーバに 2 画面**はその逆で、**毎回新しいシェル**が要ります ——
+    ///
+    /// > 同じサーバに２画面入る場合もある
+    ///
+    /// **別の口にしてあります。**同じ口に旗を立てると、
+    /// 握り直したいときに新しく立ててしまう事故が起きます（それが #21 でした）。
+    ///
+    /// 返るのは**新しい端末の番号**。
+    pub async fn console_open_new(
+        &self,
+        actor: Actor,
+        on: &str,
+        cols: u32,
+        rows: u32,
+    ) -> Result<u64, EngineError> {
+        // **AI が握れるのは、全体で 1 本だけ**（D60）。問う前に見ます。
+        if actor != Actor::Human {
+            if let Some(elsewhere) = self.console.lock().await.up_held_by(actor) {
+                let elsewhere = elsewhere.connection.clone();
+                self.diag.error(
+                    Stage::Exec,
+                    Some(on),
+                    format!("端末を開けません（{elsewhere} で既に握っています）"),
+                    "AI が握れるのは 1 本だけです（D60）。先に止めてください",
+                );
+                return Err(EngineError::ConsoleOnOtherConnection { id: elsewhere });
+            }
+        }
+        self.ask_first(actor, on).await?;
+
+        // **方針の上限**（`PER_CONNECTION_LIMIT`）。構造ではありません。
+        if !self.console.lock().await.room_on(on) {
+            self.diag.error(
+                Stage::Exec,
+                Some(on),
+                format!(
+                    "この接続ではもう端末を開けません（上限 {} 枚）",
+                    crate::console::PER_CONNECTION_LIMIT
+                ),
+                "開いている端末を止めてから開き直してください",
+            );
+            return Err(EngineError::ConsoleLimitReached {
+                limit: crate::console::PER_CONNECTION_LIMIT,
+            });
+        }
+
+        let session = self.session_on(on).await?;
+        // **2 か所へ配ります**（Issue #21）——
+        // この端末だけの出力と、画面が見ている接続ごとの出力。
+        let only_this = Arc::new(OutputStream::new());
+        let console = session
+            .open_console(
+                actor,
+                cols,
+                rows,
+                vec![Arc::clone(&only_this), self.stream_for(on).await],
+            )
+            .await?;
+
+        let mut slot = self.console.lock().await;
+        let id = slot.add(on, actor);
+        let previous = slot.attach(id, console, only_this);
+        drop(slot);
+        if let Some(previous) = previous {
+            previous.close().await;
+        }
+
+        self.diag.info(
+            Stage::Exec,
+            Some(on),
+            format!("端末を開きました（#{id}・{}・{cols}×{rows}）", who(actor)),
+        );
+        let _ = self.console_changed.send_replace(Some(actor));
+        self.publish_consoles().await;
+        Ok(id)
     }
 
     /// 打ち込む。**握っている側だけ**（D29）。番号で指します。
@@ -1306,6 +1421,7 @@ impl Engine {
                     },
                 );
                 let _ = self.console_changed.send_replace(Some(actor));
+                self.publish_consoles().await;
                 Ok(())
             }
         }
@@ -1365,6 +1481,7 @@ impl Engine {
         let _ = self.console_request_changed.send_replace(None);
         if allow {
             let _ = self.console_changed.send_replace(Some(asked.by));
+            self.publish_consoles().await;
         }
         Ok(())
     }
@@ -1457,6 +1574,7 @@ impl Engine {
             );
         }
         let _ = self.console_changed.send_replace(None);
+        self.publish_consoles().await;
         Ok(())
     }
 

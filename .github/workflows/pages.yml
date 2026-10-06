@@ -77,6 +77,23 @@ jobs:
           test -f site/sitemap.xml
           grep -q '<title>' site/index.html
 
+          # **釦があるのに配線が無い、を作らない**（baseline §23）。
+          #
+          # 落とす先は `app.js` が実物のリリースから引いて埋めます。
+          # **`index.html` に釦だけ足して `app.js` を忘れると、
+          # 押しても Releases の一覧へ飛ぶだけ**になります —— ページは出るので
+          # CI は緑のまま、人だけが迷います。
+          #
+          # 2026-10-06、Windows を x64 と ARM64 に分けたときに入れました。
+          # git-qa は同じ所で **x64 と ARM64 を取り違えています。**
+          for id in $(grep -o 'id="\(dl\|size\)-[a-z-]*"' site/index.html \
+                      | sed 's/id="//;s/"//' | sort -u); do
+            grep -q "'${id}'" site/app.js || {
+              echo "::error::site/index.html の ${id} が site/app.js で配線されていません"
+              exit 1
+            }
+          done
+
           # **写真が 2 組そろっていること**（日本語と英語）。
           #
           # 参照だけ足して実物を忘れると、**ページは出るのに絵だけ出ません**
