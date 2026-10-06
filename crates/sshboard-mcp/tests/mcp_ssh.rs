@@ -554,3 +554,74 @@ async fn an_agent_is_told_when_its_console_request_was_already_allowed() {
 
     harness.endpoint.shutdown();
 }
+
+#[tokio::test]
+async fn a_console_can_be_named_by_its_number() {
+    // **同じサーバに 2 画面**（実運用の言葉・2026-10-02）——
+    //
+    // > 同じサーバに２画面入る場合もある。タブとか、画面分割できると尚良い
+    //
+    // 接続の名前だけで指していると、**2 本開いた日にどちらの話か言えません。**
+    // 番号で指せる口を、画面分割より**先に**用意します ——
+    // 後からだと「増えたが指せない」を一度作ることになります。
+    if !server_is_up().await {
+        println!("テスト用サーバーが建っていません（想定内・飛ばします）");
+        return;
+    }
+
+    let band = Band::new();
+    let _screen = fake_screen(&band);
+    let harness = harness(band, &[]).await;
+    harness
+        .call("connect", serde_json::json!({ "connection_id": "local" }))
+        .await;
+    harness
+        .engine
+        .console_open(Actor::Human, Some("local"), 80, 24)
+        .await
+        .expect("人が開けない");
+
+    // **一覧に番号が出る。**
+    let listed = harness.call("list_consoles", serde_json::json!({})).await;
+    assert!(
+        listed.contains(r#"\"id\":1"#),
+        "端末の番号が一覧に出ていない: {listed}"
+    );
+
+    harness
+        .engine
+        .console_type(Actor::Human, Some("local"), b"echo BY_NUMBER\n")
+        .await
+        .expect("人が打てない");
+
+    // **番号で読める。**
+    let mut seen = String::new();
+    for _ in 0..50 {
+        seen = harness
+            .call("read_console", serde_json::json!({ "console_id": 1 }))
+            .await;
+        if seen.contains("BY_NUMBER") {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
+    assert!(seen.contains("BY_NUMBER"), "番号で読めない: {seen}");
+
+    // **無い番号は、正直に断る。**空を返さない。
+    let nowhere = harness
+        .call("read_console", serde_json::json!({ "console_id": 99 }))
+        .await;
+    assert!(
+        nowhere.contains("no console #99"),
+        "無い番号に何か返している: {nowhere}"
+    );
+
+    // **何も指さなければ、どう指すかを言う。**
+    let unnamed = harness.call("read_console", serde_json::json!({})).await;
+    assert!(
+        unnamed.contains("console_id"),
+        "指し方を教えていない: {unnamed}"
+    );
+
+    harness.endpoint.shutdown();
+}

@@ -2065,6 +2065,8 @@ async fn reading_one_console_shows_only_that_console() {
         if engine
             .console_tail(None)
             .await
+            .ok()
+            .flatten()
             .is_some_and(|tail| tail.contains("FROM_THE_SHELL"))
         {
             break;
@@ -2072,7 +2074,11 @@ async fn reading_one_console_shows_only_that_console() {
         tokio::time::sleep(std::time::Duration::from_millis(100)).await;
     }
 
-    let only_console = engine.console_tail(None).await.expect("端末の出力が無い");
+    let only_console = engine
+        .console_tail(None)
+        .await
+        .expect("端末の出力を読めない")
+        .expect("端末の出力が無い");
     let shared = engine.stream().await.plain_tail();
 
     assert!(
@@ -2096,5 +2102,9 @@ async fn reading_one_console_shows_only_that_console() {
     let _ = engine.console_stop(Actor::Human, None).await;
     // **止めたら、その端末の出力も残しません。**番号を使い回さないのと同じ理由 ——
     // 閉じた端末を読めると、AI は「まだ生きている」と読みます。
-    assert_eq!(engine.console_tail(None).await, None, "止めたのに読めた");
+    assert_eq!(
+        engine.console_tail(None).await.expect("読めない"),
+        None,
+        "止めたのに読めた"
+    );
 }

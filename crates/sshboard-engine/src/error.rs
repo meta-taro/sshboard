@@ -42,6 +42,14 @@ pub enum EngineError {
     ConsoleHeldByOther { holder: String },
     /// 端末がまだ開いていない。
     ConsoleNotOpen,
+    /// **その接続に端末が何本もあって、どれの話か決められない**（D60）。
+    ///
+    /// **勝手に 1 本選びません。**推測した端末へ打つのが、いちばん危険です。
+    ConsoleAmbiguous { open: usize },
+    /// **方針の上限に達した**（`PER_CONNECTION_LIMIT`）。
+    ///
+    /// 構造ではなく方針です。**画面が描けるようになったら上げます。**
+    ConsoleLimitReached { limit: usize },
     /// **AI が端末を握るには、人の許可が要る**（D42）。
     ///
     /// 頼んだことは記録に残り、画面へ出ます。**人が答えるまで握れません。**
@@ -156,6 +164,16 @@ impl fmt::Display for EngineError {
                  **呼び直して確かめないでください** —— `await_answer` で待つか、\
                  `pending_status` の `waitingForConsole.granted` を見てください。\
                  真になったら、`console_open` を 1 回呼べば握れます"
+            ),
+            EngineError::ConsoleAmbiguous { open } => write!(
+                f,
+                "その接続には端末が {open} 本あります。\
+                 **どれの話か、番号で指してください**（list_consoles に出ています）"
+            ),
+            EngineError::ConsoleLimitReached { limit } => write!(
+                f,
+                "この接続では、もう端末を開けません（上限 {limit} 本）。\
+                 **開いている端末を止めてから開き直してください**"
             ),
             EngineError::ConsoleNotOpen => write!(
                 f,

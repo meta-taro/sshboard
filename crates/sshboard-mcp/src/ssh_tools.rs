@@ -1052,6 +1052,8 @@ pub struct OpenConsole {
 pub struct TypeIntoConsole {
     /// 打ち込む文字列。**改行を入れないと実行されません**（本物の端末と同じ）。
     pub text: String,
+    /// **端末の番号**（`list_consoles` に出ます）。これが最優先。
+    pub console_id: Option<u64>,
     /// どの接続の端末へ打つか。**省略すると、人の画面が向いている接続**（D60）。
     ///
     /// **あなたが握っていない端末へは打てません。**人が握っている面へ
@@ -1127,6 +1129,18 @@ impl SshboardMcp {
             ));
         }
         let engine = self.engine()?;
+        // **番号が最優先**（D60）。同じサーバに 2 本開いている日は、
+        // 番号でしか区別できません。
+        if let Some(id) = request.console_id {
+            engine
+                .console_type_into(Actor::Ai, id, bytes)
+                .await
+                .map_err(refuse)?;
+            return Ok(format!(
+                "typed {} bytes into console #{id}. Read what came back with read_console #{id}.",
+                bytes.len()
+            ));
+        }
         let on = engine
             .console_where(request.connection_id.as_deref())
             .await
@@ -1150,8 +1164,11 @@ impl SshboardMcp {
     #[tool(
         description = "List every console currently open, including the ones the person opened \
                        themselves: which connection each is on, who is holding it, and which one \
-                       the person's screen is pointed at. Read any of them with read_console. \
-                       Touches no remote server and shows nothing on their screen."
+                       the person's screen is pointed at, and its number. Read any of them with \
+                       read_console, and pass that number when a connection has more than one \
+                       console. **Numbers are never reused**, so a number you remember never \
+                       starts pointing at a different shell. Touches no remote server and shows \
+                       nothing on their screen."
     )]
     pub async fn list_consoles(&self) -> Result<String, ErrorData> {
         self.show("list_consoles").await?;
@@ -1163,11 +1180,18 @@ impl SshboardMcp {
             .iter()
             .find(|held| held.holder == Actor::Ai)
             .map(|held| held.connection.clone());
+        let mine_id = open
+            .iter()
+            .find(|held| held.holder == Actor::Ai)
+            .map(|held| held.id);
 
         let rows: Vec<serde_json::Value> = open
             .iter()
             .map(|held| {
                 serde_json::json!({
+                    // **番号。**read_console / console_type でこれを指します。
+                    // **使い回されません** —— 閉じた番号が別の端末を指すことはない。
+                    "id": held.id,
                     "connection": held.connection,
                     "holder": match held.holder {
                         Actor::Human => "human",
@@ -1184,6 +1208,7 @@ impl SshboardMcp {
             "open": rows,
             // **あなたが握っているのは 1 本だけ**（D60）。
             "youHold": mine,
+            "youHoldConsole": mine_id,
             "personIsLookingAt": focused,
         }))
         .map_err(|error| ErrorData::internal_error(error.to_string(), None))
@@ -1194,45 +1219,64 @@ impl SshboardMcp {
     /// `read_stream` は「いまの宛先」を返します。**どれが宛先かに関わらず
     /// 名前で読める口**が無いと、AI は人にタブを動かしてもらうしかありません。
     #[tool(
-        description = "Read the plain-text tail of ONE console's output, by connection id - \
-                       including a console the person opened and is using. **Only what that \
-                       shell said**: output from run_readonly, read_log and the other \
-                       purpose-built tools does not appear here, so you can tell the shell \
-                       apart from the tools. Never contains ANSI escapes. Use list_consoles \
-                       first to see what is open. This does not move the person's screen and \
-                       does not take the console."
+        description = "Read the plain-text tail of ONE console's output - including a console the \
+                       person opened and is using. Name it by `console_id` (from list_consoles), \
+                       or by `connection_id` when that connection has only one console. \
+                       **Only what that shell said**: output from run_readonly, read_log and the \
+                       other purpose-built tools does not appear here, so you can tell the shell \
+                       apart from the tools. Never contains ANSI escapes. This does not move the \
+                       person's screen and does not take the console."
     )]
     pub async fn read_console(
         &self,
         Parameters(request): Parameters<ReadConsole>,
     ) -> Result<String, ErrorData> {
-        self.show(&format!("read_console {}", request.connection_id))
-            .await?;
-
         let engine = self.engine()?;
+
+        // **番号が最優先。**番号で指されたら、接続のことは考えません ——
+        // 同じサーバに 2 本開いている日に、番号が無いと区別できません（D60）。
+        if let Some(id) = request.console_id {
+            self.show(&format!("read_console #{id}")).await?;
+            return engine.console_tail_of(id).await.ok_or_else(|| {
+                ErrorData::invalid_params(
+                    format!(
+                        "there is no console #{id}. Call list_consoles to see what is open \
+                         (numbers are never reused, so a closed one never comes back)."
+                    ),
+                    None,
+                )
+            });
+        }
+
+        let Some(connection) = request.connection_id.as_deref() else {
+            return Err(ErrorData::invalid_params(
+                "name the console: pass console_id (from list_consoles) or connection_id."
+                    .to_string(),
+                None,
+            ));
+        };
+        self.show(&format!("read_console {connection}")).await?;
+
         // **知らない接続に空を返さない。**空は「何も出ていない」とも読めてしまい、
         // AI は打ち続けます。**開いていないなら、開いていないと言います。**
         let open = engine.open_connections().await;
-        if !open.iter().any(|held| held.id == request.connection_id) {
+        if !open.iter().any(|held| held.id == connection) {
             return Err(ErrorData::invalid_params(
-                format!(
-                    "{} is not open. Call session_status to see what is.",
-                    request.connection_id
-                ),
+                format!("{connection} is not open. Call session_status to see what is."),
                 None,
             ));
         }
         // **端末だけの出力**（Issue #21）。接続ごとの出力を返すと、
         // 用途別ツールの出力が混ざり、「シェルが言ったこと」と区別できません。
         engine
-            .console_tail(Some(&request.connection_id))
+            .console_tail(Some(connection))
             .await
+            .map_err(refuse)?
             .ok_or_else(|| {
                 ErrorData::invalid_params(
                     format!(
-                        "no console is open on {}. Open one with console_open, \
-                         or read the whole connection's output with read_stream.",
-                        request.connection_id
+                        "no console is open on {connection}. Open one with console_open, \
+                         or read the whole connection's output with read_stream."
                     ),
                     None,
                 )
@@ -1254,16 +1298,20 @@ impl SshboardMcp {
             .console_list()
             .await
             .into_iter()
-            .find(|held| held.holder == Actor::Ai)
-            .map(|held| held.connection);
+            .find(|held| held.holder == Actor::Ai);
+        let Some(mine) = mine else {
+            return Ok("no console was held".to_string());
+        };
+        // **番号で止めます。**接続の名前で止めると、同じサーバに 2 本ある日に
+        // **どちらが止まるか言えません。**
         engine
-            .console_stop(Actor::Ai, mine.as_deref())
+            .console_stop_of(Actor::Ai, mine.id)
             .await
             .map_err(refuse)?;
-        Ok(match mine {
-            Some(on) => format!("console on {on} released"),
-            None => "no console was held".to_string(),
-        })
+        Ok(format!(
+            "console #{} on {} released",
+            mine.id, mine.connection
+        ))
     }
 }
 
@@ -1271,8 +1319,15 @@ impl SshboardMcp {
 #[derive(Debug, Deserialize, rmcp::schemars::JsonSchema)]
 #[schemars(crate = "rmcp::schemars")]
 pub struct ReadConsole {
+    /// **端末の番号**（`list_consoles` に出ます）。これが最優先。
+    ///
+    /// **同じサーバに 2 本開いている日は、番号でしか区別できません**（D60）。
+    /// 番号は使い回されないので、**閉じた端末の番号が別の端末を指すことはありません。**
+    pub console_id: Option<u64>,
     /// どの接続の面を読むか。**識別子だけ**（ホスト名は受け取りません）。
-    pub connection_id: String,
+    ///
+    /// その接続に端末が 2 本以上あるときは断ります。**番号で指してください。**
+    pub connection_id: Option<String>,
 }
 
 /// `await_answer` の引数。

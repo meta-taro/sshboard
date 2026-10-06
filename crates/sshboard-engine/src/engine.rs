@@ -12,8 +12,8 @@ use sshboard_credentials::SecretStore;
 use sshboard_diag::{Diagnostics, Stage};
 use sshboard_readonly::{Allowlist, Operations, ReadonlyCommand, Refusals};
 use sshboard_ssh::{
-    inspect_key, Auth, Console, DirEntry, FileFacts, KeyFacts, KeyFormat, KeyVerdict, Ran,
-    SshSession, Target, WriteScope,
+    inspect_key, Auth, DirEntry, FileFacts, KeyFacts, KeyFormat, KeyVerdict, Ran, SshSession,
+    Target, WriteScope,
 };
 use sshboard_stream::OutputStream;
 use tokio::sync::{watch, Mutex};
@@ -21,6 +21,7 @@ use tokio::sync::{watch, Mutex};
 // （`tokio::time::pause` が効かず、**上限も札の寿命も確かめようがない**）。
 use tokio::time::{Duration, Instant};
 
+use crate::console::{Ambiguous, ConsoleFacts, ConsoleRequest, Consoles};
 use crate::error::EngineError;
 use crate::open::{Opened, WriteAccess};
 
@@ -35,100 +36,6 @@ struct Live {
     /// 繋いだときの値を持ちます。**接続中に `connections.toml` を書き換えても
     /// 効きません** —— 効くと、人が画面で見ている状態と食い違います。
     elevation: Elevation,
-}
-
-/// その接続の端末 1 本と、握っている側。
-///
-/// **`console` が `None` のことがあります。**人が許したが、まだ PTY を
-/// 立てていない段です（D42）—— 許可は「開く前」に出るので、
-/// **握りだけが先に在る時間が必ずあります。**
-/// ここを分けずに持っていた頃、「人が許したのに AI が開けない」で
-/// 行き詰まりました（2026-10-02）。
-struct OpenConsole {
-    console: Option<Console>,
-    holder: Actor,
-    /// **この端末だけの出力**（D60 / Issue #21）。
-    /// 端末が立っていない段（許可だけ出ている）では `None`。
-    stream: Option<Arc<OutputStream>>,
-}
-
-/// 開いている端末ぜんぶ（D29 / D60）。
-///
-/// **ロックはここ 1 か所だけが持ちます。**画面と MCP が別々に持つと、
-/// 必ず食い違います（D25 で実際に食い違って気づきました）。
-///
-/// **接続ごとに 1 本**持てます（D60・2026-10-02）。以前は**全体で 1 本**でしたが、
-/// 実運用はこうでした ——
-///
-/// > レッツエンクリプトで、マルチドメインで、**３台同時に延長申請とか作業するから、
-/// > テラターム最低２画面はいつも開いている**
-///
-/// **「全体で 1 本」が守っていたのは「人が AI を見ていること」**で、
-/// それは本数の制限でなくても守れます（AI が握れるのは、やはり 1 本だけ）。
-#[derive(Default)]
-struct ConsoleSlot {
-    /// 鍵は**接続の識別子**（ホスト名は持たない・CLAUDE.md 禁止事項 4）。
-    held: std::collections::HashMap<String, OpenConsole>,
-    /// **AI が「使いたい」と言っている**（D42）。人が答えるまで残ります。
-    ///
-    /// 積み上げません。**何度頼まれても、人に出る問いは 1 つ**です
-    /// （催促で人を疲れさせると、いずれ中身を見ずに許すようになります）。
-    request: Option<ConsoleRequest>,
-}
-
-/// AI が「端末を使いたい」と言っている頼み 1 件（D42 / D60）。
-///
-/// **どの接続について頼んだかを持ちます。**端末が接続ごとに持てるようになった
-/// （D60）ので、**人が答えるまでに宛先が動いていると、頼んでいない接続の握りを
-/// 渡してしまいます。**頼んだ時点の接続を覚えておき、そこへだけ渡します。
-#[derive(Debug, Clone, PartialEq, Eq)]
-struct ConsoleRequest {
-    /// **どの接続について頼んだか。**名前で持ちます ——
-    /// 「いまの宛先」で持つと、人が答えるまでに宛先が動いたとき、
-    /// **人が許していない接続の端末が AI へ渡ります。**
-    on: String,
-    /// 誰が頼んだか。
-    by: Actor,
-}
-
-impl ConsoleSlot {
-    /// **握りを置く。**端末が立っていなくても置けます（D42 の許可の段）。
-    fn hold(&mut self, on: &str, actor: Actor) {
-        match self.held.get_mut(on) {
-            Some(held) => held.holder = actor,
-            None => {
-                self.held.insert(
-                    on.to_owned(),
-                    OpenConsole {
-                        console: None,
-                        holder: actor,
-                        stream: None,
-                    },
-                );
-            }
-        }
-    }
-
-    /// AI が握っている**立っている**端末の接続。**AI は全体で 1 本だけ**（D60）。
-    ///
-    /// **数えるのは立っている端末だけ**です。許可だけ出ている段（PTY がまだ無い）を
-    /// 数えると、**人が許した直後に「既に握っています」と断る**ことになります。
-    /// 縛りたいのは「AI がいまどこで打っているか」で、**許可の枚数ではありません。**
-    fn ai_holds(&self) -> Option<&str> {
-        self.held
-            .iter()
-            .find(|(_, held)| held.holder != Actor::Human && held.console.is_some())
-            .map(|(id, _)| id.as_str())
-    }
-}
-
-/// 開いている端末 1 本の見え方（`console_list`）。
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ConsoleHeld {
-    /// どの接続か。**識別子だけ**（ホスト名は入りません）。
-    pub connection: String,
-    /// いま誰が握っているか。
-    pub holder: Actor,
 }
 
 /// 端末を開いたときに、**新しく立てたのか、受け取ったのか**（Issue #21）。
@@ -267,7 +174,7 @@ pub struct Engine {
     connections_path: PathBuf,
     held: Mutex<Held>,
     /// 端末の 1 本と、握っている側（D29）。
-    console: Mutex<ConsoleSlot>,
+    console: Mutex<Consoles>,
     /// 誰が握っているかを配る。**画面が知らないまま AI が打っている、を作らない。**
     console_changed: watch::Sender<Option<Actor>>,
     /// **AI からの頼みを画面へ押し出す**（D42）。
@@ -327,7 +234,7 @@ impl Engine {
             streams: Mutex::new(std::collections::HashMap::new()),
             connections_path,
             held: Mutex::new(Held::default()),
-            console: Mutex::new(ConsoleSlot::default()),
+            console: Mutex::new(Consoles::default()),
             console_changed,
             console_request_changed,
             passphrase_request,
@@ -830,12 +737,20 @@ impl Engine {
         let all: Vec<Opened> = held.live.values().map(|l| l.opened.clone()).collect();
         drop(held);
 
-        // **切ったら、その接続の出力も片付けます**（D60）。
+        // **切ったら、その接続の出力も端末も片付けます**（D60）。
         //
         // 残すと、繋ぎ直したときに**前回の出力が混ざって出ます** ——
         // 人は「いま打ったもの」と「前に打ったもの」を見分けられません。
+        // **端末を残すと、もっと悪い** —— 死んだ接続の端末が一覧に出続け、
+        // AI は「開いている」と読んで打ちに行きます。
         if closed.is_some() {
             self.streams.lock().await.remove(&target);
+            let gone = self.console.lock().await.remove_on(&target);
+            for open in gone {
+                if let Some(console) = open.console {
+                    console.close().await;
+                }
+            }
         }
 
         if let Some(open) = closed.as_ref() {
@@ -956,13 +871,8 @@ impl Engine {
         Err(EngineError::NotConnected)
     }
 
-    /// **どの接続の端末を指しているか**を決める。
-    ///
-    /// 名前で言われたらその接続。言われなければ**いまの宛先**。
-    /// どちらも無ければ「繋がっていません」と断ります。
-    ///
-    /// **端末が接続ごとに持てるようになった**（D60）ので、名前で指せる口が要ります。
-    /// 指せないと、AI は**人にタブを動かしてもらう**しかありません。
+    /// **どの接続の端末を指しているか。**名前で言われたらその接続、
+    /// 言われなければ**いまの宛先**。どちらも無ければ `None`。
     pub async fn console_where(&self, given: Option<&str>) -> Option<String> {
         match given {
             Some(id) => Some(id.to_owned()),
@@ -987,17 +897,32 @@ impl Engine {
         Err(EngineError::NotConnected)
     }
 
+    /// **その接続のただ 1 本の番号。**2 本以上あるなら断ります。
+    ///
+    /// 接続の名前だけで指す口（画面がこれを使います）が、
+    /// **本数が増えた日に黙って 1 本選ばない**ようにするための関所です。
+    async fn only_console_on(&self, on: &str) -> Result<Option<u64>, EngineError> {
+        match self.console.lock().await.the_one_on(on) {
+            Ok(found) => Ok(found.map(|open| open.id)),
+            Err(Ambiguous(many)) => {
+                self.diag.error(
+                    Stage::Exec,
+                    Some(on),
+                    format!("その接続には端末が {many} 本あります"),
+                    "どの端末かを番号で指してください（list_consoles に出ています）",
+                );
+                Err(EngineError::ConsoleAmbiguous { open: many })
+            }
+        }
+    }
+
     /// 誰がその接続の端末を握っているか。**画面はこれを見て入力を締めます。**
     ///
     /// **端末が立っていなくても、握りだけが先に在ることがあります** ——
     /// 人が許したが、まだ PTY を立てていない段（D42）。
     pub async fn console_holder(&self, on: &str) -> Option<Actor> {
-        self.console
-            .lock()
-            .await
-            .held
-            .get(on)
-            .map(|held| held.holder)
+        let slot = self.console.lock().await;
+        slot.the_one_on(on).ok().flatten().map(|open| open.holder)
     }
 
     /// **いまの宛先の端末を誰が握っているか。**
@@ -1014,20 +939,18 @@ impl Engine {
         self.console
             .lock()
             .await
-            .held
-            .get(on)
-            .is_some_and(|held| held.console.is_some())
+            .on(on)
+            .iter()
+            .any(|open| open.is_up())
     }
 
     /// **いまの宛先に端末が立っているか。**立っていればその接続の識別子。
-    ///
-    /// 接続ごとに 1 本なので（D60）、**宛先を移せば、その接続の端末を指します。**
     pub async fn console_connection(&self) -> Option<String> {
         let target = self.active().await.map(|open| open.id)?;
         self.console_is_open(&target).await.then_some(target)
     }
 
-    /// **許可は出ているが、まだ端末を立てていない接続**（別セッションの報告・2026-09-29）。
+    /// **許可は出ているが、まだ端末を立てていない接続**（Issue #29）。
     ///
     /// **なぜ要るか**: `console_holder` だけでは、AI は 2 つの状態を区別できません。
     ///
@@ -1037,24 +960,16 @@ impl Engine {
     /// ```
     ///
     /// どちらも「人が握っている」に見えたので、**人が何度許可を押しても
-    /// AI は気づけませんでした。**オーナーの言葉 ——
-    ///
-    /// > 「したって。わからないの？もうなんべんもしてるけど
-    /// > **きづけないなら MCP 改善を rc でつたえて**」
-    ///
-    /// `waitingForPassphrase` には専用の枠があるのに、端末の許可には無かった。
+    /// AI は気づけませんでした。**
     pub async fn console_may_open(&self, actor: Actor) -> Option<String> {
-        let slot = self.console.lock().await;
-        slot.held
-            .iter()
-            .find(|(_, held)| held.holder == actor && held.console.is_none())
-            .map(|(id, _)| id.clone())
+        self.console
+            .lock()
+            .await
+            .may_open(actor)
+            .map(|open| open.connection.clone())
     }
 
     /// **いま人に尋ねている接続**（D42 / D60）。答えが出たら `None`。
-    ///
-    /// `console_request` が「誰が頼んだか」で、こちらが「どこについて」です。
-    /// **どちらも要ります** —— 人は「どの接続を許したのか」を知らずに押せません。
     pub async fn console_asked_on(&self) -> Option<String> {
         self.console
             .lock()
@@ -1064,44 +979,39 @@ impl Engine {
             .map(|asked| asked.on.clone())
     }
 
-    /// **その端末だけの出力**（D60 / Issue #21）。
+    /// **その端末だけの出力**（D60 / Issue #21）。番号で指します。
     ///
     /// 立っていなければ `None`。**空文字と区別します** ——
     /// 空は「まだ何も出ていない」とも読めて、AI は打ち続けます。
     ///
     /// **接続ごとの出力（`stream_for`）とは別です。**同じ接続の中に、端末の出力と
     /// 用途別ツール（`run_readonly` / `read_log`）の出力が両方流れます。
-    /// 分けないと、AI は**「シェルが言ったこと」と「ツールが言ったこと」を
-    /// 区別できません**（#21 で指摘された形）。
-    pub async fn console_tail(&self, on: Option<&str>) -> Option<String> {
-        let target = self.console_where(on).await?;
-        let slot = self.console.lock().await;
-        slot.held
-            .get(&target)
-            .and_then(|held| held.stream.as_ref())
+    pub async fn console_tail_of(&self, id: u64) -> Option<String> {
+        self.console
+            .lock()
+            .await
+            .by_id(id)
+            .and_then(|open| open.stream.as_ref())
             .map(|stream| stream.plain_tail())
+    }
+
+    /// 同じものを、接続の名前で。**2 本あるなら断ります。**
+    pub async fn console_tail(&self, on: Option<&str>) -> Result<Option<String>, EngineError> {
+        let Some(target) = self.console_where(on).await else {
+            return Ok(None);
+        };
+        let Some(id) = self.only_console_on(&target).await? else {
+            return Ok(None);
+        };
+        Ok(self.console_tail_of(id).await)
     }
 
     /// 立っている端末を全部並べる（D60）。**AI もここを読みます。**
     ///
-    /// 並びは接続の識別子順。**人が開いた分も含めて全部**出します ——
+    /// **人が開いた分も含めて全部**出します ——
     /// 「人が開いた端末を AI が読める」が、この製品の差です（PRD §4-0）。
-    ///
-    /// **握りだけ在って端末が立っていないものは出しません。**出すと、
-    /// 「開いている」と読まれて `console_type` が断られます。
-    pub async fn console_list(&self) -> Vec<ConsoleHeld> {
-        let slot = self.console.lock().await;
-        let mut all: Vec<ConsoleHeld> = slot
-            .held
-            .iter()
-            .filter(|(_, held)| held.console.is_some())
-            .map(|(connection, held)| ConsoleHeld {
-                connection: connection.clone(),
-                holder: held.holder,
-            })
-            .collect();
-        all.sort_by(|a, b| a.connection.cmp(&b.connection));
-        all
+    pub async fn console_list(&self) -> Vec<ConsoleFacts> {
+        self.console.lock().await.facts()
     }
 
     /// 握っている側の変化を受け取る口。**画面が知らないまま AI が打っている、を作らない。**
@@ -1128,9 +1038,9 @@ impl Engine {
         // **人は押しても通らない問いを押させられます**（D42 は人を疲れさせない方針）。
         if actor != Actor::Human {
             let slot = self.console.lock().await;
-            if let Some(elsewhere) = slot.ai_holds() {
-                if elsewhere != target {
-                    let elsewhere = elsewhere.to_owned();
+            if let Some(elsewhere) = slot.up_held_by(actor) {
+                if elsewhere.connection != target {
+                    let elsewhere = elsewhere.connection.clone();
                     drop(slot);
                     self.diag.error(
                         Stage::Exec,
@@ -1146,14 +1056,14 @@ impl Engine {
         // **AI が握るには、人の許可が要る**（D42）。**サーバーへ行く前に**尋ねます。
         self.ask_first(actor, &target).await?;
 
+        let existing = self.only_console_on(&target).await?;
         {
             let slot = self.console.lock().await;
             // **この接続の端末を、別の側が握っているか。**
             //
             // ここは問うたあとで見ます。**人が握っているなら、人は問いを見たい** ——
             // 「AI が端末を使いたい」と出れば、渡すかどうかを人が決められます。
-            if let Some(held) = slot.held.get(&target) {
-                // 同じ側が開き直すのは、握り直しとして通す。
+            if let Some(held) = existing.and_then(|id| slot.by_id(id)) {
                 if held.holder != actor {
                     let holder = held.holder;
                     drop(slot);
@@ -1177,10 +1087,10 @@ impl Engine {
         // 実機ではこう出ました —— 人が `su -` して root になったあと AI へ渡すと、
         // **`Last login` が途中で出て、プロンプトが元の利用者に戻る。**
         // `su` も、カレントディレクトリも、環境変数も、実行中のジョブも消えます。
-        {
+        if let Some(id) = existing {
             let mut slot = self.console.lock().await;
-            if let Some(held) = slot.held.get_mut(&target) {
-                if held.console.is_some() {
+            if let Some(held) = slot.by_id_mut(id) {
+                if held.is_up() {
                     held.holder = actor;
                     drop(slot);
                     self.diag.info(
@@ -1194,10 +1104,22 @@ impl Engine {
             }
         }
 
-        // **開けなかったことを残す**（Issue #10）。
-        //
-        // 実機で端末が繋がらなかったとき、記録に残っていたのは接続の 4 行だけで、
-        // **端末の行は 1 本もありませんでした。追えない失敗は、直せない失敗**です。
+        // **方針の上限**（`PER_CONNECTION_LIMIT`）。構造ではありません。
+        if !self.console.lock().await.room_on(&target) {
+            self.diag.error(
+                Stage::Exec,
+                Some(&target),
+                format!(
+                    "この接続ではもう端末を開けません（上限 {} 本）",
+                    crate::console::PER_CONNECTION_LIMIT
+                ),
+                "開いている端末を止めてから開き直してください",
+            );
+            return Err(EngineError::ConsoleLimitReached {
+                limit: crate::console::PER_CONNECTION_LIMIT,
+            });
+        }
+
         let session = self.session_on(&target).await?;
         // **2 か所へ配ります**（D60 / Issue #21）——
         // この端末だけの出力と、画面が見ている接続ごとの出力。
@@ -1213,7 +1135,7 @@ impl Engine {
 
         let mut slot = self.console.lock().await;
         // 立てている間に別の側が入っていたら、立てたものは捨てて断る。
-        if let Some(held) = slot.held.get(&target) {
+        if let Some(held) = existing.and_then(|id| slot.by_id(id)) {
             if held.holder != actor {
                 let holder = held.holder;
                 drop(slot);
@@ -1221,16 +1143,13 @@ impl Engine {
                 return Err(held_by(holder));
             }
         }
-        let previous = slot.held.insert(
-            target.clone(),
-            OpenConsole {
-                console: Some(console),
-                holder: actor,
-                stream: Some(only_this),
-            },
-        );
+        let id = match existing {
+            Some(id) => id,
+            None => slot.add(&target, actor),
+        };
+        let previous = slot.attach(id, console, only_this);
         drop(slot);
-        if let Some(previous) = previous.and_then(|held| held.console) {
+        if let Some(previous) = previous {
             previous.close().await;
         }
 
@@ -1239,17 +1158,57 @@ impl Engine {
         self.diag.info(
             Stage::Exec,
             Some(&target),
-            format!("端末を開きました（{}・{cols}×{rows}）", who(actor)),
+            format!("端末を開きました（#{id}・{}・{cols}×{rows}）", who(actor)),
         );
         let _ = self.console_changed.send_replace(Some(actor));
         Ok(ConsoleOpened::Fresh)
     }
 
-    /// 打ち込む。**握っている側だけ**（D29）。
+    /// 打ち込む。**握っている側だけ**（D29）。番号で指します。
     ///
     /// **通った打鍵は記録しません。**1 キーずつ残すと記録が溢れ、
     /// **打った中身がそのまま残る**ことにもなります（パスワードを打つ人が居ます）。
     /// 残すのは**断った事実だけ**です — Issue #10 の「入力が届かない」を追う材料。
+    pub async fn console_type_into(
+        &self,
+        actor: Actor,
+        id: u64,
+        bytes: &[u8],
+    ) -> Result<(), EngineError> {
+        let slot = self.console.lock().await;
+        let Some(here) = slot.by_id(id) else {
+            drop(slot);
+            self.refuse_typing_because_nothing_is_open("");
+            return Err(EngineError::ConsoleNotOpen);
+        };
+        if here.holder != actor {
+            let holder = here.holder;
+            let on = here.connection.clone();
+            drop(slot);
+            self.diag.error(
+                Stage::Exec,
+                Some(&on),
+                format!(
+                    "打鍵を断りました（{}が打ち、{}が握っています）",
+                    who(actor),
+                    who(holder)
+                ),
+                "同時に触れるのは 1 人です。人は［取り返す］で取り返せます",
+            );
+            return Err(held_by(holder));
+        }
+        match here.console.as_ref() {
+            Some(console) => Ok(console.type_in(bytes).await?),
+            None => {
+                let on = here.connection.clone();
+                drop(slot);
+                self.refuse_typing_because_nothing_is_open(&on);
+                Err(EngineError::ConsoleNotOpen)
+            }
+        }
+    }
+
+    /// 同じものを、接続の名前で。**2 本あるなら断ります。**
     pub async fn console_type(
         &self,
         actor: Actor,
@@ -1262,38 +1221,11 @@ impl Engine {
             self.refuse_typing_because_nothing_is_open("");
             return Err(EngineError::ConsoleNotOpen);
         };
-        let slot = self.console.lock().await;
-        let here = slot.held.get(&target);
-        match here.map(|held| held.holder) {
-            // 握りだけ在って端末が立っていない場合も、ここへ落ちます。
-            None => {
-                drop(slot);
-                self.refuse_typing_because_nothing_is_open(&target);
-                Err(EngineError::ConsoleNotOpen)
-            }
-            Some(holder) if holder != actor => {
-                drop(slot);
-                self.diag.error(
-                    Stage::Exec,
-                    Some(&target),
-                    format!(
-                        "打鍵を断りました（{}が打ち、{}が握っています）",
-                        who(actor),
-                        who(holder)
-                    ),
-                    "同時に触れるのは 1 人です。人は［取り返す］で取り返せます",
-                );
-                Err(held_by(holder))
-            }
-            Some(_) => match here.and_then(|held| held.console.as_ref()) {
-                Some(console) => Ok(console.type_in(bytes).await?),
-                None => {
-                    drop(slot);
-                    self.refuse_typing_because_nothing_is_open(&target);
-                    Err(EngineError::ConsoleNotOpen)
-                }
-            },
-        }
+        let Some(id) = self.only_console_on(&target).await? else {
+            self.refuse_typing_because_nothing_is_open(&target);
+            return Err(EngineError::ConsoleNotOpen);
+        };
+        self.console_type_into(actor, id, bytes).await
     }
 
     fn refuse_typing_because_nothing_is_open(&self, on: &str) {
@@ -1319,11 +1251,14 @@ impl Engine {
             .console_where(on)
             .await
             .ok_or(EngineError::ConsoleNotOpen)?;
+        let id = self
+            .only_console_on(&target)
+            .await?
+            .ok_or(EngineError::ConsoleNotOpen)?;
         let slot = self.console.lock().await;
         let console = slot
-            .held
-            .get(&target)
-            .and_then(|held| held.console.as_ref())
+            .by_id(id)
+            .and_then(|open| open.console.as_ref())
             .ok_or(EngineError::ConsoleNotOpen)?;
         Ok(console.resize(cols, rows).await?)
     }
@@ -1339,8 +1274,12 @@ impl Engine {
             .ok_or(EngineError::ConsoleNotOpen)?;
         // **AI が握るには、人の許可が要る**（D42）。
         self.ask_first(actor, &target).await?;
+        let existing = self.only_console_on(&target).await?;
         let mut slot = self.console.lock().await;
-        match slot.held.get(&target).map(|held| held.holder) {
+        let previous = existing
+            .and_then(|id| slot.by_id(id))
+            .map(|open| open.holder);
+        match previous {
             Some(holder) if holder != actor && actor != Actor::Human => {
                 drop(slot);
                 self.diag.error(
@@ -1383,16 +1322,8 @@ impl Engine {
     }
 
     /// **どの接続について頼まれているか**（D60）。
-    ///
-    /// 画面はこれを問いに添えます。**どこの端末を許すのかが分からないまま
-    /// 押させてはいけません。**
     pub async fn console_request_on(&self) -> Option<String> {
-        self.console
-            .lock()
-            .await
-            .request
-            .as_ref()
-            .map(|asked| asked.on.clone())
+        self.console_asked_on().await
     }
 
     /// 頼みの変化を受け取る口。**押し出さないと、人は気づけません。**
@@ -1454,7 +1385,8 @@ impl Engine {
         }
         let mut slot = self.console.lock().await;
         // すでに握っているなら、頼み直させません（打鍵のたびに問いが出ます）。
-        if slot.held.get(on).map(|held| held.holder) == Some(actor) {
+        let mine = slot.on(on).iter().any(|open| open.holder == actor);
+        if mine {
             return Ok(());
         }
         // **催促を積み上げない。**何度呼ばれても、人に出る問いは 1 つ。
@@ -1482,52 +1414,64 @@ impl Engine {
         Err(EngineError::ConsoleApprovalNeeded)
     }
 
-    /// 止める（D29 の停止ボタン）。**握っている側と、人だけ。**
+    /// 止める（D29 の停止ボタン）。**握っている側と、人だけ。**番号で指します。
     ///
     /// 帯の受け取りを待ちません。切断と同じ扱いです — **止まらない停止は、
     /// 無い方がまし。**握りも外すので、次の側が開き直せます。
-    pub async fn console_stop(&self, actor: Actor, on: Option<&str>) -> Result<(), EngineError> {
-        let target = self
-            .console_where(on)
-            .await
-            .ok_or(EngineError::ConsoleNotOpen)?;
+    pub async fn console_stop_of(&self, actor: Actor, id: u64) -> Result<(), EngineError> {
         let mut slot = self.console.lock().await;
+        let Some(here) = slot.by_id(id) else {
+            // 無いものを止めた。**同じ状態へ向かうので失敗にしません。**
+            return Ok(());
+        };
+        let on = here.connection.clone();
         // **人は常に勝つ**（D29）。ここは 1 ミリも緩めない。
-        if actor != Actor::Human {
-            if let Some(holder) = slot.held.get(&target).map(|held| held.holder) {
-                if holder != actor {
-                    drop(slot);
-                    self.diag.error(
-                        Stage::Exec,
-                        Some(&target),
-                        format!(
-                            "端末を止めさせませんでした（{}が止めようとし、{}が握っています）",
-                            who(actor),
-                            who(holder)
-                        ),
-                        "止められるのは、握っている側と人だけです（D29）",
-                    );
-                    return Err(held_by(holder));
-                }
-            }
+        if actor != Actor::Human && here.holder != actor {
+            let holder = here.holder;
+            drop(slot);
+            self.diag.error(
+                Stage::Exec,
+                Some(&on),
+                format!(
+                    "端末を止めさせませんでした（{}が止めようとし、{}が握っています）",
+                    who(actor),
+                    who(holder)
+                ),
+                "止められるのは、握っている側と人だけです（D29）",
+            );
+            return Err(held_by(holder));
         }
         // **握りも一緒に外します。**外さないと、人が止めた直後に
         // AI が頼まず開き直せます（D29・人は常に勝つ）。
-        let gone = slot.held.remove(&target);
+        let gone = slot.remove(id);
         drop(slot);
 
-        if let Some(console) = gone.and_then(|held| held.console) {
+        if let Some(console) = gone.and_then(|open| open.console) {
             console.close().await;
             // **段階は `Exec`。**端末は「繋がったあとのコマンド」で、到達ではありません
             // （他の端末の記録と並べて読めるように揃えました・Issue #10）。
             self.diag.info(
                 Stage::Exec,
-                Some(&target),
-                format!("端末を止めました（{}）", who(actor)),
+                Some(&on),
+                format!("端末を止めました（#{id}・{}）", who(actor)),
             );
         }
         let _ = self.console_changed.send_replace(None);
         Ok(())
+    }
+
+    /// 同じものを、接続の名前で。**2 本あるなら断ります。**
+    pub async fn console_stop(&self, actor: Actor, on: Option<&str>) -> Result<(), EngineError> {
+        let target = self
+            .console_where(on)
+            .await
+            .ok_or(EngineError::ConsoleNotOpen)?;
+        let Some(id) = self.only_console_on(&target).await? else {
+            // 開いていないものを止めた。**失敗にしません**（同じ状態へ向かいます）。
+            let _ = self.console_changed.send_replace(None);
+            return Ok(());
+        };
+        self.console_stop_of(actor, id).await
     }
 
     // --- 読み取り -----------------------------------------------------------
