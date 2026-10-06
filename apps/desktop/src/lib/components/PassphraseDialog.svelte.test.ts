@@ -16,6 +16,7 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/svelte';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 
+import { CATALOGS } from '$lib/i18n/messages';
 import { i18n } from '$lib/i18n/i18n.svelte';
 
 import PassphraseDialog from './PassphraseDialog.svelte';
@@ -200,5 +201,67 @@ describe('預ける', () => {
 		await fireEvent.input(field, { target: { value: SECRET } });
 		await fireEvent.submit(field.closest('form') as HTMLFormElement);
 		expect(onSubmit).toHaveBeenCalledWith(SECRET, true);
+	});
+});
+
+/**
+ * **引退した文言。**ここに在るものを再び配らない。
+ *
+ * **言語を読まずに戻りを捕まえます。**「たびに聞く」をどう言うかは言語ごとに違い、
+ * 正規表現で言い当てようとすると**直した文まで引っかかります**（実際に引っかかりました）。
+ * **引退した実物を覚えておく**のがいちばん確かです。
+ */
+const RETIRED_NOTES = [
+	'Asked every time you connect. sshboard never stores it.',
+	'繋ぐたびに聞きます。sshboard は保存しません。',
+	'연결할 때마다 묻습니다. sshboard는 저장하지 않습니다.',
+	'每次连接时都会询问。sshboard 不会保存。',
+	'每次連線時都會詢問。sshboard 不會儲存。',
+	'Wird bei jeder Verbindung abgefragt. sshboard speichert sie nicht.',
+	'Demandée à chaque connexion. sshboard ne la conserve jamais.',
+	'Se pide en cada conexión. sshboard no la guarda.',
+	'Pedida em cada ligação. O sshboard não a guarda.',
+	'Спрашивается при каждом подключении. sshboard его не сохраняет.',
+	'Viene chiesta a ogni connessione. sshboard non la salva.'
+];
+
+describe('説明文とチェックの食い違い', () => {
+	test('shows the note next to the remember box', () => {
+		mount();
+		// **預ける口と説明文が、同じ箱に並んでいること。**
+		expect(screen.getByText(i18n.t('files.passphrase.note'))).toBeTruthy();
+		expect(screen.getByText(i18n.t('files.passphrase.remember'))).toBeTruthy();
+	});
+
+	test('no locale still says it is asked every time', () => {
+		// **実運用の報告**（2026-10-06・別セッション経由）。箱の中身はこうでした ——
+		//
+		// ```
+		// 繋ぐたびに聞きます。sshboard は保存しません。
+		// [鍵のパスフレーズ            ]
+		// ☐ このパスフレーズを OS の資格情報ストアに預ける
+		// ```
+		//
+		// > 保存しないと書いてあるのに、保存のチェックがある
+		// > どちらが本当か分からないので、押していいのか判断できない
+		//
+		// **0.1.16 でチェックを足したとき、説明文を直し忘れていました。**
+		// そのせいで**入っているのに気づかれず**、「つけられないですかね」という
+		// 要望が出たあとも 10 日押されていませんでした。
+		// **機能が在ることと、人が使えることは別**です。
+		const offenders = Object.keys(CATALOGS).filter((lang) =>
+			RETIRED_NOTES.includes(CATALOGS[lang]['files.passphrase.note'] ?? '')
+		);
+
+		expect(offenders, `引退した文言を配っている言語: ${offenders.join(', ')}`).toEqual([]);
+	});
+
+	test('every locale has the note and the remember label', () => {
+		// **片方だけ訳が在る状態を作らない**（英語に落ちて、箱の中で言語が混ざります）。
+		const missing = Object.keys(CATALOGS).filter(
+			(lang) =>
+				!CATALOGS[lang]['files.passphrase.note'] || !CATALOGS[lang]['files.passphrase.remember']
+		);
+		expect(missing).toEqual([]);
 	});
 });
