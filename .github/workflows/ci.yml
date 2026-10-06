@@ -105,6 +105,15 @@ jobs:
           python3 tools/check-css-contrast.py --self
           python3 tools/check-css-contrast.py
 
+      # **束ねるものが git に在るか**（baseline §23・2026-10-06）。
+      #
+      # 他製品の報告 ——「まっさらな clone で `tauri dev` を走らせると、
+      # `bundle.resources` に載せたファイルが無いと言って止まる」。
+      # **先に build を走らせた手元では出ません。**
+      # 参照だけ足して、**ビルドもテストも通ったまま実行時にだけ壊れる**形です。
+      - name: 束ねるものが git に在るか
+        run: python3 tools/check-bundle-assets.py
+
       - name: 型検査
         run: pnpm --filter desktop check
 

@@ -64,16 +64,17 @@ jobs:
       - name: 依存を入れる
         run: pnpm install --frozen-lockfile
 
-      # **ARM の Windows で、ARM 用の部品が入らないことがある**
-      # （`@rollup/rollup-win32-arm64-msvc` / `@tauri-apps/cli-win32-arm64-msvc`）。
-      # lockfile には入っているのに、入り直さないと解決しない形です。
+      # **ここに `pnpm install --force` を置いていました**（2026-10-06 の午前）。
       #
-      # **git-qa が踏んだ穴の 1 つ**（2026-10-06 に報告を受けました）。
-      # **こちらではまだ踏んでいません** —— 先に置いておきます。
-      # 要らなければ空振りするだけで、**要るときに 10 分ビルドの末に落ちる**より良い。
-      - name: ARM 用の部品を入れ直す（git-qa の報告・未確認）
-        if: matrix.os == 'windows-11-arm'
-        run: pnpm install --force
+      # 「ARM の Windows で ARM 用の部品が入らない」という報告を受けて入れましたが、
+      # **報告者が ARM の実機で確かめて取り消しました**（同日午後）——
+      # `@rollup/rollup-win32-arm64-msvc` も `@tauri-apps/cli-win32-arm64-msvc` も
+      # **最初から正しく入ります。**pnpm は optional の依存をトップの
+      # `node_modules` に出さず、`node_modules/.pnpm/…` と依存元の下に置くだけで、
+      # **トップを見て「無い」と読んだのが誤り**でした。
+      #
+      # **要らない段は置きません。**毎回 1 回余計に install が走るのは、
+      # 「念のため」で説明できる重さではありません。
 
       # **タグとアプリの番号が合っているか、いちばん先に見る**（D34 追記）。
       #

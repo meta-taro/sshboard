@@ -38,7 +38,8 @@ if command -v python3 >/dev/null 2>&1; then
   # `UnicodeEncodeError` で死にます。**こちらは macOS でしか試していませんでした。
   #
   # **ここで同じ条件を作ります。**出力は捨てて、死ぬかどうかだけ見ます。
-  for _t in tools/check-css-tokens.py tools/check-css-contrast.py tools/make-site-tools.py; do
+  for _t in tools/check-css-tokens.py tools/check-css-contrast.py tools/make-site-tools.py \
+            tools/check-bundle-assets.py; do
     # **検査の言い分を捨てない**（§8）。捨てていたので、
     # 「道具の分類漏れ」を**「Windows の文字コードで死にます」と言っていました** ——
     # 嘘の理由は、理由が無いより悪い（2026-10-02 に実際に迷いました）。
