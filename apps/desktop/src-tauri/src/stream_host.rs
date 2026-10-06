@@ -18,7 +18,7 @@ use tauri::{AppHandle, Emitter};
 /// 画面が待ち受けるイベント名。**ANSI を落とさずに渡す。**
 pub const STREAM_EVENT: &str = "stream://raw";
 
-/// 出力の塊 1 つ。**どの接続のものかを添えます**（D60）。
+/// 出力の塊 1 つ。**どこのものかを添えます**（D60）。
 #[derive(Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct StreamChunk {
@@ -26,12 +26,18 @@ pub struct StreamChunk {
     ///
     /// `None` は**まだ 1 本も繋いでいない間**の出力です。
     pub connection: Option<String>,
+    /// **どの端末のものか**（2026-10-06・分割）。
+    ///
+    /// `None` は**端末ではないもの** —— 用途別ツールの出力や `tail -f` です。
+    /// 画面は、これが入っていればその面へだけ書きます ——
+    /// **同じサーバに 2 枚開いた日に、両方へ同じものを映さないため。**
+    pub console: Option<u64>,
     pub chunk: Vec<u8>,
 }
 
 /// 繋ぐ前の出力を画面へ流す。**繋ぐ前にも出るものがあります。**
 pub fn spawn_bridge(app: AppHandle, stream: Arc<OutputStream>) {
-    pump(app, None, stream);
+    pump(app, None, None, stream);
 }
 
 /// **開いている接続ぜんぶの出力**を画面へ流し続ける（D60）。
@@ -55,7 +61,7 @@ pub fn spawn_connection_bridges(app: AppHandle, engine: Arc<Engine>) {
                     continue;
                 }
                 let stream = engine.stream_for(&id).await;
-                pump(app.clone(), Some(id.clone()), stream);
+                pump(app.clone(), Some(id.clone()), None, stream);
                 wired.insert(id, ());
             }
             // **切れた接続は忘れる。**繋ぎ直したら、また繋げるようにします
@@ -74,7 +80,46 @@ pub fn spawn_connection_bridges(app: AppHandle, engine: Arc<Engine>) {
     });
 }
 
-fn pump(app: AppHandle, connection: Option<String>, stream: Arc<OutputStream>) {
+/// **端末ごとの出力**を画面へ流し続ける（2026-10-06・分割）。
+///
+/// 接続ごとの口とは別です。**同じサーバに 2 枚開くと、
+/// 接続ごとの口には両方の出力が混ざって流れます** ——
+/// 左右の面を見比べる人には、それでは使えません。
+pub fn spawn_console_bridges(app: AppHandle, engine: Arc<Engine>) {
+    tauri::async_runtime::spawn(async move {
+        let mut watching = engine.subscribe_consoles();
+        // **同じ端末へ 2 本繋がない。**繋ぐと 1 文字が 2 回出ます。
+        // 番号は使い回されないので、**消えたものを忘れる必要はありません** ——
+        // 忘れないほうが安全です（閉じた番号が再び来ることはない）。
+        let mut wired: HashMap<u64, ()> = HashMap::new();
+        loop {
+            let open: Vec<(u64, String)> = watching
+                .borrow_and_update()
+                .iter()
+                .map(|facts| (facts.id, facts.connection.clone()))
+                .collect();
+            for (id, connection) in open {
+                if wired.contains_key(&id) {
+                    continue;
+                }
+                if let Some(stream) = engine.console_stream(id).await {
+                    pump(app.clone(), Some(connection), Some(id), stream);
+                    wired.insert(id, ());
+                }
+            }
+            if watching.changed().await.is_err() {
+                break;
+            }
+        }
+    });
+}
+
+fn pump(
+    app: AppHandle,
+    connection: Option<String>,
+    console: Option<u64>,
+    stream: Arc<OutputStream>,
+) {
     let mut raw = stream.subscribe_raw();
     tauri::async_runtime::spawn(async move {
         loop {
@@ -82,6 +127,7 @@ fn pump(app: AppHandle, connection: Option<String>, stream: Arc<OutputStream>) {
                 Ok(chunk) => {
                     let payload = StreamChunk {
                         connection: connection.clone(),
+                        console,
                         chunk,
                     };
                     if let Err(error) = app.emit(STREAM_EVENT, payload) {

@@ -107,6 +107,10 @@ pub fn run() {
             session_cmd::console_take,
             session_cmd::console_stop,
             session_cmd::console_holder,
+            session_cmd::console_list,
+            session_cmd::console_open_another,
+            session_cmd::console_type_into,
+            session_cmd::console_stop_of,
             session_cmd::console_request,
             session_cmd::operation_request,
             session_cmd::operation_answer,
@@ -185,6 +189,9 @@ pub fn run() {
             // **接続ごとの出力を画面へ**（D60）。繋ぎ忘れると、
             // その接続の端末だけが無言になります（Issue #10 の形）。
             stream_host::spawn_connection_bridges(app.handle().clone(), Arc::clone(&engine));
+            // **端末ごとの出力を画面へ**（分割）。繋ぎ忘れると、
+            // 2 枚目の面だけが無言になります（Issue #10 の形）。
+            stream_host::spawn_console_bridges(app.handle().clone(), Arc::clone(&engine));
             // **AI が握った瞬間に、人の側の入力が締まる**必要がある（D29）。
             session_cmd::spawn_console_bridge(app.handle().clone(), Arc::clone(&engine));
             // **AI からの頼みを画面へ**（D42）。出せない問いは無いのと同じ。

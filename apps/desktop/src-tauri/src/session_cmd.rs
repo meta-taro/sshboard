@@ -859,6 +859,79 @@ pub async fn console_stop(engine: State<'_, Arc<Engine>>) -> Result<(), String> 
     Ok(())
 }
 
+/// 端末 1 枚の見え方（分割・2026-10-06）。
+///
+/// **番号を画面へ出します。**人が口で「②を見て」と言えて、
+/// AI も同じ番号で指せる（PRD §4-0 の「同じ視点」）。
+#[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct ConsolePane {
+    pub id: u64,
+    /// どの接続か。**識別子だけ**（ホスト名は入りません）。
+    pub connection: String,
+    /// `"human"` / `"ai"`。
+    pub holder: String,
+}
+
+/// 開いている端末ぜんぶ。**画面はこれを見て、何枚描くかを決めます。**
+#[tauri::command]
+pub async fn console_list(engine: State<'_, Arc<Engine>>) -> Result<Vec<ConsolePane>, String> {
+    Ok(engine
+        .console_list()
+        .await
+        .into_iter()
+        .map(|facts| ConsolePane {
+            id: facts.id,
+            connection: facts.connection,
+            holder: holder_name(Some(facts.holder))
+                .unwrap_or("human")
+                .to_string(),
+        })
+        .collect())
+}
+
+/// **もう 1 枚、新しく開く**（分割）。返るのは新しい番号。
+///
+/// `console_open` は「在るなら握り直す」です（Issue #21）。
+/// **こちらは毎回新しいシェル**で、同じサーバに 2 枚入るための口です。
+#[tauri::command]
+pub async fn console_open_another(
+    connection_id: String,
+    cols: u32,
+    rows: u32,
+    engine: State<'_, Arc<Engine>>,
+) -> Result<u64, String> {
+    engine
+        .console_open_new(Actor::Human, &connection_id, cols.max(20), rows.max(5))
+        .await
+        .map_err(|error| error.to_string())
+}
+
+/// 番号で打ち込む（分割）。**どの面へ打ったかが曖昧にならない。**
+#[tauri::command]
+pub async fn console_type_into(
+    console_id: u64,
+    bytes: Vec<u8>,
+    engine: State<'_, Arc<Engine>>,
+) -> Result<(), String> {
+    engine
+        .console_type_into(Actor::Human, console_id, &bytes)
+        .await
+        .map_err(|error| error.to_string())
+}
+
+/// 番号で止める（分割）。**人は常に勝ちます**（D29）。
+#[tauri::command]
+pub async fn console_stop_of(
+    console_id: u64,
+    engine: State<'_, Arc<Engine>>,
+) -> Result<(), String> {
+    engine
+        .console_stop_of(Actor::Human, console_id)
+        .await
+        .map_err(|error| error.to_string())
+}
+
 /// 端末の今。**握っている側と、どの接続のものか**を一緒に返します。
 ///
 /// 別々に返すと、画面で組み合わせるときに食い違います（D25 で実際に食い違った）。
