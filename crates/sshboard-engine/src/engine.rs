@@ -38,6 +38,19 @@ struct Live {
     elevation: Elevation,
 }
 
+/// **画面にいま見えている端末**（PRD §4-0 の「同じ視点」・2026-10-07）。
+///
+/// 人は 2 枚を目で見比べて作業します。**AI がそれを知らないと、
+/// 「人が見ていない面で打つ」が起こり得ます**（D29 の前提が崩れます）。
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct OnScreen {
+    /// 並んで見えている端末の番号。**空のこともあります** ——
+    /// 人が別のタブ（ファイル・接続・記録）を見ているとき。
+    pub shown: Vec<u64>,
+    /// **打鍵が行く面。**見えていても、打つ先は 1 つです。
+    pub typing_into: Option<u64>,
+}
+
 /// 端末を開いたときに、**新しく立てたのか、受け取ったのか**（Issue #21）。
 ///
 /// **黙って別のシェルになるのが一番危ない**ので、呼んだ側へ返します。
@@ -177,6 +190,16 @@ pub struct Engine {
     console: Mutex<Consoles>,
     /// 誰が握っているかを配る。**画面が知らないまま AI が打っている、を作らない。**
     console_changed: watch::Sender<Option<Actor>>,
+    /// **画面にいま何が見えているか**（PRD §4-0 の「同じ視点」・2026-10-07）。
+    ///
+    /// **画面が言うまでは `None`。**「分からない」と「見えていない」を分けます ——
+    /// 混ぜると、**画面の無い所（ヘッドレスの MCP）で「人は見ていません」と
+    /// 言い切る**ことになり、それは嘘です。
+    ///
+    /// これが無かった間、`list_consoles` の `personIsLookingAtIt` は
+    /// **「宛先の接続かどうか」**で答えていました。同じサーバに 2 枚開くと
+    /// **両方 true** になり、タブに隠れた 3 枚目も true でした。
+    screen: Mutex<Option<OnScreen>>,
     /// **開いている端末ぜんぶの変化**を配る（D60 の分割）。
     ///
     /// 握っている側だけでは、**画面は「何枚描けばよいか」が分かりません。**
@@ -243,6 +266,7 @@ impl Engine {
             held: Mutex::new(Held::default()),
             console: Mutex::new(Consoles::default()),
             console_changed,
+            screen: Mutex::new(None),
             consoles_changed,
             console_request_changed,
             passphrase_request,
@@ -688,6 +712,7 @@ impl Engine {
             id: entry.id.clone(),
             name: entry.name.clone(),
             tag: entry.tag.clone(),
+            color: entry.color.clone(),
             fingerprint: session.host_key().fingerprint.clone(),
             host_key_algorithm: session.host_key().algorithm.clone(),
             write: WriteAccess {
@@ -1026,6 +1051,19 @@ impl Engine {
     /// 握っている側の変化を受け取る口。**画面が知らないまま AI が打っている、を作らない。**
     pub fn subscribe_console(&self) -> watch::Receiver<Option<Actor>> {
         self.console_changed.subscribe()
+    }
+
+    /// **画面が「いま何が見えているか」を言う**（PRD §4-0）。
+    ///
+    /// 言わないと、AI は**宛先の接続から推測するしかありません。**
+    /// 推測は、同じサーバに 2 枚開いた日に必ず外れます。
+    pub async fn report_on_screen(&self, shown: Vec<u64>, typing_into: Option<u64>) {
+        *self.screen.lock().await = Some(OnScreen { shown, typing_into });
+    }
+
+    /// 画面が言ったこと。**まだ言っていなければ `None`。**
+    pub async fn on_screen(&self) -> Option<OnScreen> {
+        self.screen.lock().await.clone()
     }
 
     /// **開いている端末ぜんぶ**の変化を受け取る口（D60 の分割）。

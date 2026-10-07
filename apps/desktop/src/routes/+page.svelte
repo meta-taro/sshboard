@@ -545,6 +545,23 @@
 	});
 
 	/**
+	 * **いま何が見えているかを、実行体へ言う**（PRD §4-0・2026-10-07）。
+	 *
+	 * 言わないと、AI は**宛先の接続から推測するしかありません。**
+	 * 推測は、同じサーバに 2 枚開いた日に必ず外れます。
+	 *
+	 * **端末の面を離れたら空を言います。**人がファイルの面を見ているなら、
+	 * 端末は 1 枚も見えていません。**それを AI が知れることが「同じ視点」です。**
+	 */
+	$effect(() => {
+		const shown = view === 'console' ? layout.panes.map((pane) => pane.id) : [];
+		const typingInto = view === 'console' ? layout.focused : null;
+		invoke('console_on_screen', { shown, typingInto }).catch(() => {
+			/* 言えないだけ。**画面は止めません。** */
+		});
+	});
+
+	/**
 	 * **宛先が変わったら、面を描き直す**（D60・2026-10-02）。
 	 *
 	 * 描き直さないと、**前の接続の出力の下に次の接続の出力が続いて**出ます。
@@ -1658,6 +1675,7 @@
 							{clipboard}
 							{platform}
 							backlog={replayFor(backlogs, consoleKey(pane.id))}
+							mark={session.all.find((held) => held.id === pane.connection)?.color ?? null}
 							fontPx={textSize.terminalPx}
 							active={layout.focused === pane.id}
 							iHold={pane.holder === 'human'}

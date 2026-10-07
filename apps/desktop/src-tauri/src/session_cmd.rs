@@ -922,6 +922,24 @@ pub async fn console_list(engine: State<'_, Arc<Engine>>) -> Result<Vec<ConsoleP
         .collect())
 }
 
+/// **画面にいま何が見えているかを言う**（PRD §4-0 の「同じ視点」・2026-10-07）。
+///
+/// 言わないと、AI は**宛先の接続から推測するしかありません。**
+/// 推測は、同じサーバに 2 枚開いた日に必ず外れます ——
+/// **両方「人が見ている」になり、タブに隠れた 3 枚目まで true** になります。
+///
+/// **端末の面を離れたら空を言います。**人がファイルの面を見ているなら、
+/// 端末は 1 枚も見えていません。それを AI が知れることが「同じ視点」です。
+#[tauri::command]
+pub async fn console_on_screen(
+    shown: Vec<u64>,
+    typing_into: Option<u64>,
+    engine: State<'_, Arc<Engine>>,
+) -> Result<(), String> {
+    engine.report_on_screen(shown, typing_into).await;
+    Ok(())
+}
+
 /// **もう 1 枚、新しく開く**（分割）。返るのは新しい番号。
 ///
 /// `console_open` は「在るなら握り直す」です（Issue #21）。

@@ -12,6 +12,13 @@ export type Opened = {
 	id: string;
 	name: string;
 	tag?: string | null;
+	/**
+	 * **人が付けた印の色**（`red` などの名前）。
+	 *
+	 * **端末の面にも回します**（DESIGN.md「端末の割り方」）——
+	 * 端末のための色をもう 1 つ作らないため。
+	 */
+	color?: string | null;
 	fingerprint: string;
 	hostKeyAlgorithm: string;
 	write: {

@@ -625,3 +625,89 @@ async fn a_console_can_be_named_by_its_number() {
 
     harness.endpoint.shutdown();
 }
+
+#[tokio::test]
+async fn what_the_person_can_see_is_what_the_agent_is_told() {
+    // **PRD §4-0 の「同じ視点」**。オーナーの言葉 ——
+    //
+    // > 私の思想は、私のこの視覚と、あなたと同化することです。
+    // > **同じ視点で物事を見ることです。**
+    //
+    // これが無かった間、`personIsLookingAtIt` は**「宛先の接続かどうか」**で
+    // 答えていました。同じサーバに 2 枚開くと**両方 true** になり、
+    // タブに隠れた 3 枚目も true でした。**AI へ嘘が届いていました。**
+    if !server_is_up().await {
+        println!("テスト用サーバーが建っていません（想定内・飛ばします）");
+        return;
+    }
+
+    let band = Band::new();
+    let _screen = fake_screen(&band);
+    let harness = harness(band, &[]).await;
+    harness
+        .call("connect", serde_json::json!({ "connection_id": "local" }))
+        .await;
+
+    let first = harness
+        .engine
+        .console_open_new(Actor::Human, "local", 80, 24)
+        .await
+        .expect("1 枚目が開けない");
+    let second = harness
+        .engine
+        .console_open_new(Actor::Human, "local", 80, 24)
+        .await
+        .expect("2 枚目が開けない");
+
+    // **画面が何も言っていない段。**「見えていない」ではなく「分からない」。
+    let unknown = harness.call("list_consoles", serde_json::json!({})).await;
+    assert!(
+        unknown.contains(r#"\"personIsLookingAtIt\":null"#),
+        "**画面が言っていないのに、見えている／いないを言い切った**: {unknown}"
+    );
+    assert!(
+        unknown.contains(r#"\"onScreen\":null"#),
+        "分からないことを null で言えていない: {unknown}"
+    );
+
+    // **画面が「1 枚目だけ見えていて、そこへ打っている」と言う。**
+    harness
+        .engine
+        .report_on_screen(vec![first], Some(first))
+        .await;
+
+    let said = harness.call("list_consoles", serde_json::json!({})).await;
+    assert!(
+        said.contains(&format!(r#"\"onScreen\":[{first}]"#)),
+        "画面が言ったことが届いていない: {said}"
+    );
+    assert!(
+        said.contains(&format!(r#"\"personIsTypingInto\":{first}"#)),
+        "どこへ打っているかが届いていない: {said}"
+    );
+
+    // **2 枚目は「見えていない」と言えること。**ここが嘘だったところです。
+    let rows: Vec<&str> = said.split("\\\"id\\\":").collect();
+    let about_second = rows
+        .iter()
+        .find(|row| row.starts_with(&second.to_string()))
+        .unwrap_or_else(|| panic!("2 枚目の行が無い: {said}"));
+    assert!(
+        about_second.contains(r#"\"personIsLookingAtIt\":false"#),
+        "**見えていない面を「人が見ている」と言っている**: {about_second}"
+    );
+
+    // **端末の面を離れたら、1 枚も見えていない。**
+    harness.engine.report_on_screen(vec![], None).await;
+    let away = harness.call("list_consoles", serde_json::json!({})).await;
+    assert!(
+        away.contains(r#"\"onScreen\":[]"#),
+        "人が別の面を見ていることを言えていない: {away}"
+    );
+    assert!(
+        !away.contains(r#"\"personIsLookingAtIt\":true"#),
+        "**誰も見ていないのに、見られていると言っている**: {away}"
+    );
+
+    harness.endpoint.shutdown();
+}

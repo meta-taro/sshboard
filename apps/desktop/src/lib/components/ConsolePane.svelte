@@ -31,6 +31,13 @@
 		/** 作った端に書き戻すもの（**見ていない間の分**・Issue #14 / #11）。 */
 		backlog = [],
 		fontPx = 12,
+		/**
+		 * **接続の印の色**（`red` などの名前。無ければ色を出しません）。
+		 *
+		 * **端末のための色をもう 1 つ作りません**（DESIGN.md）——
+		 * 接続の一覧とファイルの面と同じ札です。
+		 */
+		mark = null,
 		/** いま打鍵が行く面か。**人が見ている面を 1 つに決めるため。** */
 		active = false,
 		/** 人が握っているか。**握っていなければ打たない**（往復させずに止める）。 */
@@ -53,6 +60,7 @@
 		pane: ConsolePane;
 		backlog?: number[];
 		fontPx?: number;
+		mark?: string | null;
 		active?: boolean;
 		iHold?: boolean;
 		clipboard: ClipboardPorts;
@@ -137,8 +145,15 @@
 	番号は実行体が振るもの。**人が口で「②を見て」と言えて、AI も同じ番号で指せます**
 	（PRD §4-0 の「同じ視点」）。
 -->
-<section class="pane" class:active data-console={pane.id}>
+<section
+	class="pane"
+	class:active
+	data-console={pane.id}
+	style:--mark={mark ? `var(--mark-${mark})` : 'transparent'}
+>
 	<header>
+		<!-- **色は帯で出します。**字の色にすると、読みにくい組み合わせが出ます（D57）。 -->
+		<span class="mark-bar" aria-hidden="true"></span>
 		<span class="num">#{pane.id}</span>
 		<span class="on" data-secret>{pane.connection}</span>
 		<span class="holder" class:ai={pane.holder === 'ai'}>
@@ -182,6 +197,15 @@
 		padding: 0.2rem 0.45rem;
 		border-bottom: 1px solid var(--hairline);
 		font-size: 0.72rem;
+	}
+
+	/* **印の色。**無ければ透明で、場所だけ残します（並びが動かないように）。 */
+	.mark-bar {
+		flex: 0 0 auto;
+		width: 3px;
+		align-self: stretch;
+		border-radius: 999px;
+		background: var(--mark, transparent);
 	}
 
 	.num {

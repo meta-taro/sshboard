@@ -1167,8 +1167,11 @@ impl SshboardMcp {
                        the person's screen is pointed at, and its number. Read any of them with \
                        read_console, and pass that number when a connection has more than one \
                        console. **Numbers are never reused**, so a number you remember never \
-                       starts pointing at a different shell. Touches no remote server and shows \
-                       nothing on their screen."
+                       starts pointing at a different shell. \
+                       `personIsLookingAtIt` and `personIsTypingIntoIt` are what the screen \
+                       reported: **null means the screen has not said**, which is not the same \
+                       as the person not looking. Touches no remote server and shows nothing on \
+                       their screen."
     )]
     pub async fn list_consoles(&self) -> Result<String, ErrorData> {
         self.show("list_consoles").await?;
@@ -1176,6 +1179,14 @@ impl SshboardMcp {
         let engine = self.engine()?;
         let open = engine.console_list().await;
         let focused = engine.active().await.map(|open| open.id);
+        // **画面が言ったことだけを答えます**（PRD §4-0・2026-10-07）。
+        //
+        // 言っていなければ `null` —— 「分からない」と「見えていない」を混ぜません。
+        // **混ぜると、画面の無い所で「人は見ていません」と言い切る**ことになります。
+        //
+        // これが無かった間は「宛先の接続かどうか」で答えており、
+        // **同じサーバに 2 枚開くと両方 true**、タブに隠れた 3 枚目も true でした。
+        let on_screen = engine.on_screen().await;
         let mine = open
             .iter()
             .find(|held| held.holder == Actor::Ai)
@@ -1197,9 +1208,16 @@ impl SshboardMcp {
                         Actor::Human => "human",
                         Actor::Ai => "ai",
                     },
-                    // **人の画面がどれを向いているか。**人が見ていない面へ打つと、
+                    // **人の画面にこの面が見えているか。**見えていない面へ打つと、
                     // 「人が見ている前で動く」という前提が崩れます（D29）。
-                    "personIsLookingAtIt": Some(&held.connection) == focused.as_ref(),
+                    // **`null` は「画面がまだ言っていない」**（見えていない、ではありません）。
+                    "personIsLookingAtIt": on_screen
+                        .as_ref()
+                        .map(|screen| screen.shown.contains(&held.id)),
+                    // **人が打っている面か。**見えていても、打つ先は 1 つです。
+                    "personIsTypingIntoIt": on_screen
+                        .as_ref()
+                        .map(|screen| screen.typing_into == Some(held.id)),
                 })
             })
             .collect();
@@ -1209,7 +1227,11 @@ impl SshboardMcp {
             // **あなたが握っているのは 1 本だけ**（D60）。
             "youHold": mine,
             "youHoldConsole": mine_id,
+            // **人の画面が向いている接続**（端末の面に限らない話）。
             "personIsLookingAt": focused,
+            // **いま画面に並んでいる端末の番号。**`null` は画面がまだ言っていない。
+            "onScreen": on_screen.as_ref().map(|screen| screen.shown.clone()),
+            "personIsTypingInto": on_screen.as_ref().and_then(|screen| screen.typing_into),
         }))
         .map_err(|error| ErrorData::internal_error(error.to_string(), None))
     }

@@ -108,6 +108,7 @@ pub fn run() {
             session_cmd::console_stop,
             session_cmd::console_holder,
             session_cmd::console_list,
+            session_cmd::console_on_screen,
             session_cmd::console_open_another,
             session_cmd::console_type_into,
             session_cmd::console_stop_of,

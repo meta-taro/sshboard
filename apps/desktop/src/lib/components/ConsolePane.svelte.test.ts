@@ -159,6 +159,28 @@ describe('端末 1 枚の面', () => {
 		expect(made[0].options.fontSize).toBe(18);
 	});
 
+	test('shows the colour the person gave the connection', () => {
+		// **端末のための色をもう 1 つ作らない**（DESIGN.md）——
+		// 接続の一覧とファイルの面と**同じ札**を使います。
+		// 色が別物だと、人は「どれが本番か」を 2 回覚えることになります。
+		const { container } = mount({ mark: 'red' });
+		const pane = container.querySelector('.pane') as HTMLElement;
+
+		expect(pane.style.getPropertyValue('--mark')).toBe('var(--mark-red)');
+		expect(container.querySelector('.mark-bar')).toBeTruthy();
+	});
+
+	test('leaves the colour slot empty rather than guessing one', () => {
+		// **印を付けていない接続に色を作りません。**
+		// 勝手に振ると、人が付けた色と意味が混ざります。
+		// **場所は残します** —— 無くすと、色のある面と並びがずれます。
+		const { container } = mount({ mark: null });
+		const pane = container.querySelector('.pane') as HTMLElement;
+
+		expect(pane.style.getPropertyValue('--mark')).toBe('transparent');
+		expect(container.querySelector('.mark-bar')).toBeTruthy();
+	});
+
 	test('marks the pane the keystrokes go to', () => {
 		const { container } = mount({ active: true });
 		expect(container.querySelector('.pane.active')).toBeTruthy();
