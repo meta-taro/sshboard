@@ -432,7 +432,7 @@ impl Engine {
     ///
     /// **中身は返しません** —— 指紋も、走る中身も、`pending_status` が持っています。
     /// ここは「**何が待っているか**」だけを数えるためのものです。
-    async fn standing_questions(&self) -> Vec<String> {
+    pub async fn standing_questions(&self) -> Vec<String> {
         let mut waiting = Vec::new();
         if self.console_request_changed.borrow().is_some() {
             waiting.push("console".to_owned());

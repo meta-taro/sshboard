@@ -12,7 +12,13 @@ use base64::engine::general_purpose::STANDARD as BASE64;
 use base64::Engine as _;
 use rmcp::handler::server::router::tool::ToolRouter;
 use rmcp::handler::server::wrapper::Parameters;
-use rmcp::model::{CallToolResult, ContentBlock, ServerCapabilities, ServerInfo};
+use rmcp::model::{
+    CallToolResult, ContentBlock, ListResourcesResult, PaginatedRequestParams,
+    ReadResourceRequestParams, ReadResourceResponse, ReadResourceResult, Resource,
+    ResourceContents, ResourceUpdatedNotificationParam, ServerCapabilities, ServerInfo,
+    SubscribeRequestParams,
+};
+use rmcp::service::{NotificationContext, RequestContext, RoleServer};
 use rmcp::{tool, tool_handler, tool_router, ErrorData, ServerHandler};
 use serde::Deserialize;
 use sshboard_band::{Actor, Band, DeliveryOutcome};
@@ -44,6 +50,14 @@ in each version.";
 /// 撮った画像の長辺の既定値。**dbboard と揃える**（同じ操作感にする）。
 const DEFAULT_MAX_EDGE: u32 = 1400;
 
+/// **待ちの状態を置く場所**（Issue #29）。
+///
+/// AI は `read_resource` でここを読み、購読すれば
+/// **人が答えた瞬間に `notifications/resources/updated` が届きます。**
+/// 中身は `pending_status` と同じものです ——
+/// **2 つ作ると、片方だけ直る日が来ます**（D39）。
+pub const PENDING_URI: &str = "sshboard://pending";
+
 /// 帯が受け取りを返すまで待つ上限。
 /// 画面が固まっていることを、ここで初めて検出する。
 pub const DEFAULT_ACK_TIMEOUT: Duration = Duration::from_secs(2);
@@ -70,6 +84,11 @@ pub struct SshboardMcp {
     /// ヘッドレスのテストは、これが無いまま走る。
     view: Option<Arc<dyn crate::view::ShowView>>,
     ack_timeout: Duration,
+    /// **購読されている資源**（Issue #29）。
+    ///
+    /// 購読されていないものを push すると、**要らないクライアントの口を埋めます。**
+    /// MCP もそう決めています。
+    subscribed: Arc<tokio::sync::Mutex<std::collections::HashSet<String>>>,
     tool_router: ToolRouter<Self>,
 }
 
@@ -88,6 +107,7 @@ impl SshboardMcp {
             capture: None,
             view: None,
             ack_timeout,
+            subscribed: Arc::new(tokio::sync::Mutex::new(std::collections::HashSet::new())),
             // 帯・出力・接続一覧の口と、サーバーへ触る口。**同じ 1 つのサーバーに載る。**
             tool_router: Self::tool_router()
                 + Self::ssh_tool_router()
@@ -625,6 +645,114 @@ fn default_ssh_port() -> u16 {
 
 #[tool_handler(router = self.tool_router)]
 impl ServerHandler for SshboardMcp {
+    /// **人が答えたことを、こちらから知らせる**（Issue #29 の提案 1）。
+    ///
+    /// それまでは AI が `pending_status` を叩くしかなく、
+    /// **ターンが終わったあとに押されると、知る手段がありません。**
+    /// 毎回このやり取りになっていました ——
+    ///
+    /// ```text
+    /// AI : console_open → 「人に尋ねています」
+    /// 人 : 画面で答える
+    /// AI : （気づかない。止まったまま）
+    /// 人 : 「押したけど？」「気づけないの？」
+    /// ```
+    ///
+    /// **`notifications/message` で押し出します。**MCP には
+    /// 「待ちが解けた」専用の通知が無いので、記録の通知に乗せます。
+    /// **拾うかはクライアント次第**ですが、Issue にこう書いてあります ——
+    ///
+    /// > クライアントが拾うかは別問題ですが、**送る側が持っていなければ始まりません。**
+    ///
+    /// **溜めません。**変わった瞬間に 1 通だけ。
+    /// 同じ状態で繰り返し送ると、**人を疲れさせるのと同じことを AI にします。**
+    async fn on_initialized(&self, context: NotificationContext<RoleServer>) {
+        let Some(engine) = self.engine.clone() else {
+            // 実行体が無い（ヘッドレスのテスト）。**知らせるものがありません。**
+            return;
+        };
+        let peer = context.peer;
+        let subscribed = Arc::clone(&self.subscribed);
+        tokio::spawn(async move {
+            let mut console = engine.subscribe_console_request();
+            let mut passphrase = engine.subscribe_passphrase_request();
+            let mut host_key = engine.subscribe_host_key_request();
+            let mut operation = engine.subscribe_operation_request();
+
+            loop {
+                // **どれか 1 つでも動いたら、まとめて今の形を送ります。**
+                // 「何が解けたか」を当てさせず、**いまの待ちをそのまま**渡します ——
+                // `pending_status` と同じものが届く方が、読む側は迷いません。
+                tokio::select! {
+                    changed = console.changed() => if changed.is_err() { break },
+                    changed = passphrase.changed() => if changed.is_err() { break },
+                    changed = host_key.changed() => if changed.is_err() { break },
+                    changed = operation.changed() => if changed.is_err() { break },
+                }
+
+                // **購読されていなければ送りません**（MCP の決まり）。
+                // 送りつけると、要らないクライアントの口を埋めます。
+                if !subscribed.lock().await.contains(PENDING_URI) {
+                    continue;
+                }
+                if peer
+                    .notify_resource_updated(ResourceUpdatedNotificationParam::new(PENDING_URI))
+                    .await
+                    .is_err()
+                {
+                    // **相手が居なくなった。**黙って止まります（繋ぎ直せば立て直ります）。
+                    break;
+                }
+            }
+        });
+    }
+
+    /// **待ちの状態を 1 つだけ置きます**（Issue #29）。
+    ///
+    /// 資源を増やしません —— **繋いだ全員の文脈を食う**ので、
+    /// 置くのは「呼ばなくても要る」ものだけです（D49 と同じ考え）。
+    async fn list_resources(
+        &self,
+        _request: Option<PaginatedRequestParams>,
+        _context: RequestContext<RoleServer>,
+    ) -> Result<ListResourcesResult, ErrorData> {
+        let about = Resource::new(PENDING_URI, "pending")
+            .with_description(
+                "What sshboard is waiting on the person for. **Subscribe to be told the moment \
+                 they answer**, instead of polling pending_status. The contents are the same \
+                 JSON pending_status returns.",
+            )
+            .with_mime_type("application/json");
+        Ok(ListResourcesResult::with_all_items(vec![about]))
+    }
+
+    async fn read_resource(
+        &self,
+        request: ReadResourceRequestParams,
+        _context: RequestContext<RoleServer>,
+    ) -> Result<ReadResourceResponse, ErrorData> {
+        if request.uri != PENDING_URI {
+            return Err(ErrorData::resource_not_found(request.uri, None));
+        }
+        // **`pending_status` と同じものを返します。**2 つ作ると、
+        // 片方だけ直る日が来ます（D39）。
+        let said = self.pending_status().await?;
+        Ok(ReadResourceResult::new(vec![ResourceContents::text(said, PENDING_URI)]).into())
+    }
+
+    /// **購読を覚えます**（Issue #29）。購読されていないものは push しません。
+    ///
+    /// `resources/unsubscribe` は rmcp で廃止扱いなので、実装しません ——
+    /// **繋ぎが切れたら、送る先が消えて自然に止まります。**
+    async fn subscribe(
+        &self,
+        request: SubscribeRequestParams,
+        _context: RequestContext<RoleServer>,
+    ) -> Result<(), ErrorData> {
+        self.subscribed.lock().await.insert(request.uri);
+        Ok(())
+    }
+
     fn get_info(&self) -> ServerInfo {
         // **呼ばなくても届く唯一の場所**（D49）。
         //
@@ -637,7 +765,19 @@ impl ServerHandler for SshboardMcp {
         // 1. **人が同じ画面を見ている**（知らないと「誰も見ていない」前提で動く）
         // 2. **既定が空なのは故障ではない**（知らないと「壊れている」と報告する）
         // 3. **続きの読み方**
-        let mut info = ServerInfo::new(ServerCapabilities::builder().enable_tools().build());
+        // **待ちの解消を push すると名乗る**（Issue #29）。
+        //
+        // **記録の通知（`notifications/message`）は採りません** ——
+        // SEP-2577 で廃止予定で、**消える口に乗せると、ある日黙って止まります。**
+        // 代わりに**資源の更新**（`notifications/resources/updated`）を使います。
+        // こちらは廃止されておらず、**AI が同じものを読める**という利点もあります。
+        let mut info = ServerInfo::new(
+            ServerCapabilities::builder()
+                .enable_tools()
+                .enable_resources()
+                .enable_resources_subscribe()
+                .build(),
+        );
         // **自分の名前を名乗る。**既定のままだと `rmcp`（ライブラリの名前）を
         // 名乗ってしまい、繋いだ AI からは**何のサーバーなのか分かりません。**
         info.server_info.name = "sshboard".into();

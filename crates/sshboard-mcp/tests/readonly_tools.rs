@@ -66,11 +66,13 @@ async fn an_unlisted_id_comes_back_as_something_the_ai_can_act_on() {
     let server = server_in(&dir);
 
     let error = server
-        .run_readonly(rmcp::handler::server::wrapper::Parameters(
-            sshboard_mcp::ReadonlyCommandId {
+        .run_readonly(
+            rmcp::handler::server::wrapper::Parameters(sshboard_mcp::ReadonlyCommandId {
                 command_id: "systemctl-restart-nginx".to_string(),
-            },
-        ))
+            }),
+            // **取り消されていない札**（Issue #31 の③）。
+            tokio_util::sync::CancellationToken::new(),
+        )
         .await
         .expect_err("許可していないものが通った");
 

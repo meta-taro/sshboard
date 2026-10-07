@@ -17,6 +17,11 @@ const INITIALIZED_BODY: &str = r#"{"jsonrpc":"2.0","method":"notifications/initi
 const PING_BODY: &str =
     r#"{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"ping","arguments":{}}}"#;
 const LIST_BODY: &str = r#"{"jsonrpc":"2.0","id":3,"method":"tools/list","params":{}}"#;
+/// **待ちの資源**（Issue #29）。一覧・購読・知らないものの 3 本で使います。
+const RESOURCES_LIST_BODY: &str =
+    r#"{"jsonrpc":"2.0","id":7,"method":"resources/list","params":{}}"#;
+const SUBSCRIBE_BODY: &str = r#"{"jsonrpc":"2.0","id":8,"method":"resources/subscribe","params":{"uri":"sshboard://pending"}}"#;
+const READ_NOWHERE_BODY: &str = r#"{"jsonrpc":"2.0","id":9,"method":"resources/read","params":{"uri":"sshboard://nothing-like-this"}}"#;
 
 /// 画面の代わり。帯へ来た行を 1 本受けて ack し、その行を返す。
 fn fake_screen(band: &Band) -> tokio::task::JoinHandle<String> {
@@ -734,6 +739,82 @@ async fn the_server_says_what_it_is_before_any_tool_is_called() {
     assert!(
         said.contains("about_sshboard"),
         "全体像の読み方を示していない: {said}"
+    );
+
+    endpoint.shutdown();
+}
+
+#[tokio::test]
+async fn the_pending_state_can_be_read_as_a_resource() {
+    // **Issue #29 の提案 1**（待ちの解消を push する）。
+    //
+    // > AI : connect / console_open → 「人に尋ねています」
+    // > 人 : 画面で答える
+    // > AI : （気づかない。止まったまま）
+    // > 人 : 「押したけど？」「気づけないの？」
+    //
+    // **`notifications/message` は採りません** —— SEP-2577 で廃止予定で、
+    // **消える口に乗せると、ある日黙って止まります。**
+    // 資源の更新（`notifications/resources/updated`）を使います。
+    // **AI が同じものを読める**という利点もあります。
+    let endpoint = serve(ServeParts {
+        band: Band::new(),
+        stream: Arc::new(OutputStream::new()),
+        connections_watch: Arc::new(ConnectionsWatch::new()),
+        engine: None,
+        capture: None,
+        view: None,
+        token: None,
+        port: 0,
+        ack_timeout: Duration::from_secs(5),
+    })
+    .await
+    .expect("MCP が立ち上がらない");
+    let client = reqwest::Client::new();
+
+    let init = post(&client, &endpoint, None, INIT_BODY).await;
+    let session = init
+        .headers()
+        .get("mcp-session-id")
+        .map(|v| v.to_str().unwrap().to_owned());
+    let _ = init.text().await;
+    post(&client, &endpoint, session.as_deref(), INITIALIZED_BODY).await;
+
+    let listed = post(&client, &endpoint, session.as_deref(), RESOURCES_LIST_BODY)
+        .await
+        .text()
+        .await
+        .unwrap();
+    assert!(
+        listed.contains("sshboard://pending"),
+        "待ちの資源が一覧に出ていない: {listed}"
+    );
+    // **何のためのものかを言うこと。**名前だけでは、購読する気になりません。
+    assert!(
+        listed.contains("Subscribe"),
+        "購読すればよいと言っていない: {listed}"
+    );
+
+    // **購読できること。**購読されていないものは push しません（MCP の決まり）。
+    let subscribed = post(&client, &endpoint, session.as_deref(), SUBSCRIBE_BODY)
+        .await
+        .text()
+        .await
+        .unwrap();
+    assert!(
+        !subscribed.contains("\"error\""),
+        "購読できない: {subscribed}"
+    );
+
+    // **知らない資源は、正直に断る。**
+    let nowhere = post(&client, &endpoint, session.as_deref(), READ_NOWHERE_BODY)
+        .await
+        .text()
+        .await
+        .unwrap();
+    assert!(
+        nowhere.contains("\"error\""),
+        "知らない資源に何か返している: {nowhere}"
     );
 
     endpoint.shutdown();

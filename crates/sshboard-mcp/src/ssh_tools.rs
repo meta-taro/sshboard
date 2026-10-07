@@ -13,6 +13,7 @@ use serde::Deserialize;
 use sshboard_band::Actor;
 use sshboard_connections::sudo_is_unavailable;
 use sshboard_engine::EngineError;
+use tokio_util::sync::CancellationToken;
 
 use crate::about::{changes_since, CHANGELOG};
 use crate::server::SshboardMcp;
@@ -26,6 +27,32 @@ const DEFAULT_DIAGNOSTICS: usize = 40;
 const MAX_DIAGNOSTICS: usize = 200;
 
 /// 断り方を MCP の形へ。**接続先を混ぜない**（PRD §8）。
+/// **クライアントが取り消したら、待つのをやめる**（Issue #31 の③）。
+///
+/// MCP には `notifications/cancelled` が在り、rmcp はそれを受けて
+/// **その呼び出しの札（`CancellationToken`）を倒します。**
+/// ところが待っている側がその札を見ていなければ、**倒されても待ち続けます** ——
+/// 「止める手段が無い」と報告された形がこれです。
+///
+/// **走らせたものを殺すのではなく、待つのをやめます。**
+/// 待つ future を落とすと russh のチャネルが閉じ、相手側の実行は多くの場合
+/// `SIGHUP` で終わります。**終わらないこともあります**（`nohup` で走っているもの）——
+/// そこは返り文で正直に言います。
+pub(crate) async fn until_cancelled<T>(
+    ct: &CancellationToken,
+    work: impl std::future::Future<Output = Result<T, ErrorData>>,
+) -> Result<T, ErrorData> {
+    tokio::select! {
+        done = work => done,
+        () = ct.cancelled() => Err(ErrorData::internal_error(
+            "cancelled: sshboard stopped waiting for this. \
+             The remote command may still be running - check with process_list \
+             or read_stream before running it again.".to_string(),
+            None,
+        )),
+    }
+}
+
 fn refuse(error: EngineError) -> ErrorData {
     match error {
         // 設定漏れ・人にしかできないことは、AI が次に何をすべきか分かる形で返す。
@@ -166,12 +193,19 @@ impl SshboardMcp {
     pub async fn run_operation(
         &self,
         Parameters(request): Parameters<OperationId>,
+        ct: CancellationToken,
     ) -> Result<String, ErrorData> {
-        let ran = self
-            .engine()?
-            .run_operation(Actor::Ai, &request.operation_id)
-            .await
-            .map_err(refuse)?;
+        let engine = self.engine()?;
+        // **取り消されたら待つのをやめます**（Issue #31 の③）。
+        // ここは**正しく何十分もかかることがある**ので、一律の締め切りではなく
+        // 「人が止めたら止まる」でなければいけません。
+        let ran = until_cancelled(&ct, async {
+            engine
+                .run_operation(Actor::Ai, &request.operation_id)
+                .await
+                .map_err(refuse)
+        })
+        .await?;
 
         // **「sudo が無い」を「パスワードが違う」に見せない**（2026-09-25）。
         //
@@ -662,12 +696,16 @@ impl SshboardMcp {
     pub async fn run_readonly(
         &self,
         Parameters(request): Parameters<ReadonlyCommandId>,
+        ct: CancellationToken,
     ) -> Result<String, ErrorData> {
-        let ran = self
-            .engine()?
-            .run_readonly(Actor::Ai, &request.command_id)
-            .await
-            .map_err(refuse)?;
+        let engine = self.engine()?;
+        let ran = until_cancelled(&ct, async {
+            engine
+                .run_readonly(Actor::Ai, &request.command_id)
+                .await
+                .map_err(refuse)
+        })
+        .await?;
 
         let (out, out_cut) = capped(ran.out);
         let (err, err_cut) = capped(ran.err);
@@ -751,12 +789,16 @@ impl SshboardMcp {
     pub async fn read_log(
         &self,
         Parameters(request): Parameters<ReadLog>,
+        ct: CancellationToken,
     ) -> Result<String, ErrorData> {
-        let ran = self
-            .engine()?
-            .read_log(Actor::Ai, &request.path, request.lines.unwrap_or(200))
-            .await
-            .map_err(refuse)?;
+        let engine = self.engine()?;
+        let ran = until_cancelled(&ct, async {
+            engine
+                .read_log(Actor::Ai, &request.path, request.lines.unwrap_or(200))
+                .await
+                .map_err(refuse)
+        })
+        .await?;
         probe_json("read_log", ran)
     }
 }
@@ -773,19 +815,24 @@ impl SshboardMcp {
     pub async fn search(
         &self,
         Parameters(request): Parameters<Search>,
+        ct: CancellationToken,
     ) -> Result<String, ErrorData> {
         let engine = self.engine()?;
         let hits = request.hits.unwrap_or(100);
-        let ran = if request.in_contents.unwrap_or(false) {
-            engine
-                .search_content(Actor::Ai, &request.path, &request.pattern, hits)
-                .await
-        } else {
-            engine
-                .search_names(Actor::Ai, &request.path, &request.pattern, hits)
-                .await
-        }
-        .map_err(refuse)?;
+        // **大きな木を掘ると長くかかります。**取り消されたら待つのをやめます。
+        let ran = until_cancelled(&ct, async {
+            if request.in_contents.unwrap_or(false) {
+                engine
+                    .search_content(Actor::Ai, &request.path, &request.pattern, hits)
+                    .await
+            } else {
+                engine
+                    .search_names(Actor::Ai, &request.path, &request.pattern, hits)
+                    .await
+            }
+            .map_err(refuse)
+        })
+        .await?;
 
         probe_json("search", ran)
     }
@@ -907,6 +954,72 @@ mod tests {
         assert!(cut);
         assert!(text.len() <= MAX_OUTPUT_BYTES);
         assert!(text.chars().all(|c| c == 'あ'), "文字が壊れている");
+    }
+
+    /// **取り消されたら、待つのをやめる**（Issue #31 の③）。
+    ///
+    /// MCP には `notifications/cancelled` が在り、rmcp はそれを受けて札を倒します。
+    /// **待っている側がその札を見ていなければ、倒されても待ち続けます** ——
+    /// 「止める手段が無い」と報告された形がこれです。
+    #[tokio::test]
+    async fn a_cancelled_call_stops_waiting_instead_of_hanging() {
+        let ct = super::CancellationToken::new();
+        ct.cancel();
+
+        // **絶対に返らない仕事。**札を見ていなければ、ここで永久に止まります。
+        let never = std::future::pending::<Result<(), rmcp::ErrorData>>();
+        let said = super::until_cancelled(&ct, never)
+            .await
+            .expect_err("止まらなかった");
+
+        assert!(
+            said.message.contains("cancelled"),
+            "止めたことを言えていない: {}",
+            said.message
+        );
+        // **「相手はまだ走っているかもしれない」を言うこと。**
+        // 黙って止めると、AI は「終わった」と読んで二度打ちします。
+        assert!(
+            said.message.contains("still be running"),
+            "相手が残っている可能性を言っていない: {}",
+            said.message
+        );
+    }
+
+    /// **取り消されていなければ、そのまま通す。**
+    #[tokio::test]
+    async fn work_that_finishes_first_comes_through_untouched() {
+        let ct = super::CancellationToken::new();
+        let done = super::until_cancelled(&ct, async { Ok::<_, rmcp::ErrorData>(42) })
+            .await
+            .expect("通らなかった");
+
+        assert_eq!(done, 42);
+    }
+
+    /// **途中で倒されたら、その場でやめる。**
+    #[tokio::test]
+    async fn a_call_cancelled_midway_does_not_wait_for_the_work() {
+        let ct = super::CancellationToken::new();
+        let later = ct.clone();
+        tokio::spawn(async move {
+            tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+            later.cancel();
+        });
+
+        let slow = async {
+            tokio::time::sleep(std::time::Duration::from_secs(30)).await;
+            Ok::<_, rmcp::ErrorData>(())
+        };
+        let began = std::time::Instant::now();
+        let said = super::until_cancelled(&ct, slow).await;
+
+        assert!(said.is_err(), "30 秒待ってしまった");
+        assert!(
+            began.elapsed() < std::time::Duration::from_secs(5),
+            "倒されたのに待ち続けた: {:?}",
+            began.elapsed()
+        );
     }
 }
 
