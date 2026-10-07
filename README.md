@@ -32,7 +32,10 @@ or two on the same host, side by side — and the agent can read *all* of them w
 work. Not "the agent runs it for you": **the agent watches what you are doing and tells
 you which pane went wrong.**
 
-![Two consoles on the same server, side by side](site/shots/en/console.png)
+![One shared console; the tabs along the top are the open connections](site/shots/en/console.png)
+
+*(This shot predates the split view — it shows one console with the open connections as
+tabs. Two panes side by side landed in 0.1.21.)*
 
 ### "Mail stopped arriving and I don't know where to look"
 
