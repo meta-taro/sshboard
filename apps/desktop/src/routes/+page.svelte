@@ -383,6 +383,21 @@
 	 * 見ていない面を探し始めると、人は「何も見つからない」と読みます。
 	 */
 	let consoleSearches = $state(new Map<number, TerminalSearch>());
+	/**
+	 * **面ごとの「書く口」**（2026-10-07 の回帰）。
+	 *
+	 * **これが無いと、開いたままの面には何も出ません。**控えに入れるだけでは、
+	 * 面は**作られたときの 1 回**しか描かず、**そのあと流れてくる分が落ちます。**
+	 * タブを切り替えると出るのは、作り直しで控えを書き戻しているからです。
+	 *
+	 * 実運用でこう踏みました ——
+	 *
+	 * > リアルタイムでコマンドを打てたのが分からず、画面を切り替えないと反映されない
+	 *
+	 * **AI が `rm` を打っても人の画面は静かなまま**で、
+	 * 「人が常に見ている」（D29）が崩れていました。
+	 */
+	let consoleWriters = new Map<number, (chunk: number[]) => void>();
 	let outputSearch: TerminalSearch | undefined;
 
 	function searchFor(pane: SearchPane): TerminalSearch | undefined {
@@ -991,9 +1006,16 @@
 			// ここを通らないと、別のタブに居る間の分が丸ごと消えます。
 			backlogs = rememberFor(backlogs, from, event.payload.chunk);
 			// ***出力* の面は、接続ごとのものだけ**を映します（端末の分は端末の面へ）。
-			if (event.payload.console === null && from === shownConnection && terminal) {
-				writeChunk(terminal, event.payload.chunk);
+			if (event.payload.console === null) {
+				if (from === shownConnection && terminal) {
+					writeChunk(terminal, event.payload.chunk);
+				}
+				return;
 			}
+			// **端末の分は、その面へその場で書きます。**
+			// **控えに入れるだけにしません** —— 開いたままの面に何も出なくなります
+			// （2026-10-07 の回帰。`rm` を打っても人の画面が静かなままでした）。
+			consoleWriters.get(event.payload.console)?.(event.payload.chunk);
 		})
 			.then((stop) => stops.push(stop))
 			.catch((error: unknown) => {
@@ -1689,6 +1711,12 @@
 							iHold={pane.holder === 'human'}
 							findIsOpen={findFrom('console')}
 							onpick={(id) => (chosenConsole = id)}
+							onready={(id, write) => {
+								// **地図は作り直しません。**面の数は 2 つなので、
+								// 書き換えても描き直しは要りません（`$state` にしていません）。
+								if (write) consoleWriters.set(id, write);
+								else consoleWriters.delete(id);
+							}}
 							onsearch={(id, search) => {
 								const next = new Map(consoleSearches);
 								if (search) next.set(id, search);

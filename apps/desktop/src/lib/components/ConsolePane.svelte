@@ -46,6 +46,18 @@
 		platform,
 		/** 検索の取っ手を親へ渡す。**閉じるときは `undefined`。** */
 		onsearch = () => {},
+		/**
+		 * **流れてくる出力を書く口**を親へ渡す（**閉じるときは `undefined`**）。
+		 *
+		 * **これが無いと、開いたままの面には何も出ません。**
+		 * 作ったときに控えを書き戻すだけでは、**マウント時の 1 回**しか描かれず、
+		 * **そのあと流れてくる分が落ちます** —— タブを切り替えると出るのは、
+		 * 作り直しのときに控えを書き戻しているからです。
+		 *
+		 * 2026-10-07 に実運用で踏みました。**AI が `rm` を打っても人の画面は静かなまま**で、
+		 * 「人が常に見ている」（D29）が崩れていました。
+		 */
+		onready = () => {},
 		/** この面が選ばれた。**親が「いま見ている面」を移します。** */
 		onpick = () => {},
 		onfailure = () => {},
@@ -66,6 +78,7 @@
 		clipboard: ClipboardPorts;
 		platform: TerminalPlatform;
 		onsearch?: (id: number, search: TerminalSearch | undefined) => void;
+		onready?: (id: number, write: ((chunk: number[]) => void) | undefined) => void;
 		onpick?: (id: number) => void;
 		onfailure?: (message: string) => void;
 		findIsOpen?: ClipboardOptions['handledElsewhere'];
@@ -114,6 +127,10 @@
 				pane.id,
 				attachSearch(term, (error: unknown) => onfailure(String(error)))
 			);
+			// **流れてくる分を書く口を渡す。**作った端に書き戻すだけでは、
+			// **マウント時の 1 回**しか描かれません。
+			const live = term;
+			onready(pane.id, (chunk) => writeChunk(live, chunk));
 			// **なぞるだけでコピー**。右クリックで貼り付け（PuTTY / TeraTerm の形）。
 			// **素の Ctrl+C は横取りしません**（走っているものを止められなくなるため）。
 			detach.push(
@@ -126,6 +143,7 @@
 			detach.forEach((off) => off());
 			detach = [];
 			onsearch(pane.id, undefined);
+			onready(pane.id, undefined);
 			term.dispose();
 			term = undefined;
 		}

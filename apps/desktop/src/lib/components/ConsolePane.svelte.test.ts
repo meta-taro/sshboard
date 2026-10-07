@@ -110,6 +110,44 @@ describe('端末 1 枚の面', () => {
 		expect(made[0].written).toEqual([[65, 66, 67]]);
 	});
 
+	test('writes what arrives while it is open, not just at mount', () => {
+		// **2026-10-07 の回帰。**0.1.21 で部品へ切り出したとき、
+		// **流れてくる分を書く経路が落ちていました。**
+		//
+		// > リアルタイムでコマンドを打てたのが分からず、画面を切り替えないと反映されない
+		//
+		// **AI が `rm` を打っても、人の画面は静かなまま**でした ——
+		// 「人が常に見ている」（D29）が崩れます。
+		//
+		// **「作った端に書き戻す」試験は通っていました。**あれは**マウント時の 1 回**で、
+		// **開いたまま流れてくる**経路とは別物です。**別物なので、別に見張ります。**
+		const writers: Array<(chunk: number[]) => void> = [];
+		mount({
+			backlog: [65],
+			onready: (_id: number, write?: (chunk: number[]) => void) => {
+				if (write) writers.push(write);
+			}
+		});
+
+		expect(writers, '流れてくる分を書く口を親へ渡していない').toHaveLength(1);
+
+		writers[0]([66, 67]);
+		// 1 回目が控え、2 回目が流れてきた分。**両方描かれていること。**
+		expect(made[0].written).toEqual([[65], [66, 67]]);
+	});
+
+	test('takes the write handle back when the terminal goes away', () => {
+		// **閉じた面へ書き続けない。**捨てた端末へ書くと、
+		// 「出ているはずなのに見えない」が起きます。
+		const seen: Array<[number, unknown]> = [];
+		const { unmount } = mount({
+			onready: (id: number, write: unknown) => seen.push([id, write])
+		});
+
+		expect(seen[0][1]).toBeTruthy();
+		unmount();
+	});
+
 	test('sends what is typed to its own number', () => {
 		// **番号で送ること。**接続の名前で送ると、同じサーバに 2 枚開いた日に
 		// **どちらへ打ったか言えません。**
