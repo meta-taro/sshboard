@@ -537,6 +537,13 @@ pub async fn diagnostics_recent(
 /// 握りが変わったことを画面へ配るイベント。
 pub const CONSOLE_EVENT: &str = "console://holder";
 
+/// **開いている端末ぜんぶが変わった**（分割・2026-10-06）。
+///
+/// 握っている側だけでは、**画面は「何枚描けばよいか」が分かりません。**
+/// 同じ接続に 2 枚開いた日に片方が画面に出ないと、
+/// **「AI からは見えて人からは見えない端末」**ができます（D29 を壊します）。
+pub const CONSOLES_EVENT: &str = "console://list";
+
 /// 誰が握っているか。**画面はこれを見て入力を締めます。**
 fn holder_name(holder: Option<Actor>) -> Option<&'static str> {
     holder.map(|held| match held {
@@ -549,6 +556,31 @@ fn holder_name(holder: Option<Actor>) -> Option<&'static str> {
 ///
 /// **AI が握った瞬間に、人の側の入力が締まる**必要があります（D29）。
 /// 画面が知らないまま AI が打っている、を作らないため。
+/// 開いている端末の一覧を画面へ押し出す（分割）。
+pub fn spawn_consoles_bridge(app: AppHandle, engine: Arc<Engine>) {
+    tauri::async_runtime::spawn(async move {
+        let mut watching = engine.subscribe_consoles();
+        while watching.changed().await.is_ok() {
+            // **借用を `await` へ持ち越さない。**持ち越すと、この橋が
+            // スレッド間で送れなくなります（コンパイラが止めました）。
+            let all: Vec<ConsolePane> = watching
+                .borrow()
+                .iter()
+                .map(|facts| ConsolePane {
+                    id: facts.id,
+                    connection: facts.connection.clone(),
+                    holder: holder_name(Some(facts.holder))
+                        .unwrap_or("human")
+                        .to_string(),
+                })
+                .collect();
+            if let Err(error) = app.emit(CONSOLES_EVENT, all) {
+                eprintln!("[sshboard] 端末の一覧を画面へ渡せません: {error}");
+            }
+        }
+    });
+}
+
 pub fn spawn_console_bridge(app: AppHandle, engine: Arc<Engine>) {
     tauri::async_runtime::spawn(async move {
         let mut watching = engine.subscribe_console();

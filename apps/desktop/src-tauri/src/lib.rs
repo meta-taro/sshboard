@@ -194,6 +194,9 @@ pub fn run() {
             stream_host::spawn_console_bridges(app.handle().clone(), Arc::clone(&engine));
             // **AI が握った瞬間に、人の側の入力が締まる**必要がある（D29）。
             session_cmd::spawn_console_bridge(app.handle().clone(), Arc::clone(&engine));
+            // **何枚描けばよいかを画面へ**（分割）。押し出さないと、
+            // 2 枚目を開いても画面は 1 枚のままです。
+            session_cmd::spawn_consoles_bridge(app.handle().clone(), Arc::clone(&engine));
             // **AI からの頼みを画面へ**（D42）。出せない問いは無いのと同じ。
             session_cmd::spawn_console_request_bridge(app.handle().clone(), Arc::clone(&engine));
             // **出せない画面を案内しない**（Issue #13）。

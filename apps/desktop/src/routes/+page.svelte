@@ -10,6 +10,7 @@
 	import OperationRequestDialog from '$lib/components/OperationRequestDialog.svelte';
 	import PassphraseDialog from '$lib/components/PassphraseDialog.svelte';
 	import ConnectPanel from '$lib/components/ConnectPanel.svelte';
+	import ConsolePaneView from '$lib/components/ConsolePane.svelte';
 	import FileBrowser from '$lib/components/FileBrowser.svelte';
 	import Icon from '$lib/components/Icon.svelte';
 	import { i18n } from '$lib/i18n/i18n.svelte';
@@ -25,6 +26,7 @@
 	import { textSize } from '$lib/text-size/text-size.svelte';
 	import { theme, type ThemeMode } from '$lib/theme/theme.svelte';
 	import { attachFit, attachSearch, createTerminal, writeChunk } from '$lib/terminal.svelte';
+	import { paneLayout, type ConsolePane } from '$lib/console-panes';
 	import {
 		BEFORE_CONNECTING,
 		emptyBacklogs,
@@ -104,10 +106,17 @@
 
 	// --- 端末（D29）------------------------------------------------------------
 	// **同時に触れるのは 1 人。**AI が握っている間、人の入力は締まる。
-	let consoleHost: HTMLDivElement | undefined = $state();
+	/**
+	 * **開いている端末ぜんぶ**（分割・2026-10-06）。
+	 *
+	 * 実行体が押し出します（`console://list`）。**握っている側だけでは、
+	 * 画面は「何枚描けばよいか」が分かりません。**
+	 */
+	let consolesOpen = $state<ConsolePane[]>([]);
+	/** 人が選んだ面の番号。**閉じたら忘れます**（`paneLayout` が面倒を見ます）。 */
+	let chosenConsole = $state<number | null>(null);
 	// **`$state` にする。**そうしないと、文字サイズの効果が
 	// 「端末ができたこと」を追えず、片方だけ取り残される（実際に取り残された）。
-	let consoleTerm = $state<Terminal | undefined>();
 
 	/**
 	 * **直近の出力**（Issue #14 / #11）。
@@ -290,6 +299,26 @@
 	 */
 	const shownConnection = $derived(session.open?.id ?? BEFORE_CONNECTING);
 
+	/** 出力の塊 1 つ。**どこのものか**が添えてあります（D60 / 分割）。 */
+	type StreamChunk = { connection: string | null; console: number | null; chunk: number[] };
+
+	/**
+	 * 端末ごとの控えの鍵。**接続の識別子とぶつからない形**にします ——
+	 * ぶつかると、端末の出力が *出力* の面へ混ざります。
+	 */
+	function consoleKey(id: number): string {
+		return `console:${id}`;
+	}
+
+	/**
+	 * **いま何枚、どれを描くか**（分割・2026-10-06）。
+	 *
+	 * 規則は `console-panes.ts` に在ります（画面を描かずに確かめられる形）。
+	 */
+	const layout = $derived(
+		paneLayout(consolesOpen, session.open?.id ?? null, chosenConsole)
+	);
+
 	/*
 	 * **ここに在った「端末はいまここに無い」の帯は、2026-10-02 に外しました**（D60）。
 	 *
@@ -329,7 +358,6 @@
 		failure = String(error);
 	});
 	/** 端末を作り直すときに外すもの。**溜めっぱなしにすると監視が二重に走る。** */
-	let detachConsole: Array<() => void> = [];
 	let detachOutput: Array<() => void> = [];
 
 	// --- 検索 --------------------------------------------------------------------
@@ -340,11 +368,18 @@
 	/** 打った語が無かったか。**「押したのに何も起きない」を作らないため。** */
 	let searchMissed = $state(false);
 	let searchInput: HTMLInputElement | undefined = $state();
-	let consoleSearch: TerminalSearch | undefined;
+	/**
+	 * **面ごとの検索の取っ手**（分割）。
+	 *
+	 * 検索の窓は 1 つで、面は 2 枚あります。**探すのは、いま打鍵が行く面**です ——
+	 * 見ていない面を探し始めると、人は「何も見つからない」と読みます。
+	 */
+	let consoleSearches = $state(new Map<number, TerminalSearch>());
 	let outputSearch: TerminalSearch | undefined;
 
 	function searchFor(pane: SearchPane): TerminalSearch | undefined {
-		return pane === 'console' ? consoleSearch : outputSearch;
+		if (pane === 'output') return outputSearch;
+		return layout.focused === null ? undefined : consoleSearches.get(layout.focused);
 	}
 
 	function openSearch(pane: SearchPane) {
@@ -443,54 +478,17 @@
 	 * タブを行き来すると要素が作り直されるので、**同じ端末を貼り直します。**
 	 * 作り直すと、それまでの表示が消えます。
 	 */
-	$effect(() => {
-		const host = consoleHost;
-		if (!host) return;
-		if (!consoleTerm) {
-			// **打てる面。**握っていないときは Rust 側が断るので、
-			// ここで打てること自体は塞がない（断り方で伝える）。
-			consoleTerm = createTerminal(host, textSize.terminalPx, true);
-			// **作った端に書き戻す**（Issue #14 / #11）。
-			// タブを行き来しても消えず、見ていない間の分も出ます。
-			writeChunk(consoleTerm, replayFor(backlogs, shownConnection));
-			consoleTerm.onData((data) => {
-				// **握っていなければ打たない。**往復させて断られるより、
-				// 画面で止める方が速い（Rust 側でも同じ判断をしている）。
-				if (!iHold) return;
-				const bytes = Array.from(new TextEncoder().encode(data));
-				invoke('console_type', { bytes }).catch((error: unknown) => {
-					failure = String(error);
-				});
-			});
-			consoleTerm.onResize(({ cols, rows }) => {
-				invoke('console_resize', { cols, rows }).catch(() => {
-					/* まだ開いていないだけ。**開いてから効く。** */
-				});
-			});
-			// **窓に追従させる。**無いと 80×24 で固定され、上の `onResize` も一度も出ない。
-			detachConsole.push(attachFit(consoleTerm, host));
-			// **なぞるだけでコピー**。ショートカットは ⌘C / Ctrl+Shift+C / Ctrl+Shift+V。
-			// **素の Ctrl+C は横取りしません**（走っているものを止められなくなるため）。
-			consoleSearch = attachSearch(consoleTerm, (error: unknown) => {
-				failure = String(error);
-			});
-			detachConsole.push(
-				attachClipboard(consoleTerm, clipboard, platform, {
-					handledElsewhere: findFrom('console'),
-					// **右クリックで貼り付け**（実機の指摘・2026-09-06）。
-					// PuTTY / TeraTerm がこの形で、手が覚えている操作です。
-					host
-				})
-			);
-		} else if (!host.contains(consoleTerm.element ?? null)) {
-			// **貼り直しでは戻らなかった**（実測）。作り直す。
-			// 表示は消えますが、**シェルは Engine 側で生き続けます。**
-			detachConsole.forEach((detach) => detach());
-			detachConsole = [];
-			consoleTerm.dispose();
-			consoleTerm = undefined;
-		}
-	});
+	/**
+	 * **ここに在った 1 枚分の配線は、`ConsolePane.svelte` へ移しました**
+	 * （分割・2026-10-06）。
+	 *
+	 * xterm を作る・書き戻す・打鍵を送る・窓に追従させる・検索とクリップボードを
+	 * 付ける —— 全部ここに在ったので、**2 枚にするには写すしかありませんでした。**
+	 * 写した日に、片方だけ直る日が来ます（D39）。
+	 *
+	 * 部品にしたので、**端末の面を描いて確かめるテストが初めて書けました**
+	 * （`ConsolePane.svelte.test.ts`・10 本）。
+	 */
 
 	$effect(() => {
 		const host = terminalHost;
@@ -534,7 +532,7 @@
 	let autoOpenTried = $state(false);
 	$effect(() => {
 		if (view !== 'console') return;
-		if (!consoleTerm || session.open === null) return;
+		if (session.open === null) return;
 		if (holder !== null || autoOpenTried || session.busy) return;
 		autoOpenTried = true;
 		void openConsole();
@@ -559,19 +557,16 @@
 	$effect(() => {
 		const on = shownConnection;
 		const back = replayFor(backlogs, on);
-		for (const term of [consoleTerm, terminal]) {
-			if (!term) continue;
-			term.reset();
-			writeChunk(term, back);
-		}
+		// **端末の面は部品が持ちます**（面ごとに控えが違うので、ここでは触りません）。
+		if (!terminal) return;
+		terminal.reset();
+		writeChunk(terminal, back);
 	});
 
 	$effect(() => {
 		const px = textSize.terminalPx;
 		if (terminal) terminal.options.fontSize = px;
-		// **端末タブにも効かせる。**片方だけ変わると、同じ 1 つの道具に見えない
-		// （実際に端末タブだけ取り残されていた）。
-		if (consoleTerm) consoleTerm.options.fontSize = px;
+		// **端末の面は部品が持ちます**（`fontPx` を渡しています）。
 	});
 
 	/**
@@ -650,10 +645,45 @@
 	 * 受け取り待ちを挟むと端末が使い物になりません。開始と終了は載ります。
 	 */
 	async function openConsole() {
-		if (!consoleTerm) return;
 		try {
-			await invoke('console_open', { cols: consoleTerm.cols, rows: consoleTerm.rows });
+			// **大きさは部品が窓に追従して直します**（`attachFit`）。目安だけ渡します。
+			await invoke('console_open', { cols: 80, rows: 24 });
 			holder = 'human';
+			await refreshConsoles();
+		} catch (error: unknown) {
+			failure = String(error);
+		}
+	}
+
+	/**
+	 * **もう 1 枚、同じサーバに開く**（分割・2026-10-06）。
+	 *
+	 * > 同じサーバに２画面入る場合もある
+	 *
+	 * `console_open` は「在るなら握り直す」です（Issue #21 —— 握りを渡すたびに
+	 * PTY を立て直すと、人の `su -` が消えます）。**こちらは毎回新しいシェル。**
+	 */
+	async function openAnotherConsole() {
+		const on = session.open?.id;
+		if (!on) return;
+		try {
+			const id = await invoke<number>('console_open_another', {
+				connectionId: on,
+				cols: 80,
+				rows: 24
+			});
+			// **開いた面を、そのまま見せる。**開いたのに見えないのは、押せない釦と同じ。
+			chosenConsole = id;
+			await refreshConsoles();
+		} catch (error: unknown) {
+			failure = String(error);
+		}
+	}
+
+	/** 開いている端末を読み直す。**押し出しを取りこぼしたときの保険。** */
+	async function refreshConsoles() {
+		try {
+			consolesOpen = await invoke<ConsolePane[]>('console_list');
 		} catch (error: unknown) {
 			failure = String(error);
 		}
@@ -664,16 +694,22 @@
 		try {
 			await invoke('console_take');
 			holder = 'human';
+			await refreshConsoles();
 		} catch (error: unknown) {
 			failure = String(error);
 		}
 	}
 
-	/** 止める。**失敗しません**（D29 の停止ボタン）。 */
+	/** 止める。**失敗しません**（D29 の停止ボタン）。**番号で止めます。** */
 	async function stopConsole() {
 		try {
-			await invoke('console_stop');
+			// **番号で止める。**接続の名前で止めると、同じサーバに 2 枚ある日に
+			// **どちらが止まるか言えません。**
+			if (layout.focused !== null) {
+				await invoke('console_stop_of', { consoleId: layout.focused });
+			}
 			holder = null;
+			await refreshConsoles();
 		} catch (error: unknown) {
 			failure = String(error);
 		}
@@ -881,6 +917,16 @@
 				/* 購読できないだけ。**画面は出す。** */
 			});
 
+		// **何枚描けばよいか**を受け取る（分割）。
+		// 押し出しを取りこぼしても、`refreshConsoles` が保険になります。
+		listen<ConsolePane[]>('console://list', (event) => {
+			consolesOpen = event.payload;
+		})
+			.then((stop) => stops.push(stop))
+			.catch(() => {
+				/* 購読できないだけ。**画面は出す。** */
+			});
+
 		listen<ConsoleState>('console://holder', (event) => {
 			holder = event.payload.holder;
 			consoleOn = event.payload.connection;
@@ -892,7 +938,7 @@
 
 
 		// **ANSI を落とさずに渡す。**色は人の側にだけ残す（Issue 005）。
-		listen<{ connection: string | null; chunk: number[] }>('stream://raw', (event) => {
+		listen<StreamChunk>('stream://raw', (event) => {
 			// **端末の面へも書く**（Issue #10）。
 			//
 			// ここは長らく `terminal`（*出力* の面）にしか書いていませんでした。
@@ -909,13 +955,20 @@
 			// **接続ごとに分かれています**（D60）。どの接続の出力かが添えてあり、
 			// **いま見ている接続の分だけ**を面へ書きます。
 			// 書き分けないと、2 台の出力が 1 つの面で混ざります。
-			const from = keyFor(event.payload.connection);
+			// **端末のものは、その面へだけ**（分割・2026-10-06）。
+			// 接続ごとの口には 2 枚分が混ざって流れるので、
+			// **番号が入っているものは番号で分けます。**
+			const from =
+				event.payload.console === null
+					? keyFor(event.payload.connection)
+					: consoleKey(event.payload.console);
 			// **面が無くても覚えておく**（Issue #14）。
 			// ここを通らないと、別のタブに居る間の分が丸ごと消えます。
 			backlogs = rememberFor(backlogs, from, event.payload.chunk);
-			if (from !== shownConnection) return;
-			if (terminal) writeChunk(terminal, event.payload.chunk);
-			if (consoleTerm) writeChunk(consoleTerm, event.payload.chunk);
+			// ***出力* の面は、接続ごとのものだけ**を映します（端末の分は端末の面へ）。
+			if (event.payload.console === null && from === shownConnection && terminal) {
+				writeChunk(terminal, event.payload.chunk);
+			}
 		})
 			.then((stop) => stops.push(stop))
 			.catch((error: unknown) => {
@@ -971,7 +1024,6 @@
 		return () => {
 			stops.forEach((stop) => stop());
 			terminal?.dispose();
-			consoleTerm?.dispose();
 		};
 	});
 </script>
@@ -1553,8 +1605,74 @@
 				{/if}
 			</div>
 			{@render searchBar('console')}
-			<div class="terminal shell" class:locked={holder === 'ai'}>
-				<div class="core terminal-core" bind:this={consoleHost}></div>
+			<!--
+				**端末のタブ**（分割・2026-10-06）。番号・接続・色を出します ——
+				人が口で「②を見て」と言えて、AI も同じ番号で指せる（PRD §4-0）。
+				**3 枚目以降はここで切り替えます**（半々は 2 枚まで・DESIGN.md）。
+			-->
+			{#if consolesOpen.length > 0}
+				<div class="console-tablist" role="tablist" aria-label={i18n.t('tab.console')}>
+					{#each consolesOpen as held (held.id)}
+						<button
+							type="button"
+							role="tab"
+							class="console-tab"
+							class:active={layout.panes.some((pane) => pane.id === held.id)}
+							aria-selected={layout.focused === held.id}
+							onclick={() => (chosenConsole = held.id)}
+						>
+							<span class="num">#{held.id}</span>
+							<span data-secret>{held.connection}</span>
+						</button>
+					{/each}
+					{#if layout.canOpenAnother}
+						<!-- **同じサーバにもう 1 枚。**押しても断られる釦は出しません。 -->
+						<button
+							type="button"
+							class="ghost add"
+							onclick={openAnotherConsole}
+							title={i18n.t('console.another')}
+						>
+							<Icon name="plus" size={13} />
+							{i18n.t('console.another')}
+						</button>
+					{/if}
+				</div>
+			{/if}
+			<!--
+				**半々に並べる**（人が決めた形）——
+
+				> 見た目はデスクトップみたいに半々とかタブ切り替えかなぁ
+
+				**等分から始めます。**掴んで動かす境目は、要ると分かってから足します。
+			-->
+			<div class="console-panes" class:locked={holder === 'ai'}>
+				{#if layout.panes.length === 0}
+					<div class="terminal shell">
+						<div class="core terminal-core empty"></div>
+					</div>
+				{:else}
+					{#each layout.panes as pane (pane.id)}
+						<ConsolePaneView
+							{pane}
+							{clipboard}
+							{platform}
+							backlog={replayFor(backlogs, consoleKey(pane.id))}
+							fontPx={textSize.terminalPx}
+							active={layout.focused === pane.id}
+							iHold={pane.holder === 'human'}
+							findIsOpen={findFrom('console')}
+							onpick={(id) => (chosenConsole = id)}
+							onsearch={(id, search) => {
+								const next = new Map(consoleSearches);
+								if (search) next.set(id, search);
+								else next.delete(id);
+								consoleSearches = next;
+							}}
+							onfailure={(message) => (failure = message)}
+						/>
+					{/each}
+				{/if}
 			</div>
 		</section>
 	{:else if view === 'files'}
@@ -1786,6 +1904,56 @@
 	}
 
 	/* --- 「表示」メニュー（自前タイトルバーで OS のメニューを失った分） --- */
+
+	.console-panes {
+		display: flex;
+		gap: 0.4rem;
+		flex: 1 1 auto;
+		min-height: 0;
+	}
+
+	/* **AI が握っている間は、人の入力を締める**（D29）。 */
+	.console-panes.locked {
+		opacity: 0.92;
+	}
+
+	.console-tablist {
+		display: flex;
+		gap: 0.3rem;
+		flex-wrap: wrap;
+		padding-bottom: 0.35rem;
+	}
+
+	.console-tab {
+		font-size: 0.75rem;
+		padding: 0.2rem 0.55rem;
+		border: 1px solid var(--hairline);
+		border-radius: var(--r-control);
+		background: transparent;
+		display: inline-flex;
+		align-items: center;
+		gap: 0.3rem;
+	}
+
+	/* **並んで出ている面**（半々のどちらか）。 */
+	.console-tab.active {
+		border-color: var(--accent);
+		color: var(--accent);
+	}
+
+	.console-tab .num {
+		font-variant-numeric: tabular-nums;
+		font-weight: 600;
+	}
+
+	.console-tablist .add {
+		font-size: 0.75rem;
+		padding: 0.2rem 0.55rem;
+		display: inline-flex;
+		align-items: center;
+		gap: 0.3rem;
+		flex: 0 0 auto;
+	}
 
 	.console-tabs {
 		display: flex;

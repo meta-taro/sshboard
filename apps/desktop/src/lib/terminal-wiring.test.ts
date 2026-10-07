@@ -20,6 +20,13 @@
  *
  * ここが見るのはソースの形です。**中身の正しさは見ていません** —
  * 「作ったのに繋がっていない」という、あの 1 つの壊れ方だけを止めます。
+ *
+ * **2026-10-07 に持ち場が変わりました。**端末の面は `ConsolePane.svelte` へ移り、
+ * **描いて確かめるテストが 10 本入りました**（`ConsolePane.svelte.test.ts`）——
+ * `writeChunk` を外すと落ちることまで確かめてあります。
+ *
+ * なので**ここが見るのは *出力* の面だけ**です。あちらはまだ `+page.svelte` に在り、
+ * 描いて確かめるものがありません。**代用が要るのは、そちらになりました。**
  */
 import { describe, expect, test } from 'vitest';
 
@@ -34,13 +41,14 @@ function terminalsCreatedIn(text: string): string[] {
 }
 
 describe('端末の配線', () => {
-	test('finds the terminals the page creates', () => {
+	test('finds the terminal the page still creates', () => {
 		// **この検査自体が空振りしていないこと。**正規表現が合わなくなった日に、
 		// 「1 つも見つからないので全部通った」になると、見張りが死にます。
 		const created = terminalsCreatedIn(source);
 
-		expect(created.length).toBeGreaterThanOrEqual(2);
-		expect(created).toContain('consoleTerm');
+		expect(created.length).toBeGreaterThanOrEqual(1);
+		// ***出力* の面。**端末の面は部品へ移りました（`ConsolePane.svelte`）。
+		expect(created).toContain('terminal');
 	});
 
 	test('replays what it remembered into every terminal it creates', () => {
@@ -68,14 +76,25 @@ describe('端末の配線', () => {
 	});
 
 	test('keeps each connection apart and redraws when the focus moves', () => {
-		// **D60（2026-10-02）**: 端末が接続ごとに持てるようになったので、
+		// **D60（2026-10-02）**: 出力が接続ごとに分かれたので、
 		// 面へ書く前に**どの接続の出力か**を見なければなりません。
 		// 見ないと、2 台の出力が 1 つの面で混ざります。
-		expect(source).toContain('if (from !== shownConnection) return;');
+		expect(source).toContain('from === shownConnection');
+
+		// **端末のものは端末の面へ**（分割・2026-10-07）。
+		// *出力* の面に端末の分まで出すと、同じサーバに 2 枚開いた日に
+		// **両方の打鍵が 1 つの面で混ざります。**
+		expect(source).toContain('event.payload.console === null');
 
 		// **宛先が変わったら消して描き直す。**続けて出すと、人は境目が分からず、
 		// **どの台で打ったのかを取り違えます。**
-		expect(source).toContain('term.reset();');
+		expect(source).toContain('terminal.reset();');
+	});
+
+	test('hands the console panes their own backlog', () => {
+		// **面ごとに控えが違います**（同じサーバに 2 枚開くので）。
+		// 接続ごとの控えを渡すと、**両方の面に同じものが出ます。**
+		expect(source).toContain('replayFor(backlogs, consoleKey(pane.id))');
 	});
 
 	test('writes the incoming stream into every terminal it creates', () => {
