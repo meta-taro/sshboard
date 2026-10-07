@@ -14,6 +14,7 @@
 	import { onMount } from 'svelte';
 
 	import Icon from '$lib/components/Icon.svelte';
+	import { readableFailure } from '$lib/connect-failure';
 	import PassphraseDialog from '$lib/components/PassphraseDialog.svelte';
 	import { i18n } from '$lib/i18n/i18n.svelte';
 	import type { Connection } from '$lib/connections';
@@ -95,7 +96,9 @@
 			await invoke('connection_passphrase_save', { id, passphrase: value });
 		} catch (error: unknown) {
 			// **黙らない。**預かったつもりで預かっていないのが、いちばん悪い形です。
-			failure = String(error);
+			// **構造を持った失敗を潰さない**（Issue #33）。
+			// `[object Object]` だけが帯に出る形を、ここにも残していました。
+			failure = readableFailure(error);
 		}
 	}
 

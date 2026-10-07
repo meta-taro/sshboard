@@ -37,7 +37,7 @@
 	} from '$lib/stream-backlog';
 	import { applyEdit, editIntent, type EditableField } from '$lib/edit-keys';
 	import { canFollow, isView, type View, viewAfterAnswered} from '$lib/view-request'
-	import { asConnectFailure, readableFailure } from '$lib/connect-failure';;
+	import { asConnectFailure, readableFailure } from '$lib/connect-failure';
 	import { attachClipboard, browserClipboard, detectPlatform } from '$lib/terminal-clipboard';
 	import { isFindShortcut, type TerminalSearch } from '$lib/terminal-search';
 	import '@xterm/xterm/css/xterm.css';
@@ -252,7 +252,15 @@
 			passphraseFor = null;
 			await session.refresh();
 		} catch (error: unknown) {
-			failure = String(error);
+			// **構造を持った失敗を `String()` で潰さない**（Issue #33・2026-10-03）。
+			//
+			// > その直後に赤帯が `[object Object]` になり、接続が開かない
+			//
+			// `session_connect` は**構造を持った失敗**を返します
+			// （ホスト鍵・パスフレーズ・その他）。`String(error)` だと
+			// **`[object Object]` になり、人にも私たちにも何も伝わりません。**
+			// ホスト鍵の経路（`answerHostKey`）だけが直っていて、ここは残っていました。
+			failure = readableFailure(error);
 		} finally {
 			passphraseBusy = false;
 		}

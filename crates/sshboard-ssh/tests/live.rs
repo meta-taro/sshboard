@@ -1014,3 +1014,56 @@ async fn a_chatty_command_is_not_cut_off_even_when_it_runs_longer_than_the_cap()
 
     assert_eq!(out.out.matches("tick").count(), 4, "実際: {out:?}");
 }
+
+#[tokio::test]
+async fn an_authentication_that_fails_is_written_down() {
+    // **Issue #33**（2026-10-03・0.1.17 / Windows 11）——
+    //
+    // > diagnostics を見ると、ホスト鍵の照合までは成功している。
+    // > ところが**その直後に赤帯が `[object Object]` になり、接続が開かない**
+    // > 失敗した段階が `diagnostics` に残らない（最後の行は host-key の info）
+    //
+    // **そのとおりでした。**鍵とパスワードの認証が失敗する経路に、
+    // `diag` の行が 1 本もありませんでした。**ホスト鍵の後で記録が途切れます。**
+    //
+    // 追えない失敗は、直せない失敗です（Issue #10 の教訓）。
+    // **何が起きたか分からないままでは、人も AI も次の一手を選べません。**
+    if !server_is_up().await {
+        println!("テスト用サーバーが建っていません（想定内・飛ばします）");
+        return;
+    }
+
+    let fingerprint = known_fingerprint().await.clone();
+    let mut target = target(Some(&fingerprint));
+    target.user = "pw".into();
+
+    let diag = Diagnostics::new();
+    let result = SshSession::connect(
+        &target,
+        &Auth::Password {
+            password: "まちがったパスワード".into(),
+        },
+        Band::new(),
+        &diag,
+    )
+    .await;
+    assert!(matches!(result, Err(SshError::Authenticate(_))));
+
+    let said: Vec<String> = diag.recent(50).iter().map(|event| event.render()).collect();
+    let all = said.join("\n");
+
+    // **認証で落ちたことが残る。**ホスト鍵の行で終わらない。
+    assert!(
+        said.iter()
+            .any(|line| line.contains("認証") && line.contains("失敗")),
+        "**認証の失敗が記録に残っていない**（Issue #33 の形）\n{all}"
+    );
+    // **次の一手が付いている**（product-baseline §17）。
+    assert!(all.contains("→"), "失敗に次の一手が付いていない\n{all}");
+    // **秘密も接続先も残さない**（PRD §8 / D14）。
+    assert!(
+        !all.contains("まちがったパスワード"),
+        "**打ったものが記録に残った**\n{all}"
+    );
+    assert!(!all.contains(HOST), "記録に接続先が入っている\n{all}");
+}

@@ -467,28 +467,68 @@ async fn authenticate(
             let hash = handle
                 .best_supported_rsa_hash()
                 .await
-                .map_err(|error| SshError::Authenticate(error.to_string()))?
+                .map_err(|error| {
+                    // **鍵の種類を聞けなかった。**ここも記録に残します（Issue #33）。
+                    diag.error(
+                        Stage::Auth,
+                        id,
+                        format!("相手が受け付ける鍵の形を聞けませんでした（{error}）"),
+                        "繋ぎ直してください。続くなら相手の sshd の設定を確かめてください",
+                    );
+                    SshError::Authenticate(error.to_string())
+                })?
                 .flatten();
             handle
                 .authenticate_publickey(user, PrivateKeyWithHashAlg::new(Arc::new(key), hash))
                 .await
-                .map_err(|error| SshError::Authenticate(error.to_string()))?
+                .map_err(|error| {
+                    diag.error(
+                        Stage::Auth,
+                        id,
+                        format!("鍵で認証を試せませんでした（{error}）"),
+                        "鍵が読めていても、相手が受け付けない形のことがあります。\
+                         `diagnostics` の 1 つ前の行に、読めた形が出ています",
+                    );
+                    SshError::Authenticate(error.to_string())
+                })?
         }
     };
 
     if result.success() {
-        Ok(())
-    } else {
-        // **何で試したかを言う。**「受け付けられません」だけでは、
-        // 鍵を直すのかパスワードを直すのか分かりません。
-        Err(SshError::Authenticate(match auth {
-            Auth::Password { .. } => {
-                "パスワードが受け付けられませんでした。利用者名とパスワードを確かめてください"
-                    .into()
-            }
-            _ => "鍵が受け付けられませんでした".to_string(),
-        }))
+        diag.info(Stage::Auth, id, "認証が通りました");
+        return Ok(());
     }
+
+    // **何で試したかを言う。**「受け付けられません」だけでは、
+    // 鍵を直すのかパスワードを直すのか分かりません。
+    let (why, next) = match auth {
+        Auth::Password { .. } => (
+            "パスワードが受け付けられませんでした".to_string(),
+            "利用者名とパスワードを確かめてください。\
+             サーバーが `PasswordAuthentication no` のこともあります",
+        ),
+        _ => (
+            "鍵が受け付けられませんでした".to_string(),
+            "その鍵の公開鍵が、相手の `~/.ssh/authorized_keys` に入っているか確かめてください。\
+             パスフレーズ付きの鍵なら、入れたパスフレーズが正しいかも確かめてください",
+        ),
+    };
+    // **認証で落ちたことを残す**（Issue #33）。
+    //
+    // ここには `diag` の行が 1 本もありませんでした。**ホスト鍵の行で記録が途切れ**、
+    // 実運用でこう報告されました ——
+    //
+    // > 失敗した段階が `diagnostics` に残らない（最後の行は host-key の info）
+    //
+    // **追えない失敗は、直せない失敗**です（Issue #10 の教訓）。
+    // **打ったものは 1 バイトも残しません**（D14）。残すのは「認証で落ちた」事実だけ。
+    diag.error(
+        Stage::Auth,
+        id,
+        format!("認証が失敗しました（{why}）"),
+        next,
+    );
+    Err(SshError::Authenticate(format!("{why}。{next}")))
 }
 
 /// agent へ繋げないときに出す案内。

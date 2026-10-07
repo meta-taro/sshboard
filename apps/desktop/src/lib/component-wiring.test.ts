@@ -310,3 +310,48 @@ describe('繋ぐ道', () => {
 		]);
 	});
 });
+
+/**
+ * **構造を持った失敗を `String()` で潰さない**（Issue #33 / #26）。
+ *
+ * `session_connect` は**構造を持った失敗**を返します
+ * （ホスト鍵・パスフレーズ・その他）。`String(error)` だと
+ * **赤帯が `[object Object]` になり、人にも私たちにも何も伝わりません。**
+ *
+ * **2 回同じことが起きています。**#26 で 1 か所直し、
+ * **#33 で残りの 2 か所が見つかりました**（パスフレーズを答えた後と `ConnectPanel`）。
+ * 「この字だけで 2 日使った」と書かれています。**3 回目を作りません。**
+ */
+describe('繋ぐ失敗の見せ方', () => {
+	test('every place that connects makes the failure readable', () => {
+		const connecting = Object.entries(sources).filter(
+			([path, source]) =>
+				/\.svelte$/.test(path) && !/\.test\./.test(path) && /session_connect/.test(source)
+		);
+
+		// **この検査自体が空振りしていないこと。**
+		expect(connecting.length).toBeGreaterThanOrEqual(2);
+
+		const unreadable = connecting
+			.filter(([, source]) => !/readableFailure/.test(source))
+			.map(([path]) => path.slice(path.lastIndexOf('/') + 1));
+
+		expect(
+			unreadable,
+			`session_connect を呼ぶのに readableFailure を使っていない: ${unreadable.join(', ')}`
+		).toEqual([]);
+	});
+
+	test('the readable failure never leaves an object as the text', () => {
+		// **最後の砦が在ること。**`[object Object]` になる経路を 1 つも残さない。
+		const made = sources['../lib/connect-failure.ts'] ?? pickConnectFailure();
+		expect(made).toContain('JSON.stringify');
+	});
+});
+
+/** `connect-failure.ts` のソース。**glob の鍵が変わった日に空振りしないこと。** */
+function pickConnectFailure(): string {
+	const found = Object.entries(sources).find(([path]) => path.endsWith('/connect-failure.ts'));
+	if (!found) throw new Error('connect-failure.ts が読めていません');
+	return found[1];
+}
