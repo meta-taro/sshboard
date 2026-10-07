@@ -86,6 +86,19 @@ jobs:
           #
           # 2026-10-06、Windows を x64 と ARM64 に分けたときに入れました。
           # git-qa は同じ所で **x64 と ARM64 を取り違えています。**
+          # **README が指す写真が在るか**（baseline §23・2026-10-07）。
+          #
+          # README に画像を足して**上げ忘れると、GitHub 上で壊れた札が出ます** ——
+          # しかも**手元では見えます**（ファイルが在るので）。
+          # 外から来た人が最初に見る 1 枚が壊れている、がいちばん損です。
+          for img in $(grep -ohE 'site/shots/[a-z]+/[a-z]+\.png' README.md README.ja.md \
+                       | sort -u); do
+            git ls-files --error-unmatch "$img" >/dev/null 2>&1 || {
+              echo "::error::README が指す ${img} が git に在りません"
+              exit 1
+            }
+          done
+
           for id in $(grep -o 'id="\(dl\|size\)-[a-z-]*"' site/index.html \
                       | sed 's/id="//;s/"//' | sort -u); do
             grep -q "'${id}'" site/app.js || {

@@ -2,21 +2,103 @@
 
 *English ／ [日本語](README.ja.md)*
 
-**MCP SFTP client and MCP SSH terminal — let an AI agent *see* your remote server, over one SSH session, on the same screen you are looking at.**
+**Your AI agent and you, looking at the same server, on the same screen, over one SSH
+connection.**
 
-Files, command output, everything — **over the same single SSH connection**, shown to
-you and to the agent at once.
+You keep your own SFTP client and your own terminal. The agent works beside you — inside
+a fence you drew — and **every single thing it does scrolls past in your window while it
+happens.**
+
+![The connection list, with a connection being edited](site/shots/en/connections.png)
 
 > ⚠️ **This is alpha.** It **started being used on a production server** on 2026-09-09
-> (investigating a failed certificate renewal). **611 tests pass** (390 Rust, 221
-> frontend) and installers are bundled for Windows and macOS. **None of that means it
-> works as a tool** — we shipped a build whose terminal displayed *not one byte* for
-> three days (Issue #10).
-> Direction lives in [`PRD.md`](PRD.md), the plan in
-> [`.claude/roadmap.md`](.claude/roadmap.md), and every decision with its reasoning in
-> [`.claude/decisions.md`](.claude/decisions.md).
+> (investigating a failed certificate renewal). **747 tests pass** (418 Rust, 329
+> frontend) and installers are bundled for Windows (x64 / ARM64) and macOS.
+> **None of that means it works as a tool** — we shipped a build whose terminal
+> displayed *not one byte* for three days (Issue #10).
+
+**[⬇ Download](https://github.com/meta-taro/sshboard/releases/latest)** ·
+[Direction](PRD.md) · [Every decision, with its reasoning](.claude/decisions.md)
 
 ---
+
+## When you would reach for this
+
+### "Renew the certificates on three hosts, today"
+
+You have a terminal open per host and you are copying the same command into each,
+watching for the one that fails. **sshboard opens one console per connection** —
+or two on the same host, side by side — and the agent can read *all* of them while you
+work. Not "the agent runs it for you": **the agent watches what you are doing and tells
+you which pane went wrong.**
+
+![Two consoles on the same server, side by side](site/shots/en/console.png)
+
+### "Mail stopped arriving and I don't know where to look"
+
+You ask the agent. It reads `/etc/postfix/main.cf`, checks the service, tails the log —
+**over the same SSH session you are already on**, and you see each step as it happens.
+It cannot run an arbitrary command to do it: **there is no `run_command(cmd)` tool.**
+
+```
+[Human] $ cd /var/www
+[AI]    $ df -h
+Filesystem      Size  Used Avail Use% Mounted on
+/dev/vda1        50G   38G   10G  80% /
+[AI]    read /etc/postfix/main.cf  (4.1 KB)
+```
+
+### "I want help, but not an agent loose on my server"
+
+The agent may write **only** inside directories you listed, one connection at a time.
+**The list starts empty, so it cannot write a single byte until you say where.**
+Delete, rename, move, chmod, restart, package installs, sudo — **none of them exist for
+the agent.** You are not restricted anywhere.
+
+![The two-pane file browser; the agent's writable directory is shown at the top](site/shots/en/files.png)
+
+---
+
+## Try it in five minutes
+
+**Install the app**, then point your agent at it. There is nothing else to run — the MCP
+server lives inside the app.
+
+```sh
+# 1. a throwaway SSH server on your own machine (needs Docker)
+sh tools/test-server/up.sh
+ssh-add tools/test-server/.key
+
+# 2. the app
+pnpm install
+pnpm --filter desktop tauri dev
+```
+
+Register `127.0.0.1:2222`, user `probe`, connect, then press **Copy the MCP command** in
+the window's title bar and paste it into your agent:
+
+```sh
+claude mcp add --transport http sshboard http://127.0.0.1:22022 \
+  --header "Authorization: Bearer <the token the button copied>"
+```
+
+Prebuilt installers are on the
+[releases page](https://github.com/meta-taro/sshboard/releases/latest)
+(Windows x64 / ARM64, macOS Apple Silicon). **They are not code-signed**, so SmartScreen
+and Gatekeeper will both stop you the first time.
+
+---
+
+## What you see while the agent works
+
+**Every operation, yours and the agent's, lands in one band.** You do not have to ask what
+it did.
+
+![The activity band: one line per operation, with [AI] marking the agent's](site/shots/en/band.png)
+
+When something fails, the same log the agent reads over MCP is on your screen — which
+stage it reached, why it stopped, and what to do next. **It carries no hostnames, no
+usernames and no secrets.**
 
 ## Why this exists
 
