@@ -114,6 +114,25 @@ jobs:
       - name: 束ねるものが git に在るか
         run: python3 tools/check-bundle-assets.py
 
+      # **MCP の名乗りの版が、アプリの版と揃っているか**（AEO・2026-10-13）。
+      #
+      # `server.json` は MCP Registry が読みます。**放っておくと必ず腐ります** ——
+      # 版を上げるたびに手で直す所なので、忘れた日に**古い版を名乗り続けます。**
+      # 一覧に古い版が並ぶと、見た人は「更新されていない製品」と読みます。
+      - name: MCP の名乗りの版が揃っているか
+        shell: bash
+        run: |
+          set -eu
+          APP="$(sed -n 's/.*"version": "\([0-9.]*\)".*/\1/p' \
+            apps/desktop/src-tauri/tauri.conf.json | head -1)"
+          MCP="$(sed -n 's/.*"version": "\([0-9.]*\)".*/\1/p' server.json | head -1)"
+          if [ "$APP" != "$MCP" ]; then
+            echo "::error::server.json の版 ${MCP} が、アプリの版 ${APP} と違います。" \
+                 "server.json の \"version\" を ${APP} へ揃えてください"
+            exit 1
+          fi
+          echo "MCP の名乗りの版は ${MCP}（アプリと一致）"
+
       - name: 型検査
         run: pnpm --filter desktop check
 
