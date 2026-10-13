@@ -128,7 +128,16 @@
 	 */
 	// **接続ごとに覚えます**（D60）。1 本で持つと、タブを戻したときに
 	// **別のサーバーの出力が出ます。**
-	let backlogs: Backlogs = emptyBacklogs();
+	//
+	// **わざと反応しない入れ物に入れています**（`$state` を付けないこと）。
+	// ここは「面ができた時点で書き戻すための控え」で、**画面を描き直す元ではありません。**
+	// 生きている面への書き込みは `consoleWriters`（`onready` で受けた口）が運びます。
+	//
+	// `$state` を付けると、`ConsolePane` へ渡す `backlog` が**出力 1 片ごとに変わり**、
+	// 面の `$effect` が毎回走ります（面は既にあるので何も書かずに戻るだけの空回り）。
+	// 控えを反応させても**打鍵が画面に出るようにはなりません** ——
+	// 0.1.21 の回帰はそこを間違えて、控えに溜めるだけで面へ書いていませんでした。
+	const backlogs: { all: Backlogs } = { all: emptyBacklogs() };
 	/** 誰が握っているか。`null` は誰も握っていない。 */
 	let holder = $state<'human' | 'ai' | null>(null);
 	/** **どの接続の端末か。**タブを移しても端末は付いてこない（D25）。 */
@@ -520,7 +529,7 @@
 			terminal = createTerminal(host, textSize.terminalPx);
 			// **こちらも書き戻す。**同じ 1 本の出力を見ている面なので、
 			// 片方だけ戻ると「どちらが本当か」が分からなくなります。
-			writeChunk(terminal, replayFor(backlogs, shownConnection));
+			writeChunk(terminal, replayFor(backlogs.all, shownConnection));
 			detachOutput.push(attachFit(terminal, host));
 			// **見るだけの面でも、なぞればコピーできます。**ログを拾うのはここ。
 			// 貼り付けは付けません（`disableStdin` の面から文字が出ると嘘になる）。
@@ -596,7 +605,7 @@
 	 */
 	$effect(() => {
 		const on = shownConnection;
-		const back = replayFor(backlogs, on);
+		const back = replayFor(backlogs.all, on);
 		// **端末の面は部品が持ちます**（面ごとに控えが違うので、ここでは触りません）。
 		if (!terminal) return;
 		terminal.reset();
@@ -1004,7 +1013,7 @@
 					: consoleKey(event.payload.console);
 			// **面が無くても覚えておく**（Issue #14）。
 			// ここを通らないと、別のタブに居る間の分が丸ごと消えます。
-			backlogs = rememberFor(backlogs, from, event.payload.chunk);
+			backlogs.all = rememberFor(backlogs.all, from, event.payload.chunk);
 			// ***出力* の面は、接続ごとのものだけ**を映します（端末の分は端末の面へ）。
 			if (event.payload.console === null) {
 				if (from === shownConnection && terminal) {
@@ -1704,7 +1713,7 @@
 							{pane}
 							{clipboard}
 							{platform}
-							backlog={replayFor(backlogs, consoleKey(pane.id))}
+							backlog={replayFor(backlogs.all, consoleKey(pane.id))}
 							mark={session.all.find((held) => held.id === pane.connection)?.color ?? null}
 							fontPx={textSize.terminalPx}
 							active={layout.focused === pane.id}

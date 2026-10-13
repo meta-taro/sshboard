@@ -72,7 +72,20 @@ describe('端末の配線', () => {
 	test('remembers the stream even when no terminal exists', () => {
 		// **面が無い間も覚えておく。**ここを通らないと、
 		// 書き戻す中身がそもそも溜まりません。
-		expect(source).toContain('backlogs = rememberFor(backlogs,');
+		expect(source).toContain('backlogs.all = rememberFor(backlogs.all,');
+	});
+
+	test('keeps the backlog cache out of the redraw path', () => {
+		// **控えは画面を描き直す元ではありません。**面ができた時点で書き戻すための
+		// 控えで、生きている面への書き込みは `consoleWriters` が運びます。
+		//
+		// `$state` を付けると、`ConsolePane` へ渡す `backlog` が
+		// **出力 1 片ごとに変わり**、面の `$effect` が毎回空回りします。
+		// しかも**それで打鍵が出るようにはなりません** ——
+		// 0.1.21 の回帰は、控えに溜めるだけで面へ書いていなかったのが原因でした。
+		// 「警告が出ているから `$state` を付ける」で直したことにさせない。
+		expect(source).toContain('const backlogs: { all: Backlogs } = {');
+		expect(source).not.toMatch(/backlogs\s*=\s*\$state/);
 	});
 
 	test('keeps each connection apart and redraws when the focus moves', () => {
@@ -94,7 +107,7 @@ describe('端末の配線', () => {
 	test('hands the console panes their own backlog', () => {
 		// **面ごとに控えが違います**（同じサーバに 2 枚開くので）。
 		// 接続ごとの控えを渡すと、**両方の面に同じものが出ます。**
-		expect(source).toContain('replayFor(backlogs, consoleKey(pane.id))');
+		expect(source).toContain('replayFor(backlogs.all, consoleKey(pane.id))');
 	});
 
 	test('writes the incoming stream into every terminal it creates', () => {
