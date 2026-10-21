@@ -53,8 +53,11 @@ NEED_FAINT = 3.0
 
 # **実際に組にして使っているものだけ。**（字, 地, 目安, どこで使っているか）
 PAIRS = [
-    ("fg", "surface-raised", NEED_TEXT, "選ばれているタブ（.tabs button.active）"),
-    ("fg-muted", "shell", NEED_TEXT, "選ばれていないタブ（.tabs button）"),
+    # **選ばれているタブは、2026-10-21 から地と字を入れ替えます**（UI 案）。
+    # `--surface-raised`（明るさで浮かせる）は使わなくなったので外しました ——
+    # **使っていない組を見張ると、説明がそのまま嘘になります。**
+    ("selected-fg", "selected", NEED_TEXT, "選ばれているタブ（.tabs button.active）"),
+    ("fg-control", "shell", NEED_TEXT, "選ばれていないタブ（.tabs button）"),
     ("fg", "surface", NEED_TEXT, "本文・札の中身"),
     ("fg-muted", "surface", NEED_TEXT, "控えめな字（説明・補足）"),
     ("fg-faint", "surface", NEED_FAINT, "薄い字（識別子・道）"),
@@ -150,7 +153,7 @@ GOOD = {
     "fg": "#e8eaed", "fg-control": "#c9cdd3", "fg-muted": "#9ba3ae",
     "fg-dim": "#8a929d", "fg-faint": "#6f7782",
     "ground": "#0b0d10", "shell": "#121417", "surface": "#13161b",
-    "surface-2": "#171a20", "surface-raised": "#262e3a",
+    "surface-2": "#171a20",
     "accent": "#8cc2ff", "accent-fg": "#0b0d10",
     "human": "#8cc2ff", "ai": "#f5a65b",
     "selected": "#e8eaed", "selected-fg": "#0b0d10",

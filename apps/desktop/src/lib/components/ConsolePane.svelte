@@ -222,7 +222,7 @@
 		flex: 0 0 auto;
 		width: 3px;
 		align-self: stretch;
-		border-radius: 999px;
+		border-radius: var(--r-pill);
 		background: var(--mark, transparent);
 	}
 

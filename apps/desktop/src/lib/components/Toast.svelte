@@ -52,7 +52,7 @@
 		color: var(--fg);
 		background: var(--surface);
 		border: 1px solid var(--hairline-strong);
-		border-radius: 999px;
+		border-radius: var(--r-pill);
 		box-shadow: var(--lift-3);
 		max-width: min(28rem, calc(100vw - 2rem));
 	}

@@ -4,6 +4,11 @@ import type { MessageKey } from './messages';
 type Catalog = Partial<Record<MessageKey, string>>;
 
 export const de: Catalog = {
+	// **画面を伏せる**（UI 案・2026-10-21）。接続先が画面に写り込むため。
+	'mask.hide': 'Bildschirm verdecken',
+	'mask.on': 'Verdeckt',
+	'ai.stop': 'KI anhalten',
+	'ai.stop.none': 'Die KI tut gerade nichts',
 	'app.phase0': "eine SSH-Verbindung, geteilt von Ihnen und der KI.",
 	'app.driven': "Sie können das für sich allein als SFTP-Client nutzen. Eine externe KI ruft MCP über dieselbe Sitzung auf; alles, was Sie beide tun, erscheint im Band.",
 	'theme.label': 'Design', 'theme.auto': 'Automatisch', 'theme.light': 'Hell', 'theme.dark': 'Dunkel',
@@ -230,6 +235,11 @@ export const de: Catalog = {
 };
 
 export const fr: Catalog = {
+	// **画面を伏せる**（UI 案・2026-10-21）。接続先が画面に写り込むため。
+	'mask.hide': 'Masquer l’écran',
+	'mask.on': 'Masqué',
+	'ai.stop': 'Arrêter l’IA',
+	'ai.stop.none': 'L’IA ne fait rien pour le moment',
 	'app.phase0': "une seule connexion SSH, partagée entre vous et l'IA.",
 	'app.driven': "Normalement, vous n'opérez pas ici. Un agent IA externe appelle MCP, et ses actions défilent dans le bandeau.",
 	'theme.label': 'Thème', 'theme.auto': 'Auto', 'theme.light': 'Clair', 'theme.dark': 'Sombre',
@@ -456,6 +466,11 @@ export const fr: Catalog = {
 };
 
 export const es: Catalog = {
+	// **画面を伏せる**（UI 案・2026-10-21）。接続先が画面に写り込むため。
+	'mask.hide': 'Ocultar la pantalla',
+	'mask.on': 'Oculto',
+	'ai.stop': 'Detener la IA',
+	'ai.stop.none': 'La IA no está haciendo nada ahora',
 	'app.phase0': "una sola conexión SSH, compartida por usted y la IA.",
 	'app.driven': "Puede usarlo solo como cliente SFTP. Un agente de IA externo llama a MCP sobre la misma sesión, y todo lo que hacen ambos aparece en la banda.",
 	'theme.label': 'Tema', 'theme.auto': 'Automático', 'theme.light': 'Claro', 'theme.dark': 'Oscuro',

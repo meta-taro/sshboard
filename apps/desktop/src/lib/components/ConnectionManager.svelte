@@ -1116,7 +1116,7 @@
 		font-size: 9px;
 		letter-spacing: 0.06em;
 		border: 1px solid currentColor;
-		border-radius: 999px;
+		border-radius: var(--r-pill);
 		padding: 0 0.4rem;
 		flex: none;
 		opacity: 0.9;
@@ -1145,7 +1145,7 @@
 		inset: 25% 50% 25% 50%;
 		width: 2px;
 		margin-left: -1px;
-		border-radius: 999px;
+		border-radius: var(--r-pill);
 		background: var(--hairline-strong);
 		transition: background var(--fast) var(--ease);
 	}
@@ -1340,7 +1340,7 @@
 		color: var(--fg);
 		background: var(--surface-2);
 		border: 1px solid var(--hairline);
-		border-radius: 999px;
+		border-radius: var(--r-pill);
 		padding: 0.3rem 0.85rem;
 		cursor: pointer;
 		box-shadow: var(--inner-highlight), var(--lift-1);
@@ -1391,7 +1391,7 @@
 		justify-content: center;
 		width: 22px;
 		height: 22px;
-		border-radius: 999px;
+		border-radius: var(--r-pill);
 		background: color-mix(in srgb, var(--accent-fg) 18%, transparent);
 		font-size: 0.72rem;
 		transition: transform var(--fast) var(--ease);

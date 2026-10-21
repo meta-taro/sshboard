@@ -36,7 +36,9 @@
 		type Backlogs
 	} from '$lib/stream-backlog';
 	import { applyEdit, editIntent, type EditableField } from '$lib/edit-keys';
-	import { canFollow, isView, type View, viewAfterAnswered} from '$lib/view-request'
+	import { appIntent } from '$lib/app-keys';
+	import { redaction } from '$lib/redaction/redaction.svelte';
+	import { canFollow, isView, VIEWS, type View, viewAfterAnswered} from '$lib/view-request'
 	import { asConnectFailure, readableFailure } from '$lib/connect-failure';
 	import { attachClipboard, browserClipboard, detectPlatform } from '$lib/terminal-clipboard';
 	import { isFindShortcut, type TerminalSearch } from '$lib/terminal-search';
@@ -102,6 +104,78 @@
 	function humanShows(next: typeof view) {
 		humanSwitchedAt = Date.now();
 		view = next;
+	}
+
+	/**
+	 * **画面を伏せる**（UI 案・2026-10-21／D26）。
+	 *
+	 * 配線はもともと在りました —— `[data-redact='on'] [data-secret]` が
+	 * 中身を塗り潰し（**ぼかしでないので拡大しても読めない**）、印は 9 ファイルに
+	 * 付いています。**足りなかったのは人が押す口だけ**で、
+	 * それまでは写真撮り用のイベントでしか立ちませんでした。
+	 *
+	 * **この製品は画面そのものに接続先が写り込みます**（CLAUDE.md 禁止事項 4）。
+	 * 画面共有や撮影の前に、人が 1 回押せることが要ります。
+	 */
+	function toggleMask() {
+		void redaction.set(!redaction.on).catch((error: unknown) => {
+			// **握り潰さない。**押したのに伏せられていない、が一番危ない。
+			failure = String(error);
+		});
+	}
+
+	/**
+	 * **AI を止める**（UI 案・2026-10-21）。
+	 *
+	 * 止めるのは**いま走っているもの**です ——
+	 * 流れている出力（`stop_stream`）と、AI が握っている端末（`console_stop`）。
+	 *
+	 * **MCP そのものを閉じる口はまだありません。**
+	 * 「AI を二度と繋げない」ではなく「**いまの手を止める**」です。
+	 * 文言もそこに合わせています（案の `AI を止める`）。
+	 */
+	async function stopAi() {
+		failure = null;
+		try {
+			// **出力を先に止める。**端末を先に閉じると、残りが流れ続けます。
+			await invoke('stop_stream');
+			if (holder === 'ai') await invoke('console_stop');
+		} catch (error: unknown) {
+			failure = String(error);
+		}
+	}
+
+	/** 画面ぜんたいのキー操作を実行する（判定は `app-keys.ts`）。 */
+	function runApp(intent: NonNullable<ReturnType<typeof appIntent>>) {
+		if (intent === 'mask') {
+			toggleMask();
+			return;
+		}
+		if (intent === 'stopAi') {
+			// **何もしていないときは何もしない。**空振りを「止めた」と見せない。
+			if (aiIsDoing) void stopAi();
+			return;
+		}
+		if (intent === 'menu') {
+			viewMenuOpen = true;
+			return;
+		}
+		if (intent === 'help') {
+			// **いまは「〜について」が一番近い場所です。**
+			// 案はヘルプを別に持っていますが、それはメニューの回（フェーズ F）。
+			aboutOpen = true;
+			return;
+		}
+		if (intent === 'newConnection') {
+			humanShows('connections');
+			return;
+		}
+		// `view:1` 〜 `view:5`。**並びは `VIEWS` が正本**
+		// （案は 端末 / ファイル / 接続 の順ですが、実物は **接続が 1 番目**です ——
+		//  「繋がないとファイルも端末も空」という実機の指摘でそうなっています）。
+		const at = Number(intent.slice('view:'.length)) - 1;
+		const next = VIEWS[at];
+		if (next) humanShows(next);
 	}
 
 	// --- 端末（D29）------------------------------------------------------------
@@ -307,6 +381,14 @@
 		}
 	}
 	const iHold = $derived(holder === 'human');
+	/**
+	 * **AI がいま何かしているか。**「AI を止める」を出していいかの判断。
+	 *
+	 * 握っていないし何も走っていないときに押せるボタンを出すと、
+	 * **押しても何も起きません。**そこは「止まった」と読まれるので、
+	 * **出さない**より悪いです。
+	 */
+	const aiIsDoing = $derived(holder === 'ai' || session.busy);
 
 	/**
 	 * **いま面に映っている接続**（D60・2026-10-02）。
@@ -625,6 +707,35 @@
 	 * 押しても何も起きないより、**期待どおりに動く方**へ寄せる。
 	 */
 	function onKeydown(event: KeyboardEvent) {
+		const target = event.target;
+		const typing = target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement;
+
+		/*
+		 * **画面ぜんたいのキー操作**（UI 案・2026-10-21）。
+		 *
+		 * **ここは飾りの検査より前に置きます。**`F1` は Ctrl も ⌘ も押さないので、
+		 * 下の早期 return を通ると**永久に届きません。**
+		 *
+		 * 判定そのものは `app-keys.ts` です。**端末の担当と取り合っていないこと**を
+		 * そこで数えています（`Ctrl Shift C` / `V` / `F` は端末のもの）。
+		 */
+		const app = appIntent(
+			{
+				key: event.key,
+				ctrlKey: event.ctrlKey,
+				metaKey: event.metaKey,
+				shiftKey: event.shiftKey,
+				altKey: event.altKey,
+				inField: typing
+			},
+			platform
+		);
+		if (app) {
+			event.preventDefault();
+			runApp(app);
+			return;
+		}
+
 		if (!(event.metaKey || event.ctrlKey)) return;
 
 		/*
@@ -641,9 +752,7 @@
 		 * **パスフレーズが入れられない ＝ 繋げない**ので、ここは一番手前の詰まりです。
 		 * **端末の上では手を出しません**（素の Ctrl+C は「走っているものを止める」）。
 		 */
-		const target = event.target;
-		const inField =
-			target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement;
+		const inField = typing;
 		const intent = editIntent(
 			{
 				key: event.key,
@@ -1133,7 +1242,26 @@
 			**この要素自体を掴める領域にします。**`pointer-events: none` で
 			下へ落とす手もありますが、それだと吹き出しが出なくなります。
 		-->
-		<span class="phase" data-tauri-drag-region title={i18n.t('app.driven')}>sshboard</span>
+		<!--
+			**ロゴの印**（UI 案・2026-10-21）。
+			端末の枠に、打っている矢印と行。**この道具が何なのかを 22px で言う。**
+			飾りなので読み上げからは外します（隣に製品名が文字で在る）。
+		-->
+		<span class="brand" data-tauri-drag-region title={i18n.t('app.driven')}>
+			<svg
+				class="brand-mark"
+				viewBox="0 0 24 24"
+				fill="none"
+				stroke="currentColor"
+				stroke-width="1.8"
+				stroke-linecap="round"
+				aria-hidden="true"
+			>
+				<rect x="3" y="4" width="18" height="16" rx="4"></rect>
+				<path d="M7 10l3 2-3 2M12 15h5"></path>
+			</svg>
+			<span class="brand-name">sshboard</span>
+		</span>
 
 		<!-- **ボタンとボタンの隙間でも掴める。**
 		     付けないと、並びの余白は「掴めない帯」になります。 -->
@@ -1176,6 +1304,42 @@
 			**失ったメニューを、自分の帯の中に作り直します。**
 			文言は `messages-menu` に既にあるものを使い、言い方を増やしません。
 		-->
+		<!--
+			**画面を伏せる**（UI 案・2026-10-21／D26）。
+			**この製品は画面そのものに接続先が写り込みます**（禁止事項 4）。
+			画面共有や撮影の前に、人が 1 回押せることが要ります。
+			伏せている間は**地と字を入れ替えて**、押したままなのが分かるようにします。
+		-->
+		<button
+			type="button"
+			class="mask-toggle"
+			class:on={redaction.on}
+			onclick={toggleMask}
+			title={`${i18n.t('mask.hide')}（${platform === 'mac' ? '⌘' : 'Ctrl'} Shift H）`}
+			aria-pressed={redaction.on}
+		>
+			<Icon name={redaction.on ? 'eye-off' : 'eye'} size={12} />
+			{redaction.on ? i18n.t('mask.on') : i18n.t('mask.hide')}
+		</button>
+
+		<!--
+			**AI を止める**（UI 案・2026-10-21）。
+			止めるのは**いま走っているもの**（流れている出力と、AI が握っている端末）。
+			**何もしていないときは押せません** —— 空振りを「止めた」と見せない。
+		-->
+		<button
+			type="button"
+			class="stop-ai"
+			onclick={() => void stopAi()}
+			disabled={!aiIsDoing}
+			title={aiIsDoing
+				? `${i18n.t('ai.stop')}（${platform === 'mac' ? '⌘' : 'Ctrl'} Shift .）`
+				: i18n.t('ai.stop.none')}
+		>
+			<span class="stop-ai-mark" aria-hidden="true"></span>
+			{i18n.t('ai.stop')}
+		</button>
+
 		<!-- **「〜について」はここ。**版を確かめる場所を 1 つに決めます（dbboard と同じ形）。 -->
 		<button
 			type="button"
@@ -1881,7 +2045,7 @@
 		place-items: center;
 		width: 26px;
 		height: 26px;
-		border-radius: 999px;
+		border-radius: var(--r-pill);
 		background: var(--accent-soft);
 		color: var(--accent);
 	}
@@ -1955,7 +2119,7 @@
 
 	.toast-bar {
 		height: 4px;
-		border-radius: 999px;
+		border-radius: var(--r-pill);
 		background: var(--surface-2);
 		overflow: hidden;
 	}
@@ -2059,12 +2223,101 @@
 		color: var(--accent);
 	}
 
+	/*
+	 * **画面を伏せる**（UI 案・2026-10-21／D26）。
+	 *
+	 * 押している間は**地と字を入れ替えます** —— 選ばれているタブと同じ合図。
+	 * 「伏せているのに伏せていないと思っている」が一番危ないので、
+	 * **弱い合図にしません。**
+	 */
+	.mask-toggle {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.3rem;
+		flex: none;
+		font: inherit;
+		font-size: 0.7rem;
+		color: var(--fg-control);
+		background: var(--shell);
+		border: 1px solid var(--hairline-strong);
+		border-radius: var(--r-pill);
+		padding: 0.24rem 0.6rem;
+		white-space: nowrap;
+		cursor: pointer;
+		transition:
+			background var(--fast) var(--ease),
+			color var(--fast) var(--ease);
+	}
+
+	.mask-toggle:hover {
+		background: var(--surface-2);
+	}
+
+	.mask-toggle.on {
+		color: var(--selected-fg);
+		background: var(--selected);
+		font-weight: 700;
+		border-color: transparent;
+	}
+
+	.mask-toggle:focus-visible,
+	.stop-ai:focus-visible {
+		outline: 2px solid var(--accent);
+		outline-offset: 1px;
+	}
+
+	/*
+	 * **AI を止める**（UI 案・2026-10-21）。
+	 *
+	 * **何もしていないときは押せません。**押しても何も起きないボタンは、
+	 * 「止まった」と読まれるので**出さないより悪い**。
+	 * 止まっているときは薄くして、**在ることだけ**は見せます
+	 * （探して見つからない方が困る）。
+	 */
+	.stop-ai {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.36rem;
+		flex: none;
+		font: inherit;
+		font-size: 0.7rem;
+		font-weight: 700;
+		color: var(--danger);
+		background: var(--danger-soft);
+		border: 1px solid var(--danger);
+		border-radius: var(--r-pill);
+		padding: 0.24rem 0.65rem;
+		white-space: nowrap;
+		cursor: pointer;
+		transition:
+			background var(--fast) var(--ease),
+			opacity var(--fast) var(--ease);
+	}
+
+	.stop-ai:hover:not(:disabled) {
+		background: color-mix(in srgb, var(--danger) 22%, transparent);
+	}
+
+	.stop-ai:disabled {
+		opacity: 0.4;
+		cursor: default;
+	}
+
+	/* 止める印。**丸ではなく角。**「停止」は四角という慣習に乗る。 */
+	.stop-ai-mark {
+		width: 0.42rem;
+		height: 0.42rem;
+		border-radius: 2px;
+		background: currentColor;
+		flex: none;
+	}
+
 	.about-open {
 		flex: 0 0 auto;
 		width: 24px;
 		height: 24px;
 		padding: 0;
-		border-radius: 999px;
+		border-radius: var(--r-pill);
 		background: transparent;
 		border: 1px solid var(--hairline);
 		color: var(--fg-muted);
@@ -2185,14 +2438,37 @@
 
 	/* 長い説明は常時出さない。**ここに置くと本文の面積が消える。**
 	   全文は title 属性と、帯が空のときの案内に出す。 */
-	.phase {
-		font-size: 0.7rem;
-		color: var(--fg-muted);
+	/*
+	 * **ロゴの印と製品名**（UI 案・2026-10-21）。
+	 *
+	 * 印は人の色（青）で引きます。**この道具の主は人**で、
+	 * AI は橙で別に名乗ります。色の役をここから一貫させます。
+	 */
+	.brand {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.4rem;
+		min-width: 0;
+		flex: 1 1 auto;
+		overflow: hidden;
+	}
+
+	.brand-mark {
+		width: 1.1rem;
+		height: 1.1rem;
+		flex: none;
+		color: var(--human);
+	}
+
+	.brand-name {
+		font-size: 0.78rem;
+		font-weight: 700;
+		letter-spacing: 0.02em;
+		color: var(--fg);
 		white-space: nowrap;
 		overflow: hidden;
 		text-overflow: ellipsis;
 		min-width: 0;
-		flex: 1 1 auto;
 	}
 
 	/* **合言葉ごと写せるボタン。**起動ごとに変わる値を人に書き写させない（D23）。 */
@@ -2286,7 +2562,7 @@
 	.who {
 		padding: 0 0.3rem;
 		border: 1px solid var(--hairline);
-		border-radius: 999px;
+		border-radius: var(--r-pill);
 	}
 
 	/*
@@ -2322,7 +2598,7 @@
 		white-space: nowrap;
 		flex: none;
 		padding: 0.2rem 0.5rem;
-		border-radius: 999px;
+		border-radius: var(--r-pill);
 		border: 1px solid var(--hairline);
 		background: var(--shell);
 		cursor: pointer;
@@ -2348,7 +2624,7 @@
 		flex: none;
 		background: var(--shell);
 		border: 1px solid var(--hairline);
-		border-radius: 999px;
+		border-radius: var(--r-pill);
 		padding: 3px;
 	}
 
@@ -2371,7 +2647,7 @@
 		color: var(--fg-muted);
 		background: transparent;
 		border: 1px solid transparent;
-		border-radius: 999px;
+		border-radius: var(--r-pill);
 		padding: 0.2rem 0.7rem;
 		white-space: nowrap;
 		cursor: pointer;
@@ -2391,15 +2667,23 @@
 	}
 
 	/*
-	 * **選ばれているタブ。**`--surface` では暗い配色で帯との差が 6 / 255 しか無く、
-	 * **どれが選ばれているか分かりませんでした**（実機の指摘・2026-09-24）。
-	 * 影は暗い背景に出ないので、**明るさで浮かせます**（`--surface-raised`）。
+	 * **選ばれているタブ。**
+	 *
+	 * 2026-09-24、`--surface` では暗い配色で帯との差が 6 / 255 しか無く、
+	 * **どれが選ばれているか分かりませんでした**（実機の指摘）。
+	 * そのときは `--surface-raised` で**明るさで浮かせて**直しました
+	 * （影は暗い背景に出ないため）。
+	 *
+	 * **UI 案（2026-10-21）はもっと強い合図を使います** —— 地と字を入れ替える。
+	 * 浮かせるのは「少し明るい」でしかなく、**白黒で撮ると消えます。**
+	 * 反転なら残ります。上の指摘は直したままで、合図だけ強くしました。
 	 */
 	.view-panel button.active,
 	.tabs button.active {
-		color: var(--fg);
-		background: var(--surface-raised);
-		box-shadow: var(--inner-highlight), var(--lift-1);
+		color: var(--selected-fg);
+		background: var(--selected);
+		font-weight: 700;
+		box-shadow: var(--lift-1);
 	}
 
 	.view-panel button:focus-visible,
@@ -2415,7 +2699,7 @@
 		color: var(--fg);
 		background: var(--surface);
 		border: 1px solid var(--hairline);
-		border-radius: 999px;
+		border-radius: var(--r-pill);
 		padding: 0.16rem 0.5rem;
 		margin-left: 0.15rem;
 		box-shadow: var(--inner-highlight);
@@ -2586,7 +2870,7 @@
 		color: var(--fg);
 		background: var(--surface-2);
 		border: 1px solid var(--hairline);
-		border-radius: 999px;
+		border-radius: var(--r-pill);
 		padding: 0.22rem 0.75rem;
 		cursor: pointer;
 		box-shadow: var(--inner-highlight), var(--lift-1);

@@ -4,6 +4,11 @@ import type { MessageKey } from './messages';
 type Catalog = Partial<Record<MessageKey, string>>;
 
 export const ko: Catalog = {
+	// **画面を伏せる**（UI 案・2026-10-21）。接続先が画面に写り込むため。
+	'mask.hide': '화면 가리기',
+	'mask.on': '가리고 있습니다',
+	'ai.stop': 'AI 중지',
+	'ai.stop.none': '지금 AI는 아무것도 하지 않습니다',
 	'app.phase0': "하나의 SSH를 사람과 AI가 함께 씁니다.",
 	'app.driven': "이것만으로 SFTP 클라이언트로 쓸 수 있습니다. 외부 AI 에이전트는 MCP로 같은 세션을 쓰고, 양쪽의 조작이 모두 밴드에 나옵니다.",
 	'theme.label': '테마', 'theme.auto': '자동', 'theme.light': '밝게', 'theme.dark': '어둡게',
@@ -230,6 +235,11 @@ export const ko: Catalog = {
 };
 
 export const zhCN: Catalog = {
+	// **画面を伏せる**（UI 案・2026-10-21）。接続先が画面に写り込むため。
+	'mask.hide': '遮住屏幕',
+	'mask.on': '已遮住',
+	'ai.stop': '停止 AI',
+	'ai.stop.none': 'AI 现在没有在做任何事',
 	'app.phase0': "一条 SSH，人和 AI 共用。",
 	'app.driven': "单独用作 SFTP 客户端也可以。外部 AI 代理通过 MCP 使用同一个会话，双方的操作都会显示在带上。",
 	'theme.label': '主题', 'theme.auto': '自动', 'theme.light': '浅色', 'theme.dark': '深色',
@@ -456,6 +466,11 @@ export const zhCN: Catalog = {
 };
 
 export const zhTW: Catalog = {
+	// **画面を伏せる**（UI 案・2026-10-21）。接続先が画面に写り込むため。
+	'mask.hide': '遮住畫面',
+	'mask.on': '已遮住',
+	'ai.stop': '停止 AI',
+	'ai.stop.none': 'AI 現在沒有在做任何事',
 	'app.phase0': "一條 SSH，人與 AI 共用。",
 	'app.driven': "單獨當作 SFTP 用戶端也可以。外部 AI 代理透過 MCP 使用同一個工作階段，雙方的操作都會顯示在帶上。",
 	'theme.label': '主題', 'theme.auto': '自動', 'theme.light': '淺色', 'theme.dark': '深色',

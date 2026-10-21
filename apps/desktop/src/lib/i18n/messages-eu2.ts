@@ -4,6 +4,11 @@ import type { MessageKey } from './messages';
 type Catalog = Partial<Record<MessageKey, string>>;
 
 export const ptBR: Catalog = {
+	// **画面を伏せる**（UI 案・2026-10-21）。接続先が画面に写り込むため。
+	'mask.hide': 'Ocultar a tela',
+	'mask.on': 'Oculto',
+	'ai.stop': 'Parar a IA',
+	'ai.stop.none': 'A IA não está fazendo nada agora',
 	'app.phase0': "uma única conexão SSH, compartilhada por você e pela IA.",
 	'app.driven': "Dá para usar sozinho como cliente SFTP. Um agente de IA externo chama o MCP na mesma sessão, e tudo o que vocês dois fazem aparece na faixa.",
 	'theme.label': 'Tema', 'theme.auto': 'Automático', 'theme.light': 'Claro', 'theme.dark': 'Escuro',
@@ -230,6 +235,11 @@ export const ptBR: Catalog = {
 };
 
 export const ru: Catalog = {
+	// **画面を伏せる**（UI 案・2026-10-21）。接続先が画面に写り込むため。
+	'mask.hide': 'Скрыть экран',
+	'mask.on': 'Скрыто',
+	'ai.stop': 'Остановить ИИ',
+	'ai.stop.none': 'ИИ сейчас ничего не делает',
 	'app.phase0': "одно SSH-соединение на вас и ИИ.",
 	'app.driven': "Можно пользоваться и просто как SFTP-клиентом. Внешний ИИ-агент обращается через MCP к той же сессии, и всё, что делаете вы оба, видно в ленте.",
 	'theme.label': 'Тема', 'theme.auto': 'Авто', 'theme.light': 'Светлая', 'theme.dark': 'Тёмная',
@@ -456,6 +466,11 @@ export const ru: Catalog = {
 };
 
 export const it: Catalog = {
+	// **画面を伏せる**（UI 案・2026-10-21）。接続先が画面に写り込むため。
+	'mask.hide': 'Nascondi lo schermo',
+	'mask.on': 'Nascosto',
+	'ai.stop': 'Ferma l’IA',
+	'ai.stop.none': 'L’IA non sta facendo nulla ora',
 	'app.phase0': "una sola connessione SSH, condivisa fra te e l'IA.",
 	'app.driven': "Puoi usarlo da solo come client SFTP. Un agente IA esterno chiama MCP sulla stessa sessione, e tutto quello che fate entrambi compare nella banda.",
 	'theme.label': 'Tema', 'theme.auto': 'Automatico', 'theme.light': 'Chiaro', 'theme.dark': 'Scuro',

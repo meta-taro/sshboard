@@ -6,6 +6,11 @@
  */
 
 const en = {
+	// **画面を伏せる**（UI 案・2026-10-21）。接続先が画面に写り込むため。
+	'mask.hide': 'Hide what is on screen',
+	'mask.on': 'Hidden',
+	'ai.stop': 'Stop the AI',
+	'ai.stop.none': 'The AI is not doing anything right now',
 	'app.phase0': "one SSH, shared by you and the AI.",
 	'app.driven': "You can use this on its own as an SFTP client. An external AI agent calls MCP over the same session, and everything both of you do shows in the band.",
 	'theme.label': 'Theme',
@@ -272,6 +277,11 @@ export type MessageKey = keyof typeof en;
 type Catalog = Partial<Record<MessageKey, string>>;
 
 const ja: Catalog = {
+	// **画面を伏せる**（UI 案・2026-10-21）。接続先が画面に写り込むため。
+	'mask.hide': '画面を伏せる',
+	'mask.on': '伏せています',
+	'ai.stop': 'AI を止める',
+	'ai.stop.none': 'AI はいま何もしていません',
 	'app.phase0': "1 本の SSH を、人と AI で共有します。",
 	'app.driven': "これ単体で SFTP クライアントとして使えます。外の AI エージェントは MCP から同じセッションを使い、どちらの操作も帯に出ます。",
 	'theme.label': 'テーマ',

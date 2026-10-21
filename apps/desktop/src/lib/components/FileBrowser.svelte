@@ -1018,7 +1018,7 @@
 		 * 縮められない床をここで置きます。
 		 */
 		min-width: max-content;
-		border-radius: 999px;
+		border-radius: var(--r-pill);
 		border: 1px solid var(--hairline);
 		background: var(--shell);
 	}
@@ -1053,7 +1053,7 @@
 	.conn-tab button {
 		border: none;
 		background: none;
-		border-radius: 999px;
+		border-radius: var(--r-pill);
 		/*
 		 * **名前を折り返さない**（2026-09-18 に実機で踏みました）。
 		 *
@@ -1087,7 +1087,7 @@
 	.tag {
 		font-size: 0.62rem;
 		padding: 0.05rem 0.32rem;
-		border-radius: 999px;
+		border-radius: var(--r-pill);
 		border: 1px solid var(--hairline);
 		color: var(--fg-muted);
 	}
@@ -1192,7 +1192,7 @@
 		width: 8px;
 		margin: 0 -0.25rem;
 		cursor: col-resize;
-		border-radius: 999px;
+		border-radius: var(--r-pill);
 		background: transparent;
 		position: relative;
 		align-self: stretch;
@@ -1206,7 +1206,7 @@
 		left: 50%;
 		width: 2px;
 		transform: translateX(-50%);
-		border-radius: 999px;
+		border-radius: var(--r-pill);
 		background: var(--hairline-strong);
 	}
 
@@ -1408,7 +1408,7 @@
 		font: inherit;
 		font-size: 0.7rem;
 		padding: 0.22rem 0.5rem;
-		border-radius: 999px;
+		border-radius: var(--r-pill);
 		border: 1px solid var(--hairline);
 		background: var(--shell);
 		color: var(--fg);
