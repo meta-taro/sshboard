@@ -347,3 +347,91 @@ jobs:
             --title "更新の宛先（自動生成・触らないでください）" \
             --notes "アプリが更新を探しに来る先です（D34）。中身は ${TAG} を指しています。" \
             latest.json
+
+  # **MCP の一覧へ、配った版を出し直す**（D61・2026-10-13）。
+  #
+  # CI が見張っているのは `server.json` とアプリの版が揃っているかだけで、
+  # **一覧に出し直す所は誰も見ていませんでした。**
+  # 0.1.24 を手で載せたあと、0.1.25 を配っても
+  # **一覧は 0.1.24 のまま**になります。古い版が並ぶと、
+  # 見た人は「更新されていない製品」と読みます。
+  #
+  # **`release` の後に置きます。**束ねるのが落ちた版を一覧へ出すと、
+  # 「在ると書いてあるのに落とせない」という一番悪い形になります。
+  #
+  # **Secrets は要りません。**`github-oidc` は GitHub Actions の
+  # id-token で `io.github.meta-taro` の持ち主を示します
+  # （人が `mcp-publisher login github` を叩くのと同じ所へ行きます）。
+  registry:
+    name: MCP の一覧へ出し直す（D61）
+    needs: release
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # **この 1 行が認証の全部。**鍵も token も置きません。
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: タグと名乗りの版が合っているか確かめる
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -eu
+          WANT="${TAG#v}"
+          HAVE="$(sed -n 's/.*"version": "\([0-9A-Za-z.+-]*\)".*/\1/p' server.json | head -1)"
+          if [ "$WANT" != "$HAVE" ]; then
+            echo "::error::server.json の版 ${HAVE} が、タグ ${TAG} と違います"
+            exit 1
+          fi
+          echo "出す版: ${HAVE}"
+
+      - name: 既に同じ版が載っていないか見る
+        id: already
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -eu
+          WANT="${TAG#v}"
+          # **一覧が落ちていても、ここで止めません。**
+          # 見えなかっただけで「載っていない」と決めると、二重に出します。
+          # 取れなかったら出さずに終わり、人へ渡します。
+          BODY="$(curl -fsS --max-time 20 \
+            'https://registry.modelcontextprotocol.io/v0/servers?search=sshboard' || true)"
+          if [ -z "$BODY" ]; then
+            echo "::warning::一覧が読めませんでした。出し直しは行いません（人が叩いてください）"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          NOW="$(echo "$BODY" | jq -r \
+            '.servers[] | select(.server.name=="io.github.meta-taro/sshboard")
+             | select(._meta["io.modelcontextprotocol.registry/official"].isLatest)
+             | .server.version' | head -1)"
+          echo "いま載っている版: ${NOW:-（無し）}"
+          if [ "$NOW" = "$WANT" ]; then
+            echo "既に ${WANT} が載っています。何もしません"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: mcp-publisher を入れる
+        if: steps.already.outputs.skip != 'true'
+        run: |
+          set -eu
+          # **版を固定します。**ここが勝手に上がると、
+          # タグを押した日に初めて壊れ方が分かります。
+          # 名前に版番号は入りません（`mcp-publisher_linux_amd64.tar.gz`）。
+          VER=1.8.1
+          curl -fsSL -o /tmp/mcp-publisher.tar.gz \
+            "https://github.com/modelcontextprotocol/registry/releases/download/v${VER}/mcp-publisher_linux_amd64.tar.gz"
+          tar -xzf /tmp/mcp-publisher.tar.gz -C /tmp mcp-publisher
+          /tmp/mcp-publisher --version
+
+      - name: 出し直す
+        if: steps.already.outputs.skip != 'true'
+        run: |
+          set -eu
+          /tmp/mcp-publisher login github-oidc
+          /tmp/mcp-publisher publish
