@@ -58,6 +58,9 @@ ROOT = Path(__file__).resolve().parent.parent
 SRC = ROOT / "apps/desktop/src"
 MIN_FILES = 10
 MIN_DEFINED = 20
+# **配色の塊だと認める下限。**これ未満の `:root` は色の塊ではない
+# （`prefers-reduced-motion` の中は 2 個しかない）。
+MIN_PALETTE = 20
 
 
 def strip_notes(text: str) -> str:
@@ -89,6 +92,99 @@ def missing(files: dict[str, str]) -> list[str]:
         for name, where in used.items()
         if name not in defined
     )
+
+
+# **テーマに依らないもの。**書体・角丸・動きは暗い側に持たなくてよい。
+THEME_FREE = re.compile(r"^--(font|r|shell-pad|ease|fast|slow)")
+
+TOKENS_CSS = SRC / "lib/styles/tokens.css"
+
+# **案が決めた「役」の色**（UI 案・2026-10-21）。
+#
+# 16 色の印は値を縛りません —— **全部違っていて、地の上で読めること**を
+# `check-css-contrast.py` が見ています。縛ると、色を 1 つ調整するたびに
+# **CI が落ち、人は検査を書き換えることを覚えます。**
+#
+# ここに置くのは**意味を担っている色だけ**です。人と AI を入れ替えたら
+# 画面の意味が変わるので、**黙って変わってはいけません。**
+DESIGN_DARK = {
+    "human": "#8cc2ff",
+    "ai": "#f5a65b",
+    "ground": "#0b0d10",
+    "surface": "#13161b",
+}
+
+
+def theme_blocks(text: str) -> list[tuple[str, dict[str, str]]]:
+    """`:root` の塊ごとに `--name: value` を拾う。**畳まずに、並びで返す。**
+
+    `check-css-contrast.py` が「**塊を名前で畳まないこと**」と書いている所です。
+    最初は見出しを鍵にした辞書で返していて、**明るい側が 2 個になりました** ——
+    `@media (prefers-reduced-motion: reduce)` の中にも見出し `:root` の塊が在り、
+    `--fast: 0ms` / `--slow: 0ms` の 2 個で**上書きしていた**からです。
+
+    `read_themes` が同じ形で無事だったのは、**16 進数しか拾わないので
+    その塊が空になり、捨てられていた**だけです。偶然です。
+
+    暗い配色は 2 か所に在ります（`@media` の中と `[data-theme='dark']`）。
+    畳むと**その 2 つがずれても誰も気づきません** ——
+    しかも「自動」と「手動で暗い」は**同時に見られない**ので、
+    気づくのがいちばん遅い形になります。
+
+    こちらは `rgba(…)` も含めて**全部**拾います（名前の抜けを数えるため）。
+    """
+    out: list[tuple[str, dict[str, str]]] = []
+    for m in re.finditer(r"(:root[^{]*)\{(.*?)\n\t*\}", text, re.S):
+        head, body = m.group(1).strip(), re.sub(r"/\*.*?\*/", "", m.group(2), flags=re.S)
+        found = dict(re.findall(r"(--[A-Za-z0-9_-]+)\s*:\s*([^;]+);", body))
+        if found:
+            out.append((head, {k: v.strip().lower() for k, v in found.items()}))
+    return out
+
+
+def theme_trouble(text: str) -> list[str]:
+    """明るい側に在る色が暗い側にも在るか、暗い側 2 か所の値が一致するか。"""
+    blocks = theme_blocks(text)
+    # **配色の塊だけを見る。**`[data-text-size=…]` や `prefers-reduced-motion` の
+    # 中の `:root` は色を持たないので、**件数で切り分けます。**
+    palettes = [(head, tokens) for head, tokens in blocks if len(tokens) >= MIN_PALETTE]
+    if len(palettes) != 3:
+        return [
+            f"配色の塊が {len(palettes)} 個です（明るい 1 つ ＋ 暗い 2 つ のはず）。"
+            f"読み方が壊れている可能性があります —— 見えた塊: "
+            + ", ".join(f"{h}({len(t)})" for h, t in blocks)
+        ]
+
+    # **並びで決める。**最初の素の `:root` が明るい側。
+    # 見出しで選ぶと、`@media` の中が `:root:not([data-theme='light'])` で
+    # **dark の字がどこにも無い**ので取りこぼします。
+    light_head, light = palettes[0]
+    if light_head != ":root":
+        return [f"1 つ目の配色が `{light_head}` です（素の `:root` のはず）"]
+    darks = palettes[1:]
+
+    bad: list[str] = []
+    for name in sorted(light):
+        if THEME_FREE.match(name):
+            continue
+        for head, colors in darks:
+            if name not in colors:
+                bad.append(f"{head}: **{name} が定義されていません**（明るい側の値がそのまま残ります）")
+
+    (head_a, a), (head_b, b) = darks
+    for name in sorted(set(a) | set(b)):
+        if a.get(name) != b.get(name):
+            bad.append(
+                f"**{name} が暗い側 2 か所で違います** —— "
+                f"{head_a} が {a.get(name)} / {head_b} が {b.get(name)}"
+            )
+
+    for name, want in DESIGN_DARK.items():
+        for head, colors in darks:
+            got = colors.get(f"--{name}")
+            if got != want:
+                bad.append(f"{head}: --{name} が案と違います —— 案 {want} / 実物 {got}")
+    return bad
 
 
 def read_sources() -> dict[str, str]:
@@ -161,7 +257,17 @@ def main() -> int:
               file=sys.stderr)
         return 1
 
+    trouble = theme_trouble(TOKENS_CSS.read_text(encoding="utf-8"))
+    if trouble:
+        print(f"NG **配色の不整合が {len(trouble)} 件**:", file=sys.stderr)
+        for line in trouble:
+            print(f"   {line}", file=sys.stderr)
+        print("\n   暗い側は 2 か所に在ります（`@media` と `[data-theme]`）。**両方直してください。**",
+              file=sys.stderr)
+        return 1
+
     print(f"OK ファイル {len(files)} / 定義 {len(defined)} / 控え無しの使用 {len(used)} —— 未定義は 0 件")
+    print("OK 配色の不整合なし（暗い側 2 か所が一致・案の色が入っている）")
     return 0
 
 

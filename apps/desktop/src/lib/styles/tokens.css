@@ -79,11 +79,58 @@
 	--warning-soft: rgba(138, 90, 18, 0.1);
 	--ok: #1f6b58;
 
-	/* 角丸 — 外殻とその中の芯。**同心円になるよう芯は外殻 − padding** */
-	--r-shell: 14px;
-	--r-core: 10px;
-	--r-control: 8px;
-	--shell-pad: 4px;
+	/*
+	 * **人と AI を色で見分ける**（UI 案・2026-10-21）。
+	 *
+	 * この道具は 1 本の SSH に人と AI が並びます。**どちらが触ったのかが
+	 * 分からないと、帯も端末も読めません。**案は人を青、AI を橙にしました。
+	 *
+	 * **色だけに頼りません。**案の 2 色は明るさがほぼ同じ（差 9.5 / 255）で、
+	 * 色が見えない人には見分けられないので、**画面側では必ず文字でも書きます**
+	 * （`Human` / `AI`）。色は「どちらか」ではなく「同じ仲間か」を示す役です。
+	 *
+	 * 明るい配色の値は案に無いので、**同じ色相で地に載る明るさ**へ落としました。
+	 */
+	--human: #1c62c4;
+	--human-soft: rgba(28, 98, 196, 0.1);
+	--ai: #9a5a16;
+	--ai-soft: rgba(154, 90, 22, 0.1);
+
+	/*
+	 * **選ばれているもの**（案の錠剤の中で白くなる所）。
+	 *
+	 * 案は地と文字を**入れ替えます**（暗い画面で #E8EAED の地に #0B0D10 の文字）。
+	 * 面を少し持ち上げるより強い合図で、**白黒で撮っても分かります。**
+	 */
+	--selected: #14181d;
+	--selected-fg: #ffffff;
+
+	/*
+	 * 文字の段 —— 案は 5 段あります（実物は 3 段でした）。
+	 *
+	 * `--fg-control` は**押せるものの文字**（選ばれていない錠剤の名前など）。
+	 * `--fg-dim` は**等幅で出す細かい値**（ホスト・時刻・件数）。
+	 */
+	--fg-control: #2d353f;
+	--fg-dim: #6b7380;
+
+	/*
+	 * 角丸 — 外殻とその中の芯。**同心円になるよう芯は外殻 − padding**
+	 *
+	 * **値は UI 案のもの**（2026-10-21）。案は外殻 22 / 芯 16 / 詰め 6 で、
+	 * 22 − 6 = 16 と同心円の条件を満たしています。
+	 */
+	--r-shell: 22px;
+	--r-core: 16px;
+	--r-control: 12px;
+	--shell-pad: 6px;
+	/*
+	 * **錠剤形。**案のボタンは全部これです。
+	 *
+	 * 各所に `999px` と直書きすると、**1 か所だけ角が違う画面**になります
+	 * （そして気づくのは撮ったあと）。名前を 1 つにしておきます。
+	 */
+	--r-pill: 999px;
 
 	/* 動き — 既定の ease を使わない。質量のある動きにする */
 	--ease: cubic-bezier(0.32, 0.72, 0, 1);
@@ -127,10 +174,10 @@
 	:root:not([data-theme='light']) {
 		color-scheme: dark;
 
-		--ground: #0b0e11;
-		--shell: #12161b;
-		--surface: #171c22;
-		--surface-2: #1c222a;
+		--ground: #0b0d10;
+		--shell: #121417;
+		--surface: #13161b;
+		--surface-2: #171a20;
 		/*
 		 * **暗い所で「浮いている」は、影ではなく明るさでしか出せない。**
 		 *
@@ -146,98 +193,116 @@
 		 * 帯との差が 25 になり、明るい配色の 23 とほぼ揃う。
 		 */
 		--surface-raised: #262e3a;
-		--surface-input: #12161b;
+		--surface-input: #0f1216;
 
-		--fg: #e8ecf1;
-		--fg-muted: #a3adb9;
-		--fg-faint: #737d89;
+		--fg: #e8eaed;
+		--fg-muted: #9ba3ae;
+		--fg-faint: #6f7782;
 
-		--hairline: rgba(255, 255, 255, 0.08);
-		--hairline-strong: rgba(255, 255, 255, 0.15);
-		--inner-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+		--hairline: rgba(255, 255, 255, 0.06);
+		--hairline-strong: rgba(255, 255, 255, 0.1);
+		--inner-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.05);
 
 		--lift-1: 0 1px 2px rgba(0, 0, 0, 0.4);
 		--lift-2: 0 1px 2px rgba(0, 0, 0, 0.4), 0 12px 30px -12px rgba(0, 0, 0, 0.7);
 		--lift-3: 0 2px 4px rgba(0, 0, 0, 0.45), 0 20px 48px -16px rgba(0, 0, 0, 0.8);
 
-		--accent: #4fd6ae;
-		--accent-fg: #06251c;
-		--accent-soft: rgba(79, 214, 174, 0.14);
+		--accent: #8cc2ff;
+		--accent-fg: #0b0d10;
+		--accent-soft: rgba(140, 194, 255, 0.12);
 
-		--danger: #ff8b86;
-		--danger-soft: rgba(255, 139, 134, 0.12);
-		--warning: #e5bb6b;
-		--warning-soft: rgba(229, 187, 107, 0.12);
-		--ok: #4fd6ae;
+		--danger: #ff8a8a;
+		--danger-soft: rgba(255, 92, 92, 0.14);
+		--warning: #f5c08a;
+		--warning-soft: rgba(245, 166, 91, 0.12);
+		--ok: #7fd8a6;
 
-		--mark-red: #ff5a52;
-		--mark-orange: #ff9640;
-		--mark-amber: #ffb327;
-		--mark-yellow: #ffe14d;
-		--mark-lime: #b8e02f;
-		--mark-green: #48d15f;
-		--mark-emerald: #2fd39a;
-		--mark-teal: #21ccc0;
-		--mark-cyan: #2fc9e8;
-		--mark-sky: #3aaefb;
-		--mark-blue: #5b8cff;
-		--mark-indigo: #8b7cff;
-		--mark-violet: #b06cff;
-		--mark-purple: #d264ff;
-		--mark-magenta: #ff5fd0;
-		--mark-pink: #ff5f96;
+		--fg-control: #c9cdd3;
+		--fg-dim: #8a929d;
+		--human: #8cc2ff;
+		--human-soft: rgba(140, 194, 255, 0.12);
+		--ai: #f5a65b;
+		--ai-soft: rgba(245, 166, 91, 0.12);
+		--selected: #e8eaed;
+		--selected-fg: #0b0d10;
+
+		--mark-red: #e5484d;
+		--mark-orange: #f07a3a;
+		--mark-amber: #e0a526;
+		--mark-yellow: #d9c22b;
+		--mark-lime: #8fc93a;
+		--mark-green: #3fb45e;
+		--mark-emerald: #21a67a;
+		--mark-teal: #2bb3a3;
+		--mark-cyan: #1fb0cf;
+		--mark-sky: #3d9be9;
+		--mark-blue: #3e6fe0;
+		--mark-indigo: #5b5bd6;
+		--mark-violet: #7c6cf2;
+		--mark-purple: #9d5bd2;
+		--mark-magenta: #c84fb4;
+		--mark-pink: #e5578f;
 	}
 }
 
 :root[data-theme='dark'] {
 	color-scheme: dark;
 
-	--ground: #0b0e11;
-	--shell: #12161b;
-	--surface: #171c22;
-	--surface-2: #1c222a;
+	--ground: #0b0d10;
+	--shell: #121417;
+	--surface: #13161b;
+	--surface-2: #171a20;
 	/* 上の暗い側と同じ理由。**2 か所に持つのは既存の作りに合わせている。** */
 	--surface-raised: #262e3a;
-	--surface-input: #12161b;
+	--surface-input: #0f1216;
 
-	--fg: #e8ecf1;
-	--fg-muted: #a3adb9;
-	--fg-faint: #737d89;
+	--fg: #e8eaed;
+	--fg-muted: #9ba3ae;
+	--fg-faint: #6f7782;
 
-	--hairline: rgba(255, 255, 255, 0.08);
-	--hairline-strong: rgba(255, 255, 255, 0.15);
-	--inner-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+	--hairline: rgba(255, 255, 255, 0.06);
+	--hairline-strong: rgba(255, 255, 255, 0.1);
+	--inner-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.05);
 
 	--lift-1: 0 1px 2px rgba(0, 0, 0, 0.4);
 	--lift-2: 0 1px 2px rgba(0, 0, 0, 0.4), 0 12px 30px -12px rgba(0, 0, 0, 0.7);
 	--lift-3: 0 2px 4px rgba(0, 0, 0, 0.45), 0 20px 48px -16px rgba(0, 0, 0, 0.8);
 
-	--accent: #4fd6ae;
-	--accent-fg: #06251c;
-	--accent-soft: rgba(79, 214, 174, 0.14);
+	--accent: #8cc2ff;
+	--accent-fg: #0b0d10;
+	--accent-soft: rgba(140, 194, 255, 0.12);
 
-	--danger: #ff8b86;
-	--danger-soft: rgba(255, 139, 134, 0.12);
-	--warning: #e5bb6b;
-	--warning-soft: rgba(229, 187, 107, 0.12);
-	--ok: #4fd6ae;
+	--danger: #ff8a8a;
+	--danger-soft: rgba(255, 92, 92, 0.14);
+	--warning: #f5c08a;
+	--warning-soft: rgba(245, 166, 91, 0.12);
+	--ok: #7fd8a6;
 
-	--mark-red: #ff5a52;
-	--mark-orange: #ff9640;
-	--mark-amber: #ffb327;
-	--mark-yellow: #ffe14d;
-	--mark-lime: #b8e02f;
-	--mark-green: #48d15f;
-	--mark-emerald: #2fd39a;
-	--mark-teal: #21ccc0;
-	--mark-cyan: #2fc9e8;
-	--mark-sky: #3aaefb;
-	--mark-blue: #5b8cff;
-	--mark-indigo: #8b7cff;
-	--mark-violet: #b06cff;
-	--mark-purple: #d264ff;
-	--mark-magenta: #ff5fd0;
-	--mark-pink: #ff5f96;
+	--fg-control: #c9cdd3;
+	--fg-dim: #8a929d;
+	--human: #8cc2ff;
+	--human-soft: rgba(140, 194, 255, 0.12);
+	--ai: #f5a65b;
+	--ai-soft: rgba(245, 166, 91, 0.12);
+	--selected: #e8eaed;
+	--selected-fg: #0b0d10;
+
+	--mark-red: #e5484d;
+	--mark-orange: #f07a3a;
+	--mark-amber: #e0a526;
+	--mark-yellow: #d9c22b;
+	--mark-lime: #8fc93a;
+	--mark-green: #3fb45e;
+	--mark-emerald: #21a67a;
+	--mark-teal: #2bb3a3;
+	--mark-cyan: #1fb0cf;
+	--mark-sky: #3d9be9;
+	--mark-blue: #3e6fe0;
+	--mark-indigo: #5b5bd6;
+	--mark-violet: #7c6cf2;
+	--mark-purple: #9d5bd2;
+	--mark-magenta: #c84fb4;
+	--mark-pink: #e5578f;
 }
 
 /* 動きを減らす設定を尊重する。 */

@@ -60,6 +60,28 @@ PAIRS = [
     ("fg-faint", "surface", NEED_FAINT, "薄い字（識別子・道）"),
     ("fg", "surface-2", NEED_TEXT, "触れている行・入力の地"),
     ("accent-fg", "accent", NEED_TEXT, "強調のボタンの字"),
+    # **人と AI の色**（UI 案・2026-10-21）。
+    #
+    # 案は人を青、AI を橙にしました。**この 2 色は明るさがほぼ同じ**
+    # （#8CC2FF が 186.9、#F5A65B が 177.4。差 9.5 / 255）なので、
+    # **色だけでは見分けられません。**画面側では必ず `Human` / `AI` と
+    # 文字でも書きます。ここで見るのは「**地の上で読めるか**」だけです。
+    ("human", "ground", NEED_TEXT, "人の色（地の上・帯の who）"),
+    ("ai", "ground", NEED_TEXT, "AI の色（地の上・帯の who）"),
+    ("human", "surface", NEED_TEXT, "人の色（面の上・いま打てるのは）"),
+    ("ai", "surface", NEED_TEXT, "AI の色（面の上・AI が握っています）"),
+    # **選ばれているものは、案では地と字を入れ替えます**（白地に暗い字）。
+    # 面を少し持ち上げるより強く、**白黒で撮っても分かります。**
+    ("selected-fg", "selected", NEED_TEXT, "選ばれている錠剤（端末 / ファイル / 接続）"),
+    # 案の文字は 5 段あります。足した 2 段も見ます。
+    ("fg-control", "shell", NEED_TEXT, "押せるものの字（選ばれていない錠剤）"),
+    ("fg-control", "surface", NEED_TEXT, "押せるものの字（面の上のボタン）"),
+    ("fg-dim", "surface", NEED_FAINT, "等幅の細かい値（ホスト・時刻・件数）"),
+    # **危険と良。**赤と緑は、案でも地の上に文字として出ます
+    # （「止めました」「含めない」／「含める」「接続中」）。
+    ("danger", "surface", NEED_TEXT, "止めた・含めない（赤い字）"),
+    ("ok", "surface", NEED_TEXT, "含める・接続中（緑の字）"),
+    ("warning", "surface", NEED_TEXT, "AI の柵の見出し（橙の字）"),
 ]
 
 
@@ -119,17 +141,30 @@ def check(themes: dict[str, dict[str, str]]) -> list[str]:
     return bad
 
 
+# **`PAIRS` に並べた色を全部持つ見本。**
+#
+# 組を足したら、ここへも足してください。**足し忘れると
+# 「足りている組は通す」が「名前が無い」で落ちます** ——
+# それは検査の壊れではなく、**見本が追いついていない**という合図です。
+GOOD = {
+    "fg": "#e8eaed", "fg-control": "#c9cdd3", "fg-muted": "#9ba3ae",
+    "fg-dim": "#8a929d", "fg-faint": "#6f7782",
+    "ground": "#0b0d10", "shell": "#121417", "surface": "#13161b",
+    "surface-2": "#171a20", "surface-raised": "#262e3a",
+    "accent": "#8cc2ff", "accent-fg": "#0b0d10",
+    "human": "#8cc2ff", "ai": "#f5a65b",
+    "selected": "#e8eaed", "selected-fg": "#0b0d10",
+    "danger": "#ff8a8a", "ok": "#7fd8a6", "warning": "#f5c08a",
+}
+
+
 def self_check() -> int:
     cases = [
         ("足りない組を見つける",
-         {":root[data-theme='dark']": {"fg": "#3a3f45", "surface-raised": "#262e3a", "fg-muted": "#a3adb9",
-                       "shell": "#12161b", "surface": "#171c22", "fg-faint": "#737d89",
-                       "surface-2": "#1c222a", "accent-fg": "#06251c", "accent": "#4fd6ae"}},
+         {":root[data-theme='dark']": {**GOOD, "fg": "#3a3f45"}},
          True),
         ("足りている組は通す",
-         {":root[data-theme='dark']": {"fg": "#e8ecf1", "surface-raised": "#262e3a", "fg-muted": "#a3adb9",
-                       "shell": "#12161b", "surface": "#171c22", "fg-faint": "#737d89",
-                       "surface-2": "#1c222a", "accent-fg": "#06251c", "accent": "#4fd6ae"}},
+         {":root[data-theme='dark']": GOOD},
          False),
         ("名前が無ければ、通さずに言う",
          {":root[data-theme='dark']": {"fg": "#e8ecf1"}},
