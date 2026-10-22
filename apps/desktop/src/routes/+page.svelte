@@ -145,6 +145,20 @@
 		}
 	}
 
+	/**
+	 * 柵のカードの見出し。
+	 *
+	 * **文言は増やしません**（`files.scope.some` を使い回す・11 言語ぶん訳が揃っている）。
+	 * ただし案は**道を別の行に等幅で**出すので、見出しからは道を抜きます。
+	 *
+	 * `files.scope.some` は全言語で `{roots}` が末尾に在り、その手前が
+	 * `:` か `：` です（`messages.test.ts` が**そうであることを見張っています** ——
+	 * 崩れたら「AI が書けるのは:」のような尻切れが出ます）。
+	 */
+	function fenceHead(): string {
+		return i18n.t('files.scope.some', { roots: '' }).replace(/[\s:：,，]+$/u, '');
+	}
+
 	/** 画面ぜんたいのキー操作を実行する（判定は `app-keys.ts`）。 */
 	function runApp(intent: NonNullable<ReturnType<typeof appIntent>>) {
 		if (intent === 'mask') {
@@ -1851,6 +1865,31 @@
 			</div>
 			{@render searchBar('console')}
 			<!--
+				**AI の柵を、端末の面にも出す**（UI 案・2026-10-21／D22）。
+				案は左の列の底にこのカードを置きました。
+
+				**ここが D22 の約束そのものです** —— AI が書けるのは、人が接続ごとに
+				並べたディレクトリの下だけで、**既定は空＝書けません。**
+				ファイルの面には出ていましたが、**端末の面には無かった** ——
+				AI が端末で何かしている間、人は囲いの大きさを見られませんでした。
+
+				文言は `files.scope.*` をそのまま使います（**言い方を増やしません**・11 言語ぶん訳が揃っている）。
+			-->
+			{#if session.open}
+				<div class="fence" class:open={session.open.write.aiRoots.length > 0}>
+					<span class="fence-head">
+						<Icon name="lock" size={11} />
+						{session.open.write.aiRoots.length > 0
+							? fenceHead()
+							: i18n.t('files.scope.none')}
+					</span>
+					{#each session.open.write.aiRoots as root (root)}
+						<span class="fence-root" data-secret>{root}</span>
+					{/each}
+					<span class="fence-note">{i18n.t('files.scope.help')}</span>
+				</div>
+			{/if}
+			<!--
 				**端末のタブ**（分割・2026-10-06）。番号・接続・色を出します ——
 				人が口で「②を見て」と言えて、AI も同じ番号で指せる（PRD §4-0）。
 				**3 枚目以降はここで切り替えます**（半々は 2 枚まで・DESIGN.md）。
@@ -2256,6 +2295,60 @@
 	 * 「伏せているのに伏せていないと思っている」が一番危ないので、
 	 * **弱い合図にしません。**
 	 */
+	/*
+	 * **AI の柵**（UI 案・2026-10-21／D22）。
+	 *
+	 * 案は橙の線で囲みました。**橙は AI の色**なので、
+	 * 「これは AI にかかっている制限だ」が色で読めます。
+	 * **人は制限されません**（D22）——その誤解を生まないために、
+	 * 説明文（`files.scope.help`）を必ず添えます。
+	 *
+	 * 柵が空のときは色で主張しません —— **既定は空＝AI は読むだけ**で、
+	 * それは警告すべき状態ではなく、むしろ安全な既定です。
+	 */
+	.fence {
+		display: flex;
+		flex-direction: column;
+		gap: 0.25rem;
+		flex: 0 0 auto;
+		margin: 0 0 0.4rem;
+		padding: 0.5rem 0.6rem;
+		border: 1px solid var(--hairline);
+		border-radius: var(--r-core);
+		background: var(--surface-2);
+		font-size: 0.7rem;
+	}
+
+	.fence.open {
+		border-color: var(--ai);
+		background: var(--ai-soft);
+	}
+
+	.fence-head {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.3rem;
+		font-weight: 700;
+		color: var(--fg-muted);
+	}
+
+	.fence.open .fence-head {
+		color: var(--warning);
+	}
+
+	/* **道は等幅で、1 本ずつ別の行。**長い道が折り返して読めなくならないように。 */
+	.fence-root {
+		font-family: var(--font-mono);
+		font-size: 0.68rem;
+		color: var(--fg);
+		overflow-wrap: anywhere;
+	}
+
+	.fence-note {
+		color: var(--fg-dim);
+		line-height: 1.5;
+	}
+
 	.mask-toggle {
 		display: inline-flex;
 		align-items: center;

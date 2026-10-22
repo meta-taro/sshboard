@@ -11,6 +11,36 @@ import { CATALOGS, FALLBACK } from './messages';
 
 const KEYS = Object.keys(FALLBACK) as Array<keyof typeof FALLBACK>;
 
+describe('柵の見出し（UI 案・2026-10-21）', () => {
+	/**
+	 * **`files.scope.some` から道を抜いて見出しに使っています。**
+	 *
+	 * 端末の面の柵のカードは、案に合わせて**道を別の行に等幅で**出します。
+	 * 見出しは同じ文言から道を取り除いて作るので、
+	 * **`{roots}` が末尾に在ること**が前提です。
+	 *
+	 * 崩れると「AI が書けるのは:」のような尻切れ、あるいは
+	 * **道が見出しの途中に混ざったまま**出ます。どちらも画面を見るまで分かりません。
+	 */
+	test('ends every translation with the roots placeholder', () => {
+		for (const [code, catalog] of Object.entries(CATALOGS)) {
+			const text = catalog['files.scope.some'];
+			if (text === undefined) continue;
+			expect(text.trimEnd().endsWith('{roots}'), `${code}: ${text}`).toBe(true);
+		}
+	});
+
+	test('leaves something readable once the roots are taken out', () => {
+		for (const [code, catalog] of Object.entries(CATALOGS)) {
+			const text = catalog['files.scope.some'];
+			if (text === undefined) continue;
+			const head = text.replace('{roots}', '').replace(/[\s:：,，]+$/u, '');
+			expect(head.length, `${code} の見出しが空`).toBeGreaterThan(2);
+			expect(head, `${code} に記号が残っている`).not.toMatch(/[:：]$/u);
+		}
+	});
+});
+
 describe('the message catalogue', () => {
 	test('covers every language the picker offers', () => {
 		for (const locale of LOCALES) {
