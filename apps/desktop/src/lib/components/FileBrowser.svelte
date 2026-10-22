@@ -863,6 +863,28 @@
 									</button>
 								{/if}
 								<span class="size">{entry.isDir ? '' : humanSize(entry.size)}</span>
+								<!--
+									**AI が書けるか、行ごとに**（UI 案・2026-10-21／D22）。
+
+									案は柵の中を橙で囲み、外に鍵の印と「読むだけ」を付けました。
+									**判定は Rust の `WriteScope` が唯一の出どころ**で、
+									ここで同じ規則を書き直しません —— ずれると**嘘の安心**になります。
+
+									**人は制限されません。**この印は AI にだけかかるので、
+									読み上げにもそう書きます（`files.scope.help`）。
+								-->
+								<span
+									class="ai-write"
+									class:open={entry.aiWritable === true}
+									title={i18n.t('files.scope.help')}
+								>
+									{#if entry.aiWritable === true}
+										{i18n.t('files.writable')}
+									{:else}
+										<Icon name="lock" size={10} />
+										{i18n.t('files.readonly')}
+									{/if}
+								</span>
 								{#if !entry.isDir && pickedRemote.includes(entry.name)}
 									<span class="chosen-mark"><Icon name="check" size={11} /></span>
 								{/if}
@@ -1340,6 +1362,37 @@
 	}
 
 	/* 上書きの許し。**押すたびに戻る**ので、見えていないと気づけない。 */
+	/*
+	 * **AI が書けるかの印**（UI 案・2026-10-21／D22）。
+	 *
+	 * 書ける所は**橙**（AI の色）で囲みます ——
+	 * 「これは AI にかかっている囲い」が色で読める。
+	 * 読むだけの所は**鍵の印と文字**で、色では主張しません ——
+	 * **既定は全部読むだけ**なので、そこを警告色にすると画面が真っ赤になります。
+	 *
+	 * **色だけに頼りません。**どちらも文字が入っています。
+	 */
+	.ai-write {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.2rem;
+		flex: none;
+		font-size: 0.62rem;
+		line-height: 1;
+		padding: 0.14rem 0.4rem;
+		border-radius: var(--r-pill);
+		border: 1px solid var(--hairline);
+		color: var(--fg-dim);
+		white-space: nowrap;
+	}
+
+	.ai-write.open {
+		border-color: var(--ai);
+		background: var(--ai-soft);
+		color: var(--warning);
+		font-weight: 700;
+	}
+
 	.overwrite {
 		display: inline-flex;
 		align-items: center;

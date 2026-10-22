@@ -4,6 +4,10 @@ import type { MessageKey } from './messages';
 type Catalog = Partial<Record<MessageKey, string>>;
 
 export const ptBR: Catalog = {
+	// **AI が書けるか、行ごとに**（UI 案・2026-10-21／D22）。
+	// **人は制限されません。**この印は AI にだけかかります。
+	'files.writable': 'Gravável',
+	'files.readonly': 'Somente leitura',
 	// **絞った結果が空なのを、「まだ何も起きていない」と見せない。**
 	// 同じ文言を使うと、**行は在るのに壊れたと読まれます。**
 	'band.filtered.empty': 'Nenhuma linha corresponde a este filtro — o registro não está vazio.',
@@ -249,6 +253,10 @@ export const ptBR: Catalog = {
 };
 
 export const ru: Catalog = {
+	// **AI が書けるか、行ごとに**（UI 案・2026-10-21／D22）。
+	// **人は制限されません。**この印は AI にだけかかります。
+	'files.writable': 'Можно писать',
+	'files.readonly': 'Только чтение',
 	// **絞った結果が空なのを、「まだ何も起きていない」と見せない。**
 	// 同じ文言を使うと、**行は在るのに壊れたと読まれます。**
 	'band.filtered.empty': 'Ни одна строка не подходит под этот фильтр — сама запись не пуста.',
@@ -494,6 +502,10 @@ export const ru: Catalog = {
 };
 
 export const it: Catalog = {
+	// **AI が書けるか、行ごとに**（UI 案・2026-10-21／D22）。
+	// **人は制限されません。**この印は AI にだけかかります。
+	'files.writable': 'Scrivibile',
+	'files.readonly': 'Solo lettura',
 	// **絞った結果が空なのを、「まだ何も起きていない」と見せない。**
 	// 同じ文言を使うと、**行は在るのに壊れたと読まれます。**
 	'band.filtered.empty': 'Nessuna riga corrisponde a questo filtro — il registro non è vuoto.',

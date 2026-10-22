@@ -6,6 +6,10 @@
  */
 
 const en = {
+	// **AI が書けるか、行ごとに**（UI 案・2026-10-21／D22）。
+	// **人は制限されません。**この印は AI にだけかかります。
+	'files.writable': 'AI may write',
+	'files.readonly': 'Read only',
 	// **絞った結果が空なのを、「まだ何も起きていない」と見せない。**
 	// 同じ文言を使うと、**行は在るのに壊れたと読まれます。**
 	'band.filtered.empty': 'No line matches this filter — the band itself is not empty.',
@@ -291,6 +295,10 @@ export type MessageKey = keyof typeof en;
 type Catalog = Partial<Record<MessageKey, string>>;
 
 const ja: Catalog = {
+	// **AI が書けるか、行ごとに**（UI 案・2026-10-21／D22）。
+	// **人は制限されません。**この印は AI にだけかかります。
+	'files.writable': '書ける',
+	'files.readonly': '読むだけ',
 	// **絞った結果が空なのを、「まだ何も起きていない」と見せない。**
 	// 同じ文言を使うと、**行は在るのに壊れたと読まれます。**
 	'band.filtered.empty': 'この絞りでは 1 行もありません。帯そのものは空ではありません。',

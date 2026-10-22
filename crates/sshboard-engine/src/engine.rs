@@ -1636,6 +1636,28 @@ impl Engine {
         Ok(self.session().await?.list_dir(actor, path).await?)
     }
 
+    /// **AI がこの宛先へ書けるか**（UI 案・2026-10-21）。
+    ///
+    /// ファイルの一覧に「書ける / 読むだけ」を行ごとに出すために使います。
+    /// D22 の囲いは**既定が空**なので、**何も印が付かないのが普通の状態**です。
+    ///
+    /// **判定は `WriteScope` が唯一の出どころ。**画面側で同じ規則を書き直すと、
+    /// **片方だけ直る日**が来ます（D39）—— しかもここは
+    /// 「AI が書ける所」を示す印なので、ずれると**嘘の安心**になります。
+    ///
+    /// 繋がっていなければ `false`（**書けない側に倒す**）。
+    pub async fn ai_may_write(&self, path: &str, as_dir: bool) -> bool {
+        let Ok(session) = self.session().await else {
+            return false;
+        };
+        let scope = session.write_scope();
+        if as_dir {
+            scope.permits_dir(path).is_ok()
+        } else {
+            scope.permits(path).is_ok()
+        }
+    }
+
     /// 1 件の属性。**権限と更新日時は「なぜ読めないのか」を説明する材料。**
     pub async fn stat(&self, actor: Actor, path: &str) -> Result<FileFacts, EngineError> {
         Ok(self.session().await?.stat(actor, path).await?)

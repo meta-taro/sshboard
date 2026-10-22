@@ -4,6 +4,10 @@ import type { MessageKey } from './messages';
 type Catalog = Partial<Record<MessageKey, string>>;
 
 export const de: Catalog = {
+	// **AI が書けるか、行ごとに**（UI 案・2026-10-21／D22）。
+	// **人は制限されません。**この印は AI にだけかかります。
+	'files.writable': 'Beschreibbar',
+	'files.readonly': 'Nur lesen',
 	// **絞った結果が空なのを、「まだ何も起きていない」と見せない。**
 	// 同じ文言を使うと、**行は在るのに壊れたと読まれます。**
 	'band.filtered.empty': 'Zu diesem Filter passt keine Zeile — das Protokoll selbst ist nicht leer.',
@@ -249,6 +253,10 @@ export const de: Catalog = {
 };
 
 export const fr: Catalog = {
+	// **AI が書けるか、行ごとに**（UI 案・2026-10-21／D22）。
+	// **人は制限されません。**この印は AI にだけかかります。
+	'files.writable': 'Modifiable',
+	'files.readonly': 'Lecture seule',
 	// **絞った結果が空なのを、「まだ何も起きていない」と見せない。**
 	// 同じ文言を使うと、**行は在るのに壊れたと読まれます。**
 	'band.filtered.empty': 'Aucune ligne ne correspond à ce filtre — le journal lui-même n’est pas vide.',
@@ -494,6 +502,10 @@ export const fr: Catalog = {
 };
 
 export const es: Catalog = {
+	// **AI が書けるか、行ごとに**（UI 案・2026-10-21／D22）。
+	// **人は制限されません。**この印は AI にだけかかります。
+	'files.writable': 'Escribible',
+	'files.readonly': 'Solo lectura',
 	// **絞った結果が空なのを、「まだ何も起きていない」と見せない。**
 	// 同じ文言を使うと、**行は在るのに壊れたと読まれます。**
 	'band.filtered.empty': 'Ninguna línea coincide con este filtro; el registro no está vacío.',

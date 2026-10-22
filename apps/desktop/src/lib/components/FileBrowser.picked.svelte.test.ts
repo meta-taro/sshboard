@@ -38,12 +38,15 @@ import { session } from '$lib/session.svelte';
 import FileBrowser from './FileBrowser.svelte';
 
 /** リモートの中身。**どちらの台にも `today.log` が在る**のが要点。 */
-const REMOTE: Record<string, { name: string; isDir: boolean; size: number }[]> = {
+const REMOTE: Record<
+	string,
+	{ name: string; isDir: boolean; size: number; aiWritable?: boolean }[]
+> = {
 	'.': [
-		{ name: 'logs', isDir: true, size: 0 },
-		{ name: 'today.log', isDir: false, size: 99 }
+		{ name: 'logs', isDir: true, size: 0, aiWritable: true },
+		{ name: 'today.log', isDir: false, size: 99, aiWritable: false }
 	],
-	logs: [{ name: 'today.log', isDir: false, size: 12 }]
+	logs: [{ name: 'today.log', isDir: false, size: 12, aiWritable: true }]
 };
 
 /** `remote_download` に渡された引数。**落とす直前の画面の持ち物がここに出る。** */
@@ -182,5 +185,57 @@ describe('上書きの許しは 1 回きり（§13）', () => {
 		expect((screen.getByLabelText(i18n.t('files.overwrite')) as HTMLInputElement).checked).toBe(
 			false
 		);
+	});
+});
+
+describe('AI が書けるかの印（D22・UI 案 2026-10-21）', () => {
+	/**
+	 * **判定は Rust の `WriteScope` が唯一の出どころ。**
+	 *
+	 * 画面側で「柵の下かどうか」を計算し直すと、**片方だけ直る日**が来ます
+	 * （D39）。しかもこれは「AI が書ける所」を示す印なので、
+	 * ずれると**嘘の安心**になります —— 読むだけの所に「書ける」と出る方が、
+	 * 何も出ないより危ない。
+	 */
+	test('shows what the engine said, per row', async () => {
+		render(FileBrowser);
+		await waitFor(() => expect(screen.getByRole('button', { name: 'logs' })).toBeTruthy());
+
+		// `logs` は書ける（engine が true を返した）、`today.log` は読むだけ。
+		expect(screen.getByText(i18n.t('files.writable'))).toBeTruthy();
+		expect(screen.getByText(i18n.t('files.readonly'))).toBeTruthy();
+	});
+
+	test('treats a missing answer as read only', async () => {
+		// **古い Rust 側から来たとき**は `undefined`。
+		// **書けない側に倒す** —— 分からないものを「書ける」と見せない。
+		invoke.mockImplementation((cmd: string) => {
+			if (cmd === 'connections_list') return Promise.resolve([]);
+			if (cmd === 'session_status') {
+				return Promise.resolve({ open: session.all, active: session.activeId });
+			}
+			if (cmd === 'local_list_dir') {
+				return Promise.resolve({ path: '/home/me', parent: '/home', entries: [] });
+			}
+			if (cmd === 'remote_list_dir') {
+				return Promise.resolve([{ name: 'mystery.txt', isDir: false, size: 1 }]);
+			}
+			return Promise.resolve(undefined);
+		});
+		render(FileBrowser);
+
+		await waitFor(() => expect(screen.getByText('mystery.txt')).toBeTruthy());
+		expect(screen.getByText(i18n.t('files.readonly'))).toBeTruthy();
+		expect(screen.queryByText(i18n.t('files.writable'))).toBeNull();
+	});
+
+	test('says the fence is only for the AI', async () => {
+		// **人は制限されません**（D22）。印を見た人が
+		// 「自分も書けないのか」と読まないように、説明を添えます。
+		render(FileBrowser);
+		await waitFor(() => expect(screen.getByText(i18n.t('files.readonly'))).toBeTruthy());
+
+		const mark = screen.getByText(i18n.t('files.readonly')).closest('span');
+		expect(mark?.getAttribute('title')).toBe(i18n.t('files.scope.help'));
 	});
 });

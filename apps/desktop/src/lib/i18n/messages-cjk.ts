@@ -4,6 +4,10 @@ import type { MessageKey } from './messages';
 type Catalog = Partial<Record<MessageKey, string>>;
 
 export const ko: Catalog = {
+	// **AI が書けるか、行ごとに**（UI 案・2026-10-21／D22）。
+	// **人は制限されません。**この印は AI にだけかかります。
+	'files.writable': '쓸 수 있음',
+	'files.readonly': '읽기만',
 	// **絞った結果が空なのを、「まだ何も起きていない」と見せない。**
 	// 同じ文言を使うと、**行は在るのに壊れたと読まれます。**
 	'band.filtered.empty': '이 필터에는 한 줄도 없습니다. 기록 자체가 빈 것은 아닙니다.',
@@ -249,6 +253,10 @@ export const ko: Catalog = {
 };
 
 export const zhCN: Catalog = {
+	// **AI が書けるか、行ごとに**（UI 案・2026-10-21／D22）。
+	// **人は制限されません。**この印は AI にだけかかります。
+	'files.writable': '可写入',
+	'files.readonly': '只读',
 	// **絞った結果が空なのを、「まだ何も起きていない」と見せない。**
 	// 同じ文言を使うと、**行は在るのに壊れたと読まれます。**
 	'band.filtered.empty': '此筛选下没有任何行。记录本身并不是空的。',
@@ -494,6 +502,10 @@ export const zhCN: Catalog = {
 };
 
 export const zhTW: Catalog = {
+	// **AI が書けるか、行ごとに**（UI 案・2026-10-21／D22）。
+	// **人は制限されません。**この印は AI にだけかかります。
+	'files.writable': '可寫入',
+	'files.readonly': '只讀',
 	// **絞った結果が空なのを、「まだ何も起きていない」と見せない。**
 	// 同じ文言を使うと、**行は在るのに壊れたと読まれます。**
 	'band.filtered.empty': '此篩選下沒有任何行。記錄本身並不是空的。',

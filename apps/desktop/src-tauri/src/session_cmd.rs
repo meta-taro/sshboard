@@ -44,6 +44,14 @@ pub struct Listed {
     pub name: String,
     pub is_dir: bool,
     pub size: u64,
+    /// **AI がここへ書けるか**（UI 案・2026-10-21）。
+    ///
+    /// 行ごとに「書ける / 読むだけ」を出すため。**判定は Rust 側の
+    /// `WriteScope` が唯一の出どころ**で、画面側で同じ規則を書き直しません ——
+    /// ずれると**嘘の安心**になります（D22 / D39）。
+    ///
+    /// **既定は空＝全部 `false`。**何も印が付かないのが普通の状態です。
+    pub ai_writable: bool,
 }
 
 /// 開いている接続の変化を画面へ押し出す。
@@ -164,14 +172,18 @@ pub async fn remote_list_dir(
         .await
         .map_err(|error| error.to_string())?;
 
-    let mut listed: Vec<Listed> = entries
-        .into_iter()
-        .map(|entry| Listed {
+    // **印は 1 件ずつ Rust に聞く。**`WriteScope` の規則を画面側へ写さないため。
+    let mut listed: Vec<Listed> = Vec::with_capacity(entries.len());
+    for entry in entries {
+        let full = join_remote(&path, &entry.name);
+        let writable = engine.ai_may_write(&full, entry.is_dir).await;
+        listed.push(Listed {
             name: entry.name,
             is_dir: entry.is_dir,
             size: entry.size,
-        })
-        .collect();
+            ai_writable: writable,
+        });
+    }
 
     // ディレクトリを先に、あとは名前順。**並びが毎回変わると人が見失う。**
     listed.sort_by(|a, b| {
