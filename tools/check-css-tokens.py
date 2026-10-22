@@ -187,6 +187,37 @@ def theme_trouble(text: str) -> list[str]:
     return bad
 
 
+# **AI を名乗る選び手が、人の色を使っていないか**（UI 案・2026-10-21）。
+#
+# フェーズ A で `--accent` を**人の青**（`#8CC2FF`）にした結果、
+# それまで `--accent` で描いていた **AI の印が 2 か所で青くなりました** ——
+# 帯の AI の行と、端末の面の AI の名乗り。**案とちょうど逆**です。
+#
+# 「人と AI を色で見分ける」が案の要点なのに、取り違えていました。
+# 型検査も試験も通り、**画面を見るまで分かりません。**
+HUMAN_COLORS = ("--accent", "--human")
+# **子孫の選び手も見ること。**最初は `^\s*\.…` で書いていて、
+# `.band li.ai`（空白を含む）を**取りこぼしました** ——
+# それが実際に起きた 1 件です（AI の行が人の青で描かれていた）。
+AI_SELECTOR = re.compile(r"^[^{}\n]*\.ai\b[^{}\n]*\{", re.M)
+
+
+def ai_wearing_human(files: dict[str, str]) -> list[str]:
+    """`.ai` を名乗る選び手の中で、人の色を使っている所。"""
+    bad: list[str] = []
+    for name, text in files.items():
+        body = strip_notes(re.sub(r"/\*.*?\*/", "", text, flags=re.S))
+        for hit in AI_SELECTOR.finditer(body):
+            # その規則の中だけを見る（次の `}` まで）。
+            end = body.find("}", hit.end())
+            rule = body[hit.end() : end if end > 0 else len(body)]
+            selector = hit.group(0).strip().rstrip("{").strip()
+            for human in HUMAN_COLORS:
+                if f"var({human})" in rule:
+                    bad.append(f"{name}: `{selector}` が {human} を使っています（AI は --ai）")
+    return bad
+
+
 def read_sources() -> dict[str, str]:
     out = {}
     for path in sorted(SRC.rglob("*")):
@@ -257,6 +288,15 @@ def main() -> int:
               file=sys.stderr)
         return 1
 
+    wearing = ai_wearing_human(files)
+    if wearing:
+        print(f"NG **AI の印が人の色を使っています（{len(wearing)} 件）**:", file=sys.stderr)
+        for line in wearing:
+            print(f"   {line}", file=sys.stderr)
+        print("\n   **人は `--human` / `--accent`、AI は `--ai`。**案の要点はここです。",
+              file=sys.stderr)
+        return 1
+
     trouble = theme_trouble(TOKENS_CSS.read_text(encoding="utf-8"))
     if trouble:
         print(f"NG **配色の不整合が {len(trouble)} 件**:", file=sys.stderr)
@@ -267,7 +307,7 @@ def main() -> int:
         return 1
 
     print(f"OK ファイル {len(files)} / 定義 {len(defined)} / 控え無しの使用 {len(used)} —— 未定義は 0 件")
-    print("OK 配色の不整合なし（暗い側 2 か所が一致・案の色が入っている）")
+    print("OK 配色の不整合なし（暗い側 2 か所が一致・案の色・AI は AI の色）")
     return 0
 
 

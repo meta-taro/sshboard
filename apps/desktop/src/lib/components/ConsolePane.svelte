@@ -346,9 +346,16 @@
 		border: 1px solid var(--hairline);
 	}
 
+	/*
+	 * **AI は橙**（UI 案・2026-10-21）。
+	 *
+	 * ここは `--accent` でした。フェーズ A で `--accent` を**人の青**にしたので、
+	 * **AI の名乗りが青くなっていました** —— 案とちょうど逆です。
+	 * 「人と AI を色で見分ける」が案の要点なのに、取り違えていました。
+	 */
 	.holder.ai {
-		border-color: var(--accent);
-		color: var(--accent);
+		border-color: var(--ai);
+		color: var(--ai);
 	}
 
 	.screen {
