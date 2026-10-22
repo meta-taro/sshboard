@@ -22,6 +22,10 @@
  */
 import { describe, expect, test } from 'vitest';
 
+// **Vite の `?raw`。**`node:fs` は型検査が落ちます（`icon-shape.test.ts` の注）。
+import page from '../routes/+page.svelte?raw';
+import layout from '../routes/+layout.svelte?raw';
+
 import {
 	contrast,
 	MIN_CONTRAST,
@@ -90,5 +94,32 @@ describe('端末の配色', () => {
 		expect(theme.black).toBe(TERMINAL_PALETTE.black);
 		// **カーソルだけ別の色にしない。**そこだけ測り直しが要ります。
 		expect(theme.cursor).toBe(TERMINAL_PALETTE.foreground);
+	});
+});
+
+describe('端末の背景の出どころ（2026-10-22）', () => {
+	/**
+	 * **容器と端末で背景が違う**という形を、もう一度作らないため。
+	 *
+	 * `tokens.css` の注にあるとおり、以前は `--terminal-bg` をトークンに置き、
+	 * xterm は別の値を直書きしていて、**容器と端末で背景が違っていました。**
+	 * いまは `TERMINAL_PALETTE` が唯一の出どころで、
+	 * `+layout.svelte` が実行時に `--terminal-bg` へ入れています。
+	 *
+	 * **ただし `+page.svelte` に控えの値が直書きされています**
+	 * （`var(--terminal-bg, #0d1013)`）——最初の 1 描画のためのもので、
+	 * **いまはたまたま一致しています。**`TERMINAL_PALETTE` を変えた日に
+	 * 黙ってずれる（一瞬だけ違う色が見える）ので、ここで数えます。
+	 */
+	test('keeps the first-paint fallback equal to the palette', () => {
+		const hit = /var\(--terminal-bg,\s*(#[0-9a-fA-F]{6})\)/.exec(page);
+		expect(hit, '`var(--terminal-bg, …)` の控えが見つかりません').not.toBeNull();
+		expect(hit?.[1].toLowerCase()).toBe(TERMINAL_PALETTE.background.toLowerCase());
+	});
+
+	test('still has one place that fills the variable', () => {
+		// **控えだけになっていないこと。**入れる所が消えると、
+		// テーマを変えても端末の容器だけ古い色のままになります。
+		expect(layout).toContain("setProperty('--terminal-bg', TERMINAL_PALETTE.background)");
 	});
 });

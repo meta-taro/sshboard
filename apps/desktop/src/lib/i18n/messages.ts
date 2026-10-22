@@ -6,6 +6,10 @@
  */
 
 const en = {
+	// **柵を接続の一覧にも**（UI 案・2026-10-21／D22）。
+	// **既定は空＝AI は読むだけ。**それが普通の状態なので、警告に見せない。
+	'conn.fence.some': 'Fence · {count}',
+	'conn.fence.none': 'No fence — the AI only reads',
 	// **AI が書けるか、行ごとに**（UI 案・2026-10-21／D22）。
 	// **人は制限されません。**この印は AI にだけかかります。
 	'files.writable': 'AI may write',
@@ -295,6 +299,10 @@ export type MessageKey = keyof typeof en;
 type Catalog = Partial<Record<MessageKey, string>>;
 
 const ja: Catalog = {
+	// **柵を接続の一覧にも**（UI 案・2026-10-21／D22）。
+	// **既定は空＝AI は読むだけ。**それが普通の状態なので、警告に見せない。
+	'conn.fence.some': '柵 {count} か所',
+	'conn.fence.none': '柵なし · AI は読むだけ',
 	// **AI が書けるか、行ごとに**（UI 案・2026-10-21／D22）。
 	// **人は制限されません。**この印は AI にだけかかります。
 	'files.writable': '書ける',

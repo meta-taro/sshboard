@@ -4,6 +4,10 @@ import type { MessageKey } from './messages';
 type Catalog = Partial<Record<MessageKey, string>>;
 
 export const ko: Catalog = {
+	// **柵を接続の一覧にも**（UI 案・2026-10-21／D22）。
+	// **既定は空＝AI は読むだけ。**それが普通の状態なので、警告に見せない。
+	'conn.fence.some': '울타리 {count}곳',
+	'conn.fence.none': '울타리 없음 · AI는 읽기만',
 	// **AI が書けるか、行ごとに**（UI 案・2026-10-21／D22）。
 	// **人は制限されません。**この印は AI にだけかかります。
 	'files.writable': '쓸 수 있음',
@@ -253,6 +257,10 @@ export const ko: Catalog = {
 };
 
 export const zhCN: Catalog = {
+	// **柵を接続の一覧にも**（UI 案・2026-10-21／D22）。
+	// **既定は空＝AI は読むだけ。**それが普通の状態なので、警告に見せない。
+	'conn.fence.some': '围栏 {count} 处',
+	'conn.fence.none': '无围栏 · AI 只读',
 	// **AI が書けるか、行ごとに**（UI 案・2026-10-21／D22）。
 	// **人は制限されません。**この印は AI にだけかかります。
 	'files.writable': '可写入',
@@ -502,6 +510,10 @@ export const zhCN: Catalog = {
 };
 
 export const zhTW: Catalog = {
+	// **柵を接続の一覧にも**（UI 案・2026-10-21／D22）。
+	// **既定は空＝AI は読むだけ。**それが普通の状態なので、警告に見せない。
+	'conn.fence.some': '圍欄 {count} 處',
+	'conn.fence.none': '無圍欄 · AI 只讀',
 	// **AI が書けるか、行ごとに**（UI 案・2026-10-21／D22）。
 	// **人は制限されません。**この印は AI にだけかかります。
 	'files.writable': '可寫入',

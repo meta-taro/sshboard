@@ -543,14 +543,14 @@
 								<span
 									class="chip"
 									style:background={item.color ? `var(--mark-${item.color})` : 'transparent'}
-									style:border-color={item.color ? `var(--mark-${item.color})` : '#3a4049'}
+									style:border-color={item.color ? `var(--mark-${item.color})` : 'var(--hairline-strong)'}
 									aria-hidden="true"
 								></span>
 								<span class="row-name" data-secret>{item.name || item.id}</span>
 								{#if item.tag}
 									<span
 										class="row-tag"
-										style:color={item.color ? `var(--mark-${item.color})` : '#8b929e'}
+										style:color={item.color ? `var(--mark-${item.color})` : 'var(--fg-faint)'}
 										data-secret
 									>
 										{item.tag}
@@ -558,6 +558,27 @@
 								{/if}
 							</span>
 							<span class="row-id" data-secret>{item.id}</span>
+							<!--
+								**柵を、接続の一覧にも**（UI 案・2026-10-21／D22）。
+
+								柵は接続ごとに人が決めるものなのに、**接続を選ぶ画面に
+								出ていませんでした** —— どの接続で AI が書けるのかを、
+								一覧では比べられなかった。
+
+								**既定は空＝AI は読むだけ。**それが普通の状態なので
+								**警告には見せません。**色が付くのは柵が在るときだけ。
+							-->
+							<span class="row-fence" class:open={(item.write_roots?.length ?? 0) > 0}>
+								{#if (item.write_roots?.length ?? 0) > 0}
+									<Icon name="lock" size={10} />
+									{i18n.t('conn.fence.some', {
+										count: String(item.write_roots?.length ?? 0)
+									})}
+									<span class="row-fence-first" data-secret>{item.write_roots?.[0]}</span>
+								{:else}
+									{i18n.t('conn.fence.none')}
+								{/if}
+							</span>
 						</button>
 					</li>
 				{/each}
@@ -1266,6 +1287,35 @@
 		border-color: var(--accent);
 		color: var(--accent);
 		font-weight: 600;
+	}
+
+	/*
+	 * **柵の行**（UI 案・2026-10-21／D22）。
+	 *
+	 * 柵が在るときだけ橙（AI の色）で主張します。
+	 * **空のときは色を付けません** —— 既定が空なので、
+	 * そこを警告色にすると**一覧が全部光ります。**
+	 */
+	.row-fence {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.22rem;
+		font-size: 0.62rem;
+		color: var(--fg-faint);
+		min-width: 0;
+	}
+
+	.row-fence.open {
+		color: var(--warning);
+	}
+
+	/* 最初の 1 本だけ出す。**全部並べると行が伸びて一覧が読めません。** */
+	.row-fence-first {
+		font-family: var(--font-mono);
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+		min-width: 0;
 	}
 
 	.mark-row {

@@ -4,6 +4,10 @@ import type { MessageKey } from './messages';
 type Catalog = Partial<Record<MessageKey, string>>;
 
 export const ptBR: Catalog = {
+	// **柵を接続の一覧にも**（UI 案・2026-10-21／D22）。
+	// **既定は空＝AI は読むだけ。**それが普通の状態なので、警告に見せない。
+	'conn.fence.some': 'Cerca · {count}',
+	'conn.fence.none': 'Sem cerca — a IA só lê',
 	// **AI が書けるか、行ごとに**（UI 案・2026-10-21／D22）。
 	// **人は制限されません。**この印は AI にだけかかります。
 	'files.writable': 'Gravável',
@@ -253,6 +257,10 @@ export const ptBR: Catalog = {
 };
 
 export const ru: Catalog = {
+	// **柵を接続の一覧にも**（UI 案・2026-10-21／D22）。
+	// **既定は空＝AI は読むだけ。**それが普通の状態なので、警告に見せない。
+	'conn.fence.some': 'Ограда · {count}',
+	'conn.fence.none': 'Без ограды — ИИ только читает',
 	// **AI が書けるか、行ごとに**（UI 案・2026-10-21／D22）。
 	// **人は制限されません。**この印は AI にだけかかります。
 	'files.writable': 'Можно писать',
@@ -502,6 +510,10 @@ export const ru: Catalog = {
 };
 
 export const it: Catalog = {
+	// **柵を接続の一覧にも**（UI 案・2026-10-21／D22）。
+	// **既定は空＝AI は読むだけ。**それが普通の状態なので、警告に見せない。
+	'conn.fence.some': 'Recinto · {count}',
+	'conn.fence.none': 'Nessun recinto — l’IA legge soltanto',
 	// **AI が書けるか、行ごとに**（UI 案・2026-10-21／D22）。
 	// **人は制限されません。**この印は AI にだけかかります。
 	'files.writable': 'Scrivibile',
