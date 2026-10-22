@@ -6,6 +6,10 @@
  */
 
 const en = {
+	// **立ち上げ直すと AI の目も切れる**（UI 案・2026-10-21）。
+	// GUI と MCP は同じ 1 本を共有している（禁止事項 3）。
+	'update.cuts.ai': "Restarting ends the AI's view of this session. Nothing of yours is open.",
+	'update.ai.note': 'The AI will not reconnect by itself. It connects again the next time it asks.',
 	// **キー操作を見る場所**（UI 案・2026-10-21）。
 	// 入れても書いていなければ、**無いのと同じ**（Issue #9 で一度やった）。
 	'help.open': 'Help',
@@ -304,6 +308,10 @@ export type MessageKey = keyof typeof en;
 type Catalog = Partial<Record<MessageKey, string>>;
 
 const ja: Catalog = {
+	// **立ち上げ直すと AI の目も切れる**（UI 案・2026-10-21）。
+	// GUI と MCP は同じ 1 本を共有している（禁止事項 3）。
+	'update.cuts.ai': '再起動すると、AI が見ているものが切れます。あなたの側は何も開いていません。',
+	'update.ai.note': 'AI 側は自動では繋ぎ直しません。AI のほうからもう一度呼ばれたときに繋がります。',
 	// **キー操作を見る場所**（UI 案・2026-10-21）。
 	// 入れても書いていなければ、**無いのと同じ**（Issue #9 で一度やった）。
 	'help.open': 'ヘルプ',

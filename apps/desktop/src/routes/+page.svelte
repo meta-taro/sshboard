@@ -975,7 +975,15 @@
 	 * こちらの仕事は「知らないまま押させない」ことです。
 	 */
 	const cost = $derived(
-		cutSummary({ sessions: session.all.length, terminalOpen: consoleOn !== null })
+		cutSummary({
+			sessions: session.all.length,
+			terminalOpen: consoleOn !== null,
+			// **AI の目も切れる**（UI 案・2026-10-21／禁止事項 3）。
+			// GUI と MCP は同じ 1 本を共有しているので、立ち上げ直すと
+			// AI が見ているものも落ちます。**口が立っているかで判断します** ——
+			// 失敗していなければ立っている（`mcpFailure === null`）。
+			mcpOpen: mcpFailure === null
+		})
 	);
 
 	/** 札を出すか。**静かなときは静かでいる。** */
@@ -1658,6 +1666,16 @@
 						-->
 						<p class="toast-cut">
 							{i18n.t(cutMessageKey(cost), { count: String(cost.sessions) })}
+							{#if cost.mcp}
+								<!--
+									**AI は自動で繋ぎ直しません**（UI 案・2026-10-21）。
+									黙っていると「勝手に戻る」と思われ、戻っていないことに
+									気づかないまま作業が進みます。
+									**裏で見えない SSH を張らない**（禁止事項 3）ので、
+									繋ぎ直すのは AI からもう一度呼ばれたときです。
+								-->
+								<span class="ai-note">{i18n.t('update.ai.note')}</span>
+							{/if}
 						</p>
 					{/if}
 					<div class="toast-actions">
@@ -2487,6 +2505,21 @@
 	.band-who-pick:focus-visible {
 		outline: 2px solid var(--accent);
 		outline-offset: 1px;
+	}
+
+	/*
+	 * **AI は自動で繋ぎ直さない**という断り（UI 案・2026-10-21）。
+	 *
+	 * 橙（AI の色）で、立ち上げ直す前の帯に添えます。
+	 * 黙っていると「勝手に戻る」と思われ、**戻っていないことに
+	 * 気づかないまま作業が進みます。**
+	 */
+	.ai-note {
+		display: block;
+		margin-top: 0.3rem;
+		font-size: 0.68rem;
+		line-height: 1.55;
+		color: var(--warning);
 	}
 
 	.mask-toggle {

@@ -4,6 +4,10 @@ import type { MessageKey } from './messages';
 type Catalog = Partial<Record<MessageKey, string>>;
 
 export const ko: Catalog = {
+	// **立ち上げ直すと AI の目も切れる**（UI 案・2026-10-21）。
+	// GUI と MCP は同じ 1 本を共有している（禁止事項 3）。
+	'update.cuts.ai': '다시 시작하면 AI가 보고 있는 것이 끊어집니다. 당신 쪽은 아무것도 열려 있지 않습니다.',
+	'update.ai.note': 'AI는 스스로 다시 연결하지 않습니다. AI가 다시 요청할 때 연결됩니다.',
 	// **キー操作を見る場所**（UI 案・2026-10-21）。
 	// 入れても書いていなければ、**無いのと同じ**（Issue #9 で一度やった）。
 	'help.open': '도움말',
@@ -262,6 +266,10 @@ export const ko: Catalog = {
 };
 
 export const zhCN: Catalog = {
+	// **立ち上げ直すと AI の目も切れる**（UI 案・2026-10-21）。
+	// GUI と MCP は同じ 1 本を共有している（禁止事項 3）。
+	'update.cuts.ai': '重新启动会断开 AI 正在查看的内容。你这边没有打开任何东西。',
+	'update.ai.note': 'AI 不会自动重连。下次 AI 主动请求时才会连接。',
 	// **キー操作を見る場所**（UI 案・2026-10-21）。
 	// 入れても書いていなければ、**無いのと同じ**（Issue #9 で一度やった）。
 	'help.open': '帮助',
@@ -520,6 +528,10 @@ export const zhCN: Catalog = {
 };
 
 export const zhTW: Catalog = {
+	// **立ち上げ直すと AI の目も切れる**（UI 案・2026-10-21）。
+	// GUI と MCP は同じ 1 本を共有している（禁止事項 3）。
+	'update.cuts.ai': '重新啟動會斷開 AI 正在查看的內容。你這邊沒有打開任何東西。',
+	'update.ai.note': 'AI 不會自動重連。下次 AI 主動請求時才會連接。',
 	// **キー操作を見る場所**（UI 案・2026-10-21）。
 	// 入れても書いていなければ、**無いのと同じ**（Issue #9 で一度やった）。
 	'help.open': '說明',

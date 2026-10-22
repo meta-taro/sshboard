@@ -4,6 +4,10 @@ import type { MessageKey } from './messages';
 type Catalog = Partial<Record<MessageKey, string>>;
 
 export const ptBR: Catalog = {
+	// **立ち上げ直すと AI の目も切れる**（UI 案・2026-10-21）。
+	// GUI と MCP は同じ 1 本を共有している（禁止事項 3）。
+	'update.cuts.ai': 'Reiniciar encerra o que a IA está vendo. Você não tem nada aberto.',
+	'update.ai.note': 'A IA não reconecta sozinha. Ela conecta na próxima vez que pedir.',
 	// **キー操作を見る場所**（UI 案・2026-10-21）。
 	// 入れても書いていなければ、**無いのと同じ**（Issue #9 で一度やった）。
 	'help.open': 'Ajuda',
@@ -262,6 +266,10 @@ export const ptBR: Catalog = {
 };
 
 export const ru: Catalog = {
+	// **立ち上げ直すと AI の目も切れる**（UI 案・2026-10-21）。
+	// GUI と MCP は同じ 1 本を共有している（禁止事項 3）。
+	'update.cuts.ai': 'Перезапуск разорвёт то, что видит ИИ. У вас ничего не открыто.',
+	'update.ai.note': 'ИИ не переподключится сам. Он подключится, когда снова запросит.',
 	// **キー操作を見る場所**（UI 案・2026-10-21）。
 	// 入れても書いていなければ、**無いのと同じ**（Issue #9 で一度やった）。
 	'help.open': 'Справка',
@@ -520,6 +528,10 @@ export const ru: Catalog = {
 };
 
 export const it: Catalog = {
+	// **立ち上げ直すと AI の目も切れる**（UI 案・2026-10-21）。
+	// GUI と MCP は同じ 1 本を共有している（禁止事項 3）。
+	'update.cuts.ai': 'Riavviare interrompe ciò che l’IA sta guardando. Dalla tua parte non c’è nulla di aperto.',
+	'update.ai.note': 'L’IA non si riconnette da sola. Si connette alla prossima richiesta.',
 	// **キー操作を見る場所**（UI 案・2026-10-21）。
 	// 入れても書いていなければ、**無いのと同じ**（Issue #9 で一度やった）。
 	'help.open': 'Aiuto',

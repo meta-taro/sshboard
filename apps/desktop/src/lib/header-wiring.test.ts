@@ -208,3 +208,28 @@ describe('キー操作を見る場所（UI 案）', () => {
 		expect(source).toContain('<KeyHelpDialog {platform}');
 	});
 });
+
+describe('立ち上げ直すと AI の目も切れる（UI 案）', () => {
+	/**
+	 * **GUI と MCP は同じ 1 本の SSH を共有します**（禁止事項 3）。
+	 *
+	 * それまで数えていたのは人の側だけ（接続と端末）でした。
+	 * **人が何も開いていないのに AI は読んでいる**ことは起きるので
+	 * （AI が宛先を動かした直後など）、そこを数えないと
+	 * **「何も切れません」と言って AI を切ります。**
+	 */
+	test('counts the MCP mouth when working out what a restart costs', () => {
+		expect(source).toContain('mcpOpen: mcpFailure === null');
+	});
+
+	test('says the AI will not reconnect by itself', () => {
+		// 黙っていると「勝手に戻る」と思われ、**戻っていないことに
+		// 気づかないまま作業が進みます。**
+		expect(source).toContain("i18n.t('update.ai.note')");
+	});
+
+	test('only says it when the AI is actually there', () => {
+		// 居ないものについて断りを出すと、**毎回出る注意書き**になって読まれなくなります。
+		expect(source).toContain('{#if cost.mcp}');
+	});
+});

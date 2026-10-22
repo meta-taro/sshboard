@@ -4,6 +4,10 @@ import type { MessageKey } from './messages';
 type Catalog = Partial<Record<MessageKey, string>>;
 
 export const de: Catalog = {
+	// **立ち上げ直すと AI の目も切れる**（UI 案・2026-10-21）。
+	// GUI と MCP は同じ 1 本を共有している（禁止事項 3）。
+	'update.cuts.ai': 'Ein Neustart beendet die Sicht der KI. Bei Ihnen ist nichts offen.',
+	'update.ai.note': 'Die KI verbindet sich nicht selbst neu. Sie verbindet sich, wenn sie das nächste Mal fragt.',
 	// **キー操作を見る場所**（UI 案・2026-10-21）。
 	// 入れても書いていなければ、**無いのと同じ**（Issue #9 で一度やった）。
 	'help.open': 'Hilfe',
@@ -262,6 +266,10 @@ export const de: Catalog = {
 };
 
 export const fr: Catalog = {
+	// **立ち上げ直すと AI の目も切れる**（UI 案・2026-10-21）。
+	// GUI と MCP は同じ 1 本を共有している（禁止事項 3）。
+	'update.cuts.ai': 'Redémarrer coupe ce que l’IA regarde. Rien n’est ouvert de votre côté.',
+	'update.ai.note': 'L’IA ne se reconnecte pas d’elle-même. Elle se connecte à sa prochaine demande.',
 	// **キー操作を見る場所**（UI 案・2026-10-21）。
 	// 入れても書いていなければ、**無いのと同じ**（Issue #9 で一度やった）。
 	'help.open': 'Aide',
@@ -520,6 +528,10 @@ export const fr: Catalog = {
 };
 
 export const es: Catalog = {
+	// **立ち上げ直すと AI の目も切れる**（UI 案・2026-10-21）。
+	// GUI と MCP は同じ 1 本を共有している（禁止事項 3）。
+	'update.cuts.ai': 'Reiniciar corta lo que la IA está viendo. No tienes nada abierto.',
+	'update.ai.note': 'La IA no se reconecta por sí sola. Se conecta la próxima vez que lo pida.',
 	// **キー操作を見る場所**（UI 案・2026-10-21）。
 	// 入れても書いていなければ、**無いのと同じ**（Issue #9 で一度やった）。
 	'help.open': 'Ayuda',
