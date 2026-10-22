@@ -6,6 +6,13 @@
  */
 
 const en = {
+	// **絞った結果が空なのを、「まだ何も起きていない」と見せない。**
+	// 同じ文言を使うと、**行は在るのに壊れたと読まれます。**
+	'band.filtered.empty': 'No line matches this filter — the band itself is not empty.',
+	// **帯の絞り込み**（UI 案・2026-10-21）。混ぜるのはやめず、分けて見せるだけ。
+	'band.who.all': 'All',
+	'band.who.ai': 'AI only',
+	'band.who.human': 'You only',
 	// **いま誰が打てるか**（UI 案・2026-10-21）。
 	// **色だけに頼らない** —— 案の人（青）と AI（橙）は明るさがほぼ同じなので、
 	// 見分けは文字が担います。
@@ -284,6 +291,13 @@ export type MessageKey = keyof typeof en;
 type Catalog = Partial<Record<MessageKey, string>>;
 
 const ja: Catalog = {
+	// **絞った結果が空なのを、「まだ何も起きていない」と見せない。**
+	// 同じ文言を使うと、**行は在るのに壊れたと読まれます。**
+	'band.filtered.empty': 'この絞りでは 1 行もありません。帯そのものは空ではありません。',
+	// **帯の絞り込み**（UI 案・2026-10-21）。混ぜるのはやめず、分けて見せるだけ。
+	'band.who.all': '全部',
+	'band.who.ai': 'AI だけ',
+	'band.who.human': '人だけ',
 	// **いま誰が打てるか**（UI 案・2026-10-21）。
 	// **色だけに頼らない** —— 案の人（青）と AI（橙）は明るさがほぼ同じなので、
 	// 見分けは文字が担います。

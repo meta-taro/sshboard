@@ -4,6 +4,13 @@ import type { MessageKey } from './messages';
 type Catalog = Partial<Record<MessageKey, string>>;
 
 export const ptBR: Catalog = {
+	// **絞った結果が空なのを、「まだ何も起きていない」と見せない。**
+	// 同じ文言を使うと、**行は在るのに壊れたと読まれます。**
+	'band.filtered.empty': 'Nenhuma linha corresponde a este filtro — o registro não está vazio.',
+	// **帯の絞り込み**（UI 案・2026-10-21）。混ぜるのはやめず、分けて見せるだけ。
+	'band.who.all': 'Tudo',
+	'band.who.ai': 'Só IA',
+	'band.who.human': 'Só você',
 	// **いま誰が打てるか**（UI 案・2026-10-21）。
 	// **色だけに頼らない** —— 案の人（青）と AI（橙）は明るさがほぼ同じなので、
 	// 見分けは文字が担います。
@@ -242,6 +249,13 @@ export const ptBR: Catalog = {
 };
 
 export const ru: Catalog = {
+	// **絞った結果が空なのを、「まだ何も起きていない」と見せない。**
+	// 同じ文言を使うと、**行は在るのに壊れたと読まれます。**
+	'band.filtered.empty': 'Ни одна строка не подходит под этот фильтр — сама запись не пуста.',
+	// **帯の絞り込み**（UI 案・2026-10-21）。混ぜるのはやめず、分けて見せるだけ。
+	'band.who.all': 'Всё',
+	'band.who.ai': 'Только ИИ',
+	'band.who.human': 'Только вы',
 	// **いま誰が打てるか**（UI 案・2026-10-21）。
 	// **色だけに頼らない** —— 案の人（青）と AI（橙）は明るさがほぼ同じなので、
 	// 見分けは文字が担います。
@@ -480,6 +494,13 @@ export const ru: Catalog = {
 };
 
 export const it: Catalog = {
+	// **絞った結果が空なのを、「まだ何も起きていない」と見せない。**
+	// 同じ文言を使うと、**行は在るのに壊れたと読まれます。**
+	'band.filtered.empty': 'Nessuna riga corrisponde a questo filtro — il registro non è vuoto.',
+	// **帯の絞り込み**（UI 案・2026-10-21）。混ぜるのはやめず、分けて見せるだけ。
+	'band.who.all': 'Tutto',
+	'band.who.ai': 'Solo IA',
+	'band.who.human': 'Solo tu',
 	// **いま誰が打てるか**（UI 案・2026-10-21）。
 	// **色だけに頼らない** —— 案の人（青）と AI（橙）は明るさがほぼ同じなので、
 	// 見分けは文字が担います。

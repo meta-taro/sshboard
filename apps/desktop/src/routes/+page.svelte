@@ -3,7 +3,7 @@
 	import { listen } from '@tauri-apps/api/event';
 	import { onMount, tick } from 'svelte';
 
-	import { appendLine, type BandLine } from '$lib/band';
+	import { appendLine, filterBand, type BandLine, type BandWho } from '$lib/band';
 	import ConnectionManager from '$lib/components/ConnectionManager.svelte';
 	import ConsoleRequestDialog from '$lib/components/ConsoleRequestDialog.svelte';
 	import HostKeyDialog from '$lib/components/HostKeyDialog.svelte';
@@ -158,6 +158,18 @@
 	function fenceHead(): string {
 		return i18n.t('files.scope.some', { roots: '' }).replace(/[\s:：,，]+$/u, '');
 	}
+
+	/**
+	 * **帯の絞り込み**（UI 案・2026-10-21）。
+	 *
+	 * **既定は「全部」。**帯は人と AI の操作が時間順に 1 本で並ぶ所で、
+	 * それがこの道具の要です（PRD §4-1「見えないことが最大の危険」）。
+	 * **混ぜるのをやめません** —— 片方だけを見たいときに分けて見せるだけ。
+	 */
+	let bandWho = $state<BandWho>('all');
+
+	/** いま出す帯の行。 */
+	const bandLines = $derived(filterBand(lines, bandWho));
 
 	/** 画面ぜんたいのキー操作を実行する（判定は `app-keys.ts`）。 */
 	function runApp(intent: NonNullable<ReturnType<typeof appIntent>>) {
@@ -2034,11 +2046,42 @@
 		<!-- **帯が何なのかを書く。**「ここに何が出るのか」が分からないと、
 		     空のときに壊れているのか、何も起きていないのかが区別できない。 -->
 		<p class="what">{i18n.t('band.what')}</p>
+		<!--
+			**誰の行かで絞る**（UI 案・2026-10-21）。
+			**既定は「全部」** —— 1 本に並んでいることが要なので、
+			分けるのは人が選んだときだけ。
+			色だけで分けません（人と AI の色は明るさがほぼ同じ）——
+			**選んだ札は地と字を入れ替えます。**
+		-->
+		{#if lines.length > 0}
+			<div class="band-who" role="group" aria-label={i18n.t('band.label')}>
+				{#each [['all', 'band.who.all'], ['ai', 'band.who.ai'], ['human', 'band.who.human']] as const as [who, key] (who)}
+					<button
+						type="button"
+						class="band-who-pick"
+						class:active={bandWho === who}
+						class:ai={who === 'ai'}
+						class:human={who === 'human'}
+						aria-pressed={bandWho === who}
+						onclick={() => (bandWho = who)}
+					>
+						{i18n.t(key)}
+					</button>
+				{/each}
+			</div>
+		{/if}
 		{#if lines.length === 0}
 			<p class="empty">{i18n.t('band.empty')}</p>
+		{:else if bandLines.length === 0}
+			<!--
+				**絞った結果が空なのを、「何も起きていない」と見せない。**
+				行は在るのに絞りで消えている、と言わないと**壊れたと読まれます。**
+				**`band.empty` を使い回しません** —— 言っている事実が違います。
+			-->
+			<p class="empty">{i18n.t('band.filtered.empty')}</p>
 		{:else}
 			<ol>
-				{#each lines as line (line.seq)}
+				{#each bandLines as line (line.seq)}
 					<li class:ai={line.tag === '[AI]'}>{line.rendered}</li>
 				{/each}
 			</ol>
@@ -2347,6 +2390,72 @@
 	.fence-note {
 		color: var(--fg-dim);
 		line-height: 1.5;
+	}
+
+	/*
+	 * **帯の絞り込みの札**（UI 案・2026-10-21）。
+	 *
+	 * 選んだものは**地と字を入れ替えます** —— 色だけで分けません
+	 * （人と AI の色は明るさがほぼ同じなので、色では見分けられない）。
+	 * 「AI だけ」「人だけ」の札は**それぞれの色**を帯びますが、
+	 * **文字が本体**です。
+	 */
+	.band-who {
+		display: flex;
+		gap: 0.3rem;
+		flex: 0 0 auto;
+		margin: 0 0 0.45rem;
+	}
+
+	.band-who-pick {
+		font: inherit;
+		font-size: 0.68rem;
+		color: var(--fg-control);
+		background: transparent;
+		border: 1px solid var(--hairline);
+		border-radius: var(--r-pill);
+		padding: 0.14rem 0.6rem;
+		cursor: pointer;
+		white-space: nowrap;
+		transition:
+			background var(--fast) var(--ease),
+			color var(--fast) var(--ease);
+	}
+
+	.band-who-pick:hover {
+		background: var(--surface-2);
+	}
+
+	.band-who-pick.ai {
+		border-color: var(--ai);
+		color: var(--warning);
+	}
+
+	.band-who-pick.human {
+		border-color: var(--human);
+		color: var(--human);
+	}
+
+	.band-who-pick.active {
+		color: var(--selected-fg);
+		background: var(--selected);
+		border-color: transparent;
+		font-weight: 700;
+	}
+
+	.band-who-pick.active.ai {
+		background: var(--ai);
+		color: var(--ground);
+	}
+
+	.band-who-pick.active.human {
+		background: var(--human);
+		color: var(--ground);
+	}
+
+	.band-who-pick:focus-visible {
+		outline: 2px solid var(--accent);
+		outline-offset: 1px;
 	}
 
 	.mask-toggle {
