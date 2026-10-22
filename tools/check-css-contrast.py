@@ -85,6 +85,12 @@ PAIRS = [
     ("danger", "surface", NEED_TEXT, "止めた・含めない（赤い字）"),
     ("ok", "surface", NEED_TEXT, "含める・接続中（緑の字）"),
     ("warning", "surface", NEED_TEXT, "AI の柵の見出し（橙の字）"),
+    # **「いま打てるのは [Human · あなた]」の札**（UI 案・2026-10-21）。
+    # 札は地と字を入れ替えます —— 人の色／AI の色の上に、地の色で字を置く。
+    # **浮かせるだけだと白黒で撮ったときに消えます。**
+    ("ground", "human", NEED_TEXT, "打てる人の札（Human · あなた）"),
+    ("ground", "ai", NEED_TEXT, "打てる人の札（AI）"),
+    ("fg-muted", "surface-2", NEED_TEXT, "誰も握っていないときの札"),
 ]
 
 

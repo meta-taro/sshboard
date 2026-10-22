@@ -20,6 +20,7 @@
 	import { invoke } from '@tauri-apps/api/core';
 
 	import type { ConsolePane } from '$lib/console-panes';
+	import { i18n } from '$lib/i18n/i18n.svelte';
 	import { attachClipboard } from '$lib/terminal-clipboard';
 	import type { ClipboardOptions, ClipboardPorts, TerminalPlatform } from '$lib/terminal-clipboard';
 	import type { TerminalSearch } from '$lib/terminal-search';
@@ -38,6 +39,15 @@
 		 * 接続の一覧とファイルの面と同じ札です。
 		 */
 		mark = null,
+		/**
+		 * **この面を止める**（UI 案・2026-10-21）。
+		 *
+		 * 案は AI が握っている面の肩に［止める］を置きました。
+		 * **人はいつでも取り返せる**（D29）という約束が、
+		 * **その面の上に在ること**が要ります —— 別の所に在ると、
+		 * 2 枚開いた日に「どちらを止めるのか」が言えません。
+		 */
+		onstop,
 		/** いま打鍵が行く面か。**人が見ている面を 1 つに決めるため。** */
 		active = false,
 		/** 人が握っているか。**握っていなければ打たない**（往復させずに止める）。 */
@@ -75,6 +85,7 @@
 		mark?: string | null;
 		active?: boolean;
 		iHold?: boolean;
+		onstop?: (id: number) => void;
 		clipboard: ClipboardPorts;
 		platform: TerminalPlatform;
 		onsearch?: (id: number, search: TerminalSearch | undefined) => void;
@@ -166,6 +177,8 @@
 <section
 	class="pane"
 	class:active
+	class:mine={pane.holder === 'human'}
+	class:ai={pane.holder === 'ai'}
 	data-console={pane.id}
 	style:--mark={mark ? `var(--mark-${mark})` : 'transparent'}
 >
@@ -174,9 +187,25 @@
 		<span class="mark-bar" aria-hidden="true"></span>
 		<span class="num">#{pane.id}</span>
 		<span class="on" data-secret>{pane.connection}</span>
+		<!--
+			**誰が握っているかを、面の肩に書く**（UI 案・2026-10-21）。
+			以前はここに `'AI'` / `'人'` が**日本語のまま直書き**されていました
+			（画面は 11 言語あります）。文言は `console.held.*` に既に在ります。
+		-->
 		<span class="holder" class:ai={pane.holder === 'ai'}>
-			{pane.holder === 'ai' ? 'AI' : '人'}
+			<span class="dot" aria-hidden="true"></span>
+			{pane.holder === 'ai' ? i18n.t('console.held.ai') : i18n.t('console.held.me')}
 		</span>
+		{#if pane.holder === 'ai' && onstop}
+			<!--
+				**止まらない停止ボタンは、無い方がまし。**
+				`console_stop_of` は面の番号で止めるので、**2 枚開いていても
+				どちらを止めたのかが言えます。**
+			-->
+			<button type="button" class="stop" onclick={() => onstop(pane.id)}>
+				{i18n.t('console.stop')}
+			</button>
+		{/if}
 	</header>
 	<!--
 		**触ったら、この面へ移る。**打鍵の行き先を、人が見ている面に合わせます。
@@ -208,6 +237,24 @@
 		border-color: var(--accent);
 	}
 
+	/*
+	 * **面の枠を、握っている人の色にする**（UI 案・2026-10-21）。
+	 *
+	 * 案は人の面を青、AI の面を橙で縁取ります。**2 枚並んだとき、
+	 * どちらが AI のものかを枠だけで言える**ようにするためです。
+	 *
+	 * `active`（いま打鍵が行く面）とは別の合図です ——
+	 * `active` は「次に打つ先」、こちらは「誰のものか」。
+	 * **両方同時に要ります**（人の面が 2 枚のときもある）。
+	 */
+	.pane.mine {
+		border-color: var(--human);
+	}
+
+	.pane.ai {
+		border-color: var(--ai);
+	}
+
 	header {
 		display: flex;
 		align-items: center;
@@ -237,6 +284,59 @@
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
+	}
+
+	/*
+	 * **誰が握っているか。**丸い印と文字を並べます。
+	 *
+	 * **色だけに頼りません** —— 案の人（青）と AI（橙）は明るさがほぼ同じで、
+	 * 色が見えない人には見分けられないので、**文字が本体**です。
+	 * 印は「同じ仲間か」を一目で言うための添え物。
+	 */
+	.holder {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.26rem;
+		flex: none;
+		color: var(--human);
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		max-width: 14rem;
+	}
+
+	.holder.ai {
+		color: var(--ai);
+	}
+
+	.holder .dot {
+		width: 0.4rem;
+		height: 0.4rem;
+		border-radius: 50%;
+		background: currentColor;
+		flex: none;
+	}
+
+	/* **この面を止める。**肩に置くので、2 枚開いていても相手を取り違えません。 */
+	.stop {
+		flex: none;
+		font: inherit;
+		font-size: 0.66rem;
+		color: var(--danger);
+		background: var(--danger-soft);
+		border: 1px solid var(--danger);
+		border-radius: var(--r-pill);
+		padding: 0.06rem 0.44rem;
+		cursor: pointer;
+	}
+
+	.stop:hover {
+		background: color-mix(in srgb, var(--danger) 22%, transparent);
+	}
+
+	.stop:focus-visible {
+		outline: 2px solid var(--accent);
+		outline-offset: 1px;
 	}
 
 	.holder {

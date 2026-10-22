@@ -6,6 +6,13 @@
  */
 
 const en = {
+	// **いま誰が打てるか**（UI 案・2026-10-21）。
+	// **色だけに頼らない** —— 案の人（青）と AI（橙）は明るさがほぼ同じなので、
+	// 見分けは文字が担います。
+	'console.who': 'Who can type',
+	'console.who.me': 'Human · you',
+	'console.who.ai': 'AI',
+	'console.who.none': 'Nobody',
 	// **画面を伏せる**（UI 案・2026-10-21）。接続先が画面に写り込むため。
 	'mask.hide': 'Hide what is on screen',
 	'mask.on': 'Hidden',
@@ -277,6 +284,13 @@ export type MessageKey = keyof typeof en;
 type Catalog = Partial<Record<MessageKey, string>>;
 
 const ja: Catalog = {
+	// **いま誰が打てるか**（UI 案・2026-10-21）。
+	// **色だけに頼らない** —— 案の人（青）と AI（橙）は明るさがほぼ同じなので、
+	// 見分けは文字が担います。
+	'console.who': 'いま打てるのは',
+	'console.who.me': 'Human · あなた',
+	'console.who.ai': 'AI',
+	'console.who.none': '誰も',
 	// **画面を伏せる**（UI 案・2026-10-21）。接続先が画面に写り込むため。
 	'mask.hide': '画面を伏せる',
 	'mask.on': '伏せています',

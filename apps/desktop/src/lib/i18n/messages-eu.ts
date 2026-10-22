@@ -4,6 +4,13 @@ import type { MessageKey } from './messages';
 type Catalog = Partial<Record<MessageKey, string>>;
 
 export const de: Catalog = {
+	// **いま誰が打てるか**（UI 案・2026-10-21）。
+	// **色だけに頼らない** —— 案の人（青）と AI（橙）は明るさがほぼ同じなので、
+	// 見分けは文字が担います。
+	'console.who': 'Tippen darf gerade',
+	'console.who.me': 'Human · Sie',
+	'console.who.ai': 'KI',
+	'console.who.none': 'Niemand',
 	// **画面を伏せる**（UI 案・2026-10-21）。接続先が画面に写り込むため。
 	'mask.hide': 'Bildschirm verdecken',
 	'mask.on': 'Verdeckt',
@@ -235,6 +242,13 @@ export const de: Catalog = {
 };
 
 export const fr: Catalog = {
+	// **いま誰が打てるか**（UI 案・2026-10-21）。
+	// **色だけに頼らない** —— 案の人（青）と AI（橙）は明るさがほぼ同じなので、
+	// 見分けは文字が担います。
+	'console.who': 'Peut taper maintenant',
+	'console.who.me': 'Human · vous',
+	'console.who.ai': 'IA',
+	'console.who.none': 'Personne',
 	// **画面を伏せる**（UI 案・2026-10-21）。接続先が画面に写り込むため。
 	'mask.hide': 'Masquer l’écran',
 	'mask.on': 'Masqué',
@@ -466,6 +480,13 @@ export const fr: Catalog = {
 };
 
 export const es: Catalog = {
+	// **いま誰が打てるか**（UI 案・2026-10-21）。
+	// **色だけに頼らない** —— 案の人（青）と AI（橙）は明るさがほぼ同じなので、
+	// 見分けは文字が担います。
+	'console.who': 'Ahora puede escribir',
+	'console.who.me': 'Human · tú',
+	'console.who.ai': 'IA',
+	'console.who.none': 'Nadie',
 	// **画面を伏せる**（UI 案・2026-10-21）。接続先が画面に写り込むため。
 	'mask.hide': 'Ocultar la pantalla',
 	'mask.on': 'Oculto',

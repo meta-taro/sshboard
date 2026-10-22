@@ -860,12 +860,19 @@
 
 	/** 止める。**失敗しません**（D29 の停止ボタン）。**番号で止めます。** */
 	async function stopConsole() {
+		// **いま見ている面を止める。**肩の［止める］は面の番号を直接渡します。
+		if (layout.focused !== null) await stopConsoleOf(layout.focused);
+	}
+
+	/**
+	 * **その面を止める**（UI 案・2026-10-21 で面の肩に置いた）。
+	 *
+	 * **番号で止める。**接続の名前で止めると、同じサーバに 2 枚ある日に
+	 * **どちらが止まるか言えません。**
+	 */
+	async function stopConsoleOf(id: number) {
 		try {
-			// **番号で止める。**接続の名前で止めると、同じサーバに 2 枚ある日に
-			// **どちらが止まるか言えません。**
-			if (layout.focused !== null) {
-				await invoke('console_stop_of', { consoleId: layout.focused });
-			}
+			await invoke('console_stop_of', { consoleId: id });
 			holder = null;
 			await refreshConsoles();
 		} catch (error: unknown) {
@@ -1778,7 +1785,25 @@
 				{#if consoleOn}
 					<span class="on" data-secret>{consoleOn}</span>
 				{/if}
-				<span class="holder" class:ai={holder === 'ai'} class:mine={iHold}>
+				<!--
+					**いま誰が打てるか**（UI 案・2026-10-21）。
+					案の「いま打てるのは [Human · あなた]」。
+					**色だけに頼りません** —— 人（青）と AI（橙）は明るさがほぼ同じ
+					（差 9.5 / 255）なので、色が見えない人には見分けられません。
+					**札の中に `Human` / `AI` と文字で書きます。**
+					長い説明文は読み上げへ回します（画面では札で足りる）。
+				-->
+				<span class="who" class:ai={holder === 'ai'} class:mine={iHold}>
+					<span class="who-label">{i18n.t('console.who')}</span>
+					<span class="who-badge">
+						{holder === 'ai'
+							? i18n.t('console.who.ai')
+							: iHold
+								? i18n.t('console.who.me')
+								: i18n.t('console.who.none')}
+					</span>
+				</span>
+				<span class="holder visually-hidden" class:ai={holder === 'ai'} class:mine={iHold}>
 					<Icon name={holder ? 'lock' : 'terminal'} size={12} />
 					{holder === 'ai'
 						? i18n.t('console.held.ai')
@@ -1884,6 +1909,7 @@
 							iHold={pane.holder === 'human'}
 							findIsOpen={findFrom('console')}
 							onpick={(id) => (chosenConsole = id)}
+							onstop={(id) => void stopConsoleOf(id)}
 							onready={(id, write) => {
 								// **地図は作り直しません。**面の数は 2 つなので、
 								// 書き換えても描き直しは要りません（`$state` にしていません）。
@@ -2822,27 +2848,94 @@
 		color: var(--fg-muted);
 	}
 
+	/*
+	 * **いま誰が打てるか**（UI 案・2026-10-21）。
+	 *
+	 * 案は「いま打てるのは [Human · あなた]」という錠剤にしました。
+	 * 札の地を人の色／AI の色で塗り、**字は地の色に反転させます** ——
+	 * 浮かせるだけだと白黒で撮ったときに消えるからです。
+	 *
+	 * **色だけに頼りません。**案の 2 色は明るさがほぼ同じ（差 9.5 / 255）で、
+	 * 色が見えない人には見分けられないので、**札の中に文字で書きます。**
+	 */
+	.who {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.45rem;
+		margin-right: auto;
+		padding: 0.16rem 0.16rem 0.16rem 0.6rem;
+		border-radius: var(--r-pill);
+		background: var(--shell);
+		border: 1px solid var(--hairline);
+		font-size: 0.7rem;
+		white-space: nowrap;
+	}
+
+	.who-label {
+		color: var(--fg-control);
+	}
+
+	.who-badge {
+		font-family: var(--font-mono);
+		font-size: 0.66rem;
+		font-weight: 600;
+		padding: 0.14rem 0.5rem;
+		border-radius: var(--r-pill);
+		/* 誰も握っていないときは、色で主張しない。 */
+		background: var(--surface-2);
+		color: var(--fg-muted);
+	}
+
+	.who.mine {
+		background: var(--human-soft);
+		border-color: var(--human);
+	}
+
+	.who.mine .who-badge {
+		background: var(--human);
+		color: var(--ground);
+	}
+
+	/* **AI が握っている間は、見て分かるようにする。**締まっていることが伝わらないと、
+	   打てないのを不具合だと思われる。 */
+	.who.ai {
+		background: var(--ai-soft);
+		border-color: var(--ai);
+	}
+
+	.who.ai .who-badge {
+		background: var(--ai);
+		color: var(--ground);
+	}
+
+	/*
+	 * 長い説明文（「AI が握っています — あなたの入力は締まっています」）は
+	 * **読み上げだけに回します。**画面では上の札で足りており、
+	 * 2 つ並べると帯が溢れます。**消しません** —— 読み上げには要る文です。
+	 */
+	.visually-hidden {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		margin: -1px;
+		padding: 0;
+		overflow: hidden;
+		clip-path: inset(50%);
+		white-space: nowrap;
+		border: 0;
+	}
+
 	.holder {
 		display: inline-flex;
 		align-items: center;
 		gap: 0.3rem;
 		font-size: 0.72rem;
 		color: var(--fg-muted);
-		margin-right: auto;
 	}
 
-	.holder.mine {
-		color: var(--ok);
-	}
-
-	/* **AI が握っている間は、見て分かるようにする。**締まっていることが伝わらないと、
-	   打てないのを不具合だと思われる。 */
-	.holder.ai {
-		color: var(--warning);
-	}
-
+	/* **AI が握っている間、端末の枠で締まっていることを示す。** */
 	.terminal.locked {
-		outline: 1.5px solid var(--warning);
+		outline: 1.5px solid var(--ai);
 		outline-offset: 2px;
 	}
 

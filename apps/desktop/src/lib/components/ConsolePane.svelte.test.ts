@@ -55,6 +55,8 @@ vi.mock('$lib/terminal-clipboard', () => ({
 	attachClipboard: () => () => {}
 }));
 
+import { i18n } from '$lib/i18n/i18n.svelte';
+
 import ConsolePane from './ConsolePane.svelte';
 
 /** **合成値。**実物の接続先はテストにも置きません（PRD §8）。 */
@@ -92,14 +94,43 @@ describe('端末 1 枚の面', () => {
 
 		expect(screen.getByText('#2')).toBeTruthy();
 		expect(screen.getByText('web-prod')).toBeTruthy();
-		expect(screen.getByText('人')).toBeTruthy();
+		// **文言は `console.held.*` から。**
+		// 以前はここに `'人'` / `'AI'` が**日本語のまま直書き**されていました
+		// （画面は 11 言語あります）。訳の在る鍵に寄せました（UI 案・2026-10-21）。
+		expect(screen.getByText(i18n.t('console.held.me'))).toBeTruthy();
 	});
 
 	test('says when the AI is the one holding it', () => {
 		// **見えない所で AI が打っている、を作らない**（D29）。
 		mount({ pane: { id: 1, connection: 'db-prod', holder: 'ai' as const } });
 
-		expect(screen.getByText('AI')).toBeTruthy();
+		expect(screen.getByText(i18n.t('console.held.ai'))).toBeTruthy();
+	});
+
+	test('offers a stop button on the pane the AI is holding', () => {
+		// **人はいつでも取り返せる**（D29）。約束が**その面の上に在る**こと ——
+		// 別の所に在ると、2 枚開いた日に「どちらを止めるのか」が言えません。
+		const stopped: number[] = [];
+		mount({
+			pane: { id: 3, connection: 'db-prod', holder: 'ai' as const },
+			onstop: (id: number) => stopped.push(id)
+		});
+
+		const stop = screen.getByRole('button', { name: i18n.t('console.stop') });
+		stop.click();
+		// **番号で止める。**接続の名前だと、同じサーバに 2 枚ある日に
+		// どちらが止まったか言えません。
+		expect(stopped).toEqual([3]);
+	});
+
+	test('does not offer it on a pane the person is holding', () => {
+		// 自分の面に［止める］を出すと、**何が止まるのか読めません。**
+		//
+		// **`onstop` を渡すこと。**最初は渡していなくて、ボタンが出ない理由が
+		// 「人の面だから」ではなく**「口が無いから」**でした。
+		// それだと、人の面にも出す壊し方が素通りします（実際に素通りしました）。
+		mount({ onstop: () => {} });
+		expect(screen.queryByRole('button', { name: i18n.t('console.stop') })).toBeNull();
 	});
 
 	test('writes what it remembered into the terminal it just made', () => {
