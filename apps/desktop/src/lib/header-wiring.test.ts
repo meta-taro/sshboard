@@ -152,28 +152,23 @@ describe('AI の柵（D22）', () => {
 });
 
 describe('帯の絞り込み（UI 案）', () => {
-	test('starts on everything', () => {
-		// **1 本に並んでいることが要**（PRD §4-1）。既定で分けない。
-		expect(source).toContain("let bandWho = $state<BandWho>('all')");
+	/**
+	 * **検査は `BandPanel.svelte.test.ts` へ移しました。**
+	 *
+	 * 帯を部品に出したので、**ソース文字列を見る代わりに
+	 * 実際に描いて確かめられます** —— そちらが強い検査です
+	 * （書き方を変えても、出るものが同じなら通る）。
+	 *
+	 * ここに残すのは**繋がっているかだけ**です。
+	 */
+	test('hands the band its lines', () => {
+		expect(source).toContain('<BandPanel {lines} />');
 	});
 
-	test('filters through the shared function, not here', () => {
-		// 絞りの規則は `band.ts` に在り、**知らない札を人だと決めつけない**ことを
-		// `band.test.ts` が数えています。
-		expect(source).toContain('filterBand(lines, bandWho)');
-	});
-
-	test('draws the filtered lines, not the raw ones', () => {
-		// **ここを間違えると、絞っても表示が変わりません。**
-		expect(source).toContain('{#each bandLines as line (line.seq)}');
-		expect(source).not.toContain('{#each lines as line (line.seq)}');
-	});
-
-	test('says something different when the filter hides everything', () => {
-		// **「まだ何も起きていない」と同じ文言を使わない。**
-		// 行は在るのに壊れたと読まれます。
-		expect(source).toContain("i18n.t('band.filtered.empty')");
-		expect(source).toContain("i18n.t('band.empty')");
+	test('does not keep a second copy of the band here', () => {
+		// **写して 2 か所に置くと、片方だけ直る日が来ます**（D39）。
+		expect(source).not.toContain('class="band"');
+		expect(source).not.toContain('filterBand(');
 	});
 });
 
