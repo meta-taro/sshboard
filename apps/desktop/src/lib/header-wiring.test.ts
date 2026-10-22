@@ -176,3 +176,35 @@ describe('帯の絞り込み（UI 案）', () => {
 		expect(source).toContain("i18n.t('band.empty')");
 	});
 });
+
+describe('キー操作を見る場所（UI 案）', () => {
+	/**
+	 * **入れても書いていなければ無いのと同じ**（Issue #9 で一度やった）。
+	 *
+	 * `Ctrl Shift H`（画面を伏せる）は、**画面共有の直前に押したい**ものです。
+	 * そのとき押し方を探せないと、**接続先が写ったまま共有が始まります。**
+	 */
+	test('opens on F1', () => {
+		expect(source).toContain("if (intent === 'help') {");
+		expect(source).toContain('keyHelpOpen = true;');
+	});
+
+	test('is also reachable by pressing something', () => {
+		// **ショートカットだけだと、知らない人には無いのと同じ。**
+		expect(source).toContain('onclick={() => (keyHelpOpen = true)}');
+	});
+
+	test('does not send F1 to the about box any more', () => {
+		// 案はヘルプと「〜について」を別に持っています。
+		// 「〜について」は版を確かめる所で、**押し方の一覧ではありません。**
+		const at = source.indexOf("if (intent === 'help') {");
+		expect(at).toBeGreaterThan(-1);
+		expect(source.slice(at, at + 120)).not.toContain('aboutOpen');
+	});
+
+	test('draws the list from the one table that defines it', () => {
+		// **ヘルプが実物とずれるのが一番たちの悪い壊れ方**なので、
+		// 表は `app-keys.ts` に置き、そこから描きます。
+		expect(source).toContain('<KeyHelpDialog {platform}');
+	});
+});

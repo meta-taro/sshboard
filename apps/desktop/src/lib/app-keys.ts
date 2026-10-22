@@ -87,3 +87,87 @@ export function appIntent(event: AppKeyEvent, platform: AppPlatform): AppIntent 
 
 	return null;
 }
+
+/**
+ * **キー操作の一覧**（UI 案・2026-10-21 のヘルプ）。
+ *
+ * ## なぜ表にするか
+ *
+ * `Ctrl Shift H`（画面を伏せる）を入れても、**どこにも書いていなければ
+ * 無いのと同じ**です。Issue #9 で一度やりました ——
+ * 「2 台目に繋げるのか」を探している人に、案内が見えていなかった。
+ *
+ * ## なぜ `appIntent` と同じ所に置くか
+ *
+ * **ヘルプが実物とずれるのが、一番たちの悪い壊れ方**です
+ * （書いてあるのに効かない／効くのに書いていない）。
+ * ここに置けば、**表から事象を組み立てて `appIntent` に通し、
+ * 本当にその動作になるか**を機械が確かめられます（`app-keys.test.ts`）。
+ */
+export interface Shortcut {
+	/** どの動作か。**`AppIntent` を全部網羅していることを試験が数えます。** */
+	readonly intent: AppIntent;
+	/** 押すキー（飾りを除いた本体）。 */
+	readonly key: string;
+	readonly shift?: boolean;
+	/** `Ctrl`（mac では `⌘`）が要るか。`F1` のように要らないものもある。 */
+	readonly held?: boolean;
+	/** 画面に出す名前。**文言は既に在る鍵を使い回します**（言い方を増やさない）。 */
+	readonly label: string;
+}
+
+export const APP_SHORTCUTS: readonly Shortcut[] = [
+	{ intent: 'menu', key: ',', held: true, label: 'menu.view' },
+	{ intent: 'help', key: 'F1', label: 'help.open' },
+	{ intent: 'mask', key: 'h', held: true, shift: true, label: 'mask.hide' },
+	{ intent: 'stopAi', key: '.', held: true, shift: true, label: 'ai.stop' },
+	{ intent: 'newConnection', key: 'n', held: true, label: 'conn.new' },
+	{ intent: 'view:1', key: '1', held: true, label: 'tab.connections' },
+	{ intent: 'view:2', key: '2', held: true, label: 'tab.files' },
+	{ intent: 'view:3', key: '3', held: true, label: 'tab.console' },
+	{ intent: 'view:4', key: '4', held: true, label: 'tab.band' },
+	{ intent: 'view:5', key: '5', held: true, label: 'tab.diag' }
+];
+
+/**
+ * **他の担当が持っているキー。**
+ *
+ * ここでは**判定しません**（`appIntent` は `null` を返します）。
+ * それでも人が見る表には要ります —— **誰が持っていようと、
+ * 押す人には同じ 1 枚の表**です。
+ */
+export interface ForeignShortcut {
+	readonly key: string;
+	readonly shift?: boolean;
+	/** `Ctrl`（mac では `⌘`）が要るか。 */
+	readonly held?: boolean;
+	/** `Alt`（mac では `⌥`）が要るか。 */
+	readonly alt?: boolean;
+	readonly label: string;
+	/** 持ち主。**試験がそのファイルを読んで、いまもこのキーかを確かめます。** */
+	readonly module: string;
+}
+
+export const OTHER_SHORTCUTS: readonly ForeignShortcut[] = [
+	{ key: 'c', held: true, shift: true, label: 'menu.copy', module: 'terminal-clipboard' },
+	{ key: 'v', held: true, shift: true, label: 'menu.paste', module: 'terminal-clipboard' },
+	{ key: 'f', held: true, shift: true, label: 'search.label', module: 'terminal-search' },
+	{ key: 'F5', label: 'files.refresh', module: 'FileBrowser' },
+	{ key: 'ArrowUp', alt: true, label: 'files.up', module: 'FileBrowser' },
+	{ key: 'ArrowLeft', alt: true, label: 'files.back', module: 'FileBrowser' },
+	{ key: 'ArrowRight', alt: true, label: 'files.forward', module: 'FileBrowser' }
+];
+
+/** 人が読む形にする（`⌘ Shift H` / `Ctrl Shift H`）。 */
+export function spellShortcut(
+	shortcut: { key: string; shift?: boolean; held?: boolean; alt?: boolean },
+	platform: AppPlatform
+): string {
+	const parts: string[] = [];
+	if (shortcut.held) parts.push(platform === 'mac' ? '⌘' : 'Ctrl');
+	if (shortcut.alt) parts.push(platform === 'mac' ? '⌥' : 'Alt');
+	if (shortcut.shift) parts.push('Shift');
+	// 1 文字のキーは大文字で出す（`h` ではなく `H`）。**押すのは同じキー。**
+	parts.push(shortcut.key.length === 1 ? shortcut.key.toUpperCase() : shortcut.key);
+	return parts.join(' ');
+}

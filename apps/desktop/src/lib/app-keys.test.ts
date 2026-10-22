@@ -11,7 +11,19 @@
  */
 import { describe, expect, test } from 'vitest';
 
-import { appIntent, type AppKeyEvent } from './app-keys';
+import {
+	appIntent,
+	APP_SHORTCUTS,
+	OTHER_SHORTCUTS,
+	spellShortcut,
+	type AppIntent,
+	type AppKeyEvent
+} from './app-keys';
+
+// **持ち主のソースをそのまま読みます。**表が古いままになるのを防ぐため。
+import clipboardSource from './terminal-clipboard?raw';
+import searchSource from './terminal-search?raw';
+import fileBrowserSource from './components/FileBrowser.svelte?raw';
 
 /** 押されたキーを 1 つ作る。**既定は「飾りを何も押していない」。** */
 function press(key: string, held: Partial<AppKeyEvent> = {}): AppKeyEvent {
@@ -145,5 +157,98 @@ describe('ぶつかっていないこと', () => {
 		// `Alt + ←` / `Alt + ↑` はファイルの面の移動です。
 		expect(appIntent(press('n', { ctrlKey: true, altKey: true }), 'other')).toBeNull();
 		expect(appIntent(press('h', { ctrlKey: true, shiftKey: true, altKey: true }), 'other')).toBeNull();
+	});
+});
+
+describe('ヘルプの表が、実物とずれていないこと', () => {
+	/**
+	 * **これが一番たちの悪い壊れ方です** ——
+	 * 書いてあるのに効かない／効くのに書いていない。
+	 *
+	 * 表からキーを組み立てて `appIntent` に通し、
+	 * **本当にその動作になるか**を確かめます。
+	 */
+	test('every row really does what it says, on both platforms', () => {
+		for (const row of APP_SHORTCUTS) {
+			for (const platform of ['mac', 'other'] as const) {
+				const got = appIntent(
+					press(row.key, {
+						ctrlKey: row.held === true && platform === 'other',
+						metaKey: row.held === true && platform === 'mac',
+						shiftKey: row.shift === true
+					}),
+					platform
+				);
+				expect(got, `${spellShortcut(row, platform)} が ${row.intent} にならない`).toBe(
+					row.intent
+				);
+			}
+		}
+	});
+
+	test('lists every action the module can decide', () => {
+		// **動作を足して表に書き忘れる**のを塞ぎます。
+		const intents: AppIntent[] = [
+			'menu',
+			'help',
+			'mask',
+			'stopAi',
+			'newConnection',
+			'view:1',
+			'view:2',
+			'view:3',
+			'view:4',
+			'view:5'
+		];
+		const listed = APP_SHORTCUTS.map((row) => row.intent);
+		for (const intent of intents) {
+			expect(listed, `${intent} が表に無い`).toContain(intent);
+		}
+		expect(listed.length).toBe(intents.length);
+	});
+
+	test('does not list the same key twice', () => {
+		// 同じ組を 2 行に書くと、**どちらが効くのか表から読めません。**
+		const seen = new Set<string>();
+		for (const row of [...APP_SHORTCUTS, ...OTHER_SHORTCUTS]) {
+			const spelled = spellShortcut(row, 'other');
+			expect(seen.has(spelled), `${spelled} が 2 回出てくる`).toBe(false);
+			seen.add(spelled);
+		}
+	});
+
+	test('still finds each foreign key in the module that owns it', () => {
+		// **持ち主が変えたのに表が古いまま**を塞ぎます。
+		const sources: Record<string, string> = {
+			'terminal-clipboard': clipboardSource,
+			'terminal-search': searchSource,
+			FileBrowser: fileBrowserSource
+		};
+		for (const row of OTHER_SHORTCUTS) {
+			const source = sources[row.module];
+			expect(source, `${row.module} のソースが読めません`).toBeTruthy();
+			// `'c'` / `'F5'` / `'ArrowUp'` のような形で、必ず出てくるはず。
+			expect(source.includes(`'${row.key}'`), `${row.module} に ${row.key} が無い`).toBe(true);
+		}
+	});
+});
+
+describe('キーの読み方', () => {
+	test('says Command on a mac and Ctrl elsewhere', () => {
+		const mask = APP_SHORTCUTS.find((row) => row.intent === 'mask');
+		expect(mask).toBeTruthy();
+		expect(spellShortcut(mask!, 'mac')).toBe('⌘ Shift H');
+		expect(spellShortcut(mask!, 'other')).toBe('Ctrl Shift H');
+	});
+
+	test('leaves a key that needs no modifier alone', () => {
+		const help = APP_SHORTCUTS.find((row) => row.intent === 'help');
+		expect(spellShortcut(help!, 'other')).toBe('F1');
+	});
+
+	test('spells Alt for the keys the file panel owns', () => {
+		const up = OTHER_SHORTCUTS.find((row) => row.key === 'ArrowUp');
+		expect(spellShortcut(up!, 'other')).toBe('Alt ArrowUp');
+		expect(spellShortcut(up!, 'mac')).toBe('⌥ ArrowUp');
 	});
 });

@@ -4,6 +4,11 @@ import type { MessageKey } from './messages';
 type Catalog = Partial<Record<MessageKey, string>>;
 
 export const ko: Catalog = {
+	// **キー操作を見る場所**（UI 案・2026-10-21）。
+	// 入れても書いていなければ、**無いのと同じ**（Issue #9 で一度やった）。
+	'help.open': '도움말',
+	'help.keys': '키 조작',
+	'help.keys.note': '입력란 안이 아니면 어디서 눌러도 됩니다.',
 	// **柵を接続の一覧にも**（UI 案・2026-10-21／D22）。
 	// **既定は空＝AI は読むだけ。**それが普通の状態なので、警告に見せない。
 	'conn.fence.some': '울타리 {count}곳',
@@ -257,6 +262,11 @@ export const ko: Catalog = {
 };
 
 export const zhCN: Catalog = {
+	// **キー操作を見る場所**（UI 案・2026-10-21）。
+	// 入れても書いていなければ、**無いのと同じ**（Issue #9 で一度やった）。
+	'help.open': '帮助',
+	'help.keys': '键盘操作',
+	'help.keys.note': '除输入框内，任何位置按下都有效。',
 	// **柵を接続の一覧にも**（UI 案・2026-10-21／D22）。
 	// **既定は空＝AI は読むだけ。**それが普通の状態なので、警告に見せない。
 	'conn.fence.some': '围栏 {count} 处',
@@ -510,6 +520,11 @@ export const zhCN: Catalog = {
 };
 
 export const zhTW: Catalog = {
+	// **キー操作を見る場所**（UI 案・2026-10-21）。
+	// 入れても書いていなければ、**無いのと同じ**（Issue #9 で一度やった）。
+	'help.open': '說明',
+	'help.keys': '鍵盤操作',
+	'help.keys.note': '除輸入框內，任何位置按下都有效。',
 	// **柵を接続の一覧にも**（UI 案・2026-10-21／D22）。
 	// **既定は空＝AI は読むだけ。**それが普通の状態なので、警告に見せない。
 	'conn.fence.some': '圍欄 {count} 處',

@@ -18,6 +18,7 @@
 	import { menuLabels } from '$lib/i18n/messages-menu';
 	import { titlebar } from '$lib/window/titlebar.svelte';
 	import AboutDialog from '$lib/components/AboutDialog.svelte';
+	import KeyHelpDialog from '$lib/components/KeyHelpDialog.svelte';
 	import { summarise } from '$lib/update/notes';
 	import { cutMessageKey, cutSummary } from '$lib/update/restart-cost';
 	import { updater } from '$lib/update/updater.svelte';
@@ -168,6 +169,14 @@
 	 */
 	let bandWho = $state<BandWho>('all');
 
+	/**
+	 * **キー操作の一覧が開いているか**（UI 案・2026-10-21）。
+	 *
+	 * `Ctrl Shift H` を入れても、**どこにも書いていなければ無いのと同じ**です。
+	 * `F1` で開きます。
+	 */
+	let keyHelpOpen = $state(false);
+
 	/** いま出す帯の行。 */
 	const bandLines = $derived(filterBand(lines, bandWho));
 
@@ -187,9 +196,7 @@
 			return;
 		}
 		if (intent === 'help') {
-			// **いまは「〜について」が一番近い場所です。**
-			// 案はヘルプを別に持っていますが、それはメニューの回（フェーズ F）。
-			aboutOpen = true;
+			keyHelpOpen = true;
 			return;
 		}
 		if (intent === 'newConnection') {
@@ -1373,6 +1380,21 @@
 			{i18n.t('ai.stop')}
 		</button>
 
+		<!--
+			**キー操作はここからも開ける**（UI 案・2026-10-21）。
+			**ショートカットだけだと、知らない人には無いのと同じ** ——
+			Issue #9 で一度やりました。`F1` も効きます。
+		-->
+		<button
+			type="button"
+			class="about-open"
+			onclick={() => (keyHelpOpen = true)}
+			title={`${i18n.t('help.keys')}（F1）`}
+			aria-label={i18n.t('help.keys')}
+		>
+			?
+		</button>
+
 		<!-- **「〜について」はここ。**版を確かめる場所を 1 つに決めます（dbboard と同じ形）。 -->
 		<button
 			type="button"
@@ -1381,7 +1403,7 @@
 			title={i18n.t('about.title')}
 			aria-label={i18n.t('about.title')}
 		>
-			?
+			i
 		</button>
 
 		<div class="view-menu" data-tauri-drag-region>
@@ -1724,6 +1746,15 @@
 
 	{#if aboutOpen}
 		<AboutDialog onClose={() => (aboutOpen = false)} />
+	{/if}
+
+	<!--
+		**キー操作の一覧**（UI 案・2026-10-21）。`F1` で開きます。
+		表は `app-keys.ts` が持っており、**実物とずれていないことを試験が数えます**
+		（表からキーを組み立てて `appIntent` に通す）。
+	-->
+	{#if keyHelpOpen}
+		<KeyHelpDialog {platform} onclose={() => (keyHelpOpen = false)} />
 	{/if}
 
 	{#if failure}

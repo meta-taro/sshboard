@@ -4,6 +4,11 @@ import type { MessageKey } from './messages';
 type Catalog = Partial<Record<MessageKey, string>>;
 
 export const ptBR: Catalog = {
+	// **キー操作を見る場所**（UI 案・2026-10-21）。
+	// 入れても書いていなければ、**無いのと同じ**（Issue #9 で一度やった）。
+	'help.open': 'Ajuda',
+	'help.keys': 'Teclado',
+	'help.keys.note': 'Funciona em qualquer lugar, exceto dentro de um campo de texto.',
 	// **柵を接続の一覧にも**（UI 案・2026-10-21／D22）。
 	// **既定は空＝AI は読むだけ。**それが普通の状態なので、警告に見せない。
 	'conn.fence.some': 'Cerca · {count}',
@@ -257,6 +262,11 @@ export const ptBR: Catalog = {
 };
 
 export const ru: Catalog = {
+	// **キー操作を見る場所**（UI 案・2026-10-21）。
+	// 入れても書いていなければ、**無いのと同じ**（Issue #9 で一度やった）。
+	'help.open': 'Справка',
+	'help.keys': 'Клавиатура',
+	'help.keys.note': 'Работает везде, кроме поля ввода.',
 	// **柵を接続の一覧にも**（UI 案・2026-10-21／D22）。
 	// **既定は空＝AI は読むだけ。**それが普通の状態なので、警告に見せない。
 	'conn.fence.some': 'Ограда · {count}',
@@ -510,6 +520,11 @@ export const ru: Catalog = {
 };
 
 export const it: Catalog = {
+	// **キー操作を見る場所**（UI 案・2026-10-21）。
+	// 入れても書いていなければ、**無いのと同じ**（Issue #9 で一度やった）。
+	'help.open': 'Aiuto',
+	'help.keys': 'Tastiera',
+	'help.keys.note': 'Funziona in qualunque punto, tranne dentro un campo di testo.',
 	// **柵を接続の一覧にも**（UI 案・2026-10-21／D22）。
 	// **既定は空＝AI は読むだけ。**それが普通の状態なので、警告に見せない。
 	'conn.fence.some': 'Recinto · {count}',

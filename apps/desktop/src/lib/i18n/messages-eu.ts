@@ -4,6 +4,11 @@ import type { MessageKey } from './messages';
 type Catalog = Partial<Record<MessageKey, string>>;
 
 export const de: Catalog = {
+	// **キー操作を見る場所**（UI 案・2026-10-21）。
+	// 入れても書いていなければ、**無いのと同じ**（Issue #9 で一度やった）。
+	'help.open': 'Hilfe',
+	'help.keys': 'Tastatur',
+	'help.keys.note': 'Überall wirksam, außer in einem Eingabefeld.',
 	// **柵を接続の一覧にも**（UI 案・2026-10-21／D22）。
 	// **既定は空＝AI は読むだけ。**それが普通の状態なので、警告に見せない。
 	'conn.fence.some': 'Zaun · {count}',
@@ -257,6 +262,11 @@ export const de: Catalog = {
 };
 
 export const fr: Catalog = {
+	// **キー操作を見る場所**（UI 案・2026-10-21）。
+	// 入れても書いていなければ、**無いのと同じ**（Issue #9 で一度やった）。
+	'help.open': 'Aide',
+	'help.keys': 'Clavier',
+	'help.keys.note': 'Actif partout, sauf dans un champ de saisie.',
 	// **柵を接続の一覧にも**（UI 案・2026-10-21／D22）。
 	// **既定は空＝AI は読むだけ。**それが普通の状態なので、警告に見せない。
 	'conn.fence.some': 'Clôture · {count}',
@@ -510,6 +520,11 @@ export const fr: Catalog = {
 };
 
 export const es: Catalog = {
+	// **キー操作を見る場所**（UI 案・2026-10-21）。
+	// 入れても書いていなければ、**無いのと同じ**（Issue #9 で一度やった）。
+	'help.open': 'Ayuda',
+	'help.keys': 'Teclado',
+	'help.keys.note': 'Funciona en cualquier lugar excepto dentro de un campo de texto.',
 	// **柵を接続の一覧にも**（UI 案・2026-10-21／D22）。
 	// **既定は空＝AI は読むだけ。**それが普通の状態なので、警告に見せない。
 	'conn.fence.some': 'Valla · {count}',

@@ -6,6 +6,11 @@
  */
 
 const en = {
+	// **キー操作を見る場所**（UI 案・2026-10-21）。
+	// 入れても書いていなければ、**無いのと同じ**（Issue #9 で一度やった）。
+	'help.open': 'Help',
+	'help.keys': 'Keyboard',
+	'help.keys.note': 'Press these anywhere except inside a text field.',
 	// **柵を接続の一覧にも**（UI 案・2026-10-21／D22）。
 	// **既定は空＝AI は読むだけ。**それが普通の状態なので、警告に見せない。
 	'conn.fence.some': 'Fence · {count}',
@@ -299,6 +304,11 @@ export type MessageKey = keyof typeof en;
 type Catalog = Partial<Record<MessageKey, string>>;
 
 const ja: Catalog = {
+	// **キー操作を見る場所**（UI 案・2026-10-21）。
+	// 入れても書いていなければ、**無いのと同じ**（Issue #9 で一度やった）。
+	'help.open': 'ヘルプ',
+	'help.keys': 'キー操作',
+	'help.keys.note': '入力欄の中以外なら、どこで押しても効きます。',
 	// **柵を接続の一覧にも**（UI 案・2026-10-21／D22）。
 	// **既定は空＝AI は読むだけ。**それが普通の状態なので、警告に見せない。
 	'conn.fence.some': '柵 {count} か所',
