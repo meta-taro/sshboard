@@ -263,3 +263,46 @@ describe('3 つの列（UI 案・2026-10-21）', () => {
 		expect(rule).toContain('min-width: 0');
 	});
 });
+
+describe('メニューはロゴの下（UI 案・2026-10-21）', () => {
+	test('opens from the logo', () => {
+		expect(source).toContain('class="brand"');
+		expect(source).toContain('aria-expanded={viewMenuOpen}');
+	});
+
+	test('says it opens something, before it is pressed', () => {
+		// **落としの印を出す。**押すまで分からない口は、無いのと同じ。
+		expect(source).toContain('class="brand-chevron"');
+	});
+
+	test('holds help, diagnostics and about', () => {
+		// 案は「このアプリ」の群をここに置きました。
+		expect(source).toContain("keyHelpOpen = true; }}");
+		expect(source).toContain("humanShows('diag'); }}");
+		expect(source).toContain("aboutOpen = true; }}");
+	});
+
+	test('closes itself when one of them is chosen', () => {
+		// 開いたままだと、出した先が隠れます。
+		expect(source).toContain('viewMenuOpen = false; keyHelpOpen = true;');
+	});
+
+	test('keeps the help button in the header', () => {
+		// **案もそうしています。**押し方を探している人が、
+		// メニューを開かなくていい（Issue #9 —— 隠れているものは無いのと同じ）。
+		expect(source).toContain('onclick={() => (keyHelpOpen = true)}');
+	});
+
+	test('does not keep a second about button outside the menu', () => {
+		// **口を 2 つ置くと、片方だけ直る日が来ます**（D39）。
+		expect(source).not.toContain('onclick={() => (aboutOpen = true)}');
+	});
+
+	test('leaves enough of the bar to grab the window by', () => {
+		// この帯は OS のタイトルバー（D17）。**34px では窓を動かせない**と
+		// 実機から言われています。ロゴが伸びると掴める所が無くなります。
+		const at = source.indexOf('.brand {');
+		const rule = source.slice(at, source.indexOf('}', at));
+		expect(rule).toContain('flex: 0 1 auto');
+	});
+});

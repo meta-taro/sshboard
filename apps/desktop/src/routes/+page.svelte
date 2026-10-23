@@ -1262,25 +1262,135 @@
 			下へ落とす手もありますが、それだと吹き出しが出なくなります。
 		-->
 		<!--
-			**ロゴの印**（UI 案・2026-10-21）。
-			端末の枠に、打っている矢印と行。**この道具が何なのかを 22px で言う。**
+			**ロゴがメニューの口**（UI 案・2026-10-21）。
+			案はここに全部まとめました —— 表示（文字の大きさ・テーマ・言語）、
+			ヘルプ、診断、このアプリについて。`Ctrl ,` でも開きます。
+
+			印は端末の枠に、打っている矢印と行。**この道具が何なのかを 22px で言う。**
 			飾りなので読み上げからは外します（隣に製品名が文字で在る）。
 		-->
-		<span class="brand" data-tauri-drag-region title={i18n.t('app.driven')}>
-			<svg
-				class="brand-mark"
-				viewBox="0 0 24 24"
-				fill="none"
-				stroke="currentColor"
-				stroke-width="1.8"
-				stroke-linecap="round"
-				aria-hidden="true"
+		<div class="view-menu">
+			<button
+				type="button"
+				class="brand"
+				aria-haspopup="true"
+				aria-expanded={viewMenuOpen}
+				onclick={() => (viewMenuOpen = !viewMenuOpen)}
+				title={`${menu['menu.view']}（${platform === 'mac' ? '⌘' : 'Ctrl'} ,）`}
 			>
-				<rect x="3" y="4" width="18" height="16" rx="4"></rect>
-				<path d="M7 10l3 2-3 2M12 15h5"></path>
-			</svg>
-			<span class="brand-name">sshboard</span>
-		</span>
+				<svg
+					class="brand-mark"
+					viewBox="0 0 24 24"
+					fill="none"
+					stroke="currentColor"
+					stroke-width="1.8"
+					stroke-linecap="round"
+					aria-hidden="true"
+				>
+					<rect x="3" y="4" width="18" height="16" rx="4"></rect>
+					<path d="M7 10l3 2-3 2M12 15h5"></path>
+				</svg>
+				<span class="brand-name">sshboard</span>
+				<svg
+					class="brand-chevron"
+					viewBox="0 0 24 24"
+					fill="none"
+					stroke="currentColor"
+					stroke-width="2"
+					stroke-linecap="round"
+					aria-hidden="true"
+				>
+					<path d="M6 9l6 6 6-6"></path>
+				</svg>
+			</button>
+			{#if viewMenuOpen}
+				<!-- **外を押したら閉じる。**開きっぱなしは邪魔。 -->
+				<div class="view-backdrop" role="presentation" onclick={() => (viewMenuOpen = false)}></div>
+				<div class="view-panel" role="group" aria-label={menu['menu.view']}>
+					<div class="view-row">
+						<span class="view-label">{i18n.t('text.label')}</span>
+						<div class="view-controls">
+							<button
+								type="button"
+								class="icon-only text-step"
+								onclick={() => textSize.step(-1)}
+								disabled={textSize.atSmallest}
+								title={menu['menu.textSmaller']}
+								aria-label={menu['menu.textSmaller']}
+							>
+								<span class="smaller-a">A</span>
+							</button>
+							<span class="text-now">{i18n.t(`text.${textSize.mode}`)}</span>
+							<button
+								type="button"
+								class="icon-only text-step"
+								onclick={() => textSize.step(1)}
+								disabled={textSize.atLargest}
+								title={menu['menu.textLarger']}
+								aria-label={menu['menu.textLarger']}
+							>
+								<span class="larger-a">A</span>
+							</button>
+						</div>
+					</div>
+
+					<div class="view-row">
+						<span class="view-label">{i18n.t('theme.label')}</span>
+						<div class="view-controls">
+							{#each ['auto', 'light', 'dark'] as const as mode (mode)}
+								<button
+									type="button"
+									class="icon-only"
+									class:active={theme.mode === mode}
+									title={i18n.t(`theme.${mode}`)}
+									aria-label={`${i18n.t('theme.label')}: ${i18n.t(`theme.${mode}`)}`}
+									onclick={() => theme.set(mode as ThemeMode)}
+								>
+									<Icon name={mode === 'auto' ? 'contrast' : mode === 'light' ? 'sun' : 'moon'} />
+								</button>
+							{/each}
+						</div>
+					</div>
+
+					<div class="view-row">
+						<span class="view-label"><Icon name="globe" size={13} /></span>
+						<select
+							value={i18n.locale}
+							onchange={(event) => i18n.set((event.currentTarget as HTMLSelectElement).value)}
+							aria-label="Language"
+						>
+							{#each LOCALES as locale (locale.code)}
+								<option value={locale.code}>{locale.native}</option>
+							{/each}
+						</select>
+					</div>
+
+					<!--
+						**ここから下は、ヘッダーから移した分**（UI 案・2026-10-21）。
+						案はロゴの下に「このアプリ」の群を置きました ——
+						ヘルプ・診断・このアプリについて。
+
+						**［?］はヘッダーに残します。**案もそうしており、
+						**押し方を探している人がメニューを開かなくていい**ためです
+						（Issue #9 —— 触れる前の人には、隠れているものは無いのと同じ）。
+					-->
+					<div class="view-row">
+						<span class="view-label">{menu['menu.about']}</span>
+						<div class="view-controls">
+							<button type="button" onclick={() => { viewMenuOpen = false; keyHelpOpen = true; }}>
+								{i18n.t('help.open')}
+							</button>
+							<button type="button" onclick={() => { viewMenuOpen = false; humanShows('diag'); }}>
+								{i18n.t('tab.diag')}
+							</button>
+							<button type="button" onclick={() => { viewMenuOpen = false; aboutOpen = true; }}>
+								{i18n.t('about.title')}
+							</button>
+						</div>
+					</div>
+				</div>
+			{/if}
+		</div>
 
 		<!-- **ボタンとボタンの隙間でも掴める。**
 		     付けないと、並びの余白は「掴めない帯」になります。 -->
@@ -1374,93 +1484,7 @@
 			?
 		</button>
 
-		<!-- **「〜について」はここ。**版を確かめる場所を 1 つに決めます（dbboard と同じ形）。 -->
-		<button
-			type="button"
-			class="about-open"
-			onclick={() => (aboutOpen = true)}
-			title={i18n.t('about.title')}
-			aria-label={i18n.t('about.title')}
-		>
-			i
-		</button>
 
-		<div class="view-menu" data-tauri-drag-region>
-			<button
-				type="button"
-				class="view-trigger"
-				aria-haspopup="true"
-				aria-expanded={viewMenuOpen}
-				onclick={() => (viewMenuOpen = !viewMenuOpen)}
-			>
-				{menu['menu.view']}
-			</button>
-
-			{#if viewMenuOpen}
-				<!-- **外を押したら閉じる。**開きっぱなしは邪魔。 -->
-				<div class="view-backdrop" role="presentation" onclick={() => (viewMenuOpen = false)}></div>
-				<div class="view-panel" role="group" aria-label={menu['menu.view']}>
-					<div class="view-row">
-						<span class="view-label">{i18n.t('text.label')}</span>
-						<div class="view-controls">
-							<button
-								type="button"
-								class="icon-only text-step"
-								onclick={() => textSize.step(-1)}
-								disabled={textSize.atSmallest}
-								title={menu['menu.textSmaller']}
-								aria-label={menu['menu.textSmaller']}
-							>
-								<span class="smaller-a">A</span>
-							</button>
-							<span class="text-now">{i18n.t(`text.${textSize.mode}`)}</span>
-							<button
-								type="button"
-								class="icon-only text-step"
-								onclick={() => textSize.step(1)}
-								disabled={textSize.atLargest}
-								title={menu['menu.textLarger']}
-								aria-label={menu['menu.textLarger']}
-							>
-								<span class="larger-a">A</span>
-							</button>
-						</div>
-					</div>
-
-					<div class="view-row">
-						<span class="view-label">{i18n.t('theme.label')}</span>
-						<div class="view-controls">
-							{#each ['auto', 'light', 'dark'] as const as mode (mode)}
-								<button
-									type="button"
-									class="icon-only"
-									class:active={theme.mode === mode}
-									title={i18n.t(`theme.${mode}`)}
-									aria-label={`${i18n.t('theme.label')}: ${i18n.t(`theme.${mode}`)}`}
-									onclick={() => theme.set(mode as ThemeMode)}
-								>
-									<Icon name={mode === 'auto' ? 'contrast' : mode === 'light' ? 'sun' : 'moon'} />
-								</button>
-							{/each}
-						</div>
-					</div>
-
-					<div class="view-row">
-						<span class="view-label"><Icon name="globe" size={13} /></span>
-						<select
-							value={i18n.locale}
-							onchange={(event) => i18n.set((event.currentTarget as HTMLSelectElement).value)}
-							aria-label="Language"
-						>
-							{#each LOCALES as locale (locale.code)}
-								<option value={locale.code}>{locale.native}</option>
-							{/each}
-						</select>
-					</div>
-
-				</div>
-			{/if}
-		</div>
 
 		<!-- **合言葉ごと写せる形にする**（D23）。 -->
 		<button
@@ -2414,20 +2438,7 @@
 		align-items: center;
 	}
 
-	.view-trigger {
-		font-size: 0.75rem;
-		padding: 0.2rem 0.55rem;
-		background: transparent;
-		border: 1px solid transparent;
-		border-radius: 6px;
-		color: var(--fg);
-		white-space: nowrap;
-	}
 
-	.view-trigger:hover,
-	.view-trigger[aria-expanded='true'] {
-		border-color: var(--hairline);
-	}
 
 	/* **外を押したら閉じる。**帯より下は全部当たり判定にする。 */
 	.view-backdrop {
@@ -2529,13 +2540,52 @@
 	 * 印は人の色（青）で引きます。**この道具の主は人**で、
 	 * AI は橙で別に名乗ります。色の役をここから一貫させます。
 	 */
+	/*
+	 * **ロゴはメニューの口**（UI 案・2026-10-21）。
+	 *
+	 * **掴める所が減ります。**この帯は OS のタイトルバー（D17）で、
+	 * 34px では**窓を動かせない**と実機から言われています。
+	 * だからロゴは**必要な幅だけ**にして（`flex: 0 1 auto`）、
+	 * 余りは `nav.tabs` の `data-tauri-drag-region` に残します。
+	 */
 	.brand {
 		display: inline-flex;
 		align-items: center;
 		gap: 0.4rem;
 		min-width: 0;
-		flex: 1 1 auto;
+		flex: 0 1 auto;
 		overflow: hidden;
+		font: inherit;
+		color: inherit;
+		background: transparent;
+		border: 1px solid transparent;
+		border-radius: var(--r-pill);
+		padding: 0.14rem 0.5rem 0.14rem 0.35rem;
+		cursor: pointer;
+	}
+
+	.brand:hover {
+		background: var(--human-soft);
+		border-color: var(--human);
+	}
+
+	/* **開いているあいだは、開いていると分かること。** */
+	.brand[aria-expanded='true'] {
+		background: var(--human-soft);
+		border-color: var(--human);
+	}
+
+	.brand:focus-visible {
+		outline: 2px solid var(--accent);
+		outline-offset: 1px;
+	}
+
+	/* 落としの印。**開くものであることを、押す前に言う。** */
+	.brand-chevron {
+		width: 0.7rem;
+		height: 0.7rem;
+		flex: none;
+		color: var(--fg-faint);
 	}
 
 	.brand-mark {
