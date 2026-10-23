@@ -4,6 +4,7 @@
 //! 裏で見えないセッションを 1 本も増やさないための前提（PRD §4-1）。
 
 mod allowlist_cmd;
+mod attention;
 mod bridge;
 mod bundle_cmd;
 mod capture;
@@ -78,6 +79,8 @@ pub fn run() {
             commands::app_version,
             commands::report_facts,
             commands::band_export,
+            session_cmd::attention_how,
+            session_cmd::attention_set,
             commands::band_ack,
             commands::mcp_url,
             commands::stream_follow,

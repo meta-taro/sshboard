@@ -589,3 +589,38 @@ describe('端末が 1 枚も無いとき（実機の報告・2026-10-23）', () 
 		expect(at).toBeGreaterThan(-1);
 	});
 });
+
+describe('問いに気づけるように（Issue #30）', () => {
+	/**
+	 * > パス入れるときに、アプリを前面に出せます？
+	 * > **私の場合、裏で聞かれていて気づかないですね**
+	 *
+	 * **既定は点滅だけ。**前面強制は選んだ人だけです ——
+	 * 報告者自身が「**人によっては邪魔**」と書いています。
+	 */
+	test('lets the human choose, from the menu', () => {
+		// **設定ファイルを探させない。**押せる所に置きます。
+		const text = pageSource();
+		expect(text).toContain("i18n.t('attention.label')");
+		expect(text).toContain("invoke('attention_set'");
+	});
+
+	test('offers flashing first, not forcing to the front', () => {
+		// **並びが既定を語ります。**前面強制を先頭に置くと、人はそれを選びます。
+		const text = pageSource();
+		const at = text.indexOf("i18n.t('attention.label')");
+		const row = text.slice(at, at + 700);
+		expect(row.indexOf("'flash'")).toBeGreaterThan(-1);
+		expect(row.indexOf("'flash'")).toBeLessThan(row.indexOf("'front'"));
+	});
+
+	test('reads the current choice at startup', () => {
+		// 読まないと、**選んだはずの設定が画面に出ません。**
+		expect(pageSource()).toContain("invoke<AttentionHow>('attention_how')");
+	});
+
+	test('says what each choice does', () => {
+		// 「前へ出す」だけでは、割り込むことが伝わりません。
+		expect(pageSource()).toContain('attention.${how}.what');
+	});
+});

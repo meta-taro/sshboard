@@ -452,7 +452,17 @@ fn should_nudge(question_appeared: bool, window_focused: bool) -> bool {
     question_appeared && !window_focused
 }
 
-/// 点滅（Windows）／ Dock を跳ねさせる（macOS）。**前面へは出しません。**
+/// 問いが出たことを人へ伝える（Issue #30）。
+///
+/// **既定は点滅だけ**（Windows のタスクバー／macOS の Dock）。
+/// 前面へ出すのは、**人が `attention.toml` で選んだとき**です ——
+/// 報告者自身が「**人によっては邪魔**」と書いています。
+///
+/// ## 気づくまで続けます
+///
+/// `Informational` は**一瞬だけ**光ります。それでは
+/// 「裏で聞かれていて気づかない」が直りません。
+/// `Critical` は**窓を見るまで**続きます（前面へは出しません）。
 fn nudge(app: &AppHandle) {
     use tauri::{Manager, UserAttentionType};
     let Some(window) = app.get_webview_window("main") else {
@@ -464,9 +474,54 @@ fn nudge(app: &AppHandle) {
     if !should_nudge(true, focused) {
         return;
     }
-    if let Err(error) = window.request_user_attention(Some(UserAttentionType::Informational)) {
+
+    let how = crate::attention::read(&attention_path(app));
+    if how == crate::attention::How::Off {
+        return;
+    }
+
+    // **見るまで続きます。**一瞬の点滅では、裏に居る人は気づきません。
+    if let Err(error) = window.request_user_attention(Some(UserAttentionType::Critical)) {
         eprintln!("[sshboard] 窓へ知らせを出せません: {error}");
     }
+
+    if how == crate::attention::How::Front {
+        // **選んだ人だけ。**既定では通りません。
+        if let Err(error) = window.set_focus() {
+            eprintln!("[sshboard] 窓を前へ出せません: {error}");
+        }
+    }
+}
+
+/// `attention.toml` の置き場。**`connections.toml` の隣**（他の設定と同じ並び）。
+fn attention_path(app: &AppHandle) -> std::path::PathBuf {
+    use tauri::Manager;
+    app.try_state::<crate::connections_cmd::ConnectionsPath>()
+        .and_then(|held| held.0.parent().map(|dir| dir.to_path_buf()))
+        .unwrap_or_else(|| std::path::PathBuf::from("."))
+        .join(crate::attention::How::FILE)
+}
+
+/// いまの設定を画面へ。
+#[tauri::command]
+pub fn attention_how(app: AppHandle) -> String {
+    crate::attention::read(&attention_path(&app))
+        .word()
+        .to_owned()
+}
+
+/// 画面から選ぶ。**人だけが呼べます**（MCP には出しません）——
+/// AI が自分で「黙れ」と設定できたら、気づかせる仕掛けの意味がありません。
+#[tauri::command]
+pub fn attention_set(app: AppHandle, how: String) -> Result<(), String> {
+    let chosen = match how.as_str() {
+        "off" => crate::attention::How::Off,
+        "flash" => crate::attention::How::Flash,
+        "front" => crate::attention::How::Front,
+        other => return Err(format!("知らない選び方です: {other}")),
+    };
+    let path = attention_path(&app);
+    crate::attention::write(&path, chosen).map_err(|error| format!("書けません: {error}"))
 }
 
 /// リモートのディレクトリとファイル名を繋ぐ。**`//` を作らない。**

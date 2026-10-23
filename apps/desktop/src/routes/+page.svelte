@@ -136,6 +136,28 @@
 	 */
 	let bandExportOpen = $state(false);
 
+	/**
+	 * **問いが出たことに気づけるように**（Issue #30）。
+	 *
+	 * > パス入れるときに、アプリを前面に出せます？
+	 * > **私の場合、裏で聞かれていて気づかないですね**
+	 *
+	 * **既定は点滅だけ。**前面へ出すのは選んだ人だけです ——
+	 * 報告者自身が「**人によっては邪魔**」と書いています。
+	 */
+	type AttentionHow = 'off' | 'flash' | 'front';
+	let attention = $state<AttentionHow>('flash');
+
+	async function setAttention(how: AttentionHow) {
+		try {
+			await invoke('attention_set', { how });
+			attention = how;
+		} catch (error: unknown) {
+			// **握り潰さない。**押したのに変わっていない、を作らない。
+			failure = String(error);
+		}
+	}
+
 	async function saveBand(payload: { text: string; name: string }) {
 		bandExportOpen = false;
 		try {
@@ -1211,6 +1233,13 @@
 			});
 
 		// **パスフレーズの頼み**（Issue #13）。起動直後の取りこぼしも拾う。
+		// **いまの選び方を読む**（Issue #30）。読めなければ既定のまま。
+		invoke<AttentionHow>('attention_how')
+			.then((how) => (attention = how))
+			.catch(() => {
+				/* 読めないだけ。**既定（点滅）のまま出します。** */
+			});
+
 		invoke<string | null>('passphrase_request')
 			.then((waiting) => {
 				passphraseFor = waiting;
@@ -1527,6 +1556,27 @@
 									onclick={() => theme.set(mode as ThemeMode)}
 								>
 									<Icon name={mode === 'auto' ? 'contrast' : mode === 'light' ? 'sun' : 'moon'} />
+								</button>
+							{/each}
+						</div>
+					</div>
+
+					<!--
+						**問いに気づけるように**（Issue #30）。
+						既定は点滅だけ。**前面強制は選んだ人だけ** ——
+						報告者自身が「人によっては邪魔」と書いています。
+					-->
+					<div class="view-row">
+						<span class="view-label">{i18n.t('attention.label')}</span>
+						<div class="view-controls">
+							{#each ['flash', 'front', 'off'] as const as how (how)}
+								<button
+									type="button"
+									class:active={attention === how}
+									title={i18n.t(`attention.${how}.what`)}
+									onclick={() => void setAttention(how as AttentionHow)}
+								>
+									{i18n.t(`attention.${how}`)}
 								</button>
 							{/each}
 						</div>
