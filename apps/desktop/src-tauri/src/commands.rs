@@ -8,6 +8,7 @@ use sshboard_band::Actor;
 use sshboard_engine::Engine;
 use sshboard_stream::OutputStream;
 
+use crate::connections_cmd::ConnectionsPath;
 use crate::pending::PendingLines;
 
 /// MCP クライアントへ渡すもの一式。
@@ -118,6 +119,77 @@ pub fn stop_stream(stream: State<'_, Arc<OutputStream>>) {
 ///
 /// `CARGO_PKG_VERSION` は 3 か所で揃えており（`src/version.rs` が見張っています）、
 /// **配布物の名前・更新の判定と同じ番号**です。
+/// 報告に貼る素材（案・4 枚目「版情報を写す」）。
+///
+/// **家の場所を返しません。**`/Users/<名前>` は `~` に置き換えます ——
+/// **これは public リポジトリの Issue へ貼られる文**です
+/// （product-baseline §25 / `oss-privacy-check` が検出します）。
+///
+/// 画面側でも落としますが、ここでも落とします ——
+/// **受け取らないものは漏らせません。**
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ReportFacts {
+    pub version: String,
+    /// `macos · aarch64` の形。
+    pub platform: String,
+    /// 設定の置き場所。**家の部分は `~`。**
+    pub config_dir: Option<String>,
+    pub mcp_running: bool,
+}
+
+#[tauri::command]
+pub fn report_facts(app: tauri::AppHandle, path: State<'_, ConnectionsPath>) -> ReportFacts {
+    let config_dir = path
+        .0
+        .parent()
+        .map(|dir| without_home(&dir.display().to_string()));
+    ReportFacts {
+        version: env!("CARGO_PKG_VERSION").to_string(),
+        platform: format!("{} · {}", std::env::consts::OS, std::env::consts::ARCH),
+        config_dir,
+        mcp_running: mcp_running(app),
+    }
+}
+
+/// 家の場所を `~` にする。**見つからなければそのまま返します**
+/// （壊して短くするより、そのまま出す）。
+fn without_home(path: &str) -> String {
+    let home = std::env::var_os("HOME")
+        .or_else(|| std::env::var_os("USERPROFILE"))
+        .map(|home| home.to_string_lossy().into_owned());
+    match home {
+        Some(home) if !home.is_empty() && path.starts_with(&home) => {
+            format!("~{}", &path[home.len()..])
+        }
+        _ => path.to_owned(),
+    }
+}
+
+#[cfg(test)]
+mod report_tests {
+    use super::without_home;
+
+    #[test]
+    fn it_takes_the_home_out() {
+        // **public リポへ貼られる文です。**利用者名を入れません。
+        let home = std::env::var("HOME").unwrap_or_default();
+        if home.is_empty() {
+            return;
+        }
+        let inside = format!("{home}/Library/Application Support/x");
+        let out = without_home(&inside);
+        assert!(out.starts_with("~/"), "{out}");
+        assert!(!out.contains(&home), "{out}");
+    }
+
+    #[test]
+    fn it_leaves_a_path_outside_the_home_alone() {
+        // **壊して短くするより、そのまま出す。**
+        assert_eq!(without_home("/opt/sshboard"), "/opt/sshboard");
+    }
+}
+
 #[tauri::command]
 pub fn app_version() -> String {
     env!("CARGO_PKG_VERSION").to_string()

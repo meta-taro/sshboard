@@ -1511,6 +1511,64 @@ impl Engine {
         }
     }
 
+    /// **人の側から AI へ渡す**（案・1 枚目「AI に渡す」・2026-10-23）。
+    ///
+    /// それまで、握りが AI へ移る道は **1 本だけ**でした ——
+    /// **AI が頼み、人が許す。**案は逆向きも描いています（人が先に渡す）。
+    /// 実機の指摘（2026-09-06）——「AI に渡すときに［止める］を押さないといけません」。
+    ///
+    /// ## 人へ問い直しません
+    ///
+    /// `console_take(Actor::Ai, ..)` を通すと D42 の問いが出ます。
+    /// **人が渡しているのに人へ問うのは、押したのに何も起きないのと同じ**です。
+    /// ここでは `ask_first` を通しません。**人の操作そのものが許可**です。
+    ///
+    /// ## 画面にしか置きません
+    ///
+    /// **MCP には出しません。**出すと AI が自分へ渡せます ——
+    /// D42（AI が握るには人の許可が要る）が無くなるのと同じです。
+    ///
+    /// ## 取り返しは勝ちます
+    ///
+    /// 渡したあとも `console_take(Actor::Human, ..)` が通ります（D29）。
+    pub async fn console_give(&self, on: Option<&str>) -> Result<(), EngineError> {
+        let target = self
+            .console_where(on)
+            .await
+            .ok_or(EngineError::ConsoleNotOpen)?;
+        let existing = self.only_console_on(&target).await?;
+        let mut slot = self.console.lock().await;
+        let previous = existing
+            .and_then(|id| slot.by_id(id))
+            .map(|open| open.holder);
+        slot.hold(&target, Actor::Ai);
+        // **出ている問いを消します。**残すと、人は答え終わった問いを
+        // もう一度押すことになります（渡したのだから、頼みはもう済んでいます）。
+        if slot
+            .request
+            .as_ref()
+            .is_some_and(|asking| asking.on == target)
+        {
+            slot.request = None;
+        }
+        drop(slot);
+
+        // **誰が渡したのかを残す。**「AI がいつ握ったのか」を後から読める形に
+        // しておかないと、打てなくなった側の切り分けができません（Issue #10）。
+        self.diag.info(
+            Stage::Exec,
+            Some(&target),
+            match previous {
+                Some(Actor::Ai) => "人が渡しましたが、AI が既に握っていました".to_owned(),
+                Some(holder) => format!("人が握りを{}から AI へ渡しました", who(holder)),
+                None => "人が握りを AI へ渡しました".to_owned(),
+            },
+        );
+        let _ = self.console_changed.send_replace(Some(Actor::Ai));
+        self.publish_consoles().await;
+        Ok(())
+    }
+
     /// **AI が端末を使いたいと言っているか**（D42）。画面はこれを見て問いを出します。
     pub async fn console_request(&self) -> Option<Actor> {
         self.console

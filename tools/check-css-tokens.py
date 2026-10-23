@@ -263,6 +263,51 @@ def self_check() -> int:
     return bad
 
 
+def dropdown_dressed_as_a_pill(files: dict[str, str]) -> list[str]:
+    """**ドロップダウンを錠剤の規則へ混ぜていないか**（2026-10-23 に実機で壊れた）。
+
+    フェーズ A で `.view-panel` を `.tabs` と同じ規則へ入れました ——
+    当時あれは**ヘッダーの横並びの帯**だったので、正しい括りでした。
+
+    `75fff70` で**ロゴの下のドロップダウン**に変えたのに、括りが残り ——
+
+    ```
+    border-radius: 999px  → 丸い巨大な塊になる
+    flex-wrap: nowrap     → 行が折り返さず 497px
+    ```
+
+    パネルが 505px になり、`right: 0` 留めなので**窓の左外（x = −379）**へ出ました。
+    Windows の実機では「空の角丸と、外へはみ出した 1 項目」に見えます。
+
+    **手元（macOS の Tauri ＝ WebKit）では出ません。**
+    Chrome（＝ WebView2 と同じ Chromium）で同じ幅にして初めて再現しました。
+
+    だから**ここで見張ります** —— 画面を開かなくても分かる形で。
+    """
+    found: list[str] = []
+    for name, text in files.items():
+        # **コメントを先に落とします。**落とさないと、直前のコメントを
+        # 選択子と読んで誤検出します（最初に書いたとき実際にそうなりました）。
+        clean = re.sub(r"/\*.*?\*/", "", text, flags=re.S)
+        for block in re.finditer(r"([^{}]*)\{([^{}]*)\}", clean):
+            selector, body = block.group(1), block.group(2)
+            parts = [one.strip() for one in selector.split(",") if one.strip()]
+            # **パネル自身**の規則だけを見ます。
+            # `.view-panel button` のような子孫の規則は、他と括って構いません。
+            itself = [one for one in parts if re.fullmatch(r"\.view-panel(:[\w-]+)?", one)]
+            if not itself:
+                continue
+            others = [one for one in parts if one not in itself]
+            if not others:
+                continue
+            if "border-radius" in body or "flex-wrap" in body or "flex-direction" in body:
+                found.append(
+                    f"{name}: `{selector.strip()[:60]}` —— "
+                    "ドロップダウン自身を他と同じ括りにしています"
+                )
+    return found
+
+
 def main() -> int:
     if "--self" in sys.argv:
         print("**検査自体を確かめます**")
@@ -297,6 +342,16 @@ def main() -> int:
               file=sys.stderr)
         return 1
 
+    dressed = dropdown_dressed_as_a_pill(files)
+    if dressed:
+        print(f"NG **ドロップダウンが他の括りに混ざっています（{len(dressed)} 件）**:", file=sys.stderr)
+        for line in dressed:
+            print(f"   {line}", file=sys.stderr)
+        print("\n   2026-10-23 に実機で壊れました —— 丸い塊になり、窓の外へ出ました。",
+              file=sys.stderr)
+        print("   **`.view-panel` は単独で書いてください。**", file=sys.stderr)
+        return 1
+
     trouble = theme_trouble(TOKENS_CSS.read_text(encoding="utf-8"))
     if trouble:
         print(f"NG **配色の不整合が {len(trouble)} 件**:", file=sys.stderr)
@@ -308,6 +363,7 @@ def main() -> int:
 
     print(f"OK ファイル {len(files)} / 定義 {len(defined)} / 控え無しの使用 {len(used)} —— 未定義は 0 件")
     print("OK 配色の不整合なし（暗い側 2 か所が一致・案の色・AI は AI の色）")
+    print("OK ドロップダウンは単独の括り（錠剤の規則に混ざっていない）")
     return 0
 
 

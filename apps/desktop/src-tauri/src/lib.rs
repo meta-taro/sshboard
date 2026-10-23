@@ -76,6 +76,7 @@ pub fn run() {
         .on_menu_event(menu::handle_event)
         .invoke_handler(tauri::generate_handler![
             commands::app_version,
+            commands::report_facts,
             commands::band_ack,
             commands::mcp_url,
             commands::stream_follow,
@@ -110,6 +111,7 @@ pub fn run() {
             session_cmd::console_type,
             session_cmd::console_resize,
             session_cmd::console_take,
+            session_cmd::console_give,
             session_cmd::console_stop,
             session_cmd::console_holder,
             session_cmd::console_list,

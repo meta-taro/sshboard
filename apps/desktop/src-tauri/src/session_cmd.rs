@@ -1030,6 +1030,23 @@ pub async fn console_take(engine: State<'_, Arc<Engine>>) -> Result<(), String> 
         .map_err(|error| error.to_string())
 }
 
+/// **人の側から AI へ渡す**（案・1 枚目「AI に渡す」）。
+///
+/// **この口は画面にしかありません。**MCP には出しません ——
+/// 出すと AI が自分へ渡せて、D42（AI が握るには人の許可が要る）が無くなります。
+///
+/// 人へ問い直しません。**押したことが許可**です。
+#[tauri::command]
+pub async fn console_give(
+    on: Option<String>,
+    engine: State<'_, Arc<Engine>>,
+) -> Result<(), String> {
+    engine
+        .console_give(on.as_deref())
+        .await
+        .map_err(|error| error.to_string())
+}
+
 /// 止める。**失敗しません**（D29 の停止ボタン）。
 #[tauri::command]
 pub async fn console_stop(engine: State<'_, Arc<Engine>>) -> Result<(), String> {

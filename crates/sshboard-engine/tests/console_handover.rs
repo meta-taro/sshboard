@@ -376,3 +376,92 @@ async fn once_it_is_actually_open_it_is_no_longer_merely_allowed() {
         Some(Actor::Ai)
     );
 }
+
+// --- 人の側から渡す（案・1 枚目「AI に渡す」・2026-10-23）-------------------
+//
+// それまで、握りが AI へ移る道は **1 本だけ**でした ——
+// **AI が頼み、人が許す。**案は逆向きも描いています（人が先に渡す）。
+//
+// 実機の指摘（2026-09-06）はこうでした ——
+//
+// > AI に端末を渡すときに「止める」を押さないといけません。
+//
+// **押さなくても渡せるようにします。**ただし道は人の側にしか置きません。
+
+#[tokio::test]
+async fn the_human_can_hand_the_console_to_the_ai() {
+    // **人が先に渡せること。**AI の頼みを待たせない。
+    let dir = tempfile::tempdir().expect("一時ディレクトリが作れない");
+    let engine = engine_in(&dir);
+
+    engine
+        .console_take(Actor::Human, ON)
+        .await
+        .expect("人が握れない");
+    engine.console_give(ON).await.expect("渡せない");
+    assert_eq!(
+        engine.console_holder("test-connection").await,
+        Some(Actor::Ai)
+    );
+}
+
+#[tokio::test]
+async fn handing_it_over_does_not_ask_the_human_for_permission() {
+    // **人が渡しているのに、人へ問いを出さない。**
+    // 出すと「押したのに何も起きない」になります。
+    let dir = tempfile::tempdir().expect("一時ディレクトリが作れない");
+    let engine = engine_in(&dir);
+
+    engine.console_give(ON).await.expect("渡せない");
+    assert_eq!(engine.console_request().await, None, "問いが残っている");
+    assert_eq!(
+        engine.console_holder("test-connection").await,
+        Some(Actor::Ai)
+    );
+}
+
+#[tokio::test]
+async fn handing_it_over_clears_a_question_already_on_screen() {
+    // **AI が頼んでいる最中に人が渡したら、問いは消えること。**
+    // 残ると、人は答え終わった問いをもう一度押します。
+    let dir = tempfile::tempdir().expect("一時ディレクトリが作れない");
+    let engine = engine_in(&dir);
+
+    let asked = engine.console_take(Actor::Ai, ON).await;
+    assert!(matches!(asked, Err(EngineError::ConsoleApprovalNeeded)));
+    assert_eq!(engine.console_request().await, Some(Actor::Ai));
+
+    engine.console_give(ON).await.expect("渡せない");
+    assert_eq!(engine.console_request().await, None, "問いが残っている");
+}
+
+#[tokio::test]
+async fn the_human_can_always_take_it_back_after_handing_it_over() {
+    // **D29 の芯。**渡したあとも、人の取り返しが勝つこと。
+    let dir = tempfile::tempdir().expect("一時ディレクトリが作れない");
+    let engine = engine_in(&dir);
+
+    engine.console_give(ON).await.expect("渡せない");
+    engine
+        .console_take(Actor::Human, ON)
+        .await
+        .expect("取り返せない");
+    assert_eq!(
+        engine.console_holder("test-connection").await,
+        Some(Actor::Human)
+    );
+}
+
+#[tokio::test]
+async fn handing_over_twice_is_not_an_error() {
+    // **押し間違いで赤くしない。**もう AI が握っているなら、それでよい。
+    let dir = tempfile::tempdir().expect("一時ディレクトリが作れない");
+    let engine = engine_in(&dir);
+
+    engine.console_give(ON).await.expect("渡せない");
+    engine.console_give(ON).await.expect("2 回目が通らない");
+    assert_eq!(
+        engine.console_holder("test-connection").await,
+        Some(Actor::Ai)
+    );
+}

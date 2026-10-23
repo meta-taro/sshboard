@@ -487,3 +487,40 @@ describe('AI が走らせられることの一覧', () => {
 		expect(dialog).toContain('<code data-secret>{group.list.path}</code>');
 	});
 });
+
+describe('AI に渡す（案・1 枚目）', () => {
+	/**
+	 * **人の側から渡せること。**
+	 *
+	 * それまで握りが AI へ移る道は 1 本だけでした —— AI が頼み、人が許す。
+	 * 実機の指摘（2026-09-06）——
+	 * 「AI に渡すときに［止める］を押さないといけません」。
+	 */
+	test('is offered while the human is holding it', () => {
+		const text = pageSource();
+		expect(text).toContain("invoke('console_give')");
+		expect(text).toContain("i18n.t('console.give')");
+	});
+
+	test('is not offered when the human is not holding it', () => {
+		// **押せない釦を置かない。**握っていないのに「渡す」は意味を成しません。
+		// 渡す釦は `iHold` の枝の中にあること。
+		const text = pageSource();
+		const at = text.indexOf("i18n.t('console.give')");
+		expect(at).toBeGreaterThan(-1);
+		// 直前の分岐を見る。**`iHold` を見ている枝の中**に居ること。
+		const before = text.slice(Math.max(0, at - 700), at);
+		expect(before).toMatch(/\{:else if\s+holder\s+&&\s+iHold\}/);
+	});
+
+	test('does not ask the human again', () => {
+		// **人が渡しているのに問いを出さない。**
+		// 実行体側（`console_give`）が `ask_first` を通さないことは Rust の試験で見ています。
+		// ここでは、画面が承認の道（`console_answer`）を経由していないことを見ます。
+		const text = pageSource();
+		const at = text.indexOf('async function giveConsole');
+		const end = text.indexOf('\n\t}', at);
+		expect(at).toBeGreaterThan(-1);
+		expect(text.slice(at, end)).not.toContain('console_answer');
+	});
+});

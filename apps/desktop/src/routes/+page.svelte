@@ -961,6 +961,25 @@
 	}
 
 	/** 握りを取り返す。**人は常に勝ちます**（D29）。 */
+	/**
+	 * **人の側から AI へ渡す**（案・1 枚目「AI に渡す」）。
+	 *
+	 * それまで握りが AI へ移る道は 1 本だけでした —— AI が頼み、人が許す。
+	 * 実機の指摘（2026-09-06）——
+	 * 「AI に渡すときに［止める］を押さないといけません」。
+	 *
+	 * **問い直しません。**押したことが許可です（実行体も `ask_first` を通しません）。
+	 */
+	async function giveConsole() {
+		failure = null;
+		try {
+			await invoke('console_give');
+		} catch (error: unknown) {
+			// **握り潰さない。**渡せなかったのに渡ったように見せない。
+			failure = String(error);
+		}
+	}
+
 	async function takeConsole() {
 		try {
 			await invoke('console_take');
@@ -1506,7 +1525,13 @@
 						（Issue #9 —— 触れる前の人には、隠れているものは無いのと同じ）。
 					-->
 					<div class="view-row">
-						<span class="view-label">{menu['menu.about']}</span>
+						<!--
+							**見出しと項目が同じ言葉にならないように**（2026-10-23）。
+							`menu.about` は OS のメニューの「sshboard について」で、
+							**群の見出しに使うと、中の項目と二重に出ます。**
+							案は群を「このアプリ」と呼んでいます。
+						-->
+						<span class="view-label">{i18n.t('app.group')}</span>
 						<div class="view-controls">
 							<button type="button" onclick={() => { viewMenuOpen = false; keyHelpOpen = true; }}>
 								{i18n.t('help.open')}
@@ -2099,6 +2124,17 @@
 								<Icon name="lock" />
 								{i18n.t('console.take')}
 							</button>
+						{:else if holder && iHold}
+							<!--
+								**人の側から渡せる**（案・1 枚目）。
+								握っているときだけ出します —— 握っていないのに
+								「渡す」は意味を成しません。
+								**問いは出ません。**押したことが許可です。
+							-->
+							<button type="button" onclick={giveConsole} title={i18n.t('console.give.what')}>
+								<Icon name="arrow-right" size={13} />
+								{i18n.t('console.give')}
+							</button>
 						{/if}
 						{#if holder}
 							<!-- **止まらない停止ボタンは、無い方がまし。**必ず効く。 -->
@@ -2273,7 +2309,17 @@
 		display: flex;
 		align-items: center;
 		gap: 0.5rem;
-		flex-wrap: nowrap;
+		/*
+		 * **折り返します**（2026-10-23 に実機で切れた）。
+		 *
+		 * `nowrap` だと、窓が狭いときに**ヘッダーの中身が窓の外へ出て、
+		 * 一番外側に横スクロールバーが出ます** —— 左端（ロゴ・タブの先頭）が
+		 * 切れて読めなくなりました。**最大化していない普通の幅で起きます。**
+		 *
+		 * 案も `flex-wrap: wrap` です。畳めば縦に伸びるだけで、**切れません。**
+		 * **縦に伸びるのは許容します** —— 切れて読めないより、ずっとまし。
+		 */
+		flex-wrap: wrap;
 		min-width: 0;
 		/*
 		 * **この帯が OS のタイトルバー**（D17）。
@@ -2661,17 +2707,38 @@
 	.view-panel {
 		position: absolute;
 		top: calc(100% + 6px);
-		right: 0;
+		/*
+		 * **ロゴの左端で留めます。**ロゴは窓の左端に在るので、
+		 * `right: 0` だと**パネルが左へ伸びて窓の外へ出ます**（実機で出た形）。
+		 */
+		left: 0;
 		z-index: 41;
 		display: flex;
 		flex-direction: column;
 		gap: 0.5rem;
 		padding: 0.6rem;
 		min-width: 220px;
+		/*
+		 * **窓からはみ出させない。**中身が増えても、ここで止まります。
+		 * `100vw - 24px` は左右の余白ぶん。
+		 */
+		max-width: min(26rem, calc(100vw - 24px));
 		border: 1px solid var(--hairline);
 		border-radius: 8px;
 		background: var(--surface);
 		box-shadow: 0 8px 24px rgb(0 0 0 / 25%);
+	}
+
+	/*
+	 * **行は折り返します。**折り返さないと、釦が増えた日に
+	 * パネルごと窓の外へ出ます（2026-10-23 に出ました —— 釦 4 つで 497px）。
+	 */
+	.view-panel .view-row {
+		flex-wrap: wrap;
+	}
+
+	.view-panel .view-controls {
+		flex-wrap: wrap;
 	}
 
 	.view-row {
@@ -2862,7 +2929,15 @@
 		font-size: 0.66rem;
 		color: var(--fg-muted);
 		white-space: nowrap;
-		flex: none;
+		/*
+		 * **縮みます。**`flex: none` だと、狭いときに
+		 * この釦だけが幅を譲らず、ヘッダーを押し出しました。
+		 * 縮んだら文字は `…` になりますが、**押せる所は残ります。**
+		 */
+		flex: 0 1 auto;
+		min-width: 0;
+		overflow: hidden;
+		text-overflow: ellipsis;
 		padding: 0.2rem 0.5rem;
 		border-radius: var(--r-pill);
 		border: 1px solid var(--hairline);
@@ -2880,8 +2955,24 @@
 		cursor: default;
 	}
 
-	/* 設定と切替は、浮いた 1 本のピルにまとめる。 */
-	.view-panel,
+	/*
+	 * 切替は、浮いた 1 本のピルにまとめる。
+	 *
+	 * **`.view-panel` をここに入れてはいけません**（2026-10-23 に実機で壊れた）。
+	 * フェーズ A の時点では、あれは**ヘッダーの横並びの帯**でした。
+	 * `75fff70` で**ロゴの下のドロップダウン**に変えたのに、この規則が残り ——
+	 *
+	 * ```
+	 * border-radius: 999px  → 丸い巨大な塊になる
+	 * flex-wrap: nowrap     → 「このアプリ」の行が折り返さず 497px
+	 * ```
+	 *
+	 * パネルが 505px になり、`right: 0` で留めてあるので **窓の左外（x = −379）**
+	 * へ出ました。Windows の実機では「空の角丸と、外へはみ出した 1 項目」に見えます。
+	 *
+	 * **手元（macOS の Tauri ＝ WebKit）では出ません。**Chrome で同じ幅にして
+	 * 初めて再現しました。**Windows は WebView2 ＝ Chromium です。**
+	 */
 	.tabs {
 		display: flex;
 		align-items: center;
