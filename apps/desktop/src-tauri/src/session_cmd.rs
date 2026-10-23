@@ -394,6 +394,12 @@ pub async fn local_list_dir(path: Option<String>) -> Result<LocalListing, String
             name: entry.file_name().to_string_lossy().into_owned(),
             is_dir: meta.is_dir(),
             size: meta.len(),
+            // **手元の PC。**柵（D22）はサーバー側だけの話で、
+            // **AI には手元へ書く口がそもそもありません**（D27 —— 落とし先は人の手元で、
+            // 囲いはそこを 1 ミリも守らない。だから口を作らない）。
+            //
+            // `false` は推測ではなく**事実**です。画面の手元側にこの印は出しません。
+            ai_writable: false,
         });
     }
 
