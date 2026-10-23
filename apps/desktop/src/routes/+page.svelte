@@ -28,6 +28,7 @@
 	import type { OperationProposal } from '$lib/components/OperationProposalDialog.svelte';
 	import { summarise } from '$lib/update/notes';
 	import { cutMessageKey, cutSummary } from '$lib/update/restart-cost';
+	import { forget as forgetReopen, take as takeReopen, type Reopen } from '$lib/update/reopen';
 	import { updater } from '$lib/update/updater.svelte';
 	import { listenForPageShot } from '$lib/capture/page-shot';
 	import { LOCALES } from '$lib/i18n/locales';
@@ -156,6 +157,29 @@
 
 	/** **止める前に 1 回聞く。**口を閉じると、戻すには立ち上げ直しが要ります。 */
 	let stopAiAsking = $state(false);
+
+	/**
+	 * **立ち上げ直したあと、開いていた接続へ繋ぎ直すかを聞く**（UI 案・5 枚目）。
+	 *
+	 * **勝手には繋ぎません** —— 立ち上げ直した瞬間に繋ぎ直すと、
+	 * **人が見ていない所で SSH が開きます**（禁止事項 3）。
+	 * **AI の分も繋ぎ直しません。**
+	 */
+	let reopenAsk = $state<Reopen | null>(null);
+
+	/** 控えにあった接続へ、1 本ずつ繋ぎ直す。**失敗は握り潰さない。** */
+	async function reopenThem(ids: readonly string[]) {
+		reopenAsk = null;
+		for (const id of ids) {
+			try {
+				await invoke('session_connect', { id, passphrase: null });
+			} catch (error: unknown) {
+				// **1 本落ちても残りは試す。**そのうえで理由は出します。
+				failure = String(error);
+			}
+		}
+		await session.refresh();
+	}
 
 
 
@@ -1028,6 +1052,10 @@
 	}
 
 	onMount(() => {
+		// **立ち上げ直したあと、1 回だけ聞く**（UI 案・5 枚目）。
+		// `take` は読んだら消すので、起動のたびに同じことを聞かれません。
+		reopenAsk = takeReopen();
+
 		// **この帯が OS のタイトルバー**（D17）。最大化の状態を取り込む。
 		titlebar.init();
 
@@ -1729,7 +1757,16 @@
 						</p>
 					{/if}
 					<div class="toast-actions">
-						<button type="button" class="cta" onclick={() => updater.restart()}>
+						<button
+							type="button"
+							class="cta"
+							onclick={() => {
+								// **立ち上げ直す前に控える**（UI 案・5 枚目）。
+								// 控えるのは識別子だけで、**勝手には繋ぎ直しません。**
+								updater.rememberOpen(session.all.map((held) => held.id));
+								void updater.restart();
+							}}
+						>
 							{i18n.t('update.restart')}
 						</button>
 						<button type="button" onclick={() => updater.dismiss()}>
@@ -1834,6 +1871,25 @@
 		口を閉じると、**戻すにはアプリを立ち上げ直します** ——
 		押し間違いの結果が他と違うので、確かめます（product-baseline §13）。
 	-->
+	<!--
+		**立ち上げ直したあとの繋ぎ直し**（UI 案・5 枚目）。
+		**勝手には繋ぎません** —— 人が見ていない所で SSH が開くのを作らない（禁止事項 3）。
+		**AI の分も繋ぎ直しません**（AI のほうから呼ばれたときに繋がります）。
+	-->
+	{#if reopenAsk}
+		<ConfirmDialog
+			title={i18n.t('reopen.title')}
+			body={i18n.t('reopen.what', { ids: reopenAsk.ids.join(' , ') })}
+			yes={i18n.t('reopen.yes')}
+			no={i18n.t('reopen.no')}
+			onyes={() => void reopenThem(reopenAsk!.ids)}
+			onno={() => {
+				forgetReopen();
+				reopenAsk = null;
+			}}
+		/>
+	{/if}
+
 	{#if stopAiAsking}
 		<ConfirmDialog
 			title={i18n.t('ai.stop.title')}

@@ -21,6 +21,7 @@ import { invoke } from '@tauri-apps/api/core';
 
 import { type FailureMessageKey, messageKeyFor } from './failure';
 import { readSkipped, shouldOffer, writeSkipped } from './skipped';
+import { remember } from './reopen';
 
 export type UpdateState =
 	| { kind: 'idle' }
@@ -144,6 +145,16 @@ export const updater = {
 			folded = false;
 			state = { kind: 'failed', messageKey: messageKeyFor(String(error)) };
 		}
+	},
+
+	/**
+	 * **立ち上げ直す前に、開いていた接続を控える**（UI 案・5 枚目）。
+	 *
+	 * 控えるのは**識別子だけ**（`reopen.ts`）。
+	 * **勝手に繋ぎ直しません** —— 次の起動で人に聞きます。
+	 */
+	rememberOpen(ids: readonly string[]): void {
+		remember(ids);
 	},
 
 	/** 入れ終わったあと、人が押したら再起動する。**勝手に落としません。** */

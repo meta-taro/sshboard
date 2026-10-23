@@ -4,6 +4,13 @@ import type { MessageKey } from './messages';
 type Catalog = Partial<Record<MessageKey, string>>;
 
 export const ptBR: Catalog = {
+
+	// **立ち上げ直したあと、開いていた接続へ繋ぎ直すかを聞く**（UI 案・5 枚目）。
+	// **勝手には繋ぎません** —— 人が見ていない所で SSH が開くのを作らない（禁止事項 3）。
+	'reopen.title': 'Reconectar?',
+	'reopen.what': 'O sshboard reiniciou. Estavam abertas: {ids}. A IA não foi reconectada e conectará na próxima vez que pedir.',
+	'reopen.yes': 'Reconectar',
+	'reopen.no': 'Agora não',
 	// **「AI を止める」は MCP の口も閉じる**（2026-10-23）。
 	// 口が空いたままだと、AI は次の呼びかけで戻ってくる ——
 	// 「止めた」と言って止まっていないのが一番悪い。
@@ -284,6 +291,13 @@ export const ptBR: Catalog = {
 };
 
 export const ru: Catalog = {
+
+	// **立ち上げ直したあと、開いていた接続へ繋ぎ直すかを聞く**（UI 案・5 枚目）。
+	// **勝手には繋ぎません** —— 人が見ていない所で SSH が開くのを作らない（禁止事項 3）。
+	'reopen.title': 'Переподключиться?',
+	'reopen.what': 'sshboard перезапущен. Были открыты: {ids}. ИИ не переподключён и подключится, когда снова запросит.',
+	'reopen.yes': 'Переподключиться',
+	'reopen.no': 'Не сейчас',
 	// **「AI を止める」は MCP の口も閉じる**（2026-10-23）。
 	// 口が空いたままだと、AI は次の呼びかけで戻ってくる ——
 	// 「止めた」と言って止まっていないのが一番悪い。
@@ -564,6 +578,13 @@ export const ru: Catalog = {
 };
 
 export const it: Catalog = {
+
+	// **立ち上げ直したあと、開いていた接続へ繋ぎ直すかを聞く**（UI 案・5 枚目）。
+	// **勝手には繋ぎません** —— 人が見ていない所で SSH が開くのを作らない（禁止事項 3）。
+	'reopen.title': 'Riconnettere?',
+	'reopen.what': 'sshboard è stato riavviato. Erano aperte: {ids}. L’IA non è riconnessa e si connetterà alla prossima richiesta.',
+	'reopen.yes': 'Riconnetti',
+	'reopen.no': 'Non ora',
 	// **「AI を止める」は MCP の口も閉じる**（2026-10-23）。
 	// 口が空いたままだと、AI は次の呼びかけで戻ってくる ——
 	// 「止めた」と言って止まっていないのが一番悪い。

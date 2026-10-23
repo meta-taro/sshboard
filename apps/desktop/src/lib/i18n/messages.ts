@@ -6,6 +6,13 @@
  */
 
 const en = {
+
+	// **立ち上げ直したあと、開いていた接続へ繋ぎ直すかを聞く**（UI 案・5 枚目）。
+	// **勝手には繋ぎません** —— 人が見ていない所で SSH が開くのを作らない（禁止事項 3）。
+	'reopen.title': 'Reconnect?',
+	'reopen.what': 'sshboard restarted. These connections were open before: {ids}. The AI is not reconnected and will connect again the next time it asks.',
+	'reopen.yes': 'Reconnect',
+	'reopen.no': 'Not now',
 	// **「AI を止める」は MCP の口も閉じる**（2026-10-23）。
 	// 口が空いたままだと、AI は次の呼びかけで戻ってくる ——
 	// 「止めた」と言って止まっていないのが一番悪い。
@@ -326,6 +333,13 @@ export type MessageKey = keyof typeof en;
 type Catalog = Partial<Record<MessageKey, string>>;
 
 const ja: Catalog = {
+
+	// **立ち上げ直したあと、開いていた接続へ繋ぎ直すかを聞く**（UI 案・5 枚目）。
+	// **勝手には繋ぎません** —— 人が見ていない所で SSH が開くのを作らない（禁止事項 3）。
+	'reopen.title': '繋ぎ直しますか？',
+	'reopen.what': '立ち上げ直しました。前に開いていたのは: {ids}。AI は繋ぎ直していません（AI のほうからもう一度呼ばれたときに繋がります）。',
+	'reopen.yes': '繋ぎ直す',
+	'reopen.no': 'いまはしない',
 	// **「AI を止める」は MCP の口も閉じる**（2026-10-23）。
 	// 口が空いたままだと、AI は次の呼びかけで戻ってくる ——
 	// 「止めた」と言って止まっていないのが一番悪い。

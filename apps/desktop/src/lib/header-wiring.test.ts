@@ -368,3 +368,42 @@ describe('AI の提案と、人の登録（実運用の報告・2026-10-23）', 
 		expect(source).toContain("invoke<OperationProposal | null>('operation_proposal')");
 	});
 });
+
+describe('立ち上げ直したあとの繋ぎ直し（UI 案・5 枚目）', () => {
+	test('remembers what was open before restarting', () => {
+		// 控えるのは**識別子だけ**（`reopen.ts` が中身を見張っています）。
+		expect(source).toContain('updater.rememberOpen(session.all.map((held) => held.id))');
+	});
+
+	test('asks once on the next start, instead of reconnecting by itself', () => {
+		// **勝手に繋ぎ直すと、人が見ていない所で SSH が開きます**（禁止事項 3）。
+		expect(source).toContain('reopenAsk = takeReopen();');
+		expect(source).toContain("i18n.t('reopen.title')");
+	});
+
+	test('names which connections it is about', () => {
+		// 「繋ぎ直しますか」だけでは、**何に繋ぐのか読めません。**
+		expect(source).toContain("reopenAsk.ids.join(' , ')");
+	});
+
+	test('forgets the note when the person says no', () => {
+		// 残すと、起動のたびに同じことを聞かれます。
+		expect(source).toContain('forgetReopen();');
+	});
+
+	test('tries the rest even if one fails, and still says why', () => {
+		// **1 本落ちても残りは試す。**そのうえで理由は出す（握り潰さない）。
+		const at = source.indexOf('async function reopenThem');
+		const body = source.slice(at, at + 600);
+		expect(body).toContain('for (const id of ids)');
+		expect(body).toContain('failure = String(error)');
+	});
+
+	test('does not reconnect the AI', () => {
+		// **AI の分は繋ぎ直しません**（AI のほうから呼ばれたときに繋がる）。
+		const at = source.indexOf('async function reopenThem');
+		const body = source.slice(at, at + 600);
+		expect(body).not.toContain('console_open');
+		expect(body).not.toContain('Actor::Ai');
+	});
+});
