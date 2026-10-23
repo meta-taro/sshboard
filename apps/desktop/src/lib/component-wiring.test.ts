@@ -559,3 +559,33 @@ describe('帯の書き出し（案・4 枚目）', () => {
 		expect(pageSource()).toContain('masked={redaction.on}');
 	});
 });
+
+describe('端末が 1 枚も無いとき（実機の報告・2026-10-23）', () => {
+	/**
+	 * **「何の反応も無い」の正体。**
+	 *
+	 * 実機で `doko005` を MCP の disconnect で切ったあと、
+	 * **黒い面がそのまま残りました。**
+	 *
+	 * 残っていたのではありません —— **言葉が 1 つも無い空の面**が
+	 * 描かれていました（`<div class="core terminal-core empty"></div>`）。
+	 * 人からは「切ったのに何も起きていない」と読めます。
+	 *
+	 * **止まっている理由が人へ届かないと、人は製品の外で直します。**
+	 * 今日の本番で起きたのと同じ形です。
+	 */
+	test('says why nothing is there instead of showing a blank black panel', () => {
+		const text = pageSource();
+		// **空の面を言葉なしで描かないこと。**
+		expect(text).not.toContain('<div class="core terminal-core empty"></div>');
+		expect(text).toContain("i18n.t('console.none.connected')");
+		expect(text).toContain("i18n.t('console.none.disconnected')");
+	});
+
+	test('tells the human what to press next', () => {
+		// 「無い」だけでは、次に何をすればいいか分かりません。
+		const text = pageSource();
+		const at = text.indexOf("i18n.t('console.none.disconnected')");
+		expect(at).toBeGreaterThan(-1);
+	});
+});

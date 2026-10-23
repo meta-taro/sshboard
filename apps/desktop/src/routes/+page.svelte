@@ -2251,8 +2251,22 @@
 					-->
 					<div class="console-panes" class:locked={holder === 'ai'}>
 						{#if layout.panes.length === 0}
+							<!--
+								**言葉の無い黒い面を描かないこと**（実機の報告・2026-10-23）。
+								`doko005` を切ったあと「黒い面がそのまま残った」と言われました。
+								**残っていたのではなく、空の面を無言で描いていました。**
+								人からは「切ったのに何も起きていない」と読めます。
+
+								**止まっている理由が届かないと、人は製品の外で直します。**
+							-->
 							<div class="terminal shell">
-								<div class="core terminal-core empty"></div>
+								<div class="core terminal-core empty">
+									<p class="nothing">
+										{session.open
+											? i18n.t('console.none.connected')
+											: i18n.t('console.none.disconnected')}
+									</p>
+								</div>
 							</div>
 						{:else}
 							{#each layout.panes as pane (pane.id)}
@@ -3374,4 +3388,17 @@
 		font-size: 0.76rem;
 		color: var(--fg-faint);
 	}
+	/* **空の面にも言葉を置く。**無言の黒は「壊れている」と読まれます。 */
+	.nothing {
+		margin: 0;
+		padding: 1.2rem;
+		font-family: var(--font-ui);
+		font-size: 0.78rem;
+		line-height: 1.8;
+		color: var(--fg-faint);
+		text-align: center;
+		overflow-wrap: anywhere;
+	}
+
+
 </style>

@@ -198,7 +198,9 @@ impl SshboardMcp {
         Ok(format!(
             "`{}` を人の画面へ出しました。**まだ何も走っていません。**\n\
              書くのは人で、登録されても実行には別の承認が要ります。\n\
-             人が押すまで、これ以上呼ばないでください（問いは出たままです）。",
+             人が押すまで、これ以上呼ばないでください（問いは出たままです）。\n\
+             押されたかは `pending_status` の `waitingForProposal` で分かります —— \
+             **`null` になったら、人が登録したか断ったかです**（`list_operations` で確かめられます）。",
             request.operation_id
         ))
     }
@@ -415,6 +417,22 @@ impl SshboardMcp {
                     "onConnection": asked_on.clone().or_else(|| may_open.clone()),
                     // 人がまだ答えていない。**押し直させない。**
                     "granted": asked_on.is_none() && may_open.is_some(),
+                })
+            }),
+            // **出したままの提案**（実機の報告・2026-10-23）。
+            //
+            // `propose_operation` は「人が押すまで、これ以上呼ばないでください」と
+            // 返しておきながら、**押されたかを確かめる口がありませんでした。**
+            // 待てと言って、待ち終わりを知らせないのは筋が通りません。
+            //
+            // `null` になったら、**人が登録したか、断ったか**です
+            // （どちらかは `list_operations` で分かります）。
+            "waitingForProposal": engine.operation_proposal().map(|asked| {
+                serde_json::json!({
+                    "operationId": asked.id,
+                    // **中身も返します。**人の画面に出ているものと同じで、
+                    // 秘密は入りません（人が書いた文字列ですらなく、AI が出した案）。
+                    "run": asked.run,
                 })
             }),
             // 鍵のパスフレーズ待ちの接続（識別子だけ）。
