@@ -37,6 +37,15 @@ describe('帯の書き出し', () => {
 		expect(text).toContain('公開の場');
 	});
 
+	test('carries no markdown, because a .txt renders nothing', () => {
+		// **画面の文言と同じ決まり**（`messages.test.ts`）。
+		// 素のテキストに `**` を書いても、描く物は何もありません。
+		for (const masked of [false, true]) {
+			const text = bandExportText(LINES, { masked, at: AT });
+			expect(text, `masked=${masked}`).not.toContain('**');
+		}
+	});
+
 	test('says how many lines it carries', () => {
 		expect(bandExportText(LINES, { masked: false, at: AT })).toContain('2 行');
 	});

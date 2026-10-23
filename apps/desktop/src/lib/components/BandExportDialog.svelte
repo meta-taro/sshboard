@@ -79,7 +79,8 @@
 		</div>
 
 		<div class="actions">
-			<button type="button" class="close" onclick={onclose}>{i18n.t('propose.no')}</button>
+			<!-- **「足さない」を流用しません。**あれは提案を断る言葉で、意味が違います。 -->
+			<button type="button" class="close" onclick={onclose}>{i18n.t('conn.delete.no')}</button>
 			<button type="button" class="go" onclick={save} disabled={lines.length === 0}>
 				{i18n.t('band.export.go')}
 			</button>

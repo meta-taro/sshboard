@@ -38,7 +38,9 @@ const HIDDEN = '●●●●●';
 export const EXPORT_HEADER = [
 	'# sshboard — 人と AI の操作記録（帯）',
 	'#',
-	'# **接続の識別子とサーバー側のパスが入っています。**',
+	// **記号を書きません。**これは素のテキストで、`**` を描く物は何もありません
+	// （このリポの文言の決まりと同じ理由。`messages.test.ts` が画面の文言で見張っています）。
+	'# 接続の識別子とサーバー側のパスが入っています。',
 	'# 公開の場（Issue・チャット・ブログ）へそのまま貼らないでください。'
 ].join('\n');
 
@@ -63,7 +65,7 @@ export function bandExportText(
 	if (masked) {
 		// **伏せていることを書いておく。**後から読む人が
 		// 「●」を壊れたファイルだと思わないように。
-		head.push('# **画面を伏せた状態で書き出しました。**中身は伏せてあります。');
+		head.push('# 画面を伏せた状態で書き出しました。中身は伏せてあります。');
 	}
 	const body = lines.map((line) => (masked ? `${line.tag} ${HIDDEN}` : line.rendered));
 	return [...head, '', ...body].join('\n') + '\n';
