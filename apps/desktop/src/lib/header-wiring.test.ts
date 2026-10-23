@@ -212,3 +212,54 @@ describe('立ち上げ直すと AI の目も切れる（UI 案）', () => {
 		expect(source).toContain('{#if cost.mcp}');
 	});
 });
+
+describe('3 つの列（UI 案・2026-10-21）', () => {
+	/**
+	 * **帯を常に見えるようにする**のが要点です（PRD §4-1
+	 * 「見えないことが最大の危険」）—— 端末を打っている人が、
+	 * **AI が何をしたかを見るために画面を移らなくていい。**
+	 *
+	 * **配置は型検査もテストも素通りします。**描いて確かめても、
+	 * jsdom には幅が無いので列の形は測れません（`icon-shape.test.ts` と同じ事情）。
+	 * **測れないものを測ったことにしない**ため、ここでは「書いてあること」を見ます。
+	 */
+	test('puts the three columns in one frame', () => {
+		expect(source).toContain('<div class="three">');
+		expect(source).toContain('<div class="middle">');
+	});
+
+	test('keeps the band beside the terminal, not only in its own view', () => {
+		// **ここが案の要点。**画面を移らずに AI の手が見える。
+		const at = source.indexOf('<div class="three">');
+		const end = source.indexOf('</section>', at);
+		expect(at).toBeGreaterThan(-1);
+		expect(source.slice(at, end)).toContain('<BandPanel {lines} />');
+	});
+
+	test('stands the connection rail up on its side', () => {
+		// 横並びのままだと、左の列になりません。
+		expect(source).toContain('layout="rail"');
+	});
+
+	test('does not give the columns a fixed width', () => {
+		// **固定幅で並べると、窓を狭めた人の端末が消えます。**
+		// 折り返して縦に積む（消えるのではなく、下に来る）。
+		const at = source.indexOf('.three {');
+		expect(at).toBeGreaterThan(-1);
+		const rule = source.slice(at, source.indexOf('}', at));
+		expect(rule).toContain('flex-wrap: wrap');
+	});
+
+	test('gives the middle column the leftover room', () => {
+		// 中央が主役。両脇が先に縮む。
+		expect(source).toContain('flex: 999 1 22rem');
+	});
+
+	test('lets the terminal shrink instead of pushing the columns apart', () => {
+		// `min-width: 0` が無いと、**端末の中身が列を押し広げて
+		// 横スクロールが出ます。**
+		const at = source.indexOf('.three .middle {');
+		const rule = source.slice(at, source.indexOf('}', at));
+		expect(rule).toContain('min-width: 0');
+	});
+});

@@ -1776,177 +1776,199 @@
 					**できるようになった後にだけ現れる案内**になっていました。
 					1 本でも出せば、どのサーバーの端末なのかが常に見えます。
 				-->
-			{:else if session.all.length > 0}
-				<ConnectionRail
-					items={session.all}
-					activeId={session.activeId}
-					roots={session.open?.write.aiRoots ?? []}
-					onpick={(id) => session.focus(id)}
-					onadd={() => (consoleAddingAnother = !consoleAddingAnother)}
-				/>
+			{/if}
+			<!--
+				**3 つの列**（UI 案・2026-10-21）。
+				左に接続と柵、中央に端末の面、右に帯。**帯を常に見えるようにする**のが要点で、
+				PRD §4-1「見えないことが最大の危険」に直接効きます ——
+				端末を打っている人が、**AI が何をしたかを見るために画面を移らなくていい。**
+
+				**狭いときは折り返して縦に積みます**（`flex-wrap`）。
+				列を固定幅で並べると、窓を狭めた人の端末が消えます。
+			-->
+			<div class="three">
 				<!--
-					**繋ぐ所は 1 つの部品**（`ConnectPanel`）。
-					写して 2 か所に置くと、**片方だけ直る日**が来ます（D39）。
+					**1 本のときも出す**（Issue #9）。以前は `> 1` で、
+					**2 本目が開いて初めて現れました** ——
+					「2 台目に繋げるのか」を探している人には絶対に見えなかった。
 				-->
-				{#if consoleAddingAnother}
-					<ConnectPanel
-						onconnected={() => (consoleAddingAnother = false)}
-						onregister={() => {
-							consoleAddingAnother = false;
-							view = 'connections';
-						}}
+				{#if session.all.length > 0}
+					<ConnectionRail
+						layout="rail"
+						items={session.all}
+						activeId={session.activeId}
+						roots={session.open?.write.aiRoots ?? []}
+						onpick={(id) => session.focus(id)}
+						onadd={() => (consoleAddingAnother = !consoleAddingAnother)}
 					/>
 				{/if}
-			{/if}
-
-			<div class="console-head">
-				<!-- **誰が握っているかを、常に出す。**見えない所で AI が打っている、を作らない。 -->
-				<!-- **どの接続の端末かを常に出す**（D25）。
-				     タブを移しても端末は付いてこないので、書いていないと迷子になる。 -->
-				{#if consoleOn}
-					<span class="on" data-secret>{consoleOn}</span>
-				{/if}
-				<!--
-					**いま誰が打てるか**（UI 案・2026-10-21）。
-					案の「いま打てるのは [Human · あなた]」。
-					**色だけに頼りません** —— 人（青）と AI（橙）は明るさがほぼ同じ
-					（差 9.5 / 255）なので、色が見えない人には見分けられません。
-					**札の中に `Human` / `AI` と文字で書きます。**
-					長い説明文は読み上げへ回します（画面では札で足りる）。
-				-->
-				<span class="who" class:ai={holder === 'ai'} class:mine={iHold}>
-					<span class="who-label">{i18n.t('console.who')}</span>
-					<span class="who-badge">
-						{holder === 'ai'
-							? i18n.t('console.who.ai')
-							: iHold
-								? i18n.t('console.who.me')
-								: i18n.t('console.who.none')}
-					</span>
-				</span>
-				<span class="holder visually-hidden" class:ai={holder === 'ai'} class:mine={iHold}>
-					<Icon name={holder ? 'lock' : 'terminal'} size={12} />
-					{holder === 'ai'
-						? i18n.t('console.held.ai')
-						: iHold
-							? i18n.t('console.held.me')
-							: i18n.t('console.held.none')}
-				</span>
-				{#if !holder && session.open !== null}
+				<div class="middle">
 					<!--
-						**繋いでいないときは、そもそも出しません。**
-						押せない釦を置いても、何をすればいいかは伝わりません
-						（実機で「意味が分からない」と言われた並びです）。
-						繋ぐ所は上の `ConnectPanel` に出ています。
+						**繋ぐ所は 1 つの部品**（`ConnectPanel`）。
+						写して 2 か所に置くと、**片方だけ直る日**が来ます（D39）。
 					-->
-					<button type="button" class="primary" onclick={openConsole}>
-						<Icon name="terminal" />
-						{i18n.t('console.open')}
-					</button>
-					<!-- **「何本開けるか」を、押す前に言う。**使う人が機能の有無を判断できるように。 -->
-					<span class="onlyone">{i18n.t('console.onlyone')}</span>
-				{:else if holder && !iHold}
-					<!-- **人はいつでも取り返せる**（D29）。 -->
-					<button type="button" class="primary" onclick={takeConsole}>
-						<Icon name="lock" />
-						{i18n.t('console.take')}
-					</button>
-				{/if}
-				{#if holder}
-					<!-- **止まらない停止ボタンは、無い方がまし。**必ず効く。 -->
-					<button type="button" class="danger" onclick={stopConsole}>
-						<Icon name="stop" />
-						{i18n.t('console.stop')}
-					</button>
-				{/if}
-				<!--
-					**押せる所にも置く。**ショートカットだけだと、知らない人には無いのと同じ。
-					ただし**端末が開いていないときは出しません** — 繋ぎ方を探している人の前に、
-					無関係な釦を同じ重さで並べていました（実機の指摘）。
-				-->
-				{#if holder}
-					<button type="button" onclick={() => openSearch('console')}>
-						{i18n.t('search.label')}
-					</button>
-				{/if}
-			</div>
-			{@render searchBar('console')}
-			<!--
-				**端末のタブ**（分割・2026-10-06）。番号・接続・色を出します ——
-				人が口で「②を見て」と言えて、AI も同じ番号で指せる（PRD §4-0）。
-				**3 枚目以降はここで切り替えます**（半々は 2 枚まで・DESIGN.md）。
-			-->
-			{#if consolesOpen.length > 0}
-				<div class="console-tablist" role="tablist" aria-label={i18n.t('tab.console')}>
-					{#each consolesOpen as held (held.id)}
-						<button
-							type="button"
-							role="tab"
-							class="console-tab"
-							class:active={layout.panes.some((pane) => pane.id === held.id)}
-							aria-selected={layout.focused === held.id}
-							onclick={() => (chosenConsole = held.id)}
-						>
-							<span class="num">#{held.id}</span>
-							<span data-secret>{held.connection}</span>
-						</button>
-					{/each}
-					{#if layout.canOpenAnother}
-						<!-- **同じサーバにもう 1 枚。**押しても断られる釦は出しません。 -->
-						<button
-							type="button"
-							class="ghost add"
-							onclick={openAnotherConsole}
-							title={i18n.t('console.another')}
-						>
-							<Icon name="plus" size={13} />
-							{i18n.t('console.another')}
-						</button>
-					{/if}
-				</div>
-			{/if}
-			<!--
-				**半々に並べる**（人が決めた形）——
-
-				> 見た目はデスクトップみたいに半々とかタブ切り替えかなぁ
-
-				**等分から始めます。**掴んで動かす境目は、要ると分かってから足します。
-			-->
-			<div class="console-panes" class:locked={holder === 'ai'}>
-				{#if layout.panes.length === 0}
-					<div class="terminal shell">
-						<div class="core terminal-core empty"></div>
-					</div>
-				{:else}
-					{#each layout.panes as pane (pane.id)}
-						<ConsolePaneView
-							{pane}
-							{clipboard}
-							{platform}
-							backlog={replayFor(backlogs.all, consoleKey(pane.id))}
-							mark={session.all.find((held) => held.id === pane.connection)?.color ?? null}
-							fontPx={textSize.terminalPx}
-							active={layout.focused === pane.id}
-							iHold={pane.holder === 'human'}
-							findIsOpen={findFrom('console')}
-							onpick={(id) => (chosenConsole = id)}
-							onstop={(id) => void stopConsoleOf(id)}
-							onready={(id, write) => {
-								// **地図は作り直しません。**面の数は 2 つなので、
-								// 書き換えても描き直しは要りません（`$state` にしていません）。
-								if (write) consoleWriters.set(id, write);
-								else consoleWriters.delete(id);
+					{#if consoleAddingAnother}
+						<ConnectPanel
+							onconnected={() => (consoleAddingAnother = false)}
+							onregister={() => {
+								consoleAddingAnother = false;
+								view = 'connections';
 							}}
-							onsearch={(id, search) => {
-								const next = new Map(consoleSearches);
-								if (search) next.set(id, search);
-								else next.delete(id);
-								consoleSearches = next;
-							}}
-							onfailure={(message) => (failure = message)}
 						/>
-					{/each}
-				{/if}
+					{/if}
+
+					<div class="console-head">
+						<!-- **誰が握っているかを、常に出す。**見えない所で AI が打っている、を作らない。 -->
+						<!-- **どの接続の端末かを常に出す**（D25）。
+						     タブを移しても端末は付いてこないので、書いていないと迷子になる。 -->
+						{#if consoleOn}
+							<span class="on" data-secret>{consoleOn}</span>
+						{/if}
+						<!--
+							**いま誰が打てるか**（UI 案・2026-10-21）。
+							案の「いま打てるのは [Human · あなた]」。
+							**色だけに頼りません** —— 人（青）と AI（橙）は明るさがほぼ同じ
+							（差 9.5 / 255）なので、色が見えない人には見分けられません。
+							**札の中に `Human` / `AI` と文字で書きます。**
+							長い説明文は読み上げへ回します（画面では札で足りる）。
+						-->
+						<span class="who" class:ai={holder === 'ai'} class:mine={iHold}>
+							<span class="who-label">{i18n.t('console.who')}</span>
+							<span class="who-badge">
+								{holder === 'ai'
+									? i18n.t('console.who.ai')
+									: iHold
+										? i18n.t('console.who.me')
+										: i18n.t('console.who.none')}
+							</span>
+						</span>
+						<span class="holder visually-hidden" class:ai={holder === 'ai'} class:mine={iHold}>
+							<Icon name={holder ? 'lock' : 'terminal'} size={12} />
+							{holder === 'ai'
+								? i18n.t('console.held.ai')
+								: iHold
+									? i18n.t('console.held.me')
+									: i18n.t('console.held.none')}
+						</span>
+						{#if !holder && session.open !== null}
+							<!--
+								**繋いでいないときは、そもそも出しません。**
+								押せない釦を置いても、何をすればいいかは伝わりません
+								（実機で「意味が分からない」と言われた並びです）。
+								繋ぐ所は上の `ConnectPanel` に出ています。
+							-->
+							<button type="button" class="primary" onclick={openConsole}>
+								<Icon name="terminal" />
+								{i18n.t('console.open')}
+							</button>
+							<!-- **「何本開けるか」を、押す前に言う。**使う人が機能の有無を判断できるように。 -->
+							<span class="onlyone">{i18n.t('console.onlyone')}</span>
+						{:else if holder && !iHold}
+							<!-- **人はいつでも取り返せる**（D29）。 -->
+							<button type="button" class="primary" onclick={takeConsole}>
+								<Icon name="lock" />
+								{i18n.t('console.take')}
+							</button>
+						{/if}
+						{#if holder}
+							<!-- **止まらない停止ボタンは、無い方がまし。**必ず効く。 -->
+							<button type="button" class="danger" onclick={stopConsole}>
+								<Icon name="stop" />
+								{i18n.t('console.stop')}
+							</button>
+						{/if}
+						<!--
+							**押せる所にも置く。**ショートカットだけだと、知らない人には無いのと同じ。
+							ただし**端末が開いていないときは出しません** — 繋ぎ方を探している人の前に、
+							無関係な釦を同じ重さで並べていました（実機の指摘）。
+						-->
+						{#if holder}
+							<button type="button" onclick={() => openSearch('console')}>
+								{i18n.t('search.label')}
+							</button>
+						{/if}
+					</div>
+					{@render searchBar('console')}
+					<!--
+						**端末のタブ**（分割・2026-10-06）。番号・接続・色を出します ——
+						人が口で「②を見て」と言えて、AI も同じ番号で指せる（PRD §4-0）。
+						**3 枚目以降はここで切り替えます**（半々は 2 枚まで・DESIGN.md）。
+					-->
+					{#if consolesOpen.length > 0}
+						<div class="console-tablist" role="tablist" aria-label={i18n.t('tab.console')}>
+							{#each consolesOpen as held (held.id)}
+								<button
+									type="button"
+									role="tab"
+									class="console-tab"
+									class:active={layout.panes.some((pane) => pane.id === held.id)}
+									aria-selected={layout.focused === held.id}
+									onclick={() => (chosenConsole = held.id)}
+								>
+									<span class="num">#{held.id}</span>
+									<span data-secret>{held.connection}</span>
+								</button>
+							{/each}
+							{#if layout.canOpenAnother}
+								<!-- **同じサーバにもう 1 枚。**押しても断られる釦は出しません。 -->
+								<button
+									type="button"
+									class="ghost add"
+									onclick={openAnotherConsole}
+									title={i18n.t('console.another')}
+								>
+									<Icon name="plus" size={13} />
+									{i18n.t('console.another')}
+								</button>
+							{/if}
+						</div>
+					{/if}
+					<!--
+						**半々に並べる**（人が決めた形）——
+
+						> 見た目はデスクトップみたいに半々とかタブ切り替えかなぁ
+
+						**等分から始めます。**掴んで動かす境目は、要ると分かってから足します。
+					-->
+					<div class="console-panes" class:locked={holder === 'ai'}>
+						{#if layout.panes.length === 0}
+							<div class="terminal shell">
+								<div class="core terminal-core empty"></div>
+							</div>
+						{:else}
+							{#each layout.panes as pane (pane.id)}
+								<ConsolePaneView
+									{pane}
+									{clipboard}
+									{platform}
+									backlog={replayFor(backlogs.all, consoleKey(pane.id))}
+									mark={session.all.find((held) => held.id === pane.connection)?.color ?? null}
+									fontPx={textSize.terminalPx}
+									active={layout.focused === pane.id}
+									iHold={pane.holder === 'human'}
+									findIsOpen={findFrom('console')}
+									onpick={(id) => (chosenConsole = id)}
+									onstop={(id) => void stopConsoleOf(id)}
+									onready={(id, write) => {
+										// **地図は作り直しません。**面の数は 2 つなので、
+										// 書き換えても描き直しは要りません（`$state` にしていません）。
+										if (write) consoleWriters.set(id, write);
+										else consoleWriters.delete(id);
+									}}
+									onsearch={(id, search) => {
+										const next = new Map(consoleSearches);
+										if (search) next.set(id, search);
+										else next.delete(id);
+										consoleSearches = next;
+									}}
+									onfailure={(message) => (failure = message)}
+								/>
+							{/each}
+						{/if}
+					</div>
+				</div>
+				<!-- **帯は右の列に常設。**同じ部品を帯の面でも使っています（写していません）。 -->
+				<BandPanel {lines} />
 			</div>
 		</section>
 	{:else if view === 'files'}
@@ -2139,6 +2161,59 @@
 	}
 
 	/* --- 「表示」メニュー（自前タイトルバーで OS のメニューを失った分） --- */
+
+	/*
+	 * **3 つの列**（UI 案・2026-10-21）。左に接続と柵、中央に端末、右に帯。
+	 *
+	 * **帯を常に見えるようにする**のが要点です（PRD §4-1
+	 * 「見えないことが最大の危険」）—— 端末を打っている人が、
+	 * **AI が何をしたかを見るために画面を移らなくていい。**
+	 *
+	 * **固定幅で並べません。**窓を狭めた人の端末が消えます。
+	 * 中央に `flex: 999` を与えて**余りを全部渡し**、両脇は上限だけ決めます
+	 * （案も `flex: 999 1 560px` と `max-width` でそうしています）。
+	 */
+	.three {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: stretch;
+		gap: 0.5rem;
+		flex: 1 1 auto;
+		min-height: 0;
+		min-width: 0;
+	}
+
+	/*
+	 * **中央が主役。**`flex: 999` は「余りは全部こちら」という意味で、
+	 * 両脇が先に縮みます。`min-width: 0` が無いと、
+	 * **端末の中身が列を押し広げて横スクロールが出ます。**
+	 */
+	.three .middle {
+		display: flex;
+		flex-direction: column;
+		gap: 0.35rem;
+		flex: 999 1 22rem;
+		min-width: 0;
+		min-height: 0;
+	}
+
+	/*
+	 * 両脇。**上限だけ決めて、下限は内容に任せます。**
+	 * 狭いと `flex-wrap` で下へ落ち、縦に積まれます ——
+	 * **消えるのではなく、下に来る。**
+	 */
+	.three > :global(nav.rail) {
+		flex: 1 1 13rem;
+		max-width: 16rem;
+		min-width: 0;
+		overflow-y: auto;
+	}
+
+	.three > :global(section.band) {
+		flex: 1 1 16rem;
+		max-width: 21rem;
+		min-width: 0;
+	}
 
 	.console-panes {
 		display: flex;
