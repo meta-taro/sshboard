@@ -1,5 +1,5 @@
 {
- "total": 38,
+ "total": 39,
  "groups": [
   {
    "key": "connect",
@@ -118,6 +118,10 @@
     {
      "name": "run_operation",
      "line": "Run one of the state-changing operations the human listed in operations.toml, by id."
+    },
+    {
+     "name": "propose_operation",
+     "line": "Ask the human to add an operation to their allowlist."
     }
    ]
   },

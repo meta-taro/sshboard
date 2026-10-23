@@ -41,8 +41,11 @@ GROUPS = [
               "disk_usage", "process_list", "network_listen", "service_status",
               "runtime_versions"]),
     ("write", ["make_directory", "upload_file", "write_file"]),
+    # `propose_operation` は**走らせる口ではありません**（2026-10-23）——
+    # 人へ「これを足してよいか」と出すだけで、**書くのは画面**です。
+    # それでも `cmds` に置きます: 人が読むときの関心は「コマンドの話」で同じだからです。
     ("cmds", ["list_readonly_commands", "run_readonly", "list_operations",
-              "run_operation"]),
+              "run_operation", "propose_operation"]),
     ("console", ["console_open", "console_type", "console_stop", "read_stream",
                  "list_consoles", "read_console"]),
     ("screen", ["show_view", "capture_window", "pending_status", "await_answer", "diagnostics"]),
