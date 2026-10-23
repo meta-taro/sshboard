@@ -4,6 +4,7 @@
 	import { onMount, tick } from 'svelte';
 
 	import { appendLine, type BandLine } from '$lib/band';
+	import type { DiagEvent } from '$lib/diagnostics';
 	import ConnectionManager from '$lib/components/ConnectionManager.svelte';
 	import ConsoleRequestDialog from '$lib/components/ConsoleRequestDialog.svelte';
 	import HostKeyDialog from '$lib/components/HostKeyDialog.svelte';
@@ -19,6 +20,7 @@
 	import { titlebar } from '$lib/window/titlebar.svelte';
 	import AboutDialog from '$lib/components/AboutDialog.svelte';
 	import BandPanel from '$lib/components/BandPanel.svelte';
+	import DiagPanel from '$lib/components/DiagPanel.svelte';
 	import KeyHelpDialog from '$lib/components/KeyHelpDialog.svelte';
 	import { summarise } from '$lib/update/notes';
 	import { cutMessageKey, cutSummary } from '$lib/update/restart-cost';
@@ -51,15 +53,6 @@
 	type McpFailure = { port: number; detail: string };
 
 	/** 何が起きたかの記録。Rust 側の `Event` と対。**接続先は入っていない。** */
-	type DiagEvent = {
-		seq: number;
-		atMs: number;
-		level: 'info' | 'warn' | 'error';
-		stage: string;
-		connection?: string;
-		message: string;
-		hint?: string;
-	};
 
 	let lines = $state<BandLine[]>([]);
 	let mcp = $state<McpAccess | null>(null);
@@ -2024,33 +2017,7 @@
 		<ConnectionManager />
 	{:else if view === 'diag'}
 		<!-- **何が起きたか。**MCP の `diagnostics` と同じ 1 つを見ている。 -->
-		<section class="diag" aria-label={i18n.t('tab.diag')}>
-			<div class="diag-head">
-				<span class="label">{i18n.t('diag.label')}</span>
-				<span class="scaffold">{i18n.t('diag.help')}</span>
-				<button type="button" onclick={loadDiagnostics}>
-					<Icon name="refresh" size={13} />
-					{i18n.t('diag.refresh')}
-				</button>
-			</div>
-			{#if diag.length === 0}
-				<p class="empty">{i18n.t('diag.empty')}</p>
-			{:else}
-				<ol class="diag-list">
-					{#each diag as event (event.seq)}
-						<li class={event.level}>
-							<span class="at">{(event.atMs / 1000).toFixed(1)}s</span>
-							<span class="stage">{event.stage}</span>
-							{#if event.connection}<span class="who">{event.connection}</span>{/if}
-							<span class="detail">
-								{event.message}
-								{#if event.hint}<em class="hint">→ {event.hint}</em>{/if}
-							</span>
-						</li>
-					{/each}
-				</ol>
-			{/if}
-		</section>
+		<DiagPanel found={diag} onrefresh={loadDiagnostics} />
 	{:else}
 	<section class="stream" aria-label={i18n.t('stream.label')}>
 		<!-- **この面が何をする所かを、その場に書く。**
@@ -2686,96 +2653,16 @@
 		font-variant-numeric: tabular-nums;
 	}
 
-	/* 診断。**帯とは別。**帯は「誰が何をしたか」、ここは「なぜそうなったか」。 */
-	.diag {
-		display: flex;
-		flex-direction: column;
-		min-height: 0;
-		flex: 1 1 auto;
-		gap: 0.4rem;
-	}
 
-	.diag-head {
-		display: flex;
-		align-items: center;
-		gap: 0.5rem;
-	}
 
-	.diag-list {
-		list-style: none;
-		margin: 0;
-		padding: 0.3rem;
-		overflow: auto;
-		flex: 1 1 auto;
-		min-height: 0;
-		background: var(--surface);
-		border: 1px solid var(--hairline);
-		border-radius: var(--r-shell);
-		font-size: 0.7rem;
-		line-height: 1.6;
-	}
 
-	.diag-list li {
-		display: flex;
-		gap: 0.45rem;
-		padding: 0.12rem 0.4rem;
-		align-items: baseline;
-	}
 
-	.diag-list li.error {
-		color: var(--danger);
-	}
 
-	.diag-list li.warn {
-		color: var(--warning);
-	}
 
-	.at {
-		font-family: var(--font-mono);
-		font-size: 0.62rem;
-		color: var(--fg-faint);
-		font-variant-numeric: tabular-nums;
-		flex: none;
-		min-width: 3.2rem;
-		text-align: right;
-	}
 
-	.stage,
-	.who {
-		font-size: 0.62rem;
-		color: var(--fg-muted);
-		flex: none;
-		white-space: nowrap;
-	}
 
-	.who {
-		padding: 0 0.3rem;
-		border: 1px solid var(--hairline);
-		border-radius: var(--r-pill);
-	}
 
-	/*
-	 * 診断の 1 行の中身。**面の説明文（`.what`）と名前が衝突していました**（Issue #22）。
-	 *
-	 * 同じ `.what` が 2 か所で定義され、**`flex: 1 1 auto` が説明文にも効いて**
-	 * いました。説明文の `<p>` が縦へ伸び、**上に 250px の空白ができ、
-	 * その分だけ下の出力ペインと一覧が潰れて重なっていました。**
-	 *
-	 * **CSS は後勝ちですが、片方にしか無い宣言は生き残ります。**
-	 * 名前を分けます。
-	 */
-	.detail {
-		flex: 1 1 auto;
-		min-width: 0;
-	}
 
-	/* 次の一手。**失敗には必ず付く。** */
-	.hint {
-		display: block;
-		font-style: normal;
-		color: var(--fg-muted);
-		font-size: 0.66rem;
-	}
 
 	.mcp {
 		display: inline-flex;
@@ -2817,12 +2704,6 @@
 		padding: 3px;
 	}
 
-	.view-panel-icon {
-		display: inline-flex;
-		align-items: center;
-		padding: 0 0.15rem 0 0.4rem;
-		color: var(--fg-faint);
-	}
 
 	/* **アイコンと文字を横に並べる。**これが無いと、SVG が block なので
 	   文字の上に乗ってしまう（実際に乗った）。 */
@@ -3096,11 +2977,6 @@
 		color: var(--fg-muted);
 	}
 
-	/* **AI が握っている間、端末の枠で締まっていることを示す。** */
-	.terminal.locked {
-		outline: 1.5px solid var(--ai);
-		outline-offset: 2px;
-	}
 
 	/* **この面が何をする所か**を書く 1 行。読んで分からない面は、無いのと同じ。 */
 	/* 面の説明文。**伸びません**（Issue #22 —— 伸びて 250px の空白を作っていました）。 */
