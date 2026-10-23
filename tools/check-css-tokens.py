@@ -184,6 +184,24 @@ def theme_trouble(text: str) -> list[str]:
             got = colors.get(f"--{name}")
             if got != want:
                 bad.append(f"{head}: --{name} が案と違います —— 案 {want} / 実物 {got}")
+
+    # **明るい側も同じ骨格か**（オーナー指示・2026-10-23）。
+    #
+    # 案は暗い側しか描いていませんが、**明るい側だけ別の見た目にする理由はありません。**
+    # 明るい側の `--accent` は緑（`#1f6b58`）のままで、**案に緑はありません。**
+    # 実機（Windows）は明るいテーマで、**同じ製品に見えませんでした。**
+    #
+    # 色の値は地に合わせて取り直してよい。**同じでなければいけないのは骨格**
+    # ——「押せるものの色 ＝ 人の色」「選択は地と字の反転」。
+    head_light, light = blocks[0]
+    if light.get("--accent") != light.get("--human"):
+        bad.append(
+            f"{head_light}: **--accent が --human と違います** —— "
+            f"{light.get('--accent')} / {light.get('--human')}。"
+            "案では押せるものの色と人の色は同じです"
+        )
+    if light.get("--selected-fg") == light.get("--fg"):
+        bad.append(f"{head_light}: **--selected-fg が反転していません**（案は地と字の反転）")
     return bad
 
 
