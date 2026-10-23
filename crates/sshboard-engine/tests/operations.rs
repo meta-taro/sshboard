@@ -18,6 +18,7 @@
 use std::sync::Arc;
 
 use sshboard_band::{Actor, Band};
+use sshboard_engine::OperationProposal;
 use sshboard_engine::{Engine, EngineError};
 use sshboard_stream::OutputStream;
 
@@ -737,5 +738,87 @@ async fn dismissing_a_proposal_writes_nothing() {
     assert!(
         !dir.path().join("operations.toml").exists(),
         "**断ったのにファイルが出来ている**"
+    );
+}
+
+// --- 提案が画面へ届くか（実機の報告・2026-10-23）-----------------------------
+//
+// **5 回呼んだのに、人の画面のどこにも出ない。**帯には 5 行残っている。
+// 帯は共有、提案は実行体の中 —— **どこで切れているかを、ここで切り分けます。**
+
+#[tokio::test]
+async fn a_proposal_reaches_whoever_is_watching() {
+    // **押し出せなければ、提案は無いのと同じ。**
+    let dir = tempfile::tempdir().expect("一時ディレクトリが作れない");
+    let engine = engine_in(&dir);
+    let mut watching = engine.subscribe_operation_proposal();
+
+    engine
+        .propose_operation(
+            Actor::Ai,
+            OperationProposal {
+                id: "httpd-configtest".into(),
+                run: "sudo apachectl configtest".into(),
+                description: "書式を確かめる".into(),
+                max_per_hour: 20,
+            },
+        )
+        .await
+        .expect("提案が通らない");
+
+    watching.changed().await.expect("見張りへ届かない");
+    let got = watching.borrow().clone().expect("提案が空");
+    assert_eq!(got.id, "httpd-configtest");
+}
+
+#[tokio::test]
+async fn a_proposal_is_still_there_for_someone_who_looks_later() {
+    // **取りこぼし対策。**画面が後から読んでも在ること
+    // （起動直後に出された提案が消えない）。
+    let dir = tempfile::tempdir().expect("一時ディレクトリが作れない");
+    let engine = engine_in(&dir);
+
+    engine
+        .propose_operation(
+            Actor::Ai,
+            OperationProposal {
+                id: "httpd-reload".into(),
+                run: "sudo systemctl reload httpd".into(),
+                description: "読み直す".into(),
+                max_per_hour: 6,
+            },
+        )
+        .await
+        .expect("提案が通らない");
+
+    // **誰も見ていない状態で出しても、残っていること。**
+    let held = engine.operation_proposal().expect("提案が残っていない");
+    assert_eq!(held.id, "httpd-reload");
+}
+
+#[tokio::test]
+async fn a_proposal_survives_with_nobody_watching_at_all() {
+    // **ここが本命。**`watch::Sender::send` は**受け手が 0 本だと失敗します。**
+    // 失敗を `let _ =` で捨てていると、**値も入りません。**
+    // 画面が後から `operation_proposal()` を読んでも空になります。
+    let dir = tempfile::tempdir().expect("一時ディレクトリが作れない");
+    let engine = engine_in(&dir);
+    // 見張りを 1 本も作らずに出す。
+    engine
+        .propose_operation(
+            Actor::Ai,
+            OperationProposal {
+                id: "nginx-configtest".into(),
+                run: "sudo nginx -t".into(),
+                description: "書式を確かめる".into(),
+                max_per_hour: 20,
+            },
+        )
+        .await
+        .expect("提案が通らない");
+
+    assert!(
+        engine.operation_proposal().is_some(),
+        "**受け手が 0 本のときに提案が消えています。**`send` の失敗を捨てています"
     );
 }

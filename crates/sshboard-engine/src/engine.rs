@@ -1940,7 +1940,43 @@ impl Engine {
                 .warn(Stage::Exec, None, format!("帯へ出せませんでした: {error}"));
         }
 
-        let _ = self.operation_proposal.send(Some(proposal));
+        // **`send` ではなく `send_replace`。**
+        //
+        // `watch::Sender::send` は**受け手が 0 本だと失敗し、値も入りません。**
+        // それを `let _ =` で捨てていたので、**提案が消えていました** ——
+        // 実機（2026-10-23）で「5 回呼んだのに画面のどこにも出ない」。
+        //
+        // **帯には 5 行残っていました。**帯は共有の口で、提案は実行体の中。
+        // だから「AI は呼んだのに、人には何も無い」という読みにくい形になりました。
+        //
+        // `send_replace` は**受け手が居なくても値を入れます。**
+        // 画面が後から `operation_proposal()` で拾えます。
+        let watchers = self.operation_proposal.receiver_count();
+        self.operation_proposal.send_replace(Some(proposal));
+
+        // **誰が見ていたかを残す。**
+        //
+        // 実機（2026-10-23）で「5 回呼んだのに画面に出ない」が起きたとき、
+        // **どこで切れたのかを示すものが何も残っていませんでした** ——
+        // 帯には AI の行が在り、画面には何も無い。それだけでは切り分けられません。
+        //
+        // **0 本なら、画面へ押し出す橋が立っていません。**
+        // 値は残るので（`send_replace`）、画面を開き直せば拾えます。
+        if watchers == 0 {
+            self.diag.warn(
+                Stage::Exec,
+                None,
+                "提案を押し出す先が 1 つもありません（画面の橋が立っていない）。\
+                 値は控えてあるので、画面を開き直せば出ます"
+                    .to_string(),
+            );
+        } else {
+            self.diag.info(
+                Stage::Exec,
+                None,
+                format!("提案を画面へ押し出しました（見ている口 {watchers} 本）"),
+            );
+        }
         Ok(())
     }
 
@@ -1989,13 +2025,13 @@ impl Engine {
         })?;
 
         // 登録できたら提案は下げる。**出したままにすると二度登録されます。**
-        let _ = self.operation_proposal.send(None);
+        self.operation_proposal.send_replace(None);
         Ok(())
     }
 
     /// **人が提案を断る。**何も書きません。
     pub fn dismiss_proposal(&self) {
-        let _ = self.operation_proposal.send(None);
+        self.operation_proposal.send_replace(None);
     }
 
     pub fn operation_request(&self) -> Option<OperationAsk> {
@@ -2516,7 +2552,9 @@ impl Engine {
             let mut held = self.transfers.lock().await;
             held.record(actor, direction, what, bytes, outcome)
         };
-        let _ = self.transfer_feed.send(Some(line));
+        // **同上**（`send` だと受け手 0 本で消えます）。転送の行も今日入れた分で、
+        // 同じ書き方をしていました。
+        self.transfer_feed.send_replace(Some(line));
     }
 
     /// 控え。**新しいものが後ろ。**
