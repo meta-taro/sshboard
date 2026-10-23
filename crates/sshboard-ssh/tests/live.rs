@@ -1067,3 +1067,114 @@ async fn an_authentication_that_fails_is_written_down() {
     );
     assert!(!all.contains(HOST), "記録に接続先が入っている\n{all}");
 }
+
+// --- sudo -S にパスワードが届くこと（実機の報告・2026-10-23）-----------------
+//
+// 実機（Windows）で `become = "ask"` が動きませんでした ——
+// 人が画面にパスワードを入れたのに、sudo は
+//
+// ```text
+// 残念、また試してください。
+// sudo: パスワードが与えられませんでした
+// sudo: 1 回パスワード試行を間違えました
+// ```
+//
+// **この 3 行は「空を食わせた」と「違う字を食わせた」で同じ**です
+// （engine.rs の注釈どおり）。経路を読むだけでは決着しません。
+//
+// `cat` へ食わせる試験は通っていました。**sudo へ食わせる試験は無かった。**
+// テスト用サーバーには**パスワード必須の sudo**（`pw`・`NOPASSWD` 無し）が
+// 在るので、**経路をそのまま再現します。**
+
+/// `pw` でパスワード認証して繋ぐ。**sudo はパスワードを求めます**（Dockerfile）。
+async fn as_pw() -> Option<SshSession> {
+    if !server_is_up().await {
+        println!("テスト用サーバーが建っていません（想定内・飛ばします）");
+        return None;
+    }
+    let fingerprint = known_fingerprint().await.clone();
+    let mut target = target(Some(&fingerprint));
+    target.user = "pw".into();
+    Some(
+        SshSession::connect(
+            &target,
+            &Auth::Password {
+                password: "sshboard-test-password".into(),
+            },
+            Band::new(),
+            &Diagnostics::new(),
+        )
+        .await
+        .expect("パスワードで繋がらない"),
+    )
+}
+
+#[tokio::test]
+async fn a_password_fed_on_stdin_reaches_sudo() {
+    // **本命。**人が入れた文字が、そのまま sudo に届くこと。
+    // 実機の症状がここで出るなら、SSH 層の問題。出ないなら上流。
+    let Some(session) = as_pw().await else { return };
+
+    // **実際の組み立てと同じ文字列**（`elevated(.., Ask)` が作るもの）。
+    // ここを手で書き換えると、実物と違うものを試すことになります。
+    let ran = session
+        .exec_with_stdin(
+            Actor::Ai,
+            "sudo -S -p '' id -u",
+            Some("sshboard-test-password\n"),
+        )
+        .await
+        .expect("コマンドが通らない");
+
+    assert_eq!(
+        ran.out.trim(),
+        "0",
+        "**root になれていません。**stdout={:?} stderr={:?}",
+        ran.out,
+        ran.err
+    );
+}
+
+#[tokio::test]
+async fn a_wrong_password_on_stdin_gives_the_three_lines() {
+    // **実機で出た 3 行を、こちらでも出す。**
+    // 「違う字を食わせた」側が本当にこの形になることを押さえておきます ——
+    // 診断の「秘密を渡しました」と合わせて読めば、**打ち間違いか経路か**が割れます。
+    let Some(session) = as_pw().await else { return };
+
+    let ran = session
+        .exec_with_stdin(
+            Actor::Ai,
+            "sudo -S -p '' id -u",
+            Some("this-is-not-the-password\n"),
+        )
+        .await
+        .expect("コマンド自体は返るはず（失敗で）");
+
+    assert_ne!(ran.out.trim(), "0", "違うパスワードで root になれている");
+    // 言語によって文言は変わるので、**どちらかの形**が在ればよい。
+    let said = ran.err.to_lowercase();
+    assert!(
+        said.contains("incorrect password")
+            || said.contains("間違え")
+            || said.contains("try again"),
+        "sudo の断りが出ていない: {:?}",
+        ran.err
+    );
+}
+
+#[tokio::test]
+async fn an_empty_stdin_does_not_hang_sudo() {
+    // **空で閉じれば、その場で落ちて返る**（engine.rs の前提）。
+    // ここが固まるなら、`-S` に空を渡す作りは成り立ちません。
+    let Some(session) = as_pw().await else { return };
+
+    let ran = tokio::time::timeout(
+        Duration::from_secs(20),
+        session.exec_with_stdin(Actor::Ai, "sudo -S -p '' id -u", Some("\n")),
+    )
+    .await
+    .expect("**空の入力で sudo が固まりました**")
+    .expect("コマンド自体は返るはず（失敗で）");
+    assert_ne!(ran.out.trim(), "0");
+}
