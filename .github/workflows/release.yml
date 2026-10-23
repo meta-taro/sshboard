@@ -394,15 +394,32 @@ jobs:
         run: |
           set -eu
           WANT="${TAG#v}"
-          # **一覧が落ちていても、ここで止めません。**
-          # 見えなかっただけで「載っていない」と決めると、二重に出します。
-          # 取れなかったら出さずに終わり、人へ渡します。
-          BODY="$(curl -fsS --max-time 20 \
-            'https://registry.modelcontextprotocol.io/v0/servers?search=sshboard' || true)"
+          # **見えなかっただけで「載っていない」と決めません。**
+          # 決めると二重に出します。だから読めるまでは出しません。
+          #
+          # **ただし、読めなかったら赤くします**（2026-10-23 に直した）。
+          # それまでは warning を出して `exit 0` でした ——
+          # **v0.1.25 で実際に 20 秒で timeout し、何もせずに緑で終わりました。**
+          # 緑を見た人は「出し直した」と読みます。
+          # **何もしていないことは、緑では伝わりません。**
+          #
+          # バイナリは前の job が既に添付しているので、ここが赤くても
+          # **配布物は失われません。**赤は「一覧だけ人が叩いてください」の合図です。
+          #
+          # 名前で絞ります（`search=sshboard` より軽い）。
+          BODY=""
+          for wait in 0 5 15; do
+            [ "$wait" = 0 ] || sleep "$wait"
+            BODY="$(curl -fsS --max-time 20 \
+              'https://registry.modelcontextprotocol.io/v0/servers?search=io.github.meta-taro/sshboard' \
+              || true)"
+            [ -n "$BODY" ] && break
+            echo "一覧が読めません。${wait} 秒おいて、もう一度試します"
+          done
           if [ -z "$BODY" ]; then
-            echo "::warning::一覧が読めませんでした。出し直しは行いません（人が叩いてください）"
-            echo "skip=true" >> "$GITHUB_OUTPUT"
-            exit 0
+            echo "::error::一覧が 3 回読めませんでした。**出し直していません。**"
+            echo "::error::人が叩いてください: mcp-publisher login github && mcp-publisher publish"
+            exit 1
           fi
           NOW="$(echo "$BODY" | jq -r \
             '.servers[] | select(.server.name=="io.github.meta-taro/sshboard")
