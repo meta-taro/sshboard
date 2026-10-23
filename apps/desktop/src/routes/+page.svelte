@@ -24,6 +24,8 @@
 	import DiagPanel from '$lib/components/DiagPanel.svelte';
 	import KeyHelpDialog from '$lib/components/KeyHelpDialog.svelte';
 	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
+	import TransferList from '$lib/components/TransferList.svelte';
+	import type { TransferLine } from '$lib/components/TransferList.svelte';
 	import OperationProposalDialog from '$lib/components/OperationProposalDialog.svelte';
 	import type { OperationProposal } from '$lib/components/OperationProposalDialog.svelte';
 	import { summarise } from '$lib/update/notes';
@@ -166,6 +168,15 @@
 	 * **AI の分も繋ぎ直しません。**
 	 */
 	let reopenAsk = $state<Reopen | null>(null);
+
+	/**
+	 * **転送の列**（UI 案・2 枚目）。**誰が動かしたかが行ごとに残ります。**
+	 *
+	 * 帯には 1 行の文字列として出ていましたが、**構造が無かった**ので
+	 * 向き・誰が・何を・何バイト・成否を並べて読めませんでした。
+	 * とくに**柵の外へ書こうとして断られたこと**が、帯の 1 行に埋もれていました。
+	 */
+	let transfers = $state<TransferLine[]>([]);
 
 	/** 控えにあった接続へ、1 本ずつ繋ぎ直す。**失敗は握り潰さない。** */
 	async function reopenThem(ids: readonly string[]) {
@@ -1055,6 +1066,12 @@
 		// **立ち上げ直したあと、1 回だけ聞く**（UI 案・5 枚目）。
 		// `take` は読んだら消すので、起動のたびに同じことを聞かれません。
 		reopenAsk = takeReopen();
+		// **起動直後の取りこぼし対策。**購読だけだと、前に動いた分が出ません。
+		invoke<TransferLine[]>('transfers_recent')
+			.then((lines) => {
+				transfers = lines;
+			})
+			.catch(() => {});
 
 		// **この帯が OS のタイトルバー**（D17）。最大化の状態を取り込む。
 		titlebar.init();
@@ -1102,6 +1119,10 @@
 				operationProposal = asked;
 			})
 			.catch(() => {});
+		listen<TransferLine>('transfer://line', (event) => {
+			// **上限は Rust 側が持っています**（200 件）。ここでは足すだけ。
+			transfers = [...transfers, event.payload];
+		}).then((off) => stops.push(off));
 		listen<OperationProposal | null>('operation://proposal', (event) => {
 			operationProposal = event.payload;
 		}).then((off) => stops.push(off));
@@ -2139,6 +2160,11 @@
 		</section>
 	{:else if view === 'files'}
 		<FileBrowser />
+		<!--
+			**転送の列**（UI 案・2 枚目）。案はファイルの面の下に置きました ——
+			**動かした所のすぐ下**で読めることが要点です。
+		-->
+		<TransferList lines={transfers} />
 	{:else if view === 'connections'}
 		<ConnectionManager />
 	{:else if view === 'diag'}

@@ -24,6 +24,7 @@ use tokio::time::{Duration, Instant};
 use crate::console::{Ambiguous, ConsoleFacts, ConsoleRequest, Consoles};
 use crate::error::EngineError;
 use crate::open::{Opened, WriteAccess};
+use crate::transfers::{Direction, Outcome, Transfer, Transfers};
 
 /// OS ストアの区分名。**接続一覧には参照名しか置かない**（D11）。
 const KEYRING_SERVICE: &str = "sshboard";
@@ -247,6 +248,13 @@ pub struct Engine {
     operation_request: watch::Sender<Option<OperationAsk>>,
     /// **AI が出した提案**（実運用の報告・2026-10-23）。登録は人がします。
     operation_proposal: watch::Sender<Option<OperationProposal>>,
+    /// **誰が何を動かしたか**（UI 案・2 枚目「転送」）。
+    ///
+    /// 帯には 1 行の文字列として出ていましたが、**構造として持っていなかった**ので
+    /// 画面に列を出せませんでした。柵の外へ書こうとして断られたことも、
+    /// 帯の 1 行に埋もれていました。
+    transfers: Mutex<Transfers>,
+    transfer_feed: watch::Sender<Option<Transfer>>,
     /// **人が出した許可の札**（未使用のもの）。走るときに 1 枚取り出して消えます。
     ///
     /// **走った回数と同じ入れ物にしません。**同じにしていたせいで、
@@ -291,6 +299,7 @@ impl Engine {
         let (host_key_request, _) = watch::channel(None);
         let (operation_request, _) = watch::channel(None);
         let (operation_proposal, _) = watch::channel(None);
+        let (transfer_feed, _) = watch::channel(None);
         Self {
             band,
             diag,
@@ -307,6 +316,8 @@ impl Engine {
             host_key_request,
             operation_request,
             operation_proposal,
+            transfers: Mutex::new(Transfers::new()),
+            transfer_feed,
             operation_approvals: Mutex::new(Vec::new()),
             operation_runs: Mutex::new(Vec::new()),
             changed,
@@ -2409,7 +2420,54 @@ impl Engine {
         path: &str,
         bytes: &[u8],
     ) -> Result<u64, EngineError> {
-        Ok(self.session().await?.upload(actor, path, bytes).await?)
+        let session = self.session().await?;
+        match session.upload(actor, path, bytes).await {
+            Ok(written) => {
+                self.note_transfer(actor, Direction::Up, path, written, Outcome::Done)
+                    .await;
+                Ok(written)
+            }
+            Err(error) => {
+                // **止めたことを残す。**それまでは帯の 1 行に埋もれていて、
+                // **柵の外へ書こうとして断られたことが、並べて読めませんでした。**
+                self.note_transfer(
+                    actor,
+                    Direction::Up,
+                    path,
+                    0,
+                    Outcome::Refused {
+                        why: error.to_string(),
+                    },
+                )
+                .await;
+                Err(error.into())
+            }
+        }
+    }
+
+    /// 1 件控える。**中身も秘密も持ちません**（名前と大きさだけ）。
+    async fn note_transfer(
+        &self,
+        actor: Actor,
+        direction: Direction,
+        what: &str,
+        bytes: u64,
+        outcome: Outcome,
+    ) {
+        let line = {
+            let mut held = self.transfers.lock().await;
+            held.record(actor, direction, what, bytes, outcome)
+        };
+        let _ = self.transfer_feed.send(Some(line));
+    }
+
+    /// 控え。**新しいものが後ろ。**
+    pub async fn transfers(&self) -> Vec<Transfer> {
+        self.transfers.lock().await.all()
+    }
+
+    pub fn subscribe_transfers(&self) -> watch::Receiver<Option<Transfer>> {
+        self.transfer_feed.subscribe()
     }
 
     /// 手元のファイルを 1 つ上げる。
@@ -2454,7 +2512,10 @@ impl Engine {
         tokio::fs::write(local, &bytes)
             .await
             .map_err(|error| EngineError::Local(format!("{}: {error}", local.display())))?;
-        Ok(bytes.len() as u64)
+        let written = bytes.len() as u64;
+        self.note_transfer(actor, Direction::Down, remote, written, Outcome::Done)
+            .await;
+        Ok(written)
     }
 
     // --- 接続一覧 -----------------------------------------------------------

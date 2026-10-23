@@ -117,6 +117,7 @@ pub fn run() {
             session_cmd::console_request,
             session_cmd::operation_request,
             session_cmd::operation_proposal,
+            session_cmd::transfers_recent,
             session_cmd::operation_register,
             session_cmd::operation_dismiss,
             session_cmd::operation_answer,
@@ -211,6 +212,7 @@ pub fn run() {
             // **走らせてよいかを人へ問う**（D45 / D47）。
             session_cmd::spawn_operation_bridge(app.handle().clone(), Arc::clone(&engine));
             session_cmd::spawn_proposal_bridge(app.handle().clone(), Arc::clone(&engine));
+            session_cmd::spawn_transfer_bridge(app.handle().clone(), Arc::clone(&engine));
 
             mcp_host::spawn(
                 app.handle().clone(),

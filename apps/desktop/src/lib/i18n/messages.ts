@@ -7,6 +7,15 @@
 
 const en = {
 
+	// **転送の列**（UI 案・2 枚目）。**誰が動かしたかが行ごとに残る。**
+	// 止めたことが見えないと、人は「動いた」と思って次へ進む。
+	'transfer.label': 'Transfers',
+	'transfer.what': 'Who moved what stays on every line.',
+	'transfer.empty': 'Nothing has moved yet.',
+	'transfer.refused': 'Stopped',
+	'transfer.up': 'Upload',
+	'transfer.down': 'Download',
+
 	// **立ち上げ直したあと、開いていた接続へ繋ぎ直すかを聞く**（UI 案・5 枚目）。
 	// **勝手には繋ぎません** —— 人が見ていない所で SSH が開くのを作らない（禁止事項 3）。
 	'reopen.title': 'Reconnect?',
@@ -333,6 +342,15 @@ export type MessageKey = keyof typeof en;
 type Catalog = Partial<Record<MessageKey, string>>;
 
 const ja: Catalog = {
+
+	// **転送の列**（UI 案・2 枚目）。**誰が動かしたかが行ごとに残る。**
+	// 止めたことが見えないと、人は「動いた」と思って次へ進む。
+	'transfer.label': '転送',
+	'transfer.what': '誰が動かしたかが行ごとに残ります。',
+	'transfer.empty': 'まだ何も動かしていません。',
+	'transfer.refused': '止めました',
+	'transfer.up': '上げる',
+	'transfer.down': '落とす',
 
 	// **立ち上げ直したあと、開いていた接続へ繋ぎ直すかを聞く**（UI 案・5 枚目）。
 	// **勝手には繋ぎません** —— 人が見ていない所で SSH が開くのを作らない（禁止事項 3）。

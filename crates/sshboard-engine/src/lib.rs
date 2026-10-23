@@ -10,15 +10,16 @@
 //! - **手元へ落とす側**（`download_file`）に囲いはかかりません。守る相手が
 //!   サーバーではなく手元なので、**黙って上書きしない**ことで守ります。
 
+mod console;
+mod engine;
+mod error;
+mod open;
 /// 端末を**番号で**持つ入れ物と、誰が握るかの規則（D29 / D42 / D60）。
 ///
 /// **規則だけを分けてあります。**SSH を要らないので、
 /// **サーバーが無くても確かめられます**（D29 の「人の解除が常に勝つ」は
 /// 繋がっていなくても成り立つ話です）。
-mod console;
-mod engine;
-mod error;
-mod open;
+pub mod transfers;
 
 /// 用途別ツールが打つコマンド（D3）。
 ///
@@ -33,6 +34,7 @@ pub use engine::{
 };
 pub use error::EngineError;
 pub use open::{Opened, WriteAccess};
+pub use transfers::{Direction, Outcome, Transfer, Transfers};
 
 pub use sshboard_ssh::{DirEntry, FileFacts, Ran};
 

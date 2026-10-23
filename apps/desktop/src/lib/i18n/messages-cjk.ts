@@ -5,6 +5,15 @@ type Catalog = Partial<Record<MessageKey, string>>;
 
 export const ko: Catalog = {
 
+	// **転送の列**（UI 案・2 枚目）。**誰が動かしたかが行ごとに残る。**
+	// 止めたことが見えないと、人は「動いた」と思って次へ進む。
+	'transfer.label': '전송',
+	'transfer.what': '누가 옮겼는지가 줄마다 남습니다.',
+	'transfer.empty': '아직 아무것도 옮기지 않았습니다.',
+	'transfer.refused': '중지했습니다',
+	'transfer.up': '올리기',
+	'transfer.down': '내리기',
+
 	// **立ち上げ直したあと、開いていた接続へ繋ぎ直すかを聞く**（UI 案・5 枚目）。
 	// **勝手には繋ぎません** —— 人が見ていない所で SSH が開くのを作らない（禁止事項 3）。
 	'reopen.title': '다시 연결할까요?',
@@ -292,6 +301,15 @@ export const ko: Catalog = {
 
 export const zhCN: Catalog = {
 
+	// **転送の列**（UI 案・2 枚目）。**誰が動かしたかが行ごとに残る。**
+	// 止めたことが見えないと、人は「動いた」と思って次へ進む。
+	'transfer.label': '传输',
+	'transfer.what': '每一行都留下是谁搬动的。',
+	'transfer.empty': '还没有搬动任何东西。',
+	'transfer.refused': '已阻止',
+	'transfer.up': '上传',
+	'transfer.down': '下载',
+
 	// **立ち上げ直したあと、開いていた接続へ繋ぎ直すかを聞く**（UI 案・5 枚目）。
 	// **勝手には繋ぎません** —— 人が見ていない所で SSH が開くのを作らない（禁止事項 3）。
 	'reopen.title': '要重新连接吗？',
@@ -578,6 +596,15 @@ export const zhCN: Catalog = {
 };
 
 export const zhTW: Catalog = {
+
+	// **転送の列**（UI 案・2 枚目）。**誰が動かしたかが行ごとに残る。**
+	// 止めたことが見えないと、人は「動いた」と思って次へ進む。
+	'transfer.label': '傳輸',
+	'transfer.what': '每一行都留下是誰搬動的。',
+	'transfer.empty': '還沒有搬動任何東西。',
+	'transfer.refused': '已阻止',
+	'transfer.up': '上傳',
+	'transfer.down': '下載',
 
 	// **立ち上げ直したあと、開いていた接続へ繋ぎ直すかを聞く**（UI 案・5 枚目）。
 	// **勝手には繋ぎません** —— 人が見ていない所で SSH が開くのを作らない（禁止事項 3）。

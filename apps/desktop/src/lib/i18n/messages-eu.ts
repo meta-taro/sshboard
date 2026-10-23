@@ -5,6 +5,15 @@ type Catalog = Partial<Record<MessageKey, string>>;
 
 export const de: Catalog = {
 
+	// **転送の列**（UI 案・2 枚目）。**誰が動かしたかが行ごとに残る。**
+	// 止めたことが見えないと、人は「動いた」と思って次へ進む。
+	'transfer.label': 'Übertragungen',
+	'transfer.what': 'Wer was bewegt hat, bleibt in jeder Zeile.',
+	'transfer.empty': 'Noch nichts bewegt.',
+	'transfer.refused': 'Gestoppt',
+	'transfer.up': 'Hochladen',
+	'transfer.down': 'Herunterladen',
+
 	// **立ち上げ直したあと、開いていた接続へ繋ぎ直すかを聞く**（UI 案・5 枚目）。
 	// **勝手には繋ぎません** —— 人が見ていない所で SSH が開くのを作らない（禁止事項 3）。
 	'reopen.title': 'Neu verbinden?',
@@ -292,6 +301,15 @@ export const de: Catalog = {
 
 export const fr: Catalog = {
 
+	// **転送の列**（UI 案・2 枚目）。**誰が動かしたかが行ごとに残る。**
+	// 止めたことが見えないと、人は「動いた」と思って次へ進む。
+	'transfer.label': 'Transferts',
+	'transfer.what': 'Qui a déplacé quoi reste sur chaque ligne.',
+	'transfer.empty': 'Rien n’a encore été déplacé.',
+	'transfer.refused': 'Arrêté',
+	'transfer.up': 'Envoi',
+	'transfer.down': 'Téléchargement',
+
 	// **立ち上げ直したあと、開いていた接続へ繋ぎ直すかを聞く**（UI 案・5 枚目）。
 	// **勝手には繋ぎません** —— 人が見ていない所で SSH が開くのを作らない（禁止事項 3）。
 	'reopen.title': 'Se reconnecter ?',
@@ -578,6 +596,15 @@ export const fr: Catalog = {
 };
 
 export const es: Catalog = {
+
+	// **転送の列**（UI 案・2 枚目）。**誰が動かしたかが行ごとに残る。**
+	// 止めたことが見えないと、人は「動いた」と思って次へ進む。
+	'transfer.label': 'Transferencias',
+	'transfer.what': 'Quién movió qué queda en cada línea.',
+	'transfer.empty': 'Todavía no se movió nada.',
+	'transfer.refused': 'Detenido',
+	'transfer.up': 'Subir',
+	'transfer.down': 'Bajar',
 
 	// **立ち上げ直したあと、開いていた接続へ繋ぎ直すかを聞く**（UI 案・5 枚目）。
 	// **勝手には繋ぎません** —— 人が見ていない所で SSH が開くのを作らない（禁止事項 3）。

@@ -699,6 +699,85 @@ pub fn spawn_operation_bridge(app: AppHandle, engine: Arc<Engine>) {
     });
 }
 
+// --- 転送の列（UI 案・2 枚目） ------------------------------------------------
+
+/// 1 行を画面へ渡すイベント。
+pub const TRANSFER_EVENT: &str = "transfer://line";
+
+/// 画面へ渡す 1 件。
+///
+/// **`Actor` と `Direction` を文字へ直すのはここ**です ——
+/// エンジンの型に serde を付けると、**エンジンが画面の都合を知る**ことになります
+/// （`sshboard-band` の `Actor` と同じ立場）。
+#[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct TransferLine {
+    pub seq: u64,
+    /// `"human"` か `"ai"`。**ここが列の値打ち。**
+    pub actor: &'static str,
+    /// `"up"` か `"down"`。
+    pub direction: &'static str,
+    pub what: String,
+    pub bytes: u64,
+    /// `"done"` か `"refused"`。
+    pub outcome: &'static str,
+    /// 止めた理由。**「止めました」だけでは、人は次に何をすればいいか分かりません。**
+    pub why: Option<String>,
+}
+
+impl From<sshboard_engine::Transfer> for TransferLine {
+    fn from(line: sshboard_engine::Transfer) -> Self {
+        use sshboard_engine::{Direction, Outcome};
+        let (outcome, why) = match line.outcome {
+            Outcome::Done => ("done", None),
+            Outcome::Refused { why } => ("refused", Some(why)),
+        };
+        Self {
+            seq: line.seq,
+            actor: match line.actor {
+                Actor::Human => "human",
+                Actor::Ai => "ai",
+            },
+            direction: match line.direction {
+                Direction::Up => "up",
+                Direction::Down => "down",
+            },
+            what: line.what,
+            bytes: line.bytes,
+            outcome,
+            why,
+        }
+    }
+}
+
+/// いままでの転送。**起動直後の取りこぼし対策。**
+#[tauri::command]
+pub async fn transfers_recent(engine: State<'_, Arc<Engine>>) -> Result<Vec<TransferLine>, String> {
+    // **`Result` で返します。**参照を受ける `async` の命令は、
+    // Tauri の決まりで `Result` でないと組み立てられません。
+    Ok(engine
+        .transfers()
+        .await
+        .into_iter()
+        .map(TransferLine::from)
+        .collect())
+}
+
+/// 1 行ずつ画面へ押し出す。
+pub fn spawn_transfer_bridge(app: AppHandle, engine: Arc<Engine>) {
+    tauri::async_runtime::spawn(async move {
+        let mut watching = engine.subscribe_transfers();
+        while watching.changed().await.is_ok() {
+            let line: Option<TransferLine> = watching.borrow().clone().map(TransferLine::from);
+            if let Some(line) = line {
+                if let Err(error) = app.emit(TRANSFER_EVENT, line) {
+                    eprintln!("[sshboard] 転送の行を画面へ渡せません: {error}");
+                }
+            }
+        }
+    });
+}
+
 /// **AI が出した提案**を画面へ渡すイベント（実運用の報告・2026-10-23）。
 pub const OPERATION_PROPOSAL_EVENT: &str = "operation://proposal";
 
