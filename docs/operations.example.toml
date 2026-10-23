@@ -1,0 +1,123 @@
+# 操作のひな型。**これは棚で、既定ではありません。**
+#
+# sshboard は `operations.toml` を**既定で 1 本も持ちません**（D3 / D45）。
+# AI が渡せるのは `id` だけで、**走るのは、あなたがここへ書いた文字列そのもの**です。
+# AI には組み立てる余地がありません。
+#
+# ## 使い方
+#
+# 1. このファイルの中から、**使うものだけ**を写す
+# 2. 写す先は、断りの文に出る `operations.toml`（絶対パスで出ます）
+# 3. **`run` を自分のサーバーに合わせて直す。**ここの道は一般的な例です
+#
+# **写した瞬間から AI が走らせられるようになります。**ただし 1 回目は必ず
+# 承認の問いが立ち、**実際に打つ文字列がそのまま画面に出ます**（D42）。
+# 回数は `max_per_hour` で止まります。
+#
+# ## 入れられないもの
+#
+# 書いても弾かれます（D47）—— 檻そのもの（`sudoers` / `authorized_keys`）、
+# 鍵（`.ssh` / `id_ed25519`）、sshboard 自身の設定、`/etc/shadow`、
+# 利用者とロール（`useradd` など）、壊すもの（`mkfs` / `dd ` / `rm -rf`）。
+# **設定では有効にできません。**
+#
+# ## 権限の上げ方は別に決めます
+#
+# `sudo` で始まるものは、接続ごとの `become` の設定で形が変わります（D48）——
+# `sudoers` なら `sudo -n`、`ask` ならその場でパスワードを聞きます。
+# **`become` を書いていなければ `sudo` はそのまま打たれ、端末が無いので固まります。**
+# 先に接続の側を決めてください。
+
+version = 1
+
+
+# --- 設定を触る前に、戻せるようにする ---------------------------------------
+#
+# **最初に入れるのはこれです。**直す操作より先に、戻す道を作ります。
+# `date` はサーバー側で展開されるので、**写しの名前に日付が入ります。**
+
+[[operation]]
+id = "backup-httpd-conf"
+run = "sudo cp -a /etc/httpd/conf.d /etc/httpd/conf.d.$(date +%Y%m%d-%H%M%S)"
+description = "Apache の conf.d を日付付きで控える（上書きしない）"
+max_per_hour = 4
+
+
+# --- 設定が壊れていないか、当てる前に確かめる -------------------------------
+#
+# **`reload` の前に必ずこれを通します。**壊れた設定で reload すると、
+# 直すまでサイトが落ちます。
+
+[[operation]]
+id = "httpd-configtest"
+run = "sudo apachectl configtest"
+description = "Apache の設定を読んで、文法を確かめるだけ（当てません）"
+max_per_hour = 20
+
+
+# --- 読み直させる（止めない） -----------------------------------------------
+#
+# `restart` ではなく `reload` です。**つながっている人を切りません。**
+
+[[operation]]
+id = "httpd-reload"
+run = "sudo systemctl reload httpd"
+description = "Apache に設定を読み直させる（無停止・configtest を先に通すこと）"
+max_per_hour = 6
+
+
+# --- 証明書を取り直す / 名前を足す ------------------------------------------
+#
+# **`--dry-run` を別の id にしてあります。**本番の取得は回数制限が厳しく、
+# 試しと本番を同じ id にすると、**試したつもりで本番の枠を使います。**
+
+[[operation]]
+id = "certbot-renew-dry-run"
+run = "sudo certbot renew --dry-run"
+description = "証明書の更新を、実際には取らずに試す"
+max_per_hour = 4
+
+[[operation]]
+id = "certbot-expand-www"
+run = "sudo certbot certonly --webroot -w /var/www/html -d example.com -d www.example.com --expand --non-interactive --agree-tos"
+description = "証明書に名前を足して取り直す（-d を自分のものへ直すこと）"
+max_per_hour = 2
+
+
+# --- 当たっているものを読む（走らせずに確かめる） ---------------------------
+#
+# **これは読み取りなので `readonly.toml` の側でも書けます。**
+# ただし操作の前後で同じ id を使えると、**何が変わったかを並べて読めます。**
+
+[[operation]]
+id = "httpd-vhosts"
+run = "sudo apachectl -S"
+description = "Apache がいま認識している vhost の一覧を出す"
+max_per_hour = 20
+
+[[operation]]
+id = "certbot-certificates"
+run = "sudo certbot certificates"
+description = "いま入っている証明書と、含まれている名前を出す"
+max_per_hour = 20
+
+
+# --- nginx を使っている場合 -------------------------------------------------
+
+[[operation]]
+id = "backup-nginx-conf"
+run = "sudo cp -a /etc/nginx/conf.d /etc/nginx/conf.d.$(date +%Y%m%d-%H%M%S)"
+description = "nginx の conf.d を日付付きで控える（上書きしない）"
+max_per_hour = 4
+
+[[operation]]
+id = "nginx-configtest"
+run = "sudo nginx -t"
+description = "nginx の設定を読んで、文法を確かめるだけ（当てません）"
+max_per_hour = 20
+
+[[operation]]
+id = "nginx-reload"
+run = "sudo systemctl reload nginx"
+description = "nginx に設定を読み直させる（無停止・-t を先に通すこと）"
+max_per_hour = 6

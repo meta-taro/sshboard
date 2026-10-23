@@ -129,3 +129,98 @@ fn the_same_id_cannot_be_written_twice() {
         "同じ id を 2 つ通している: {refused:?}"
     );
 }
+
+/// **同梱したひな型が、実際に通ること**（実運用の報告・2026-10-23）。
+///
+/// `docs/operations.example.toml` は「使うものだけ写してください」という棚です。
+/// **手で書いた TOML が `parse` を通らなければ、棚として役に立ちません** ——
+/// 写した人が「書いたのに断られる」に当たり、
+/// **原因が写し元の書き間違いだと誰も気づけません。**
+///
+/// 本番で起きたのは、書く場所が分からず**画面の外で操作した**ことでした。
+/// 棚を置く以上、**その棚が壊れていないこと**は機械が見ます。
+#[test]
+fn the_shipped_examples_actually_parse() {
+    let path =
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../docs/operations.example.toml");
+    let text = std::fs::read_to_string(&path)
+        .unwrap_or_else(|error| panic!("{} が読めません: {error}", path.display()));
+
+    let parsed = Operations::parse(&text).expect("同梱したひな型が通らない");
+
+    // **空として通っていないこと。**0 件でも `parse` は通るので、数えます。
+    assert!(
+        parsed.all().len() >= 8,
+        "ひな型が少なすぎます（{} 件）—— 読み方が壊れている可能性",
+        parsed.all().len()
+    );
+}
+
+/// **ひな型に、戻す道が入っていること。**
+///
+/// 直す操作だけを並べると、**人は戻せないまま当てます。**
+/// 本番で必要だった 4 つのうち、最初が「conf を日付付きでバックアップ」でした。
+#[test]
+fn the_examples_include_a_way_back() {
+    let path =
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../docs/operations.example.toml");
+    let text = std::fs::read_to_string(&path).expect("読めない");
+    let parsed = Operations::parse(&text).expect("通らない");
+
+    assert!(
+        parsed.all().iter().any(|op| op.id.starts_with("backup-")),
+        "控えを取る操作が入っていません"
+    );
+}
+
+/// **試しと本番を同じ id にしていないこと。**
+///
+/// certbot の本番取得は回数制限が厳しく、同じ id だと
+/// **試したつもりで本番の枠を使います。**
+#[test]
+fn the_examples_keep_the_dry_run_apart() {
+    let path =
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../docs/operations.example.toml");
+    let text = std::fs::read_to_string(&path).expect("読めない");
+    let parsed = Operations::parse(&text).expect("通らない");
+
+    let dry = parsed
+        .all()
+        .iter()
+        .find(|op| op.run.contains("--dry-run"))
+        .expect("試しの操作が無い");
+    let real = parsed
+        .all()
+        .iter()
+        .find(|op| op.run.contains("certonly"))
+        .expect("本番の操作が無い");
+
+    assert_ne!(dry.id, real.id, "試しと本番が同じ id になっています");
+}
+
+/// **ひな型が、踏ませないものを含んでいないこと。**
+///
+/// `parse` が弾くので通らないはずですが、**棚に書いてあるだけで
+/// 人は写します。**写してから弾かれるのは、置いた側の落ち度です。
+#[test]
+fn the_examples_contain_nothing_that_is_never_allowed() {
+    let path =
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../docs/operations.example.toml");
+    let text = std::fs::read_to_string(&path).expect("読めない");
+
+    // `parse` が通っている＝NEVER を含まない、が成り立つ。
+    // ここでは**注記の中**も見ます（人は注記からも写します）。
+    for word in ["rm -rf", "mkfs", "id_ed25519", "authorized_keys"] {
+        for line in text.lines() {
+            let line = line.trim_start();
+            // 「入れられないもの」の説明行は除く。
+            if line.starts_with('#') {
+                continue;
+            }
+            assert!(
+                !line.contains(word),
+                "ひな型の中身に `{word}` が入っています: {line}"
+            );
+        }
+    }
+}
