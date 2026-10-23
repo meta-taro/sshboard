@@ -3,6 +3,7 @@
 //! **GUI と MCP が同じプロセスに同居する**（decisions D8 / D15）。
 //! 裏で見えないセッションを 1 本も増やさないための前提（PRD §4-1）。
 
+mod allowlist_cmd;
 mod bridge;
 mod bundle_cmd;
 mod capture;
@@ -89,6 +90,7 @@ pub fn run() {
             connections_cmd::connection_has_password,
             connections_cmd::connections_list,
             connections_cmd::ssh_config_candidates,
+            allowlist_cmd::allowlist_overview,
             connections_cmd::connections_path,
             connections_cmd::connection_save,
             connections_cmd::connection_delete,

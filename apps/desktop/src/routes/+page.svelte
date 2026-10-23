@@ -22,6 +22,9 @@
 	import BandPanel from '$lib/components/BandPanel.svelte';
 	import ConnectionRail from '$lib/components/ConnectionRail.svelte';
 	import DiagPanel from '$lib/components/DiagPanel.svelte';
+	import AllowlistDialog, {
+		type AllowedList
+	} from '$lib/components/AllowlistDialog.svelte';
 	import KeyHelpDialog from '$lib/components/KeyHelpDialog.svelte';
 	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
 	import TransferList from '$lib/components/TransferList.svelte';
@@ -201,6 +204,30 @@
 	 * `F1` と、ヘッダーの［?］で開きます。
 	 */
 	let keyHelpOpen = $state(false);
+	/**
+	 * **AI が走らせられることの一覧**（2026-10-23）。
+	 *
+	 * **人だけが見られませんでした** —— 実行体は両方のファイルを読めて、
+	 * AI も `list_operations` で読めるのに、画面へ出す口がありませんでした。
+	 * 本番で詰まったのはここで、**人は書く場所を探して見つけられませんでした。**
+	 */
+	type AllowlistOverview = { reading: AllowedList; changing: AllowedList };
+	let allowlist = $state<AllowlistOverview | null>(null);
+	let allowlistOpen = $state(false);
+
+	async function openAllowlist() {
+		viewMenuOpen = false;
+		// **開くたびに読み直します。**人が外でファイルを書き換えた直後に
+		// 開くのが、まさにこの面の使い所です（D59 と同じ考え）。
+		try {
+			allowlist = await invoke<AllowlistOverview>('allowlist_overview');
+			allowlistOpen = true;
+		} catch (error: unknown) {
+			// **握り潰さない。**開かない理由が分からないと、人は製品の外で直します。
+			failure = String(error);
+		}
+	}
+
 
 	/** 画面ぜんたいのキー操作を実行する（判定は `app-keys.ts`）。 */
 	function runApp(intent: NonNullable<ReturnType<typeof appIntent>>) {
@@ -1487,6 +1514,14 @@
 							<button type="button" onclick={() => { viewMenuOpen = false; humanShows('diag'); }}>
 								{i18n.t('tab.diag')}
 							</button>
+							<!--
+								**AI が何を走らせられるか**（2026-10-23）。
+								本番で、人は書く場所を探して見つけられませんでした ——
+								**置き場と中身が見える所**をここに置きます。
+							-->
+							<button type="button" onclick={() => void openAllowlist()}>
+								{i18n.t('allow.title')}
+							</button>
 							<button type="button" onclick={() => { viewMenuOpen = false; aboutOpen = true; }}>
 								{i18n.t('about.title')}
 							</button>
@@ -1881,6 +1916,14 @@
 	-->
 	{#if keyHelpOpen}
 		<KeyHelpDialog {platform} onclose={() => (keyHelpOpen = false)} />
+	{/if}
+
+	{#if allowlistOpen && allowlist !== null}
+		<AllowlistDialog
+			reading={allowlist.reading}
+			changing={allowlist.changing}
+			onclose={() => (allowlistOpen = false)}
+		/>
 	{/if}
 
 	<!--

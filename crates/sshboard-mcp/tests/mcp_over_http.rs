@@ -260,7 +260,24 @@ async fn the_server_advertises_only_the_phase_zero_tools() {
     // 「AI の書き込みを囲いの外へ出さない」（D22）以前の話として、
     // **AI が触ってよいものではありません。**
     // 手元へ落とす口を渡さない（D27）のと同じ理由です。
+    // **画面にしか置かない口**（2026-10-23）。
+    //
+    // `ssh_config_candidates` —— `~/.ssh/config` は**接続先そのものの一覧**で、
+    // 人が繋いでいない所まで全部並んでいます（禁止事項 4 / D11）。
+    // AI が読めると、`list_connections` が「識別子だけを返す」と決めた意味が薄れます。
+    //
+    // `allowlist_overview` —— AI は既に `list_operations` /
+    // `list_readonly_commands` で読めます。**同じ物を 2 つの口から出すと、
+    // どちらを直したか分からなくなります。**
+    //
+    // **ここで見張ります。**画面側の見張りは**空振りしました**（2026-10-23）——
+    // `import.meta.glob('../**/*.{svelte,ts}')` は `apps/desktop/src` だけを拾い、
+    // **Rust を 1 つも見ていなかった**のに緑でした（0 件の配列を回って通る）。
+    // **この試験は本物の一覧を見ます。**
     for forbidden in [
+        "ssh_config_candidates",
+        "ssh_config",
+        "allowlist_overview",
         "bundle_export",
         "bundle_import",
         "export_connections",
@@ -269,7 +286,7 @@ async fn the_server_advertises_only_the_phase_zero_tools() {
         let as_name = format!("\"name\":\"{forbidden}\"");
         assert!(
             !listed.contains(&as_name),
-            "接続情報を持ち出す口が生えている（{forbidden}）: {listed}"
+            "画面にしか置かない口が AI へ出ている（{forbidden}）: {listed}"
         );
     }
 

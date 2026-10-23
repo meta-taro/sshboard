@@ -13,6 +13,13 @@ export const de: Catalog = {
 	'conn.import.none': 'In ~/.ssh/config ist nichts zu lesen.',
 	'conn.import.add': 'Hinzufügen',
 	'conn.import.here': 'Schon eingetragen',
+	'allow.title': 'Was die KI ausführen darf',
+	'allow.note': 'Es läuft nur, was in diesen Dateien steht. Voreingestellt ist leer — bleibt es leer, führt die KI nichts aus. Diese Ansicht führt nichts aus.',
+	'allow.reading': 'Nur lesen (readonly.toml)',
+	'allow.changing': 'Ändert den Zustand (operations.toml)',
+	'allow.where': 'Liegt in',
+	'allow.empty': 'Hier steht nichts, also kann die KI nichts ausführen.',
+	'allow.ceiling': 'bis zu {count} pro Stunde',
 
 	// **転送の列**（UI 案・2 枚目）。**誰が動かしたかが行ごとに残る。**
 	// 止めたことが見えないと、人は「動いた」と思って次へ進む。
@@ -318,6 +325,13 @@ export const fr: Catalog = {
 	'conn.import.none': 'Rien à lire dans ~/.ssh/config.',
 	'conn.import.add': 'Ajouter',
 	'conn.import.here': 'Déjà enregistré',
+	'allow.title': "Ce que l'IA peut exécuter",
+	'allow.note': "Seul ce qui est écrit dans ces fichiers s'exécute. Par défaut, ils sont vides : tant qu'ils le restent, l'IA n'exécute rien. Cet écran n'exécute rien.",
+	'allow.reading': 'Lecture seule (readonly.toml)',
+	'allow.changing': "Modifie l'état (operations.toml)",
+	'allow.where': 'Emplacement',
+	'allow.empty': "Rien n'y est écrit, donc l'IA ne peut rien exécuter.",
+	'allow.ceiling': "jusqu'à {count} par heure",
 
 	// **転送の列**（UI 案・2 枚目）。**誰が動かしたかが行ごとに残る。**
 	// 止めたことが見えないと、人は「動いた」と思って次へ進む。
@@ -623,6 +637,13 @@ export const es: Catalog = {
 	'conn.import.none': 'No hay nada que leer en ~/.ssh/config.',
 	'conn.import.add': 'Añadir',
 	'conn.import.here': 'Ya registrado',
+	'allow.title': 'Lo que la IA puede ejecutar',
+	'allow.note': 'Solo se ejecuta lo escrito en estos archivos. Por omisión están vacíos: si siguen vacíos, la IA no ejecuta nada. Esta pantalla no ejecuta nada.',
+	'allow.reading': 'Solo lectura (readonly.toml)',
+	'allow.changing': 'Cambia el estado (operations.toml)',
+	'allow.where': 'Ubicación',
+	'allow.empty': 'No hay nada escrito, así que la IA no puede ejecutar nada.',
+	'allow.ceiling': 'hasta {count} por hora',
 
 	// **転送の列**（UI 案・2 枚目）。**誰が動かしたかが行ごとに残る。**
 	// 止めたことが見えないと、人は「動いた」と思って次へ進む。

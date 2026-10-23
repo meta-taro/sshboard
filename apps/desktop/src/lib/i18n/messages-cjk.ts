@@ -13,6 +13,13 @@ export const ko: Catalog = {
 	'conn.import.none': '~/.ssh/config 에서 읽을 것이 없습니다.',
 	'conn.import.add': '추가',
 	'conn.import.here': '이미 등록됨',
+	'allow.title': 'AI가 실행할 수 있는 것',
+	'allow.note': '이 파일에 적은 것만 실행됩니다. 기본값은 비어 있으므로, 비어 있으면 AI는 아무것도 실행할 수 없습니다. 이 화면은 아무것도 실행하지 않습니다.',
+	'allow.reading': '읽기만 (readonly.toml)',
+	'allow.changing': '상태를 바꿈 (operations.toml)',
+	'allow.where': '위치',
+	'allow.empty': '아무것도 적혀 있지 않습니다. AI는 아무것도 실행할 수 없습니다.',
+	'allow.ceiling': '1시간에 {count}회까지',
 
 	// **転送の列**（UI 案・2 枚目）。**誰が動かしたかが行ごとに残る。**
 	// 止めたことが見えないと、人は「動いた」と思って次へ進む。
@@ -318,6 +325,13 @@ export const zhCN: Catalog = {
 	'conn.import.none': '~/.ssh/config 中没有可读取的内容。',
 	'conn.import.add': '添加',
 	'conn.import.here': '已登记',
+	'allow.title': 'AI 可以运行的内容',
+	'allow.note': '只有写在这些文件里的才会运行。默认为空，所以留空时 AI 一条也运行不了。本页面不运行任何内容。',
+	'allow.reading': '只读（readonly.toml）',
+	'allow.changing': '改变状态（operations.toml）',
+	'allow.where': '存放位置',
+	'allow.empty': '一条也没有写。AI 一条也运行不了。',
+	'allow.ceiling': '每小时最多 {count} 次',
 
 	// **転送の列**（UI 案・2 枚目）。**誰が動かしたかが行ごとに残る。**
 	// 止めたことが見えないと、人は「動いた」と思って次へ進む。
@@ -623,6 +637,13 @@ export const zhTW: Catalog = {
 	'conn.import.none': '~/.ssh/config 中沒有可讀取的內容。',
 	'conn.import.add': '新增',
 	'conn.import.here': '已登錄',
+	'allow.title': 'AI 可以執行的內容',
+	'allow.note': '只有寫在這些檔案裡的才會執行。預設為空，所以留空時 AI 一條也執行不了。本頁面不執行任何內容。',
+	'allow.reading': '唯讀（readonly.toml）',
+	'allow.changing': '改變狀態（operations.toml）',
+	'allow.where': '存放位置',
+	'allow.empty': '一條也沒有寫。AI 一條也執行不了。',
+	'allow.ceiling': '每小時最多 {count} 次',
 
 	// **転送の列**（UI 案・2 枚目）。**誰が動かしたかが行ごとに残る。**
 	// 止めたことが見えないと、人は「動いた」と思って次へ進む。

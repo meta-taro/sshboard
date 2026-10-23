@@ -13,6 +13,13 @@ export const ptBR: Catalog = {
 	'conn.import.none': 'Nada a ler em ~/.ssh/config.',
 	'conn.import.add': 'Adicionar',
 	'conn.import.here': 'Já registado',
+	'allow.title': 'O que a IA pode executar',
+	'allow.note': 'Só corre o que está escrito nestes ficheiros. Por omissão estão vazios: enquanto assim ficarem, a IA não executa nada. Este ecrã não executa nada.',
+	'allow.reading': 'Apenas leitura (readonly.toml)',
+	'allow.changing': 'Altera o estado (operations.toml)',
+	'allow.where': 'Localização',
+	'allow.empty': 'Nada está escrito, por isso a IA não pode executar nada.',
+	'allow.ceiling': 'até {count} por hora',
 
 	// **転送の列**（UI 案・2 枚目）。**誰が動かしたかが行ごとに残る。**
 	// 止めたことが見えないと、人は「動いた」と思って次へ進む。
@@ -318,6 +325,13 @@ export const ru: Catalog = {
 	'conn.import.none': 'В ~/.ssh/config нечего читать.',
 	'conn.import.add': 'Добавить',
 	'conn.import.here': 'Уже добавлено',
+	'allow.title': 'Что может запускать ИИ',
+	'allow.note': 'Запускается только то, что написано в этих файлах. По умолчанию они пусты: пока они пусты, ИИ не запустит ничего. Этот экран ничего не запускает.',
+	'allow.reading': 'Только чтение (readonly.toml)',
+	'allow.changing': 'Меняет состояние (operations.toml)',
+	'allow.where': 'Находится в',
+	'allow.empty': 'Здесь ничего не написано, поэтому ИИ не может запустить ничего.',
+	'allow.ceiling': 'не более {count} раз в час',
 
 	// **転送の列**（UI 案・2 枚目）。**誰が動かしたかが行ごとに残る。**
 	// 止めたことが見えないと、人は「動いた」と思って次へ進む。
@@ -623,6 +637,13 @@ export const it: Catalog = {
 	'conn.import.none': 'Niente da leggere in ~/.ssh/config.',
 	'conn.import.add': 'Aggiungi',
 	'conn.import.here': 'Già registrato',
+	'allow.title': "Cosa può eseguire l'IA",
+	'allow.note': "Viene eseguito solo ciò che è scritto in questi file. Per impostazione predefinita sono vuoti: finché restano vuoti, l'IA non esegue nulla. Questa schermata non esegue nulla.",
+	'allow.reading': 'Solo lettura (readonly.toml)',
+	'allow.changing': 'Cambia lo stato (operations.toml)',
+	'allow.where': 'Posizione',
+	'allow.empty': "Non c'è scritto nulla, quindi l'IA non può eseguire nulla.",
+	'allow.ceiling': "fino a {count} all'ora",
 
 	// **転送の列**（UI 案・2 枚目）。**誰が動かしたかが行ごとに残る。**
 	// 止めたことが見えないと、人は「動いた」と思って次へ進む。

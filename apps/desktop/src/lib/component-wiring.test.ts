@@ -442,11 +442,48 @@ describe('~/.ssh/config からの取り込み', () => {
 		expect(manager()).toContain("i18n.t('conn.import.here')");
 	});
 
-	test('is not offered to the AI', () => {
-		// **MCP に口を出していないこと。**
-		const mcp = Object.entries(sources).filter(([path]) => path.includes('sshboard-mcp'));
-		for (const [path, text] of mcp) {
-			expect(text.includes('ssh_config'), `${path} に出ています`).toBe(false);
-		}
+	// **「AI に出していない」はここでは見張れません**（2026-10-23 に空振り）。
+	//
+	// `import.meta.glob('../**/*.{svelte,ts}')` は `apps/desktop/src` だけを拾い、
+	// **Rust を 1 件も見ていませんでした**（鍵 114 件・`sshboard-mcp` は 0 件）。
+	// 0 件の配列を回るので、**見張っていないのに緑**でした。
+	//
+	// 見張りは `crates/sshboard-mcp/tests/mcp_over_http.rs` に移しました ——
+	// **あちらは本物の道具一覧を見ます。**
+});
+
+describe('AI が走らせられることの一覧', () => {
+	/**
+	 * **人だけが見られませんでした**（2026-10-23）。
+	 *
+	 * 実行体は両方のファイルを読めて、AI も `list_operations` で読めるのに、
+	 * **画面へ出す口が 1 つもありませんでした。**
+	 * 本番で詰まったのはここで、人は書く場所を探して見つけられませんでした。
+	 */
+	test('is reachable from the menu', () => {
+		// **開けない面は無いのと同じ。**
+		const text = pageSource();
+		expect(text).toContain('allowlistOpen = true');
+		expect(text).toContain('<AllowlistDialog');
+	});
+
+	test('asks the engine for both lists', () => {
+		expect(pageSource()).toContain("invoke<AllowlistOverview>('allowlist_overview')");
+	});
+
+	test('runs nothing from this screen', () => {
+		// **釦を置くと、「人が押した」と「AI が頼んだ」が混ざります。**
+		// 走らせるのは承認の面（`OperationRequestDialog`）です。
+		const dialog = components['./components/AllowlistDialog.svelte'];
+		expect(dialog, 'AllowlistDialog.svelte が無い').toBeTruthy();
+		expect(dialog).not.toContain('invoke');
+		expect(dialog).not.toContain('run_operation');
+	});
+
+	test('hides what would be read off a shared screen', () => {
+		// **コマンドにはサーバー側の道とドメインが入ります**（禁止事項 4）。
+		const dialog = components['./components/AllowlistDialog.svelte'];
+		expect(dialog).toContain('class="run" data-secret');
+		expect(dialog).toContain('<code data-secret>{group.list.path}</code>');
 	});
 });

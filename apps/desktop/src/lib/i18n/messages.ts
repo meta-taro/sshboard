@@ -15,6 +15,13 @@ const en = {
 	'conn.import.none': 'Nothing to read in ~/.ssh/config.',
 	'conn.import.add': 'Add',
 	'conn.import.here': 'Already registered',
+	'allow.title': 'What the AI can run',
+	'allow.note': 'Only what is written in these files runs. Nothing is there by default, so an empty file means the AI runs nothing. This screen does not run anything.',
+	'allow.reading': 'Read-only (readonly.toml)',
+	'allow.changing': 'Changes state (operations.toml)',
+	'allow.where': 'Kept in',
+	'allow.empty': 'Nothing is written here, so the AI can run nothing.',
+	'allow.ceiling': 'up to {count} per hour',
 
 	// **転送の列**（UI 案・2 枚目）。**誰が動かしたかが行ごとに残る。**
 	// 止めたことが見えないと、人は「動いた」と思って次へ進む。
@@ -360,6 +367,13 @@ const ja: Catalog = {
 	'conn.import.none': '~/.ssh/config に読めるものがありません。',
 	'conn.import.add': '足す',
 	'conn.import.here': 'もう在ります',
+	'allow.title': 'AI が走らせられること',
+	'allow.note': 'ここに書いた物だけが走ります。既定は空なので、空のままなら AI は 1 本も走らせられません。この面は何も走らせません。',
+	'allow.reading': '読むだけ（readonly.toml）',
+	'allow.changing': '状態を変える（operations.toml）',
+	'allow.where': '置き場',
+	'allow.empty': '1 本も書かれていません。AI は 1 本も走らせられません。',
+	'allow.ceiling': '1 時間に {count} 回まで',
 
 	// **転送の列**（UI 案・2 枚目）。**誰が動かしたかが行ごとに残る。**
 	// 止めたことが見えないと、人は「動いた」と思って次へ進む。
