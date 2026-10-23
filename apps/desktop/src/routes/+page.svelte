@@ -20,6 +20,7 @@
 	import { titlebar } from '$lib/window/titlebar.svelte';
 	import AboutDialog from '$lib/components/AboutDialog.svelte';
 	import BandPanel from '$lib/components/BandPanel.svelte';
+	import ConnectionRail from '$lib/components/ConnectionRail.svelte';
 	import DiagPanel from '$lib/components/DiagPanel.svelte';
 	import KeyHelpDialog from '$lib/components/KeyHelpDialog.svelte';
 	import { summarise } from '$lib/update/notes';
@@ -140,19 +141,6 @@
 		}
 	}
 
-	/**
-	 * 柵のカードの見出し。
-	 *
-	 * **文言は増やしません**（`files.scope.some` を使い回す・11 言語ぶん訳が揃っている）。
-	 * ただし案は**道を別の行に等幅で**出すので、見出しからは道を抜きます。
-	 *
-	 * `files.scope.some` は全言語で `{roots}` が末尾に在り、その手前が
-	 * `:` か `：` です（`messages.test.ts` が**そうであることを見張っています** ——
-	 * 崩れたら「AI が書けるのは:」のような尻切れが出ます）。
-	 */
-	function fenceHead(): string {
-		return i18n.t('files.scope.some', { roots: '' }).replace(/[\s:：,，]+$/u, '');
-	}
 
 
 	/**
@@ -1789,38 +1777,13 @@
 					1 本でも出せば、どのサーバーの端末なのかが常に見えます。
 				-->
 			{:else if session.all.length > 0}
-				<div class="console-tabs">
-					<div class="console-conns" role="tablist" aria-label={i18n.t('tab.connections')}>
-						{#each session.all as held (held.id)}
-							<button
-								type="button"
-								role="tab"
-								class="console-conn"
-								class:active={held.id === session.activeId}
-								aria-selected={held.id === session.activeId}
-								onclick={() => session.focus(held.id)}
-							>
-								<span data-secret>{held.name}</span>
-								{#if held.tag}<span class="tag" data-secret>{held.tag}</span>{/if}
-							</button>
-						{/each}
-					</div>
-					<!--
-						**別の接続を開く**（実機の指摘・2026-10-04）。
-						ファイルの面と**同じ鍵の文言**を使います（11 言語ぶん訳が揃っている）。
-						**言葉を出します** —— アイコンだけだと、触れる前の人には存在しません
-						（Issue #9 で一度やった失敗）。
-					-->
-					<button
-						type="button"
-						class="ghost add"
-						onclick={() => (consoleAddingAnother = !consoleAddingAnother)}
-						title={i18n.t('files.another')}
-					>
-						<Icon name="plus" size={13} />
-						{i18n.t('files.another')}
-					</button>
-				</div>
+				<ConnectionRail
+					items={session.all}
+					activeId={session.activeId}
+					roots={session.open?.write.aiRoots ?? []}
+					onpick={(id) => session.focus(id)}
+					onadd={() => (consoleAddingAnother = !consoleAddingAnother)}
+				/>
 				<!--
 					**繋ぐ所は 1 つの部品**（`ConnectPanel`）。
 					写して 2 か所に置くと、**片方だけ直る日**が来ます（D39）。
@@ -1908,31 +1871,6 @@
 				{/if}
 			</div>
 			{@render searchBar('console')}
-			<!--
-				**AI の柵を、端末の面にも出す**（UI 案・2026-10-21／D22）。
-				案は左の列の底にこのカードを置きました。
-
-				**ここが D22 の約束そのものです** —— AI が書けるのは、人が接続ごとに
-				並べたディレクトリの下だけで、**既定は空＝書けません。**
-				ファイルの面には出ていましたが、**端末の面には無かった** ——
-				AI が端末で何かしている間、人は囲いの大きさを見られませんでした。
-
-				文言は `files.scope.*` をそのまま使います（**言い方を増やしません**・11 言語ぶん訳が揃っている）。
-			-->
-			{#if session.open}
-				<div class="fence" class:open={session.open.write.aiRoots.length > 0}>
-					<span class="fence-head">
-						<Icon name="lock" size={11} />
-						{session.open.write.aiRoots.length > 0
-							? fenceHead()
-							: i18n.t('files.scope.none')}
-					</span>
-					{#each session.open.write.aiRoots as root (root)}
-						<span class="fence-root" data-secret>{root}</span>
-					{/each}
-					<span class="fence-note">{i18n.t('files.scope.help')}</span>
-				</div>
-			{/if}
 			<!--
 				**端末のタブ**（分割・2026-10-06）。番号・接続・色を出します ——
 				人が口で「②を見て」と言えて、AI も同じ番号で指せる（PRD §4-0）。
@@ -2252,46 +2190,10 @@
 		flex: 0 0 auto;
 	}
 
-	.console-tabs {
-		display: flex;
-		align-items: flex-start;
-		justify-content: space-between;
-		gap: 0.5rem;
-		flex-wrap: wrap;
-	}
 
-	.console-conns {
-		display: flex;
-		gap: 0.3rem;
-		flex-wrap: wrap;
-		padding-bottom: 0.35rem;
-	}
 
-	/* **別の接続を開く。**ファイルの面と同じ見え方に揃えます。 */
-	.console-tabs .add {
-		font-size: 0.75rem;
-		padding: 0.2rem 0.55rem;
-		display: inline-flex;
-		align-items: center;
-		gap: 0.3rem;
-		flex: 0 0 auto;
-	}
 
-	.console-conn {
-		font-size: 0.75rem;
-		padding: 0.2rem 0.55rem;
-		border: 1px solid var(--hairline);
-		border-radius: var(--r-control);
-		background: transparent;
-		display: inline-flex;
-		align-items: center;
-		gap: 0.3rem;
-	}
 
-	.console-conn.active {
-		border-color: var(--accent);
-		color: var(--accent);
-	}
 
 	/*
 	 * **画面を伏せる**（UI 案・2026-10-21／D26）。
@@ -2300,59 +2202,11 @@
 	 * 「伏せているのに伏せていないと思っている」が一番危ないので、
 	 * **弱い合図にしません。**
 	 */
-	/*
-	 * **AI の柵**（UI 案・2026-10-21／D22）。
-	 *
-	 * 案は橙の線で囲みました。**橙は AI の色**なので、
-	 * 「これは AI にかかっている制限だ」が色で読めます。
-	 * **人は制限されません**（D22）——その誤解を生まないために、
-	 * 説明文（`files.scope.help`）を必ず添えます。
-	 *
-	 * 柵が空のときは色で主張しません —— **既定は空＝AI は読むだけ**で、
-	 * それは警告すべき状態ではなく、むしろ安全な既定です。
-	 */
-	.fence {
-		display: flex;
-		flex-direction: column;
-		gap: 0.25rem;
-		flex: 0 0 auto;
-		margin: 0 0 0.4rem;
-		padding: 0.5rem 0.6rem;
-		border: 1px solid var(--hairline);
-		border-radius: var(--r-core);
-		background: var(--surface-2);
-		font-size: 0.7rem;
-	}
 
-	.fence.open {
-		border-color: var(--ai);
-		background: var(--ai-soft);
-	}
 
-	.fence-head {
-		display: inline-flex;
-		align-items: center;
-		gap: 0.3rem;
-		font-weight: 700;
-		color: var(--fg-muted);
-	}
 
-	.fence.open .fence-head {
-		color: var(--warning);
-	}
 
-	/* **道は等幅で、1 本ずつ別の行。**長い道が折り返して読めなくならないように。 */
-	.fence-root {
-		font-family: var(--font-mono);
-		font-size: 0.68rem;
-		color: var(--fg);
-		overflow-wrap: anywhere;
-	}
 
-	.fence-note {
-		color: var(--fg-dim);
-		line-height: 1.5;
-	}
 
 
 

@@ -116,38 +116,22 @@ describe('画面の切り替え', () => {
 
 describe('AI の柵（D22）', () => {
 	/**
-	 * **端末の面にも柵を出す**（UI 案・2026-10-21）。
+	 * **検査は `ConnectionRail.svelte.test.ts` へ移しました。**
 	 *
-	 * ファイルの面には出ていましたが、**端末の面には無かった** ——
-	 * AI が端末で何かしている間、**人は囲いの大きさを見られませんでした。**
-	 * D22 の約束（AI が書けるのは人が並べた所だけ・既定は空）は、
-	 * **AI が動いている画面に在ってこそ意味があります。**
+	 * 柵を部品に出したので、**ソース文字列を見る代わりに
+	 * 実際に描いて確かめられます**（空を警告色にしない・道を全部出す・
+	 * 「人は制限されない」を添える、など 7 本）。
+	 *
+	 * ここに残すのは**繋がっているかだけ**です。
 	 */
-	test('shows the fence while the terminal is in use', () => {
-		expect(source).toContain('class="fence"');
-		expect(source).toContain('session.open.write.aiRoots');
+	test('hands the rail the fence of the connection in view', () => {
+		expect(source).toContain('roots={session.open?.write.aiRoots ?? []}');
 	});
 
-	test('tells the person they are not the one being fenced', () => {
-		// **人は制限されません**（D22）。これを書かないと、
-		// 自分が縛られていると読まれます。
-		expect(source).toContain("i18n.t('files.scope.help')");
-	});
-
-	test('says plainly when the fence is empty', () => {
-		// **既定は空＝AI は読むだけ。**空を「設定し忘れ」と読ませない。
-		expect(source).toContain("i18n.t('files.scope.none')");
-	});
-
-	test('does not invent new wording for it', () => {
-		// 言い方を増やすと、**11 言語ぶんの訳が片方だけ古くなります。**
-		expect(source).not.toContain("i18n.t('console.fence");
-	});
-
-	test('colours it as the AI, not as a warning', () => {
-		// **橙は AI の色。**「これは AI にかかっている制限」が色で読める。
-		// 空のときは色で主張しない（安全な既定を警告に見せない）。
-		expect(source).toContain('class:open={session.open.write.aiRoots.length > 0}');
+	test('does not keep a second copy of the fence here', () => {
+		// **写して 2 か所に置くと、片方だけ直る日が来ます**（D39）。
+		expect(source).not.toContain('class="fence"');
+		expect(source).not.toContain('function fenceHead');
 	});
 });
 

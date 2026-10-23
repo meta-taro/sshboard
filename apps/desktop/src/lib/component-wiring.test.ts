@@ -278,14 +278,15 @@ function pageSource(): string {
 
 describe('繋ぐ道', () => {
 	test('offers "open another connection" on the console screen too', () => {
-		const page = pageSource();
-
-		// **端末の面の中に在ること。**文言は既にある鍵を使う（11 言語ぶん訳が揃っている）。
-		const console_view = page.slice(page.indexOf("{#if view === 'console'}"));
-		expect(console_view).toContain("i18n.t('files.another')");
-
-		// **押したら繋ぐ所が出ること。**釦だけ置いて中身が無い、を作らない。
-		expect(console_view).toContain('<ConnectPanel');
+		// **実機の指摘**（2026-10-04）—— 端末の面に「別の接続を開く」が無かった。
+		//
+		// **検査は `ConnectionRail.svelte.test.ts` へ移しました**（部品に出したので
+		// 実際に押して確かめられます）。ここに残すのは繋がっているかだけ。
+		const text = Object.entries(sources).find(([path]) =>
+			path.endsWith('routes/+page.svelte')
+		)![1];
+		expect(text).toContain('<ConnectionRail');
+		expect(text).toContain('onadd={() => (consoleAddingAnother = !consoleAddingAnother)}');
 	});
 
 	test('uses the same picker on both screens rather than a copy of it', () => {
