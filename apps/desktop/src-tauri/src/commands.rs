@@ -78,6 +78,34 @@ pub async fn stream_follow(
 const DEFAULT_TAIL_LINES: u32 = 200;
 
 /// 人が止める（PRD §4-3）。**止めたあとは流れない。**
+/// **MCP の口を閉じる**（UI 案の「AI を止める」・2026-10-23）。
+///
+/// それまで「AI を止める」は、**走っているもの**（流れている出力と、AI が
+/// 握っている端末）しか止められませんでした。**口はそのまま空いていた**ので、
+/// AI は次の呼びかけで戻ってきます。
+///
+/// **人が「止める」と言ったら、止まること。**それが D29 の約束
+/// （人が常に見ていて、**いつでも取り返せる**）の意味です。
+///
+/// **立て直すには、アプリを立ち上げ直します。**ここで開き直す口は作りません ——
+/// 「止めたのに勝手に戻る」を作らないためです。
+#[tauri::command]
+pub fn mcp_stop(app: tauri::AppHandle) -> Result<(), String> {
+    use tauri::Manager;
+    let Some(endpoint) = app.try_state::<sshboard_mcp::McpEndpoint>() else {
+        return Err("MCP は立っていません".to_string());
+    };
+    endpoint.shutdown();
+    Ok(())
+}
+
+/// MCP の口がまだ立っているか。**「止める」を出していいかの判断。**
+#[tauri::command]
+pub fn mcp_running(app: tauri::AppHandle) -> bool {
+    use tauri::Manager;
+    app.try_state::<sshboard_mcp::McpEndpoint>().is_some()
+}
+
 #[tauri::command]
 pub fn stop_stream(stream: State<'_, Arc<OutputStream>>) {
     stream.stop();

@@ -53,12 +53,31 @@ describe('画面を伏せる', () => {
 describe('AI を止める', () => {
 	test('gives the person a button to press', () => {
 		expect(source).toContain('class="stop-ai"');
-		expect(source).toContain('onclick={() => void stopAi()}');
+		// **押したらまず聞く**（2026-10-23）。口を閉じると、
+		// 戻すにはアプリを立ち上げ直すので（§13）。
+		expect(source).toContain('onclick={() => (stopAiAsking = true)}');
 	});
 
-	test('cannot be pressed while the AI is doing nothing', () => {
+	test('asks once before closing the mouth', () => {
+		expect(source).toContain('<ConfirmDialog');
+		expect(source).toContain("i18n.t('ai.stop.title')");
+	});
+
+	test('closes the MCP mouth as well, not only what is running', () => {
+		// **口が空いたままだと、AI は次の呼びかけで戻ってきます** ——
+		// 「止めた」と言って止まっていないのが、いちばん悪い形。
+		const at = source.indexOf('async function stopAi()');
+		const body = source.slice(at, at + 900);
+		expect(body).toContain("invoke('mcp_stop')");
+		// **口を閉じるのは最後。**先に閉じると、走っているものを止める呼びかけが届かない。
+		expect(body.indexOf("invoke('stop_stream')")).toBeLessThan(body.indexOf("invoke('mcp_stop')"));
+	});
+
+	test('cannot be pressed when there is nothing to stop and no mouth open', () => {
 		// **空振りを「止めた」と見せない。**
-		expect(source).toContain('disabled={!aiIsDoing}');
+		// ただし**口が立っているなら、走っていなくても閉じる意味がある**ので、
+		// そこは押せます（2026-10-23）。
+		expect(source).toContain('disabled={!aiIsDoing && mcp === null}');
 		expect(source).toContain("$derived(holder === 'ai' || session.busy)");
 	});
 
@@ -102,7 +121,8 @@ describe('キー操作', () => {
 	});
 
 	test('does nothing on stopAi when there is nothing to stop', () => {
-		expect(source).toContain('if (aiIsDoing) void stopAi();');
+		// 走っていなくても**口が立っていれば聞く**（閉じる意味がある）。
+		expect(source).toContain('if (aiIsDoing || mcp !== null) stopAiAsking = true;');
 	});
 });
 

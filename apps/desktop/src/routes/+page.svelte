@@ -23,6 +23,7 @@
 	import ConnectionRail from '$lib/components/ConnectionRail.svelte';
 	import DiagPanel from '$lib/components/DiagPanel.svelte';
 	import KeyHelpDialog from '$lib/components/KeyHelpDialog.svelte';
+	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
 	import OperationProposalDialog from '$lib/components/OperationProposalDialog.svelte';
 	import type { OperationProposal } from '$lib/components/OperationProposalDialog.svelte';
 	import { summarise } from '$lib/update/notes';
@@ -138,10 +139,23 @@
 			// **出力を先に止める。**端末を先に閉じると、残りが流れ続けます。
 			await invoke('stop_stream');
 			if (holder === 'ai') await invoke('console_stop');
+			// **口も閉じる**（2026-10-23）。
+			//
+			// それまでは**走っているものしか止めていませんでした** ——
+			// 口が空いたままなので、AI は次の呼びかけで戻ってきます。
+			// 「止めた」と言って止まっていないのが、いちばん悪い形です。
+			//
+			// **戻すにはアプリを立ち上げ直します。**開き直す口は作りません ——
+			// 「止めたのに勝手に戻る」を作らないためです。
+			await invoke('mcp_stop');
+			mcp = null;
 		} catch (error: unknown) {
 			failure = String(error);
 		}
 	}
+
+	/** **止める前に 1 回聞く。**口を閉じると、戻すには立ち上げ直しが要ります。 */
+	let stopAiAsking = $state(false);
 
 
 
@@ -161,7 +175,8 @@
 		}
 		if (intent === 'stopAi') {
 			// **何もしていないときは何もしない。**空振りを「止めた」と見せない。
-			if (aiIsDoing) void stopAi();
+			// 口が立っているなら、走っていなくても閉じる意味があります。
+			if (aiIsDoing || mcp !== null) stopAiAsking = true;
 			return;
 		}
 		if (intent === 'menu') {
@@ -1499,8 +1514,8 @@
 		<button
 			type="button"
 			class="stop-ai"
-			onclick={() => void stopAi()}
-			disabled={!aiIsDoing}
+			onclick={() => (stopAiAsking = true)}
+			disabled={!aiIsDoing && mcp === null}
 			title={aiIsDoing
 				? `${i18n.t('ai.stop')}（${platform === 'mac' ? '⌘' : 'Ctrl'} Shift .）`
 				: i18n.t('ai.stop.none')}
@@ -1814,6 +1829,25 @@
 		**AI が「この操作を足してよいか」と出した提案**（実運用の報告・2026-10-23）。
 		**コマンドを 1 文字も省略せずに出します** —— 読めない同意は、同意ではありません。
 	-->
+	<!--
+		**止める前に 1 回聞く**（2026-10-23）。
+		口を閉じると、**戻すにはアプリを立ち上げ直します** ——
+		押し間違いの結果が他と違うので、確かめます（product-baseline §13）。
+	-->
+	{#if stopAiAsking}
+		<ConfirmDialog
+			title={i18n.t('ai.stop.title')}
+			body={i18n.t('ai.stop.what')}
+			yes={i18n.t('ai.stop.yes')}
+			no={i18n.t('propose.no')}
+			onyes={() => {
+				stopAiAsking = false;
+				void stopAi();
+			}}
+			onno={() => (stopAiAsking = false)}
+		/>
+	{/if}
+
 	{#if operationProposal}
 		<OperationProposalDialog
 			proposal={operationProposal}

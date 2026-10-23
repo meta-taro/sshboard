@@ -79,6 +79,8 @@ pub fn run() {
             commands::mcp_url,
             commands::stream_follow,
             commands::stop_stream,
+            commands::mcp_stop,
+            commands::mcp_running,
             bundle_cmd::bundle_export,
             bundle_cmd::bundle_import,
             connections_cmd::connection_password_save,

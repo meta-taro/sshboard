@@ -4,6 +4,12 @@ import type { MessageKey } from './messages';
 type Catalog = Partial<Record<MessageKey, string>>;
 
 export const ptBR: Catalog = {
+	// **「AI を止める」は MCP の口も閉じる**（2026-10-23）。
+	// 口が空いたままだと、AI は次の呼びかけで戻ってくる ——
+	// 「止めた」と言って止まっていないのが一番悪い。
+	'ai.stop.title': 'Parar a IA?',
+	'ai.stop.what': 'Isso também fecha o acesso MCP, então a IA não pode voltar sozinha. Para permitir de novo, reinicie o sshboard. O que estiver rodando também para.',
+	'ai.stop.yes': 'Parar',
 
 	// **AI が「この操作を足してよいか」と出す提案**（実運用の報告・2026-10-23）。
 	// **AI はファイルを書きません。**書くのは画面で、登録と実行は別の行為です。
@@ -278,6 +284,12 @@ export const ptBR: Catalog = {
 };
 
 export const ru: Catalog = {
+	// **「AI を止める」は MCP の口も閉じる**（2026-10-23）。
+	// 口が空いたままだと、AI は次の呼びかけで戻ってくる ——
+	// 「止めた」と言って止まっていないのが一番悪い。
+	'ai.stop.title': 'Остановить ИИ?',
+	'ai.stop.what': 'Это также закроет вход MCP — ИИ не сможет вернуться сам. Чтобы снова разрешить, перезапустите sshboard. Запущенное тоже остановится.',
+	'ai.stop.yes': 'Остановить',
 
 	// **AI が「この操作を足してよいか」と出す提案**（実運用の報告・2026-10-23）。
 	// **AI はファイルを書きません。**書くのは画面で、登録と実行は別の行為です。
@@ -552,6 +564,12 @@ export const ru: Catalog = {
 };
 
 export const it: Catalog = {
+	// **「AI を止める」は MCP の口も閉じる**（2026-10-23）。
+	// 口が空いたままだと、AI は次の呼びかけで戻ってくる ——
+	// 「止めた」と言って止まっていないのが一番悪い。
+	'ai.stop.title': 'Fermare l’IA?',
+	'ai.stop.what': 'Chiude anche l’accesso MCP, quindi l’IA non può tornare da sola. Per riammetterla, riavvia sshboard. Anche ciò che è in corso si ferma.',
+	'ai.stop.yes': 'Ferma',
 
 	// **AI が「この操作を足してよいか」と出す提案**（実運用の報告・2026-10-23）。
 	// **AI はファイルを書きません。**書くのは画面で、登録と実行は別の行為です。

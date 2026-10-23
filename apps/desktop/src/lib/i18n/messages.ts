@@ -6,6 +6,12 @@
  */
 
 const en = {
+	// **「AI を止める」は MCP の口も閉じる**（2026-10-23）。
+	// 口が空いたままだと、AI は次の呼びかけで戻ってくる ——
+	// 「止めた」と言って止まっていないのが一番悪い。
+	'ai.stop.title': 'Stop the AI?',
+	'ai.stop.what': 'This closes the MCP mouth as well, so the AI cannot come back on its own. To let it back in, restart sshboard. Anything running now stops too.',
+	'ai.stop.yes': 'Stop it',
 
 	// **AI が「この操作を足してよいか」と出す提案**（実運用の報告・2026-10-23）。
 	// **AI はファイルを書きません。**書くのは画面で、登録と実行は別の行為です。
@@ -320,6 +326,12 @@ export type MessageKey = keyof typeof en;
 type Catalog = Partial<Record<MessageKey, string>>;
 
 const ja: Catalog = {
+	// **「AI を止める」は MCP の口も閉じる**（2026-10-23）。
+	// 口が空いたままだと、AI は次の呼びかけで戻ってくる ——
+	// 「止めた」と言って止まっていないのが一番悪い。
+	'ai.stop.title': 'AI を止めますか？',
+	'ai.stop.what': 'MCP の口も閉じるので、AI は自分では戻れません。戻すにはアプリを立ち上げ直します。いま走っているものも止まります。',
+	'ai.stop.yes': '止める',
 
 	// **AI が「この操作を足してよいか」と出す提案**（実運用の報告・2026-10-23）。
 	// **AI はファイルを書きません。**書くのは画面で、登録と実行は別の行為です。
