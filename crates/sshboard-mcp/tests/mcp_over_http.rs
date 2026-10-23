@@ -194,6 +194,10 @@ async fn the_server_advertises_only_the_phase_zero_tools() {
         // **状態を変える操作**（D45 / Issue #17）。渡せるのは id だけ。
         "run_operation",
         "list_operations",
+        // **走らせる口ではありません**（2026-10-23）—— 人へ
+        // 「これを足してよいか」と出すだけで、**書くのは画面**です。
+        // 本番で、調べ切ったのに `operations.toml` が空で止まりました。
+        "propose_operation",
         // **この道具が何なのかを名乗る口**（実機の要望・2026-09-09）。
         // 初めて繋いだ AI が、何をしてよくて何が駄目かをここで読めます。
         "about_sshboard",
@@ -208,7 +212,7 @@ async fn the_server_advertises_only_the_phase_zero_tools() {
     //
     // 上の一覧は「在ること」しか見ないので、**足しても誰も気づきません。**
     // 記録の表（手元の記録 / `CLAUDE.md`）と実物は、
-    // **これまで 4 回ずれました**（16→15・29→30・30→34・34→35・35→36）。毎回、
+    // **これまで 5 回ずれました**（16→15・29→30・30→34・34→35・35→36・38→39）。毎回、
     // **足したときに表を直していない**のが原因です。
     //
     // ここで数えておけば、**足した本人がその場で気づきます。**
@@ -217,7 +221,7 @@ async fn the_server_advertises_only_the_phase_zero_tools() {
     // `inputSchema` は 1 本につきちょうど 1 つです。
     let counted = listed.matches("inputSchema").count();
     assert_eq!(
-        counted, 38,
+        counted, 39,
         "**MCP のツールが {counted} 本になりました。**足した／消したなら、\
          手元の記録の表と `CLAUDE.md` の本数も同じ commit で直してください\
          （product-baseline §10）。直したら、ここの数字も合わせてください"
