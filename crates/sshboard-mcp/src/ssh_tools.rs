@@ -85,13 +85,17 @@ impl SshboardMcp {
     pub async fn connect(
         &self,
         Parameters(request): Parameters<ConnectionId>,
+        ct: CancellationToken,
     ) -> Result<String, ErrorData> {
         // **パスフレーズは常に None。**AI の経路から秘密を渡す余地を作らない（D14）。
-        let opened = self
-            .engine()?
-            .connect(Actor::Ai, &request.connection_id, None)
-            .await
-            .map_err(refuse)?;
+        let engine = self.engine()?;
+        let opened = until_cancelled(&ct, async {
+            engine
+                .connect(Actor::Ai, &request.connection_id, None)
+                .await
+                .map_err(refuse)
+        })
+        .await?;
         render(&opened)
     }
 
@@ -488,14 +492,20 @@ impl SshboardMcp {
     pub async fn await_answer(
         &self,
         Parameters(request): Parameters<AwaitAnswer>,
+        ct: CancellationToken,
     ) -> Result<String, ErrorData> {
         // **帯へ載せません**（`pending_status` と同じ扱い）。
         // **待っているだけで人の画面に何も出ない**、が要点です。
         let engine = self.engine()?;
         let secs = request.timeout_secs.unwrap_or(60).clamp(1, 300);
-        let answered = engine
-            .wait_for_answer(std::time::Duration::from_secs(u64::from(secs)))
-            .await;
+        // **待つのが仕事の道具なので、取り消しがいちばん効きます。**
+        // 呼んだ側が止めたのに、こちらが 300 秒抱え込むのは筋が通りません。
+        let answered = until_cancelled(&ct, async {
+            Ok(engine
+                .wait_for_answer(std::time::Duration::from_secs(u64::from(secs)))
+                .await)
+        })
+        .await?;
         serde_json::to_string(&answered)
             .map_err(|error| ErrorData::internal_error(error.to_string(), None))
     }
@@ -553,12 +563,16 @@ impl SshboardMcp {
     pub async fn list_directory(
         &self,
         Parameters(request): Parameters<RemotePath>,
+        ct: CancellationToken,
     ) -> Result<String, ErrorData> {
-        let entries = self
-            .engine()?
-            .list_dir(Actor::Ai, &request.path)
-            .await
-            .map_err(refuse)?;
+        let engine = self.engine()?;
+        let entries = until_cancelled(&ct, async {
+            engine
+                .list_dir(Actor::Ai, &request.path)
+                .await
+                .map_err(refuse)
+        })
+        .await?;
 
         let listed: Vec<_> = entries
             .into_iter()
@@ -584,12 +598,13 @@ impl SshboardMcp {
     pub async fn stat(
         &self,
         Parameters(request): Parameters<RemotePath>,
+        ct: CancellationToken,
     ) -> Result<String, ErrorData> {
-        let facts = self
-            .engine()?
-            .stat(Actor::Ai, &request.path)
-            .await
-            .map_err(refuse)?;
+        let engine = self.engine()?;
+        let facts = until_cancelled(&ct, async {
+            engine.stat(Actor::Ai, &request.path).await.map_err(refuse)
+        })
+        .await?;
 
         serde_json::to_string(&serde_json::json!({
             "path": facts.path,
@@ -615,12 +630,16 @@ impl SshboardMcp {
     pub async fn read_file(
         &self,
         Parameters(request): Parameters<RemotePath>,
+        ct: CancellationToken,
     ) -> Result<String, ErrorData> {
-        let bytes = self
-            .engine()?
-            .read_file(Actor::Ai, &request.path)
-            .await
-            .map_err(refuse)?;
+        let engine = self.engine()?;
+        let bytes = until_cancelled(&ct, async {
+            engine
+                .read_file(Actor::Ai, &request.path)
+                .await
+                .map_err(refuse)
+        })
+        .await?;
 
         if bytes.len() > MAX_BYTES {
             return Err(ErrorData::invalid_params(
@@ -650,11 +669,16 @@ impl SshboardMcp {
     pub async fn make_directory(
         &self,
         Parameters(request): Parameters<RemotePath>,
+        ct: CancellationToken,
     ) -> Result<String, ErrorData> {
-        self.engine()?
-            .ensure_dir(Actor::Ai, &request.path)
-            .await
-            .map_err(refuse)?;
+        let engine = self.engine()?;
+        until_cancelled(&ct, async {
+            engine
+                .ensure_dir(Actor::Ai, &request.path)
+                .await
+                .map_err(refuse)
+        })
+        .await?;
         Ok(format!("ready: {}", request.path))
     }
 
@@ -665,13 +689,17 @@ impl SshboardMcp {
     pub async fn upload_file(
         &self,
         Parameters(request): Parameters<UploadFile>,
+        ct: CancellationToken,
     ) -> Result<String, ErrorData> {
         let local = std::path::PathBuf::from(&request.local_path);
-        let written = self
-            .engine()?
-            .upload_file(Actor::Ai, &local, &request.remote_path)
-            .await
-            .map_err(refuse)?;
+        let engine = self.engine()?;
+        let written = until_cancelled(&ct, async {
+            engine
+                .upload_file(Actor::Ai, &local, &request.remote_path)
+                .await
+                .map_err(refuse)
+        })
+        .await?;
         Ok(format!(
             "uploaded {written} bytes to {}",
             request.remote_path
@@ -687,6 +715,7 @@ impl SshboardMcp {
     pub async fn write_file(
         &self,
         Parameters(request): Parameters<WriteFile>,
+        ct: CancellationToken,
     ) -> Result<String, ErrorData> {
         let bytes = request.content.as_bytes();
         if bytes.len() > MAX_BYTES {
@@ -698,11 +727,14 @@ impl SshboardMcp {
                 None,
             ));
         }
-        let written = self
-            .engine()?
-            .upload_bytes(Actor::Ai, &request.remote_path, bytes)
-            .await
-            .map_err(refuse)?;
+        let engine = self.engine()?;
+        let written = until_cancelled(&ct, async {
+            engine
+                .upload_bytes(Actor::Ai, &request.remote_path, bytes)
+                .await
+                .map_err(refuse)
+        })
+        .await?;
         Ok(format!("wrote {written} bytes to {}", request.remote_path))
     }
 
@@ -777,8 +809,12 @@ impl SshboardMcp {
         description = "Report free disk space on the connected server (df). Read-only: sshboard \
                        builds the command, you cannot alter it."
     )]
-    pub async fn disk_usage(&self) -> Result<String, ErrorData> {
-        let ran = self.engine()?.disk_usage(Actor::Ai).await.map_err(refuse)?;
+    pub async fn disk_usage(&self, ct: CancellationToken) -> Result<String, ErrorData> {
+        let engine = self.engine()?;
+        let ran = until_cancelled(&ct, async {
+            engine.disk_usage(Actor::Ai).await.map_err(refuse)
+        })
+        .await?;
         probe_json("disk_usage", ran)
     }
 
@@ -787,12 +823,12 @@ impl SshboardMcp {
         description = "List the processes running on the connected server (ps). Read-only: \
                        sshboard builds the command, you cannot alter it."
     )]
-    pub async fn process_list(&self) -> Result<String, ErrorData> {
-        let ran = self
-            .engine()?
-            .process_list(Actor::Ai)
-            .await
-            .map_err(refuse)?;
+    pub async fn process_list(&self, ct: CancellationToken) -> Result<String, ErrorData> {
+        let engine = self.engine()?;
+        let ran = until_cancelled(&ct, async {
+            engine.process_list(Actor::Ai).await.map_err(refuse)
+        })
+        .await?;
         probe_json("process_list", ran)
     }
 
@@ -801,12 +837,12 @@ impl SshboardMcp {
         description = "List the TCP ports the connected server is listening on. Falls back to \
                        netstat where ss is missing. Read-only: sshboard builds the command."
     )]
-    pub async fn network_listen(&self) -> Result<String, ErrorData> {
-        let ran = self
-            .engine()?
-            .network_listen(Actor::Ai)
-            .await
-            .map_err(refuse)?;
+    pub async fn network_listen(&self, ct: CancellationToken) -> Result<String, ErrorData> {
+        let engine = self.engine()?;
+        let ran = until_cancelled(&ct, async {
+            engine.network_listen(Actor::Ai).await.map_err(refuse)
+        })
+        .await?;
         probe_json("network_listen", ran)
     }
 
@@ -819,12 +855,16 @@ impl SshboardMcp {
     pub async fn service_status(
         &self,
         Parameters(request): Parameters<ServiceName>,
+        ct: CancellationToken,
     ) -> Result<String, ErrorData> {
-        let ran = self
-            .engine()?
-            .service_status(Actor::Ai, &request.service)
-            .await
-            .map_err(refuse)?;
+        let engine = self.engine()?;
+        let ran = until_cancelled(&ct, async {
+            engine
+                .service_status(Actor::Ai, &request.service)
+                .await
+                .map_err(refuse)
+        })
+        .await?;
         probe_json("service_status", ran)
     }
 
@@ -891,12 +931,12 @@ impl SshboardMcp {
                        the language runtimes it has. A runtime that is absent is simply left out \
                        - that is not a failure, so do not go looking for a cause."
     )]
-    pub async fn runtime_versions(&self) -> Result<String, ErrorData> {
-        let ran = self
-            .engine()?
-            .runtime_versions(Actor::Ai)
-            .await
-            .map_err(refuse)?;
+    pub async fn runtime_versions(&self, ct: CancellationToken) -> Result<String, ErrorData> {
+        let engine = self.engine()?;
+        let ran = until_cancelled(&ct, async {
+            engine.runtime_versions(Actor::Ai).await.map_err(refuse)
+        })
+        .await?;
         probe_json("runtime_versions", ran)
     }
 }
@@ -1258,6 +1298,7 @@ impl SshboardMcp {
     pub async fn console_open(
         &self,
         Parameters(request): Parameters<OpenConsole>,
+        ct: CancellationToken,
     ) -> Result<String, ErrorData> {
         let cols = request.cols.unwrap_or(80).clamp(20, 500);
         let rows = request.rows.unwrap_or(24).clamp(5, 200);
@@ -1267,10 +1308,13 @@ impl SshboardMcp {
             .console_where(request.connection_id.as_deref())
             .await
             .ok_or_else(|| refuse(sshboard_engine::EngineError::NotConnected))?;
-        let opened = engine
-            .console_open(Actor::Ai, Some(&on), cols, rows)
-            .await
-            .map_err(refuse)?;
+        let opened = until_cancelled(&ct, async {
+            engine
+                .console_open(Actor::Ai, Some(&on), cols, rows)
+                .await
+                .map_err(refuse)
+        })
+        .await?;
         // **黙って別のシェルになるのが一番危ない**（Issue #21）。
         // 受け取ったのか、新しく立てたのかを必ず言います。
         let how = match opened {
@@ -1298,6 +1342,7 @@ impl SshboardMcp {
     pub async fn console_type(
         &self,
         Parameters(request): Parameters<TypeIntoConsole>,
+        ct: CancellationToken,
     ) -> Result<String, ErrorData> {
         let bytes = request.text.as_bytes();
         if bytes.len() > MAX_TYPED {
@@ -1310,10 +1355,13 @@ impl SshboardMcp {
         // **番号が最優先**（D60）。同じサーバに 2 本開いている日は、
         // 番号でしか区別できません。
         if let Some(id) = request.console_id {
-            engine
-                .console_type_into(Actor::Ai, id, bytes)
-                .await
-                .map_err(refuse)?;
+            until_cancelled(&ct, async {
+                engine
+                    .console_type_into(Actor::Ai, id, bytes)
+                    .await
+                    .map_err(refuse)
+            })
+            .await?;
             return Ok(format!(
                 "typed {} bytes into console #{id}. Read what came back with read_console #{id}.",
                 bytes.len()
@@ -1323,10 +1371,13 @@ impl SshboardMcp {
             .console_where(request.connection_id.as_deref())
             .await
             .ok_or_else(|| refuse(sshboard_engine::EngineError::ConsoleNotOpen))?;
-        engine
-            .console_type(Actor::Ai, Some(&on), bytes)
-            .await
-            .map_err(refuse)?;
+        until_cancelled(&ct, async {
+            engine
+                .console_type(Actor::Ai, Some(&on), bytes)
+                .await
+                .map_err(refuse)
+        })
+        .await?;
         Ok(format!(
             "typed {} bytes into the console on {on}. \
              Read what came back with read_console on {on}.",
