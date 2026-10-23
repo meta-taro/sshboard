@@ -127,3 +127,82 @@ pub fn sudo_is_unavailable(stderr: &str) -> bool {
                 || said.contains("見つかりません")
                 || said.contains("no such file")))
 }
+
+/// **繋いだときの上げ方と、いまファイルに書いてある上げ方がずれているか**
+/// （実機の報告・2026-10-23）。
+///
+/// 上げ方は**繋いだ時点の値を抱えます**（`Live::elevation`）。
+/// 接続中に `connections.toml` を書き換えても効きません ——
+/// 効くと、**人が画面で見ている状態と食い違う**からです。
+///
+/// **仕様としては意図どおりですが、欠陥でした。**そう言っている所が
+/// 1 つも無かったので、人からは「書いたのに効かない」でした。
+/// 実機でまさにそれが起きています ——
+/// `become = "ask"` を足したのに `-S` が付かずに走り、
+/// sudo が「パスワードを読み取るために端末が必要です」と返しました。
+///
+/// **繋ぎ直すまで効かない、と言うために使います。**
+pub fn drifted(live: Elevation, on_file: Elevation) -> bool {
+    live != on_file
+}
+
+/// 人へ出す 1 行。**何が効いていて、何をすれば効くか**まで書きます。
+///
+/// 「変わりました」だけでは、次に何をすればいいか分かりません。
+pub fn drift_note(live: Elevation, on_file: Elevation) -> String {
+    format!(
+        "`become` が書き換わっています（ファイルは {}、いま効いているのは {}）。\
+         **繋ぎ直すまで効きません。**",
+        name(on_file),
+        name(live)
+    )
+}
+
+fn name(how: Elevation) -> &'static str {
+    match how {
+        Elevation::None => "none",
+        Elevation::Sudoers => "sudoers",
+        Elevation::Ask => "ask",
+    }
+}
+
+#[cfg(test)]
+mod drift_tests {
+    use super::{drift_note, drifted, Elevation};
+
+    #[test]
+    fn the_same_setting_is_not_a_drift() {
+        assert!(!drifted(Elevation::Ask, Elevation::Ask));
+        assert!(!drifted(Elevation::None, Elevation::None));
+    }
+
+    #[test]
+    fn adding_ask_while_connected_is_a_drift() {
+        // **実機で起きた形。**繋いでから `become = "ask"` を足した。
+        assert!(drifted(Elevation::None, Elevation::Ask));
+    }
+
+    #[test]
+    fn taking_it_away_is_a_drift_too() {
+        // 外した側も言います。**効いていないと思っているのに効いている**方が危ない。
+        assert!(drifted(Elevation::Ask, Elevation::None));
+    }
+
+    #[test]
+    fn the_note_says_both_sides_and_what_to_do() {
+        // 「変わりました」だけでは、次に何をすればいいか分かりません。
+        let note = drift_note(Elevation::None, Elevation::Ask);
+        assert!(note.contains("ask"), "{note}");
+        assert!(note.contains("none"), "{note}");
+        assert!(note.contains("繋ぎ直す"), "{note}");
+    }
+
+    #[test]
+    fn the_note_carries_no_secret_and_no_host() {
+        // **帯と診断は、人が issue へ貼る前提の物**です（禁止事項 4 / §14）。
+        let note = drift_note(Elevation::Sudoers, Elevation::Ask);
+        for never in ["@", "password", "パスワード", "sudo -S"] {
+            assert!(!note.contains(never), "{never} が入っている: {note}");
+        }
+    }
+}

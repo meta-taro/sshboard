@@ -6,7 +6,7 @@ use std::sync::Arc;
 
 use sshboard_band::{Actor, Band};
 use sshboard_connections::{
-    elevated, sudo_is_unavailable, ConnectionEntry, Connections, Elevation,
+    drift_note, drifted, elevated, sudo_is_unavailable, ConnectionEntry, Connections, Elevation,
 };
 use sshboard_credentials::SecretStore;
 use sshboard_diag::{Diagnostics, Stage};
@@ -2052,6 +2052,31 @@ impl Engine {
             .unwrap_or_default()
     }
 
+    /// **繋いだときの上げ方と、いまファイルにある上げ方がずれていたら言う。**
+    ///
+    /// 読めなければ黙ります —— **一覧が読めないことは別の問題**で、
+    /// ここで言い立てると、本当の用事（操作を走らせる）が埋もれます。
+    async fn say_if_elevation_drifted(&self) {
+        let live = self.elevation().await;
+        let Some(id) = self.held.lock().await.active.clone() else {
+            return;
+        };
+        let Ok(on_file) = Connections::load_or_empty(&self.connections_path) else {
+            return;
+        };
+        let Some(entry) = on_file.connections.iter().find(|held| held.id == id) else {
+            return;
+        };
+        if !drifted(live, entry.elevation) {
+            return;
+        }
+        let note = drift_note(live, entry.elevation);
+        // **帯にも診断にも出します。**帯は人が見ている所、
+        // 診断は後から貼る所。どちらか片方だと、片方の人に届きません。
+        let _ = self.show(Actor::Human, &note).await;
+        self.diag.warn(Stage::Exec, Some(&id), note);
+    }
+
     /// 人が答える（D47）。**答えられるのは人だけ。**
     ///
     /// 許しても、**走らせるのは AI がもう一度呼んだとき**です。
@@ -2117,6 +2142,20 @@ impl Engine {
         // 上げ方は**接続ごとに人が書きます**。`sudo` で始まらないものは
         // 何も変わりません（`Elevation::None` なら、そもそも 1 文字も変わりません）。
         let raised = elevated(&operation.run, self.elevation().await);
+
+        // **書き換えたのに効いていない、を黙らない**（実機の報告・2026-10-23）。
+        //
+        // 上げ方は**繋いだ時点の値**です（`Live::elevation`）。
+        // 接続中に `connections.toml` を書き換えても効きません ——
+        // 効くと、人が画面で見ている状態と食い違うからです。
+        //
+        // **仕様としては意図どおりですが、そう言う所が 1 つもありませんでした。**
+        // 実機で `become = "ask"` を足したのに `-S` が付かずに走り、
+        // sudo が「パスワードを読み取るために端末が必要です」と返しました。
+        // **人からは「書いたのに効かない」です。**
+        //
+        // **走らせる直前に言います。**人が困るのはここなので。
+        self.say_if_elevation_drifted().await;
 
         // **回数で止まる。**暴走しても、ここで止まります。
         //
