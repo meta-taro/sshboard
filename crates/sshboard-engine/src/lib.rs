@@ -27,7 +27,10 @@ mod open;
 pub mod probes;
 
 pub use console::{ConsoleFacts, PER_CONNECTION_LIMIT};
-pub use engine::{Answered, ConsoleOpened, Engine, HostKeyAsk, OnConflict, OnScreen, OperationAsk};
+pub use engine::{
+    Answered, ConsoleOpened, Engine, HostKeyAsk, OnConflict, OnScreen, OperationAsk,
+    OperationProposal,
+};
 pub use error::EngineError;
 pub use open::{Opened, WriteAccess};
 

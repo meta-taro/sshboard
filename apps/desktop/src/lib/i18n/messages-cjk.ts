@@ -4,6 +4,18 @@ import type { MessageKey } from './messages';
 type Catalog = Partial<Record<MessageKey, string>>;
 
 export const ko: Catalog = {
+
+	// **AI が「この操作を足してよいか」と出す提案**（実運用の報告・2026-10-23）。
+	// **AI はファイルを書きません。**書くのは画面で、登録と実行は別の行為です。
+	'propose.title': '이 작업을 추가할까요?',
+	'propose.what': 'AI는 스스로 작성한 명령을 실행할 수 없습니다. 이것을 목록에 추가해도 되는지 묻고 있습니다.',
+	'propose.id': '식별자',
+	'propose.run': '실제로 실행',
+	'propose.why': '이유',
+	'propose.ceiling': '시간당',
+	'propose.note': '추가해도 실행되지 않습니다. 처음 실행할 때 이 명령을 다시 보여주고 물어봅니다.',
+	'propose.no': '추가 안 함',
+	'propose.yes': '추가',
 	// **立ち上げ直すと AI の目も切れる**（UI 案・2026-10-21）。
 	// GUI と MCP は同じ 1 本を共有している（禁止事項 3）。
 	'update.cuts.ai': '다시 시작하면 AI가 보고 있는 것이 끊어집니다. 당신 쪽은 아무것도 열려 있지 않습니다.',
@@ -266,6 +278,18 @@ export const ko: Catalog = {
 };
 
 export const zhCN: Catalog = {
+
+	// **AI が「この操作を足してよいか」と出す提案**（実運用の報告・2026-10-23）。
+	// **AI はファイルを書きません。**書くのは画面で、登録と実行は別の行為です。
+	'propose.title': '要添加这个操作吗？',
+	'propose.what': 'AI 不能运行自己写的命令。它在询问是否可以把这条加入允许列表。',
+	'propose.id': '标识符',
+	'propose.run': '实际执行',
+	'propose.why': '原因',
+	'propose.ceiling': '每小时',
+	'propose.note': '添加后不会执行。首次执行时会再次显示这条命令并询问你。',
+	'propose.no': '不添加',
+	'propose.yes': '添加',
 	// **立ち上げ直すと AI の目も切れる**（UI 案・2026-10-21）。
 	// GUI と MCP は同じ 1 本を共有している（禁止事項 3）。
 	'update.cuts.ai': '重新启动会断开 AI 正在查看的内容。你这边没有打开任何东西。',
@@ -528,6 +552,18 @@ export const zhCN: Catalog = {
 };
 
 export const zhTW: Catalog = {
+
+	// **AI が「この操作を足してよいか」と出す提案**（実運用の報告・2026-10-23）。
+	// **AI はファイルを書きません。**書くのは画面で、登録と実行は別の行為です。
+	'propose.title': '要新增這個操作嗎？',
+	'propose.what': 'AI 不能執行自己寫的命令。它在詢問是否可以把這條加入允許清單。',
+	'propose.id': '識別碼',
+	'propose.run': '實際執行',
+	'propose.why': '原因',
+	'propose.ceiling': '每小時',
+	'propose.note': '新增後不會執行。首次執行時會再次顯示這條命令並詢問你。',
+	'propose.no': '不新增',
+	'propose.yes': '新增',
 	// **立ち上げ直すと AI の目も切れる**（UI 案・2026-10-21）。
 	// GUI と MCP は同じ 1 本を共有している（禁止事項 3）。
 	'update.cuts.ai': '重新啟動會斷開 AI 正在查看的內容。你這邊沒有打開任何東西。',

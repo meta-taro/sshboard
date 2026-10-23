@@ -6,6 +6,18 @@
  */
 
 const en = {
+
+	// **AI が「この操作を足してよいか」と出す提案**（実運用の報告・2026-10-23）。
+	// **AI はファイルを書きません。**書くのは画面で、登録と実行は別の行為です。
+	'propose.title': 'Add this operation?',
+	'propose.what': 'The AI cannot run commands it writes itself. It is asking you to add this one to your allowlist.',
+	'propose.id': 'Id',
+	'propose.run': 'Runs',
+	'propose.why': 'Why',
+	'propose.ceiling': 'Per hour',
+	'propose.note': 'Adding it does not run it. The first run still asks you, and shows this exact command again.',
+	'propose.no': "Don't add",
+	'propose.yes': 'Add it',
 	// **立ち上げ直すと AI の目も切れる**（UI 案・2026-10-21）。
 	// GUI と MCP は同じ 1 本を共有している（禁止事項 3）。
 	'update.cuts.ai': "Restarting ends the AI's view of this session. Nothing of yours is open.",
@@ -308,6 +320,18 @@ export type MessageKey = keyof typeof en;
 type Catalog = Partial<Record<MessageKey, string>>;
 
 const ja: Catalog = {
+
+	// **AI が「この操作を足してよいか」と出す提案**（実運用の報告・2026-10-23）。
+	// **AI はファイルを書きません。**書くのは画面で、登録と実行は別の行為です。
+	'propose.title': 'この操作を足しますか？',
+	'propose.what': 'AI は自分で書いたコマンドを走らせられません。これを一覧へ足してよいか聞いています。',
+	'propose.id': '識別子',
+	'propose.run': '実際に打つもの',
+	'propose.why': 'なぜ',
+	'propose.ceiling': '1 時間に',
+	'propose.note': '足しても走りません。最初に走るときは、このコマンドをもう一度出して、あなたに聞きます。',
+	'propose.no': '足さない',
+	'propose.yes': '足す',
 	// **立ち上げ直すと AI の目も切れる**（UI 案・2026-10-21）。
 	// GUI と MCP は同じ 1 本を共有している（禁止事項 3）。
 	'update.cuts.ai': '再起動すると、AI が見ているものが切れます。あなたの側は何も開いていません。',

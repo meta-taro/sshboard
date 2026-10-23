@@ -4,6 +4,18 @@ import type { MessageKey } from './messages';
 type Catalog = Partial<Record<MessageKey, string>>;
 
 export const ptBR: Catalog = {
+
+	// **AI が「この操作を足してよいか」と出す提案**（実運用の報告・2026-10-23）。
+	// **AI はファイルを書きません。**書くのは画面で、登録と実行は別の行為です。
+	'propose.title': 'Adicionar esta operação?',
+	'propose.what': 'A IA não pode executar comandos que ela mesma escreve. Ela pergunta se pode adicionar este à sua lista.',
+	'propose.id': 'Identificador',
+	'propose.run': 'Executa',
+	'propose.why': 'Por quê',
+	'propose.ceiling': 'Por hora',
+	'propose.note': 'Adicionar não executa. Na primeira execução você é perguntado de novo, com este mesmo comando.',
+	'propose.no': 'Não adicionar',
+	'propose.yes': 'Adicionar',
 	// **立ち上げ直すと AI の目も切れる**（UI 案・2026-10-21）。
 	// GUI と MCP は同じ 1 本を共有している（禁止事項 3）。
 	'update.cuts.ai': 'Reiniciar encerra o que a IA está vendo. Você não tem nada aberto.',
@@ -266,6 +278,18 @@ export const ptBR: Catalog = {
 };
 
 export const ru: Catalog = {
+
+	// **AI が「この操作を足してよいか」と出す提案**（実運用の報告・2026-10-23）。
+	// **AI はファイルを書きません。**書くのは画面で、登録と実行は別の行為です。
+	'propose.title': 'Добавить эту операцию?',
+	'propose.what': 'ИИ не может выполнять команды, которые пишет сам. Он спрашивает, можно ли добавить её в список.',
+	'propose.id': 'Идентификатор',
+	'propose.run': 'Выполняет',
+	'propose.why': 'Зачем',
+	'propose.ceiling': 'В час',
+	'propose.note': 'Добавление не запускает её. При первом запуске вас спросят снова и покажут ту же команду.',
+	'propose.no': 'Не добавлять',
+	'propose.yes': 'Добавить',
 	// **立ち上げ直すと AI の目も切れる**（UI 案・2026-10-21）。
 	// GUI と MCP は同じ 1 本を共有している（禁止事項 3）。
 	'update.cuts.ai': 'Перезапуск разорвёт то, что видит ИИ. У вас ничего не открыто.',
@@ -528,6 +552,18 @@ export const ru: Catalog = {
 };
 
 export const it: Catalog = {
+
+	// **AI が「この操作を足してよいか」と出す提案**（実運用の報告・2026-10-23）。
+	// **AI はファイルを書きません。**書くのは画面で、登録と実行は別の行為です。
+	'propose.title': 'Aggiungere questa operazione?',
+	'propose.what': 'L’IA non può eseguire comandi che scrive da sé. Chiede se può aggiungerlo al tuo elenco.',
+	'propose.id': 'Identificatore',
+	'propose.run': 'Esegue',
+	'propose.why': 'Perché',
+	'propose.ceiling': 'All’ora',
+	'propose.note': 'Aggiungerlo non lo esegue. Alla prima esecuzione ti viene chiesto di nuovo, con questo stesso comando.',
+	'propose.no': 'Non aggiungere',
+	'propose.yes': 'Aggiungi',
 	// **立ち上げ直すと AI の目も切れる**（UI 案・2026-10-21）。
 	// GUI と MCP は同じ 1 本を共有している（禁止事項 3）。
 	'update.cuts.ai': 'Riavviare interrompe ciò che l’IA sta guardando. Dalla tua parte non c’è nulla di aperto.',

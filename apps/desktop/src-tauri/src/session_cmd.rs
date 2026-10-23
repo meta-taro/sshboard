@@ -9,7 +9,9 @@ use std::sync::Arc;
 use serde::Serialize;
 use sshboard_band::Actor;
 use sshboard_diag::Event;
-use sshboard_engine::{Engine, OnConflict, Opened, OperationAsk as EngineOperationAsk};
+use sshboard_engine::{
+    Engine, OnConflict, Opened, OperationAsk as EngineOperationAsk, OperationProposal,
+};
 use tauri::{AppHandle, Emitter, State};
 
 /// 開いている接続が変わったことを画面へ配るイベント。
@@ -697,7 +699,58 @@ pub fn spawn_operation_bridge(app: AppHandle, engine: Arc<Engine>) {
     });
 }
 
+/// **AI が出した提案**を画面へ渡すイベント（実運用の報告・2026-10-23）。
+pub const OPERATION_PROPOSAL_EVENT: &str = "operation://proposal";
+
+/// 提案を画面へ押し出す。
+///
+/// **提案が人の目に触れないと、操作は画面の外へ出ます** ——
+/// 本番でまさにそれが起きました（記録も残らない経路へ流れた）。
+pub fn spawn_proposal_bridge(app: AppHandle, engine: Arc<Engine>) {
+    tauri::async_runtime::spawn(async move {
+        let mut watching = engine.subscribe_operation_proposal();
+        while watching.changed().await.is_ok() {
+            let asked: Option<OperationProposal> = watching.borrow().clone();
+            if asked.is_some() {
+                nudge(&app);
+            }
+            if let Err(error) = app.emit(OPERATION_PROPOSAL_EVENT, asked) {
+                eprintln!("[sshboard] 操作の提案を画面へ渡せません: {error}");
+            }
+        }
+    });
+}
+
 /// いま人に問うている操作。**起動直後の取りこぼし対策。**
+/// AI が出した提案（まだ登録されていません）。
+#[tauri::command]
+pub fn operation_proposal(engine: State<'_, Arc<Engine>>) -> Option<OperationProposal> {
+    engine.operation_proposal()
+}
+
+/// **人が提案を登録する。**`operations.toml` へ追記します。
+///
+/// **この口は画面にしか在りません。**MCP には出していないので、
+/// **AI が `operations.toml` を書く道は 1 本もありません**（D22 / D27）。
+///
+/// **登録しても走りません。**走るときは承認の問いを通ります（D42）——
+/// 1 回の押下にまとめたら、それは手順を増やした `run_command` です（D3）。
+#[tauri::command]
+pub fn operation_register(
+    proposal: OperationProposal,
+    engine: State<'_, Arc<Engine>>,
+) -> Result<(), String> {
+    engine
+        .register_operation(&proposal)
+        .map_err(|error| error.to_string())
+}
+
+/// **人が提案を断る。**何も書きません。
+#[tauri::command]
+pub fn operation_dismiss(engine: State<'_, Arc<Engine>>) {
+    engine.dismiss_proposal();
+}
+
 #[tauri::command]
 pub async fn operation_request(
     engine: State<'_, Arc<Engine>>,

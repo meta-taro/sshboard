@@ -23,6 +23,8 @@
 	import ConnectionRail from '$lib/components/ConnectionRail.svelte';
 	import DiagPanel from '$lib/components/DiagPanel.svelte';
 	import KeyHelpDialog from '$lib/components/KeyHelpDialog.svelte';
+	import OperationProposalDialog from '$lib/components/OperationProposalDialog.svelte';
+	import type { OperationProposal } from '$lib/components/OperationProposalDialog.svelte';
 	import { summarise } from '$lib/update/notes';
 	import { cutMessageKey, cutSummary } from '$lib/update/restart-cost';
 	import { updater } from '$lib/update/updater.svelte';
@@ -243,6 +245,36 @@
 	 */
 	type OperationAsk = { id: string; runs: string; needsSecret: boolean };
 	let operationAsk = $state<OperationAsk | null>(null);
+
+	/**
+	 * **AI が「この操作を足してよいか」と出した提案**（実運用の報告・2026-10-23）。
+	 *
+	 * **これは実行の要求ではありません。**登録と実行は別の行為で、
+	 * 登録しても走りません（走るときは上の `operationAsk` を通ります）。
+	 * **1 回の押下にまとめたら、それは手順を増やした `run_command` です**（D3）。
+	 */
+	let operationProposal = $state<OperationProposal | null>(null);
+
+	/** **人が登録する。**書くのは画面で、AI にこの口はありません（D22 / D27）。 */
+	async function registerProposal(proposal: OperationProposal) {
+		failure = null;
+		try {
+			await invoke('operation_register', { proposal });
+			operationProposal = null;
+		} catch (error: unknown) {
+			// **握り潰さない。**押したのに入っていない、を作らない。
+			failure = String(error);
+		}
+	}
+
+	async function dismissProposal() {
+		try {
+			await invoke('operation_dismiss');
+		} catch (error: unknown) {
+			failure = String(error);
+		}
+		operationProposal = null;
+	}
 
 	/**
 	 * `secret` は **人がその場で入れたものだけ**（D48）。
@@ -1022,6 +1054,14 @@
 			.catch(() => {
 				/* 取れなくても画面は出す */
 			});
+		invoke<OperationProposal | null>('operation_proposal')
+			.then((asked) => {
+				operationProposal = asked;
+			})
+			.catch(() => {});
+		listen<OperationProposal | null>('operation://proposal', (event) => {
+			operationProposal = event.payload;
+		}).then((off) => stops.push(off));
 		listen<OperationAsk | null>('operation://request', (event) => {
 			operationAsk = event.payload;
 		})
@@ -1768,6 +1808,18 @@
 	-->
 	{#if keyHelpOpen}
 		<KeyHelpDialog {platform} onclose={() => (keyHelpOpen = false)} />
+	{/if}
+
+	<!--
+		**AI が「この操作を足してよいか」と出した提案**（実運用の報告・2026-10-23）。
+		**コマンドを 1 文字も省略せずに出します** —— 読めない同意は、同意ではありません。
+	-->
+	{#if operationProposal}
+		<OperationProposalDialog
+			proposal={operationProposal}
+			onregister={() => void registerProposal(operationProposal!)}
+			ondismiss={() => void dismissProposal()}
+		/>
 	{/if}
 
 	{#if failure}

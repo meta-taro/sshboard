@@ -141,6 +141,37 @@ pub struct OperationAsk {
     pub needs_secret: bool,
 }
 
+/// **AI が「これを足してよいか」と出す提案**（実運用の報告・2026-10-23）。
+///
+/// ## なぜ要るか
+///
+/// 本番で、調べるところは sshboard で完結したのに、直す段で止まりました ——
+/// `operations.toml` が空で、**人は書く場所を探して見つけられず、
+/// 操作は画面の外で行われ、記録も残りませんでした。**
+///
+/// `run_command` を作らない決定（D3）が守ろうとしたもの
+/// 「**人の見ていない所で終わらせない**」が、まさに裏返った形です。
+///
+/// ## これは `run_command` ではありません
+///
+/// **AI はこのファイルを書きません。**出すのは提案（ただのデータ）だけで、
+/// **書くのは画面（GUI）**です（D22 / D27 —— AI に手元へ書く口は作らない）。
+///
+/// そして **登録と実行は別の行為**です。登録しても走りません ——
+/// 走るときは既存の承認の問いを通ります（D42）。
+/// **1 回の押下にまとめたら、それは手順を増やした `run_command` です。**
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct OperationProposal {
+    /// AI が渡したい識別子。
+    pub id: String,
+    /// **実際に打つ文字列。**人はこれを 1 文字も省略せずに読みます。
+    pub run: String,
+    /// なぜ要るのか。**人が読んで判断するための説明。**
+    pub description: String,
+    /// 1 時間あたりの上限。**上限の無い操作は登録できません。**
+    pub max_per_hour: u32,
+}
+
 /// **押されたまま忘れられた許可を、いつまでも持たない**（D48）。
 ///
 /// 人が［許可］を押したのに AI が呼び返してこないことは在ります
@@ -214,6 +245,8 @@ pub struct Engine {
     /// 持つのは**識別子と、実際に打つ文字列**だけ。人が「何が走るのか」を
     /// 読んでから答えられるようにするためです。
     operation_request: watch::Sender<Option<OperationAsk>>,
+    /// **AI が出した提案**（実運用の報告・2026-10-23）。登録は人がします。
+    operation_proposal: watch::Sender<Option<OperationProposal>>,
     /// **人が出した許可の札**（未使用のもの）。走るときに 1 枚取り出して消えます。
     ///
     /// **走った回数と同じ入れ物にしません。**同じにしていたせいで、
@@ -257,6 +290,7 @@ impl Engine {
         let (passphrase_request, _) = watch::channel(None);
         let (host_key_request, _) = watch::channel(None);
         let (operation_request, _) = watch::channel(None);
+        let (operation_proposal, _) = watch::channel(None);
         Self {
             band,
             diag,
@@ -272,6 +306,7 @@ impl Engine {
             passphrase_request,
             host_key_request,
             operation_request,
+            operation_proposal,
             operation_approvals: Mutex::new(Vec::new()),
             operation_runs: Mutex::new(Vec::new()),
             changed,
@@ -1793,6 +1828,107 @@ impl Engine {
     }
 
     /// いま人に問うている操作。**秘密は載りません。**
+    /// **AI が出した提案**（まだ登録されていません）。
+    pub fn operation_proposal(&self) -> Option<OperationProposal> {
+        self.operation_proposal.borrow().clone()
+    }
+
+    pub fn subscribe_operation_proposal(&self) -> watch::Receiver<Option<OperationProposal>> {
+        self.operation_proposal.subscribe()
+    }
+
+    /// **AI が提案を置く。**書き込みはしません。
+    ///
+    /// **組み立てた文字列は、そのまま人へ出ます。**だから
+    /// ここで検品します —— 踏ませない語（D47）と、上限の無い指定は
+    /// **人に見せる前に**断ります。見せてから断ると、
+    /// 人は「押したのに入らない」に当たります。
+    pub async fn propose_operation(
+        &self,
+        actor: Actor,
+        proposal: OperationProposal,
+    ) -> Result<(), EngineError> {
+        // **`Operations::parse` に通して検品する。**規則の出どころを 2 つにしない。
+        let as_toml = format!(
+            "version = 1\n\n[[operation]]\nid = {:?}\nrun = {:?}\ndescription = {:?}\nmax_per_hour = {}\n",
+            proposal.id, proposal.run, proposal.description, proposal.max_per_hour
+        );
+        Operations::parse(&as_toml).map_err(|error| EngineError::BadArgument(error.to_string()))?;
+
+        // **帯に出す。**提案そのものが人の目に触れないと、
+        // 画面の外へ出るのを止められません。
+        let told = self
+            .show(
+                actor,
+                &format!(
+                    "propose_operation `{}` — **登録してよいか聞いています**: {}",
+                    proposal.id, proposal.run
+                ),
+            )
+            .await;
+        if let Err(error) = told {
+            self.diag
+                .warn(Stage::Exec, None, format!("帯へ出せませんでした: {error}"));
+        }
+
+        let _ = self.operation_proposal.send(Some(proposal));
+        Ok(())
+    }
+
+    /// **人が提案を登録する。**`operations.toml` へ追記します。
+    ///
+    /// **ここを呼べるのは画面だけ**です（MCP には出しません）。
+    /// AI がこのファイルを書く道は 1 本もありません（D22 / D27）。
+    ///
+    /// **登録しても走りません。**走るときは承認の問いを通ります（D42）。
+    pub fn register_operation(&self, proposal: &OperationProposal) -> Result<(), EngineError> {
+        let path = self.operations_path();
+
+        // **いま在るものを読んで、同じ id を 2 つにしない。**
+        // 2 つ在ると、どちらが走るのか人が読めません。
+        let existing = Operations::load_or_empty(&path)
+            .map_err(|error| EngineError::Allowlist(error.to_string()))?;
+        if existing.get(&proposal.id).is_some() {
+            return Err(EngineError::BadArgument(format!(
+                "{} は既に在ります。**上書きしません** —— 直すなら人が {} を開いてください",
+                proposal.id,
+                path.display()
+            )));
+        }
+
+        let head = if path.exists() {
+            String::new()
+        } else {
+            // 新しく作るときだけ版を書く。
+            "version = 1\n".to_string()
+        };
+        let block = format!(
+            "{head}\n[[operation]]\nid = {:?}\nrun = {:?}\ndescription = {:?}\nmax_per_hour = {}\n",
+            proposal.id, proposal.run, proposal.description, proposal.max_per_hour
+        );
+
+        let mut text = std::fs::read_to_string(&path).unwrap_or_default();
+        text.push_str(&block);
+
+        // **書いたものが読めることを、書く前に確かめる。**
+        // 読めない一覧は空として扱わない決まりなので（`OperationsError`）、
+        // 壊れたファイルを置くと**1 本も走らなくなります。**
+        Operations::parse(&text).map_err(|error| EngineError::BadArgument(error.to_string()))?;
+
+        std::fs::write(&path, &text).map_err(|error| {
+            EngineError::Allowlist(format!("{} へ書けません: {error}", path.display()))
+        })?;
+
+        // 登録できたら提案は下げる。**出したままにすると二度登録されます。**
+        let _ = self.operation_proposal.send(None);
+        Ok(())
+    }
+
+    /// **人が提案を断る。**何も書きません。
+    pub fn dismiss_proposal(&self) {
+        let _ = self.operation_proposal.send(None);
+    }
+
     pub fn operation_request(&self) -> Option<OperationAsk> {
         self.operation_request.borrow().clone()
     }

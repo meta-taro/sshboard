@@ -4,6 +4,18 @@ import type { MessageKey } from './messages';
 type Catalog = Partial<Record<MessageKey, string>>;
 
 export const de: Catalog = {
+
+	// **AI が「この操作を足してよいか」と出す提案**（実運用の報告・2026-10-23）。
+	// **AI はファイルを書きません。**書くのは画面で、登録と実行は別の行為です。
+	'propose.title': 'Diesen Vorgang hinzufügen?',
+	'propose.what': 'Die KI kann keine Befehle ausführen, die sie selbst schreibt. Sie fragt, ob dieser in Ihre Liste darf.',
+	'propose.id': 'Kennung',
+	'propose.run': 'Führt aus',
+	'propose.why': 'Warum',
+	'propose.ceiling': 'Pro Stunde',
+	'propose.note': 'Hinzufügen führt nichts aus. Beim ersten Lauf werden Sie erneut gefragt, mit genau diesem Befehl.',
+	'propose.no': 'Nicht hinzufügen',
+	'propose.yes': 'Hinzufügen',
 	// **立ち上げ直すと AI の目も切れる**（UI 案・2026-10-21）。
 	// GUI と MCP は同じ 1 本を共有している（禁止事項 3）。
 	'update.cuts.ai': 'Ein Neustart beendet die Sicht der KI. Bei Ihnen ist nichts offen.',
@@ -266,6 +278,18 @@ export const de: Catalog = {
 };
 
 export const fr: Catalog = {
+
+	// **AI が「この操作を足してよいか」と出す提案**（実運用の報告・2026-10-23）。
+	// **AI はファイルを書きません。**書くのは画面で、登録と実行は別の行為です。
+	'propose.title': 'Ajouter cette opération ?',
+	'propose.what': 'L’IA ne peut pas exécuter les commandes qu’elle écrit. Elle demande à l’ajouter à votre liste.',
+	'propose.id': 'Identifiant',
+	'propose.run': 'Exécute',
+	'propose.why': 'Pourquoi',
+	'propose.ceiling': 'Par heure',
+	'propose.note': 'L’ajouter ne l’exécute pas. Au premier lancement, on vous redemande, avec cette commande exacte.',
+	'propose.no': 'Ne pas ajouter',
+	'propose.yes': 'Ajouter',
 	// **立ち上げ直すと AI の目も切れる**（UI 案・2026-10-21）。
 	// GUI と MCP は同じ 1 本を共有している（禁止事項 3）。
 	'update.cuts.ai': 'Redémarrer coupe ce que l’IA regarde. Rien n’est ouvert de votre côté.',
@@ -528,6 +552,18 @@ export const fr: Catalog = {
 };
 
 export const es: Catalog = {
+
+	// **AI が「この操作を足してよいか」と出す提案**（実運用の報告・2026-10-23）。
+	// **AI はファイルを書きません。**書くのは画面で、登録と実行は別の行為です。
+	'propose.title': '¿Añadir esta operación?',
+	'propose.what': 'La IA no puede ejecutar comandos que escribe ella misma. Pregunta si puede añadirlo a tu lista.',
+	'propose.id': 'Identificador',
+	'propose.run': 'Ejecuta',
+	'propose.why': 'Por qué',
+	'propose.ceiling': 'Por hora',
+	'propose.note': 'Añadirlo no lo ejecuta. La primera vez se te vuelve a preguntar, con este mismo comando.',
+	'propose.no': 'No añadir',
+	'propose.yes': 'Añadir',
 	// **立ち上げ直すと AI の目も切れる**（UI 案・2026-10-21）。
 	// GUI と MCP は同じ 1 本を共有している（禁止事項 3）。
 	'update.cuts.ai': 'Reiniciar corta lo que la IA está viendo. No tienes nada abierto.',

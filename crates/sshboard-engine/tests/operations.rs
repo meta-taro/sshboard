@@ -564,3 +564,178 @@ async fn the_refusal_shows_up_in_the_band() {
         event.line().text()
     );
 }
+
+// --- AI の提案と、人の登録（実運用の報告・2026-10-23）---------------------
+//
+// **これは `run_command` ではありません。**
+// AI が出すのは提案（ただのデータ）で、**書くのは人**です。
+// そして**登録と実行は別の行為**です。
+
+/// **AI の提案が、踏ませない語を含むなら、人に見せる前に断る。**
+///
+/// 見せてから断ると、人は「押したのに入らない」に当たります。
+#[tokio::test]
+async fn a_proposal_with_a_forbidden_word_never_reaches_the_person() {
+    let dir = tempfile::tempdir().expect("一時ディレクトリ");
+    let engine = engine_in(&dir);
+
+    let refused = engine
+        .propose_operation(
+            Actor::Ai,
+            sshboard_engine::OperationProposal {
+                id: "sneaky".into(),
+                run: "sudo cat /root/.ssh/id_ed25519".into(),
+                description: "鍵を読む".into(),
+                max_per_hour: 1,
+            },
+        )
+        .await;
+
+    assert!(refused.is_err(), "踏ませない語が通っている");
+    assert!(
+        engine.operation_proposal().is_none(),
+        "**人に見せる所まで届いている**"
+    );
+}
+
+/// **上限の無い提案は入れられない。**止まる所が要ります。
+#[tokio::test]
+async fn a_proposal_without_a_ceiling_is_refused() {
+    let dir = tempfile::tempdir().expect("一時ディレクトリ");
+    let engine = engine_in(&dir);
+
+    let refused = engine
+        .propose_operation(
+            Actor::Ai,
+            sshboard_engine::OperationProposal {
+                id: "no-ceiling".into(),
+                run: "sudo systemctl reload httpd".into(),
+                description: "読み直させる".into(),
+                max_per_hour: 0,
+            },
+        )
+        .await;
+
+    assert!(refused.is_err(), "上限 0 が通っている");
+}
+
+/// **提案を出しても、まだ走らない。**
+///
+/// ここが `run_command` との違いです。**提案は実行権ではありません。**
+#[tokio::test]
+async fn proposing_does_not_make_it_runnable() {
+    let dir = tempfile::tempdir().expect("一時ディレクトリ");
+    let engine = engine_in(&dir);
+
+    engine
+        .propose_operation(
+            Actor::Ai,
+            sshboard_engine::OperationProposal {
+                id: "httpd-reload".into(),
+                run: "sudo systemctl reload httpd".into(),
+                description: "読み直させる".into(),
+                max_per_hour: 2,
+            },
+        )
+        .await
+        .expect("提案が通らない");
+
+    let refused = engine.run_operation(Actor::Ai, "httpd-reload").await;
+    assert!(
+        matches!(refused, Err(EngineError::OperationNotAllowed { .. })),
+        "**提案しただけで走った**: {refused:?}"
+    );
+}
+
+/// **人が登録すると、一覧に入る。**書くのは人の側の口です。
+#[tokio::test]
+async fn the_person_registering_it_puts_it_on_the_list() {
+    let dir = tempfile::tempdir().expect("一時ディレクトリ");
+    let engine = engine_in(&dir);
+    let proposal = sshboard_engine::OperationProposal {
+        id: "httpd-reload".into(),
+        run: "sudo systemctl reload httpd".into(),
+        description: "読み直させる".into(),
+        max_per_hour: 2,
+    };
+
+    engine
+        .propose_operation(Actor::Ai, proposal.clone())
+        .await
+        .expect("提案が通らない");
+    engine.register_operation(&proposal).expect("登録できない");
+
+    let listed = engine.operations().expect("読めない");
+    assert!(listed.get("httpd-reload").is_some(), "一覧に入っていない");
+    // **出した提案は下がる。**出したままだと二度登録されます。
+    assert!(engine.operation_proposal().is_none(), "提案が残っている");
+}
+
+/// **登録しても、AI はまだ走らせられない。**承認の問いを通ります（D42）。
+#[tokio::test]
+async fn registering_is_not_the_same_as_allowing_it_to_run() {
+    let dir = tempfile::tempdir().expect("一時ディレクトリ");
+    let engine = engine_in(&dir);
+    let proposal = sshboard_engine::OperationProposal {
+        id: "httpd-reload".into(),
+        run: "sudo systemctl reload httpd".into(),
+        description: "読み直させる".into(),
+        max_per_hour: 2,
+    };
+    engine.register_operation(&proposal).expect("登録できない");
+
+    // 繋いでいないので走りませんが、**断られ方が「承認が無い」側**であること。
+    let asked = engine.run_operation(Actor::Ai, "httpd-reload").await;
+    assert!(
+        !matches!(asked, Err(EngineError::OperationNotAllowed { .. })),
+        "登録したのに一覧に無い扱い: {asked:?}"
+    );
+    assert!(
+        engine.operation_request().is_some(),
+        "**承認の問いが立っていない** —— 登録＝実行になっています"
+    );
+}
+
+/// **同じ id を 2 つにしない。**どちらが走るのか人が読めません。
+#[tokio::test]
+async fn registering_the_same_id_twice_is_refused() {
+    let dir = tempfile::tempdir().expect("一時ディレクトリ");
+    let engine = engine_in(&dir);
+    let proposal = sshboard_engine::OperationProposal {
+        id: "httpd-reload".into(),
+        run: "sudo systemctl reload httpd".into(),
+        description: "読み直させる".into(),
+        max_per_hour: 2,
+    };
+    engine.register_operation(&proposal).expect("1 回目");
+
+    let again = engine.register_operation(&proposal);
+    assert!(again.is_err(), "**上書きしている**");
+}
+
+/// **断ったら何も書かない。**
+#[tokio::test]
+async fn dismissing_a_proposal_writes_nothing() {
+    let dir = tempfile::tempdir().expect("一時ディレクトリ");
+    let engine = engine_in(&dir);
+    engine
+        .propose_operation(
+            Actor::Ai,
+            sshboard_engine::OperationProposal {
+                id: "httpd-reload".into(),
+                run: "sudo systemctl reload httpd".into(),
+                description: "読み直させる".into(),
+                max_per_hour: 2,
+            },
+        )
+        .await
+        .expect("提案が通らない");
+
+    engine.dismiss_proposal();
+
+    assert!(engine.operation_proposal().is_none(), "提案が残っている");
+    assert!(
+        !dir.path().join("operations.toml").exists(),
+        "**断ったのにファイルが出来ている**"
+    );
+}

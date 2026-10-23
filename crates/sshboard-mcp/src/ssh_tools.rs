@@ -177,6 +177,33 @@ impl SshboardMcp {
 
     /// 人が許した操作を走らせる（D45）。**渡せるのは id だけ。**
     #[tool(
+        description = "Ask the human to add an operation to their allowlist. **This does not run anything and does not write any file.** sshboard ships an empty operations list on purpose: the AI may only pass an id, and what runs is the literal string the human wrote. When run_operation refuses because nothing is registered, call this with the exact command you would need, a short id, why it is needed, and an hourly ceiling. The proposal appears on the human's screen with the command shown verbatim; **the human - not you - writes the file**, and registering it still does not let it run (the usual approval question comes first). Refused before the human ever sees it if the command touches something that can never be allowed (sudoers, authorized_keys, ssh keys, /etc/shadow, user and group changes, mkfs, dd, rm -rf) or if max_per_hour is 0. Do not propose the same thing twice - the question is already showing."
+    )]
+    pub async fn propose_operation(
+        &self,
+        Parameters(request): Parameters<ProposeOperation>,
+    ) -> Result<String, ErrorData> {
+        self.engine()?
+            .propose_operation(
+                Actor::Ai,
+                sshboard_engine::OperationProposal {
+                    id: request.operation_id.clone(),
+                    run: request.run,
+                    description: request.description,
+                    max_per_hour: request.max_per_hour,
+                },
+            )
+            .await
+            .map_err(refuse)?;
+        Ok(format!(
+            "`{}` を人の画面へ出しました。**まだ何も走っていません。**\n\
+             書くのは人で、登録されても実行には別の承認が要ります。\n\
+             人が押すまで、これ以上呼ばないでください（問いは出たままです）。",
+            request.operation_id
+        ))
+    }
+
+    #[tool(
         description = "Run one of the state-changing operations the human listed in \
                        operations.toml, by id. **You cannot pass a command** - only an id, \
                        and only ids that are already in that file. The first call refuses \
@@ -1140,6 +1167,23 @@ anything you write, quote, or screenshot.";
 pub struct OperationId {
     /// `operations.toml` に人が書いた id。
     pub operation_id: String,
+}
+
+/// `propose_operation` の引数。
+///
+/// **これは実行の要求ではありません。**人へ出す提案で、
+/// **書くのは画面（GUI）**です。AI に `operations.toml` を書く道はありません。
+#[derive(Debug, Deserialize, rmcp::schemars::JsonSchema)]
+#[schemars(crate = "rmcp::schemars")]
+pub struct ProposeOperation {
+    /// 付けたい id。**短く、何をするか分かる名前**（`httpd-reload` など）。
+    pub operation_id: String,
+    /// **実際に打つ文字列。**人はこれを 1 文字も省略せずに読みます。
+    pub run: String,
+    /// なぜ要るのか。**人が読んで判断するための説明。**
+    pub description: String,
+    /// 1 時間あたりの上限。**1 以上**（上限の無い操作は登録できません）。
+    pub max_per_hour: u32,
 }
 
 /// `show_view` の引数。**画面のタブ名だけ**（接続先も何も通りません）。

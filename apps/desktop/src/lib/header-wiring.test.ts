@@ -306,3 +306,45 @@ describe('メニューはロゴの下（UI 案・2026-10-21）', () => {
 		expect(rule).toContain('flex: 0 1 auto');
 	});
 });
+
+describe('AI の提案と、人の登録（実運用の報告・2026-10-23）', () => {
+	/**
+	 * **これは `run_command` ではありません。**
+	 *
+	 * 本番で、調べるところは sshboard で完結したのに直す段で止まり、
+	 * **操作が画面の外で行われ、記録も残りませんでした。**
+	 * `run_command` を作らない決定（D3）が守ろうとしたもの
+	 * 「人の見ていない所で終わらせない」が裏返った形です。
+	 *
+	 * 足した道が同じ穴にならないよう、ここで数えます。
+	 */
+	test('writes the file through the GUI, never through the AI', () => {
+		// **AI にこの口はありません**（MCP には出していない）。
+		expect(source).toContain("invoke('operation_register', { proposal })");
+	});
+
+	test('keeps registering and running apart', () => {
+		// **登録しても走りません。**走るときは承認の問い（`operationAsk`）を通る。
+		// 1 回の押下にまとめたら、それは手順を増やした `run_command`。
+		expect(source).toContain('let operationProposal = $state<OperationProposal | null>(null);');
+		expect(source).toContain('let operationAsk = $state<OperationAsk | null>(null);');
+	});
+
+	test('does not swallow a failure when registering', () => {
+		// **押したのに入っていない**を黙って通さない。
+		const at = source.indexOf('async function registerProposal');
+		expect(at).toBeGreaterThan(-1);
+		expect(source.slice(at, at + 420)).toContain('failure = String(error)');
+	});
+
+	test('writes nothing when the person says no', () => {
+		expect(source).toContain("invoke('operation_dismiss')");
+	});
+
+	test('listens for proposals so they cannot be missed', () => {
+		// 提案が人の目に触れないと、操作は画面の外へ出ます。
+		expect(source).toContain("listen<OperationProposal | null>('operation://proposal'");
+		// **起動直後の取りこぼし対策。**購読だけだと、出たあとに開いた人には届かない。
+		expect(source).toContain("invoke<OperationProposal | null>('operation_proposal')");
+	});
+});
