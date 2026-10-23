@@ -407,18 +407,26 @@ jobs:
           # **配布物は失われません。**赤は「一覧だけ人が叩いてください」の合図です。
           #
           # 名前で絞ります（`search=sshboard` より軽い）。
+          # **待ちを伸ばしました**（2026-10-23）。0 / 5 / 15 秒では足りません ——
+          # v0.1.25 と v0.1.26 で**続けて落ちました。**
+          # 落ちたとき手元から叩いても同じく無応答だったので、
+          # **実行機固有ではなく、一覧そのものが止まっています。**
+          # 数分の不通で人を呼ばない程度には粘ります。
           BODY=""
-          for wait in 0 5 15; do
+          for wait in 0 30 60 120; do
             [ "$wait" = 0 ] || sleep "$wait"
             BODY="$(curl -fsS --max-time 20 \
               'https://registry.modelcontextprotocol.io/v0/servers?search=io.github.meta-taro/sshboard' \
               || true)"
             [ -n "$BODY" ] && break
-            echo "一覧が読めません。${wait} 秒おいて、もう一度試します"
+            # **秒数を書きません。**`$wait` は「今回待った分」で、次に待つ分ではない
+            # （0 / 30 / 60 / 120 と並べているので、書くとずれます）。
+            echo "一覧が読めません。間を置いて、もう一度試します"
           done
           if [ -z "$BODY" ]; then
-            echo "::error::一覧が 3 回読めませんでした。**出し直していません。**"
-            echo "::error::人が叩いてください: mcp-publisher login github && mcp-publisher publish"
+            echo "::error::一覧が 4 回（約 3.5 分）読めませんでした。**出し直していません。**"
+            echo "::error::**配布物は出ています**（前の job で添付済み）。残っているのは一覧だけです。"
+            echo "::error::一覧が戻ったら、人が叩いてください: mcp-publisher login github && mcp-publisher publish"
             exit 1
           fi
           NOW="$(echo "$BODY" | jq -r \
