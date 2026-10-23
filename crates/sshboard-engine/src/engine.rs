@@ -1897,7 +1897,10 @@ impl Engine {
                 format!("{id} は 1 時間に {} 回までです", operation.max_per_hour),
                 "時間を空けるか、人に operations.toml を見直してもらってください",
             );
-            return Err(EngineError::NotAllowed { id: id.to_owned() });
+            return Err(EngineError::OperationCeiling {
+                id: id.to_owned(),
+                max_per_hour: operation.max_per_hour,
+            });
         }
 
         // **札を取るのは、承認が要るときか、秘密が要るとき。**
@@ -2152,10 +2155,25 @@ impl Engine {
             );
         }
 
+        // **帯にも書く場所を出す**（実運用の報告・2026-10-23）。
+        //
+        // それまで断りは**診断にしか出ていませんでした** —— 人が開かないタブです。
+        // 帯は端末の横に常設されたので（UI 案・3 列）、**そこに出れば人は見ます。**
+        //
+        // 本番で起きたのはこれです —— 人は書く場所を探して見つけられず、
+        // **操作が画面の外で行われ、記録も残りませんでした。**
         let told = self
             .show(
                 actor,
-                &format!("run_operation `{id}` — 操作の一覧に無いので断りました"),
+                &format!(
+                    "run_operation `{id}` — 断りました（{}）。**既定は空です。書くのは人です**: {}",
+                    if listed.is_empty() {
+                        "まだ 1 本も書かれていません"
+                    } else {
+                        "一覧に在りません"
+                    },
+                    where_to_write.display()
+                ),
             )
             .await;
         if let Err(error) = told {
@@ -2163,7 +2181,11 @@ impl Engine {
                 .warn(Stage::Exec, None, format!("帯へ出せませんでした: {error}"));
         }
 
-        EngineError::NotAllowed { id: id.to_owned() }
+        EngineError::OperationNotAllowed {
+            id: id.to_owned(),
+            path: where_to_write.display().to_string(),
+            empty: listed.is_empty(),
+        }
     }
 
     // --- 用途別の読み取り（D3） ---------------------------------------------

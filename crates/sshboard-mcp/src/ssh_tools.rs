@@ -62,6 +62,9 @@ fn refuse(error: EngineError) -> ErrorData {
         | EngineError::PassphraseNeeded { .. }
         // **許可リストに足せるのは人だけ**（D3）。AI へは「人に頼め」と返す。
         | EngineError::NotAllowed { .. }
+        // **操作の断りも「人が決めること」の側。**AI の失敗ではありません。
+        | EngineError::OperationNotAllowed { .. }
+        | EngineError::OperationCeiling { .. }
         | EngineError::Allowlist(_)
         // 値が足りないだけ。**AI が直せる。**
         | EngineError::BadArgument(_)

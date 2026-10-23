@@ -48,7 +48,7 @@ async fn nothing_runs_until_a_person_writes_the_file() {
     let refused = engine.run_operation(Actor::Ai, "reload-httpd").await;
 
     assert!(
-        matches!(refused, Err(EngineError::NotAllowed { .. })),
+        matches!(refused, Err(EngineError::OperationNotAllowed { .. })),
         "一覧が無いのに通っている: {refused:?}"
     );
 }
@@ -288,7 +288,7 @@ async fn the_hourly_ceiling_actually_stops_it() {
     let second = engine.run_operation(Actor::Ai, "once-an-hour").await;
 
     assert!(
-        matches!(second, Err(EngineError::NotAllowed { .. })),
+        matches!(second, Err(EngineError::OperationCeiling { .. })),
         "**1 時間あたりの上限が効いていない**: {second:?}"
     );
 }
@@ -422,7 +422,10 @@ async fn an_unknown_operation_points_at_operations_toml_not_the_readonly_list() 
     let engine = engine_in(&dir);
 
     let refused = engine.run_operation(Actor::Ai, "restart-everything").await;
-    assert!(matches!(refused, Err(EngineError::NotAllowed { .. })));
+    assert!(matches!(
+        refused,
+        Err(EngineError::OperationNotAllowed { .. })
+    ));
 
     let said = engine
         .diagnostics()
@@ -453,7 +456,10 @@ async fn an_empty_operations_file_says_so() {
     let engine = engine_in(&dir);
 
     let refused = engine.run_operation(Actor::Ai, "reload-httpd").await;
-    assert!(matches!(refused, Err(EngineError::NotAllowed { .. })));
+    assert!(matches!(
+        refused,
+        Err(EngineError::OperationNotAllowed { .. })
+    ));
 
     let said = engine
         .diagnostics()
@@ -470,5 +476,91 @@ async fn an_empty_operations_file_says_so() {
     assert!(
         said.iter().any(|line| line.contains("operations.toml")),
         "**どこへ書けばいいかを言っていない**: {said:?}"
+    );
+}
+
+/// **断りの文が、正しいファイルを指すこと**（実運用の報告・2026-10-23）。
+///
+/// 本番で起きたこと ——
+///
+/// > 人の受け取り方は「sshboard に /etc を書き換える操作が無い」だった。
+/// > 「空から始めるのが仕様」という前提は、人には伝わっていなかった。
+/// > 結果として、操作は sshboard の画面の外で行われた。
+/// > **共有画面に残らず、記録もされない経路に流れた。**
+///
+/// 原因のひとつがここでした —— 操作を断ったとき、
+/// AI が受け取る文は **`readonly.toml`** を指していました。
+/// 操作の置き場は **`operations.toml`** です。
+/// `NotAllowed` を読み取り専用コマンドと共用していたためです。
+///
+/// **AI はその間違ったファイル名を人へ伝えます。**
+/// 人は書く場所を探して見つけられず、画面の外へ出ました ——
+/// `run_command` を作らない決定（D3）が守ろうとしたもの
+/// 「**人の見ていない所で終わらせない**」が、まさに裏返った形です。
+#[tokio::test]
+async fn the_refusal_names_the_file_the_person_must_write() {
+    let dir = tempfile::tempdir().expect("一時ディレクトリ");
+    let engine = engine_in(&dir);
+
+    let refused = engine.run_operation(Actor::Ai, "reload-httpd").await;
+    let said = format!("{}", refused.expect_err("通ってしまった"));
+
+    assert!(
+        said.contains("operations.toml"),
+        "書く場所を指していない: {said}"
+    );
+    assert!(
+        !said.contains("readonly.toml"),
+        "**違うファイルを指している**: {said}"
+    );
+}
+
+/// **既定が空であることを、断りの文で言うこと。**
+///
+/// 「無い」と「まだ書いていない」は別です。
+/// 前者だと読まれると、人は**製品に機能が無い**と受け取ります
+/// （実際にそう受け取られました）。
+#[tokio::test]
+async fn the_refusal_says_the_list_starts_empty() {
+    let dir = tempfile::tempdir().expect("一時ディレクトリ");
+    let engine = engine_in(&dir);
+
+    let refused = engine.run_operation(Actor::Ai, "reload-httpd").await;
+    let said = format!("{}", refused.expect_err("通ってしまった"));
+
+    assert!(
+        said.contains("既定") || said.contains("まだ"),
+        "「まだ書いていない」と言っていない: {said}"
+    );
+}
+
+/// **断ったことが帯に出ること。**
+///
+/// それまで断りは**診断にしか出ていませんでした** —— 人が開かないタブです。
+/// 帯は端末の横に常設されたので（UI 案・3 列）、**そこに出れば人は見ます。**
+#[tokio::test]
+async fn the_refusal_shows_up_in_the_band() {
+    let dir = tempfile::tempdir().expect("一時ディレクトリ");
+    let path = dir.path().join("connections.toml");
+    std::fs::write(&path, "version = 1\n").expect("接続一覧を書けない");
+
+    let band = Band::new();
+    let mut subscriber = band.subscribe();
+    let engine = Engine::new(band, Arc::new(OutputStream::new()), path);
+
+    tokio::spawn(async move { engine.run_operation(Actor::Ai, "reload-httpd").await });
+
+    let event = subscriber.recv().await.expect("帯へ出ていない");
+    event.ack();
+
+    assert!(
+        event.line().text().contains("reload-httpd"),
+        "帯に出ていない: {}",
+        event.line().text()
+    );
+    assert!(
+        event.line().text().contains("operations.toml"),
+        "**帯でも書く場所を言っていない**: {}",
+        event.line().text()
     );
 }
