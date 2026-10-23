@@ -2202,3 +2202,121 @@ async fn two_consoles_on_the_same_server_never_mix_their_output() {
     );
     let _ = engine.console_stop_of(Actor::Human, second).await;
 }
+
+// --- become = "ask" を、実行体ごと通しで再現する（実機の報告・2026-10-23）-------
+//
+// 実機（Windows）で、人が画面にパスワードを入れたのに sudo が
+// 「パスワードが与えられませんでした」と返しました。
+//
+// SSH 層だけの試験（`sshboard-ssh/tests/live.rs`）では **root になれます。**
+// ここでは**実行体の全経路**を通します ——
+// 登録（`become = "ask"`）→ AI が頼む → 人が許してパスワードを入れる →
+// AI がもう一度呼ぶ → 札と秘密が消費される → `sudo -S -p ''` へ食わせる。
+//
+// **鍵束は使いません。**`key_path` を省くと、`connect` の引数のパスワードで繋がります
+// （画面で人が打ったときと同じ道）。
+
+/// `pw` で繋ぐ一覧。**sudo はパスワードを求める**（Dockerfile・`NOPASSWD` 無し）。
+async fn registry_ask(dir: &tempfile::TempDir) -> PathBuf {
+    let path = dir.path().join("connections.toml");
+    let toml = format!(
+        "version = 1\n\n[[connections]]\nid = \"pw\"\nname = \"password user\"\n\
+         host = \"{HOST}\"\nport = {PORT}\nuser = \"pw\"\n\
+         fingerprint = \"{}\"\ntag = \"test\"\nwrite_roots = []\nbecome = \"ask\"\n",
+        known_fingerprint().await
+    );
+    std::fs::write(&path, toml).expect("接続一覧を書けない");
+    std::fs::write(
+        dir.path().join("operations.toml"),
+        "version = 1\n\n[[operation]]\nid = \"whoami-root\"\n\
+         run = \"sudo id -u\"\ndescription = \"root になれるか\"\nmax_per_hour = 5\n",
+    )
+    .expect("操作の一覧を書けない");
+    path
+}
+
+#[tokio::test]
+async fn a_password_the_person_typed_reaches_sudo_through_the_whole_engine() {
+    if !server_is_up().await {
+        println!("テスト用サーバーが建っていません（想定内・飛ばします）");
+        return;
+    }
+    let dir = tempfile::tempdir().expect("一時ディレクトリ");
+    let engine = engine_at(registry_ask(&dir).await);
+    engine
+        .connect(Actor::Human, "pw", Some("sshboard-test-password".into()))
+        .await
+        .expect("パスワードで繋がらない");
+
+    // AI が頼む。**まだ走りません。**
+    let asked = engine.run_operation(Actor::Ai, "whoami-root").await;
+    assert!(
+        matches!(asked, Err(EngineError::ConsoleApprovalNeeded)),
+        "頼まずに走っている: {asked:?}"
+    );
+    let standing = engine.operation_request().expect("問いが立っていない");
+    assert!(
+        standing.needs_secret,
+        "パスワードを聞く形になっていない: {standing:?}"
+    );
+    assert!(
+        standing.runs.starts_with("sudo -S -p ''"),
+        "打つものが `-S` になっていない: {}",
+        standing.runs
+    );
+
+    // 人が許し、その場でパスワードを入れる。
+    engine
+        .answer_operation(Actor::Human, true, Some("sshboard-test-password".into()))
+        .await
+        .expect("人が許せない");
+
+    // AI がもう一度呼ぶ。**ここで秘密が sudo へ食わされる。**
+    let ran = engine
+        .run_operation(Actor::Ai, "whoami-root")
+        .await
+        .expect("許可のあとに走らない");
+    assert_eq!(
+        ran.out.trim(),
+        "0",
+        "**人が入れたパスワードが sudo に届いていません。**stdout={:?} stderr={:?}",
+        ran.out,
+        ran.err
+    );
+}
+
+#[tokio::test]
+async fn a_wrong_password_typed_by_the_person_gives_sudos_three_lines() {
+    // **実機で出た 3 行は「違う字」でも出る。**それをこちらでも押さえておきます。
+    // 診断の「秘密を渡しました」と並べて読めば、**打ち間違いか経路か**が割れます。
+    if !server_is_up().await {
+        println!("テスト用サーバーが建っていません（想定内・飛ばします）");
+        return;
+    }
+    let dir = tempfile::tempdir().expect("一時ディレクトリ");
+    let engine = engine_at(registry_ask(&dir).await);
+    engine
+        .connect(Actor::Human, "pw", Some("sshboard-test-password".into()))
+        .await
+        .expect("パスワードで繋がらない");
+
+    let _ = engine.run_operation(Actor::Ai, "whoami-root").await;
+    engine
+        .answer_operation(Actor::Human, true, Some("not-the-password".into()))
+        .await
+        .expect("人が許せない");
+
+    let ran = engine
+        .run_operation(Actor::Ai, "whoami-root")
+        .await
+        .expect("コマンド自体は返るはず（失敗で）");
+    assert_ne!(ran.out.trim(), "0", "違うパスワードで root になれている");
+    let said = ran.err.to_lowercase();
+    assert!(
+        said.contains("incorrect password")
+            || said.contains("間違え")
+            || said.contains("try again"),
+        "sudo の断りが出ていない: {:?}",
+        ran.err
+    );
+}
