@@ -7,6 +7,15 @@
 
 const en = {
 
+	// **`~/.ssh/config` から読む**（UI 案・4 枚目）。
+	// **読むのは人の操作に限る。**AI にこの口はありません（禁止事項 4 / D11）。
+	// **1 バイトも書きません。**
+	'conn.import': 'Read ~/.ssh/config',
+	'conn.import.found': 'Found {count}. Pick the ones you want to add.',
+	'conn.import.none': 'Nothing to read in ~/.ssh/config.',
+	'conn.import.add': 'Add',
+	'conn.import.here': 'Already registered',
+
 	// **転送の列**（UI 案・2 枚目）。**誰が動かしたかが行ごとに残る。**
 	// 止めたことが見えないと、人は「動いた」と思って次へ進む。
 	'transfer.label': 'Transfers',
@@ -342,6 +351,15 @@ export type MessageKey = keyof typeof en;
 type Catalog = Partial<Record<MessageKey, string>>;
 
 const ja: Catalog = {
+
+	// **`~/.ssh/config` から読む**（UI 案・4 枚目）。
+	// **読むのは人の操作に限る。**AI にこの口はありません（禁止事項 4 / D11）。
+	// **1 バイトも書きません。**
+	'conn.import': '~/.ssh/config から読む',
+	'conn.import.found': '{count} 件見つかりました。足すものを選んでください。',
+	'conn.import.none': '~/.ssh/config に読めるものがありません。',
+	'conn.import.add': '足す',
+	'conn.import.here': 'もう在ります',
 
 	// **転送の列**（UI 案・2 枚目）。**誰が動かしたかが行ごとに残る。**
 	// 止めたことが見えないと、人は「動いた」と思って次へ進む。

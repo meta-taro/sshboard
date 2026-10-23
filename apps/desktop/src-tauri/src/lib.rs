@@ -88,6 +88,7 @@ pub fn run() {
             connections_cmd::connection_has_passphrase,
             connections_cmd::connection_has_password,
             connections_cmd::connections_list,
+            connections_cmd::ssh_config_candidates,
             connections_cmd::connections_path,
             connections_cmd::connection_save,
             connections_cmd::connection_delete,

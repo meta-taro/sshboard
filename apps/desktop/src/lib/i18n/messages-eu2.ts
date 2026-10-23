@@ -5,6 +5,15 @@ type Catalog = Partial<Record<MessageKey, string>>;
 
 export const ptBR: Catalog = {
 
+	// **`~/.ssh/config` から読む**（UI 案・4 枚目）。
+	// **読むのは人の操作に限る。**AI にこの口はありません（禁止事項 4 / D11）。
+	// **1 バイトも書きません。**
+	'conn.import': 'Ler ~/.ssh/config',
+	'conn.import.found': '{count} encontrados. Escolha os que quer adicionar.',
+	'conn.import.none': 'Nada a ler em ~/.ssh/config.',
+	'conn.import.add': 'Adicionar',
+	'conn.import.here': 'Já registado',
+
 	// **転送の列**（UI 案・2 枚目）。**誰が動かしたかが行ごとに残る。**
 	// 止めたことが見えないと、人は「動いた」と思って次へ進む。
 	'transfer.label': 'Transferências',
@@ -301,6 +310,15 @@ export const ptBR: Catalog = {
 
 export const ru: Catalog = {
 
+	// **`~/.ssh/config` から読む**（UI 案・4 枚目）。
+	// **読むのは人の操作に限る。**AI にこの口はありません（禁止事項 4 / D11）。
+	// **1 バイトも書きません。**
+	'conn.import': 'Прочитать ~/.ssh/config',
+	'conn.import.found': 'Найдено {count}. Выберите, что добавить.',
+	'conn.import.none': 'В ~/.ssh/config нечего читать.',
+	'conn.import.add': 'Добавить',
+	'conn.import.here': 'Уже добавлено',
+
 	// **転送の列**（UI 案・2 枚目）。**誰が動かしたかが行ごとに残る。**
 	// 止めたことが見えないと、人は「動いた」と思って次へ進む。
 	'transfer.label': 'Передачи',
@@ -596,6 +614,15 @@ export const ru: Catalog = {
 };
 
 export const it: Catalog = {
+
+	// **`~/.ssh/config` から読む**（UI 案・4 枚目）。
+	// **読むのは人の操作に限る。**AI にこの口はありません（禁止事項 4 / D11）。
+	// **1 バイトも書きません。**
+	'conn.import': 'Leggi ~/.ssh/config',
+	'conn.import.found': '{count} trovati. Scegliete quali aggiungere.',
+	'conn.import.none': 'Niente da leggere in ~/.ssh/config.',
+	'conn.import.add': 'Aggiungi',
+	'conn.import.here': 'Già registrato',
 
 	// **転送の列**（UI 案・2 枚目）。**誰が動かしたかが行ごとに残る。**
 	// 止めたことが見えないと、人は「動いた」と思って次へ進む。

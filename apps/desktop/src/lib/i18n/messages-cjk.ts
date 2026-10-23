@@ -5,6 +5,15 @@ type Catalog = Partial<Record<MessageKey, string>>;
 
 export const ko: Catalog = {
 
+	// **`~/.ssh/config` から読む**（UI 案・4 枚目）。
+	// **読むのは人の操作に限る。**AI にこの口はありません（禁止事項 4 / D11）。
+	// **1 バイトも書きません。**
+	'conn.import': '~/.ssh/config 에서 읽기',
+	'conn.import.found': '{count}개를 찾았습니다. 추가할 항목을 선택하세요.',
+	'conn.import.none': '~/.ssh/config 에서 읽을 것이 없습니다.',
+	'conn.import.add': '추가',
+	'conn.import.here': '이미 등록됨',
+
 	// **転送の列**（UI 案・2 枚目）。**誰が動かしたかが行ごとに残る。**
 	// 止めたことが見えないと、人は「動いた」と思って次へ進む。
 	'transfer.label': '전송',
@@ -301,6 +310,15 @@ export const ko: Catalog = {
 
 export const zhCN: Catalog = {
 
+	// **`~/.ssh/config` から読む**（UI 案・4 枚目）。
+	// **読むのは人の操作に限る。**AI にこの口はありません（禁止事項 4 / D11）。
+	// **1 バイトも書きません。**
+	'conn.import': '从 ~/.ssh/config 读取',
+	'conn.import.found': '找到 {count} 项。请选择要添加的。',
+	'conn.import.none': '~/.ssh/config 中没有可读取的内容。',
+	'conn.import.add': '添加',
+	'conn.import.here': '已登记',
+
 	// **転送の列**（UI 案・2 枚目）。**誰が動かしたかが行ごとに残る。**
 	// 止めたことが見えないと、人は「動いた」と思って次へ進む。
 	'transfer.label': '传输',
@@ -596,6 +614,15 @@ export const zhCN: Catalog = {
 };
 
 export const zhTW: Catalog = {
+
+	// **`~/.ssh/config` から読む**（UI 案・4 枚目）。
+	// **読むのは人の操作に限る。**AI にこの口はありません（禁止事項 4 / D11）。
+	// **1 バイトも書きません。**
+	'conn.import': '從 ~/.ssh/config 讀取',
+	'conn.import.found': '找到 {count} 項。請選擇要新增的。',
+	'conn.import.none': '~/.ssh/config 中沒有可讀取的內容。',
+	'conn.import.add': '新增',
+	'conn.import.here': '已登錄',
 
 	// **転送の列**（UI 案・2 枚目）。**誰が動かしたかが行ごとに残る。**
 	// 止めたことが見えないと、人は「動いた」と思って次へ進む。

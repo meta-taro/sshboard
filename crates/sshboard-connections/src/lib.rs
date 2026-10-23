@@ -8,6 +8,7 @@ mod elevation;
 mod entry;
 mod external;
 mod mark;
+pub mod ssh_config;
 mod store;
 mod watch;
 

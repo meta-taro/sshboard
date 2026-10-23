@@ -386,3 +386,53 @@ pub fn connection_has_password(
         .iter()
         .any(|held| held.id == id && held.keyring_password_ref.is_some()))
 }
+
+// --- `~/.ssh/config` から取り込む（UI 案・4 枚目）-----------------------------
+
+/// 候補 1 件。画面へ渡す形。
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SshConfigCandidate {
+    pub id: String,
+    pub host: String,
+    /// **埋めません。**`null` のときは「書いていない」です ——
+    /// ここで 22 を入れると「書いてあった 22」と区別できません。
+    pub port: Option<u16>,
+    pub user: Option<String>,
+    /// 鍵の**場所だけ**（中身は読みません・D11）。
+    pub key_path: Option<String>,
+}
+
+/// `~/.ssh/config` を読んで、登録の候補を返す。
+///
+/// **この口は画面にしかありません。**MCP には出していません ——
+/// `~/.ssh/config` は**接続先そのものの一覧**で、人が繋いでいない所まで
+/// 全部並んでいます（禁止事項 4 / D11）。
+///
+/// **1 バイトも書きません。**あのファイルは ssh 本体と他の道具が共有しており、
+/// **こちらの書式の思い込みで壊すと、人は ssh そのものを失います。**
+///
+/// **そのままでは登録しません。**返すのは候補で、選ぶのは人です。
+#[tauri::command]
+pub fn ssh_config_candidates() -> Result<Vec<SshConfigCandidate>, String> {
+    // **家の場所は既に引く所が在る**ので、依存を増やしません（`session_cmd`）。
+    let Some(home) = crate::session_cmd::home_dir() else {
+        return Err("手元の家の場所が分かりません".to_string());
+    };
+    let path = home.join(".ssh").join("config");
+
+    sshboard_connections::ssh_config::read(&path)
+        .map(|found| {
+            found
+                .into_iter()
+                .map(|one| SshConfigCandidate {
+                    id: one.id,
+                    host: one.host,
+                    port: one.port,
+                    user: one.user,
+                    key_path: one.key_path,
+                })
+                .collect()
+        })
+        .map_err(|error| error.to_string())
+}

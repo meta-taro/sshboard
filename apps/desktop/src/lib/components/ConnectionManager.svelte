@@ -396,6 +396,76 @@
 		});
 	}
 
+	/**
+	 * **`~/.ssh/config` から読んだ候補**（UI 案・4 枚目）。
+	 *
+	 * **読むのは人の操作に限ります。**AI にこの口はありません ——
+	 * あのファイルは**接続先そのものの一覧**で、
+	 * 人が繋いでいない所まで全部並んでいます（禁止事項 4 / D11）。
+	 *
+	 * **1 バイトも書きません。**ssh 本体と他の道具が共有しているファイルなので、
+	 * **こちらの書式の思い込みで壊すと、人は ssh そのものを失います。**
+	 *
+	 * **そのままでは登録しません。**人が 1 件ずつ押して足します。
+	 */
+	type Candidate = {
+		id: string;
+		host: string;
+		port: number | null;
+		user: string | null;
+		keyPath: string | null;
+	};
+	let candidates = $state<Candidate[] | null>(null);
+
+	async function readSshConfig() {
+		failure = null;
+		try {
+			candidates = await invoke<Candidate[]>('ssh_config_candidates');
+		} catch (error: unknown) {
+			// **握り潰さない。**読めなかったのと 0 件は別です。
+			failure = String(error);
+			candidates = null;
+		}
+	}
+
+	/**
+	 * **もう登録されている名前か。**
+	 *
+	 * `connection_save` は同じ識別子を**上書き**します。`~/.ssh/config` に
+	 * 同じ名前が在ると、押した瞬間に**人が並べた柵（`write_roots`）ごと消えます** ——
+	 * 「取り込んだら AI が書けなくなった」を作らないため、押せる所に出しません。
+	 *
+	 * **出して断るのでは駄目です。**人は押してから理由を探すことになります。
+	 */
+	function alreadyHere(id: string): boolean {
+		return items.some((held) => held.id === id);
+	}
+
+	/** 候補を 1 件登録する。**既定を当てるのはここ**（Rust 側は埋めません）。 */
+	async function addCandidate(one: Candidate) {
+		failure = null;
+		try {
+			await invoke('connection_save', {
+				entry: {
+					id: one.id,
+					name: one.id,
+					host: one.host,
+					// **書いていなければ 22。**Rust 側で埋めると
+					// 「書いてあった 22」と区別できないので、ここで当てます。
+					port: one.port ?? 22,
+					user: one.user ?? '',
+					key_path: one.keyPath,
+					// **柵は空のまま**（D22 —— 既定は空＝AI は読むだけ）。
+					write_roots: []
+				}
+			});
+			candidates = (candidates ?? []).filter((held) => held.id !== one.id);
+			await reload();
+		} catch (error: unknown) {
+			failure = String(error);
+		}
+	}
+
 	async function save() {
 		failure = null;
 		try {
@@ -470,6 +540,49 @@
 				{i18n.t('conn.new')}
 			</button>
 		</div>
+
+		<!--
+			**`~/.ssh/config` から読む**（UI 案・4 枚目）。
+			**読むのは人の操作に限ります** —— AI にこの口はありません。
+			**書きません。**そのままでは登録せず、人が 1 件ずつ押して足します。
+		-->
+		<div class="import-bar">
+			<button type="button" class="ghost tiny" onclick={() => void readSshConfig()}>
+				<Icon name="file" size={11} />
+				{i18n.t('conn.import')}
+			</button>
+		</div>
+		{#if candidates !== null}
+			{#if candidates.length === 0}
+				<p class="import-none">{i18n.t('conn.import.none')}</p>
+			{:else}
+				<p class="import-found">
+					{i18n.t('conn.import.found', { count: String(candidates.length) })}
+				</p>
+				<ul class="import-list">
+					{#each candidates as one (one.id)}
+						<li>
+							<span class="import-id" data-secret>{one.id}</span>
+							<!-- **接続先は伏せられる所**（禁止事項 4）。 -->
+							<span class="import-where" data-secret>
+								{one.user ? `${one.user}@` : ''}{one.host}{one.port ? `:${one.port}` : ''}
+							</span>
+							{#if alreadyHere(one.id)}
+								<!--
+									**もう在る名前は押せません。**押すと上書きで、
+									人が並べた柵ごと消えます。**黙って隠さず、そう言います。**
+								-->
+								<span class="import-here">{i18n.t('conn.import.here')}</span>
+							{:else}
+								<button type="button" class="ghost tiny" onclick={() => void addCandidate(one)}>
+									{i18n.t('conn.import.add')}
+								</button>
+							{/if}
+						</li>
+					{/each}
+				</ul>
+			{/if}
+		{/if}
 
 		<div class="transfer-bar">
 			<button
@@ -1316,6 +1429,63 @@
 		text-overflow: ellipsis;
 		white-space: nowrap;
 		min-width: 0;
+	}
+
+	/* --- `~/.ssh/config` からの取り込み（UI 案・4 枚目） --- */
+
+	.import-bar {
+		display: flex;
+		padding: 0 0.2rem 0.3rem;
+	}
+
+	.import-none,
+	.import-found {
+		margin: 0 0.2rem 0.3rem;
+		font-size: 0.66rem;
+		color: var(--fg-dim);
+		line-height: 1.5;
+	}
+
+	.import-list {
+		list-style: none;
+		margin: 0 0 0.4rem;
+		padding: 0;
+		max-height: 10rem;
+		overflow-y: auto;
+	}
+
+	.import-list li {
+		display: flex;
+		align-items: baseline;
+		gap: 0.35rem;
+		padding: 0.16rem 0.2rem;
+		border-bottom: 1px solid var(--hairline);
+		min-width: 0;
+	}
+
+	.import-id {
+		font-size: 0.7rem;
+		font-weight: 600;
+		flex: none;
+	}
+
+	/* もう在る名前。**押せないことを、押せない所で言う。** */
+	.import-here {
+		flex: none;
+		font-size: 0.62rem;
+		color: var(--fg-faint);
+	}
+
+	/* **どこへ繋ぐのかを出す。**名前だけだと、どのサーバーか分かりません。 */
+	.import-where {
+		flex: 1 1 auto;
+		min-width: 0;
+		font-family: var(--font-mono);
+		font-size: 0.62rem;
+		color: var(--fg-dim);
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
 	}
 
 	.mark-row {

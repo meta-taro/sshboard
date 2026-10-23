@@ -356,3 +356,97 @@ function pickConnectFailure(): string {
 	if (!found) throw new Error('connect-failure.ts が読めていません');
 	return found[1];
 }
+
+/**
+ * **`~/.ssh/config` からの取り込み**（UI 案・4 枚目）。
+ *
+ * ここで守るのは 3 つです。
+ *
+ * 1. **AI にこの口を出さない。**あのファイルは**接続先そのものの一覧**で、
+ *    人が繋いでいない所まで全部並んでいます（禁止事項 4 / D11）。
+ * 2. **書かない。**ssh 本体と他の道具が共有しているので、
+ *    **こちらの書式の思い込みで壊すと、人は ssh そのものを失います。**
+ * 3. **柵は空のまま足す**（D22 —— 既定は空＝AI は読むだけ）。
+ */
+/**
+ * 関数 1 本の**本体だけ**を切り出す（閉じカッコまで）。
+ *
+ * **文字数で切らないこと。**次の関数や、間に挟んだ説明文の中の名前を拾います。
+ */
+function bodyOf(text: string, signature: string): string {
+	const at = text.indexOf(signature);
+	if (at === -1) throw new Error(`${signature} が見つかりません`);
+	// 字下げ 1 段の関数なので、閉じカッコは `\n\t}` で終わります。
+	const end = text.indexOf('\n\t}', at);
+	if (end === -1) throw new Error(`${signature} の終わりが見つかりません`);
+	return text.slice(at, end);
+}
+
+describe('~/.ssh/config からの取り込み', () => {
+	const manager = () =>
+		Object.entries(sources).find(([path]) =>
+			path.endsWith('components/ConnectionManager.svelte')
+		)![1];
+
+	test('is offered to the person, in words', () => {
+		expect(manager()).toContain("i18n.t('conn.import')");
+		expect(manager()).toContain("invoke<Candidate[]>('ssh_config_candidates')");
+	});
+
+	test('does not register anything by itself', () => {
+		// **そのままでは登録しません。**人が 1 件ずつ押して足します。
+		//
+		// **関数の本体だけを見ること。**2 回つまずきました（2026-10-23）——
+		// 文字数で切ると次の関数の `connection_save` を拾い、
+		// 次の関数まで切ると**間に挟んだ説明文の中の名前**を拾いました。
+		expect(bodyOf(manager(), 'async function readSshConfig')).not.toContain('connection_save');
+	});
+
+	test('adds with an empty fence', () => {
+		// **既定は空＝AI は読むだけ**（D22）。取り込みで柵を開けない。
+		expect(manager()).toContain('write_roots: []');
+	});
+
+	test('fills in the default port here, not in Rust', () => {
+		// Rust 側が `null` で返すのは、**「書いてあった 22」と「書いていない」を
+		// 区別する**ため。既定を当てるのは呼ぶ側。
+		expect(manager()).toContain('port: one.port ?? 22');
+	});
+
+	test('lets the place be hidden', () => {
+		// **接続先そのもの**（禁止事項 4）。
+		expect(manager()).toContain('<span class="import-where" data-secret>');
+	});
+
+	test('does not swallow a read failure', () => {
+		// **読めなかったのと 0 件は別です。**
+		const text = manager();
+		expect(bodyOf(text, 'async function readSshConfig')).toContain('failure = String(error)');
+	});
+
+	test('does not quietly overwrite a connection that is already registered', () => {
+		// **`connection_save` は同じ識別子を上書きします。**
+		// `~/.ssh/config` に同じ名前が在ると、人が並べた柵（`write_roots`）ごと
+		// 消えます ——「取り込んだら AI が書けなくなった」を作らない。
+		//
+		// **押せる所に出さない**のが答えです（出して断るのでは、人は理由を探します）。
+		const text = manager();
+		expect(text).toContain('alreadyHere');
+		const at = text.indexOf('function alreadyHere');
+		expect(at).toBeGreaterThan(-1);
+		expect(text.slice(at, at + 260)).toContain('items.some');
+	});
+
+	test('says so instead of hiding the collision', () => {
+		// **黙って消すのも、黙って出さないのも、どちらも読めません。**
+		expect(manager()).toContain("i18n.t('conn.import.here')");
+	});
+
+	test('is not offered to the AI', () => {
+		// **MCP に口を出していないこと。**
+		const mcp = Object.entries(sources).filter(([path]) => path.includes('sshboard-mcp'));
+		for (const [path, text] of mcp) {
+			expect(text.includes('ssh_config'), `${path} に出ています`).toBe(false);
+		}
+	});
+});

@@ -420,7 +420,7 @@ pub async fn local_list_dir(path: Option<String>) -> Result<LocalListing, String
 }
 
 /// 持ち主の home。**Windows も見る**（配布対象・PRD §7）。
-fn home_dir() -> Option<PathBuf> {
+pub(crate) fn home_dir() -> Option<PathBuf> {
     std::env::var_os("HOME")
         .or_else(|| std::env::var_os("USERPROFILE"))
         .map(PathBuf::from)
