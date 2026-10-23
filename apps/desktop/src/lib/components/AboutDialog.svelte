@@ -15,6 +15,7 @@
 	import { onMount } from 'svelte';
 
 	import { i18n } from '$lib/i18n/i18n.svelte';
+	import { reportText, type ReportFacts } from '$lib/report';
 	import { updater } from '$lib/update/updater.svelte';
 
 	interface Props {
@@ -48,6 +49,32 @@
 		onClose();
 	}
 
+	/**
+	 * **報告に貼る 4 行を写す**（案・4 枚目「版情報を写す」）。
+	 *
+	 * 報告に最初に要るのは版です（`about.alpha` にもそう書いてあります）。
+	 * **画面には出ているのに写せませんでした** —— 目で読んで打ち直せば間違います。
+	 *
+	 * **利用者名は入りません。**実行体が `~` に落としたものを受け取り、
+	 * ここでも落とします（`reportText`）—— **これは public リポの Issue へ
+	 * 貼られる文**です（product-baseline §25）。
+	 */
+	let copied = $state(false);
+
+	async function copyReport() {
+		try {
+			const facts = await invoke<ReportFacts>('report_facts');
+			await navigator.clipboard.writeText(reportText(facts));
+			copied = true;
+			setTimeout(() => (copied = false), 2000);
+		} catch (error: unknown) {
+			// **写せないことを黙らない。**押したのに何も起きない、を作らない。
+			failure = String(error);
+		}
+	}
+
+	let failure = $state<string | null>(null);
+
 	function onKeydown(event: KeyboardEvent) {
 		if (event.key === 'Escape') onClose();
 	}
@@ -76,7 +103,15 @@
 
 		<p class="note">{i18n.t('about.alpha')}</p>
 
+		{#if failure}
+			<p class="failure" role="alert">{failure}</p>
+		{/if}
+
 		<div class="actions">
+			<!-- **報告に貼る 4 行。**打ち直させない（案・4 枚目）。 -->
+			<button type="button" onclick={() => void copyReport()}>
+				{copied ? i18n.t('about.copied') : i18n.t('about.copy')}
+			</button>
 			<button type="button" onclick={checkForUpdate}>{i18n.t('update.check')}</button>
 			<button type="button" class="cta" onclick={onClose}>{i18n.t('about.close')}</button>
 		</div>
@@ -134,6 +169,14 @@
 
 	.mono {
 		font-family: var(--font-mono);
+	}
+
+	/* **写せなかった理由を出す。**押したのに何も起きない、を作らない。 */
+	.failure {
+		margin: 0 0 0.6rem;
+		font-size: 0.72rem;
+		color: var(--danger);
+		overflow-wrap: anywhere;
 	}
 
 	.note {

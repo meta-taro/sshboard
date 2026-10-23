@@ -524,3 +524,38 @@ describe('AI に渡す（案・1 枚目）', () => {
 		expect(text.slice(at, end)).not.toContain('console_answer');
 	});
 });
+
+describe('帯の書き出し（案・4 枚目）', () => {
+	/**
+	 * **囲い（D22）は落とし先を守りません。**
+	 * D27 で「手元へ落とす口は AI に作らない」と決めたのと同じ性質です。
+	 */
+	test('is reachable from the menu', () => {
+		const text = pageSource();
+		expect(text).toContain('bandExportOpen = true');
+		expect(text).toContain('<BandExportDialog');
+	});
+
+	test('shows what goes in the file before writing it', () => {
+		// **押してから知るのでは遅い。**案の書き出し側と同じ形（含める / 含めない）。
+		const dialog = components['./components/BandExportDialog.svelte'];
+		expect(dialog, 'BandExportDialog.svelte が無い').toBeTruthy();
+		for (const key of ['band.export.in.who', 'band.export.in.secret', 'band.export.warn']) {
+			expect(dialog.includes(key), `${key} が出ていません`).toBe(true);
+		}
+	});
+
+	test('lets the human pick where it lands', () => {
+		// **落とし先は人が選びます。**黙ってどこかへ書きません。
+		const text = pageSource();
+		const at = text.indexOf('async function saveBand');
+		const end = text.indexOf('\n\t}', at);
+		expect(at).toBeGreaterThan(-1);
+		expect(text.slice(at, end)).toContain('saveDialog');
+	});
+
+	test('follows the screen when it is hidden', () => {
+		// **見えているものと、書き出したものが違う、を作りません。**
+		expect(pageSource()).toContain('masked={redaction.on}');
+	});
+});

@@ -19,6 +19,9 @@
 	import { menuLabels } from '$lib/i18n/messages-menu';
 	import { titlebar } from '$lib/window/titlebar.svelte';
 	import AboutDialog from '$lib/components/AboutDialog.svelte';
+	import { save as saveDialog } from '@tauri-apps/plugin-dialog';
+
+	import BandExportDialog from '$lib/components/BandExportDialog.svelte';
 	import BandPanel from '$lib/components/BandPanel.svelte';
 	import ConnectionRail from '$lib/components/ConnectionRail.svelte';
 	import DiagPanel from '$lib/components/DiagPanel.svelte';
@@ -122,6 +125,33 @@
 	 * **この製品は画面そのものに接続先が写り込みます**（CLAUDE.md 禁止事項 4）。
 	 * 画面共有や撮影の前に、人が 1 回押せることが要ります。
 	 */
+	/**
+	 * **帯を書き出す**（案・4 枚目「AI の操作記録（帯）を書き出す」）。
+	 *
+	 * **囲い（D22）は落とし先を守りません。**だから押す前に
+	 * 何が入るかを並べて見せます（`BandExportDialog`）。
+	 *
+	 * **この口は画面にしかありません。**MCP には出しません ——
+	 * D27 で「手元へ落とす口は AI に作らない」と決めたのと同じ性質です。
+	 */
+	let bandExportOpen = $state(false);
+
+	async function saveBand(payload: { text: string; name: string }) {
+		bandExportOpen = false;
+		try {
+			const destination = await saveDialog({
+				// **日時を入れる。**同じ名前だと 2 回目から上書きになります。
+				defaultPath: payload.name,
+				filters: [{ name: 'sshboard', extensions: ['txt'] }]
+			});
+			if (!destination) return;
+			await invoke<number>('band_export', { destination, text: payload.text });
+		} catch (error: unknown) {
+			// **握り潰さない。**書けなかったのに書けたように見せない。
+			failure = String(error);
+		}
+	}
+
 	function toggleMask() {
 		void redaction.set(!redaction.on).catch((error: unknown) => {
 			// **握り潰さない。**押したのに伏せられていない、が一番危ない。
@@ -1547,6 +1577,20 @@
 							<button type="button" onclick={() => void openAllowlist()}>
 								{i18n.t('allow.title')}
 							</button>
+							<!--
+								**帯を書き出す**（案・4 枚目）。
+								押す前に何が入るかを見せます ——
+								**囲いは落とし先を守りません。**
+							-->
+							<button
+								type="button"
+								onclick={() => {
+									viewMenuOpen = false;
+									bandExportOpen = true;
+								}}
+							>
+								{i18n.t('band.export.title')}
+							</button>
 							<button type="button" onclick={() => { viewMenuOpen = false; aboutOpen = true; }}>
 								{i18n.t('about.title')}
 							</button>
@@ -1941,6 +1985,15 @@
 	-->
 	{#if keyHelpOpen}
 		<KeyHelpDialog {platform} onclose={() => (keyHelpOpen = false)} />
+	{/if}
+
+	{#if bandExportOpen}
+		<BandExportDialog
+			{lines}
+			masked={redaction.on}
+			onclose={() => (bandExportOpen = false)}
+			onsave={(payload) => void saveBand(payload)}
+		/>
 	{/if}
 
 	{#if allowlistOpen && allowlist !== null}

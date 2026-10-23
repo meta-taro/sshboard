@@ -77,6 +77,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::app_version,
             commands::report_facts,
+            commands::band_export,
             commands::band_ack,
             commands::mcp_url,
             commands::stream_follow,
