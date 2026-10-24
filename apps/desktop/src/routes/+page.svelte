@@ -1706,7 +1706,9 @@
 			aria-pressed={redaction.on}
 		>
 			<Icon name={redaction.on ? 'eye-off' : 'eye'} size={12} />
-			{redaction.on ? i18n.t('mask.on') : i18n.t('mask.hide')}
+			<!-- 狭い窓（既定の 1100px・英語）では短い言い方に。意味は同じ。 -->
+			<span class="label-long">{redaction.on ? i18n.t('mask.on') : i18n.t('mask.hide')}</span>
+			<span class="label-short">{redaction.on ? i18n.t('mask.on.short') : i18n.t('mask.hide.short')}</span>
 		</button>
 
 		<!--
@@ -1724,7 +1726,8 @@
 				: i18n.t('ai.stop.none')}
 		>
 			<span class="stop-ai-mark" aria-hidden="true"></span>
-			{i18n.t('ai.stop')}
+			<span class="label-long">{i18n.t('ai.stop')}</span>
+			<span class="label-short">{i18n.t('ai.stop.short')}</span>
 		</button>
 
 		<!--
@@ -3149,6 +3152,7 @@
 			background var(--fast) var(--ease),
 			color var(--fast) var(--ease),
 			transform var(--fast) var(--ease);
+		flex: none;
 	}
 
 	.view-panel button.icon-only {
@@ -3516,10 +3520,15 @@
 			padding: 0 9px;
 		}
 
-		/* 長い文言（英語）は「…」で切る。製品名とタブは切らない。 */
-		.mask-toggle,
-		.stop-ai {
-			min-width: 3.5rem;
+		/* 長い文言（英語）は短い言い方に切り替える。製品名とタブは切らない。 */
+		.mask-toggle .label-long,
+		.stop-ai .label-long {
+			display: none;
+		}
+
+		.mask-toggle .label-short,
+		.stop-ai .label-short {
+			display: inline;
 		}
 
 		/* **MCP の釦は印だけ**（文言は title に残る）。実機（WebKit・1100px）では
@@ -3538,5 +3547,8 @@
 		box-shadow:
 			inset 0 0 0 1px var(--accent),
 			0 0 0 3px var(--accent-soft);
+	}
+	.label-short {
+		display: none;
 	}
 </style>
