@@ -1398,7 +1398,9 @@
 		background: var(--surface-input);
 		box-shadow: inset 0 0 0 1px var(--hairline-strong);
 		align-self: flex-start;
-		flex-wrap: wrap;
+		/* 折らない・幅は中身で決める（WebKit で 3 つ目が下に落ちた） */
+		flex-wrap: nowrap;
+		width: max-content;
 	}
 
 	/* **選んだものが見て分かること。**色だけに頼らず、枠も変えます
