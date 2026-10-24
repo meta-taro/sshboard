@@ -1418,12 +1418,18 @@
 		cursor: pointer;
 		/* **折り返させない。**`ssh-agent` が 2 行に割れて読めませんでした（実機）。 */
 		white-space: nowrap;
+		position: relative;
 	}
 
 	.auth-choice input {
 		/* 既定の丸を小さく。**言葉の方を読ませる。** */
 		margin: 0;
 		flex: 0 0 auto;
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		opacity: 0;
+		pointer-events: none;
 	}
 
 	/* 選んだものは地と字を入れ替える（案）。色だけに頼らない。 */
@@ -1757,5 +1763,8 @@
 		display: inline-flex;
 		gap: 0.4rem;
 		margin-left: 0.5rem;
+	}
+	.import-bar button {
+		white-space: nowrap;
 	}
 </style>

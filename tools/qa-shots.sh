@@ -127,6 +127,7 @@ shoot_one() {
     tail -5 "$home/sshboard.log" || true
     exit 1
   }
+  # **既定の窓（1100×700）のまま撮ります**（2026-10-24）。人が最初に見る大きさで崩れないことが先。
   python3 "$SHOOT" "$home" "$ROOT/site/shots/$lang"
 }
 

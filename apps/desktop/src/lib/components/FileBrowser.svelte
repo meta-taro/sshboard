@@ -1439,6 +1439,10 @@
 		text-overflow: ellipsis;
 		white-space: nowrap;
 		text-align: left;
+		height: auto;
+		box-shadow: none;
+		border-radius: 0;
+		font-size: var(--text-control);
 	}
 
 	.empty {
@@ -1477,6 +1481,7 @@
 		transition: background 220ms var(--ease);
 		height: var(--control-h);
 		box-shadow: inset 0 0 0 1px var(--hairline-strong);
+		white-space: nowrap;
 	}
 
 	/*

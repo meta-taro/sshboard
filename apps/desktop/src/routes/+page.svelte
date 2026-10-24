@@ -2957,6 +2957,7 @@
 		align-items: center;
 		gap: 0.4rem;
 		min-width: 0;
+		/* 縮めること（掴める所を残す・header-wiring.test）。狭い窓はヘッダー側の隙間で収める。 */
 		flex: 0 1 auto;
 		overflow: hidden;
 		font: inherit;
@@ -3216,9 +3217,10 @@
 	}
 
 	.stream-head .label {
-		flex: 1;
+		flex: 0 0 auto;
 		font-size: var(--text-sm);
 		color: var(--fg-faint);
+		white-space: nowrap;
 	}
 
 	/* 端末の検索バー。**帯やログの並びに合わせただけ**の仮置き（DESIGN.md）。 */
@@ -3476,4 +3478,25 @@
 	}
 
 
+	/*
+	 * **既定の窓（1100×700）でヘッダーを 1 段に収める**（2026-10-24・写真で判明）。
+	 * 土台を案の寸法（gap 16px・左右 16px）にしたら、1100px では
+	 * **窓の操作釦が 2 段目に落ち、ロゴが「sshb…」に切れました。**
+	 * 狭いときは隙間だけ詰めます。釦の高さや字は変えません。
+	 */
+	@media (max-width: 1240px) {
+		header {
+			gap: 0.5rem;
+			padding: 0 0.6rem;
+		}
+
+		/* 錠剤の中の余白も少し詰める（高さと字は変えない）。1100px で計測して 1 段に入る値。 */
+		.tabs button {
+			padding: 0 10px;
+		}
+
+		.mcp {
+			padding: 0 8px;
+		}
+	}
 </style>

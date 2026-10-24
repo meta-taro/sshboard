@@ -144,6 +144,7 @@
 		flex-direction: column;
 		align-items: stretch;
 		flex-wrap: nowrap;
+		gap: 4px;
 	}
 
 	.pick {
@@ -154,7 +155,7 @@
 		font-size: var(--text-sm);
 		color: var(--fg-control);
 		background: transparent;
-		border: 1px solid transparent;
+		border: 0;
 		border-radius: var(--r-pill);
 		padding: 0.2rem 0.6rem;
 		cursor: pointer;
@@ -165,8 +166,14 @@
 	}
 
 	.rail.vertical .pick {
-		justify-content: flex-start;
-		border-radius: var(--r-control);
+		justify-content: space-between;
+		border-radius: 12px;
+		padding: 10px;
+		gap: 8px;
+		font-size: var(--text-body);
+		font-weight: 500;
+		color: var(--fg);
+		white-space: nowrap;
 	}
 
 	.pick:hover {
@@ -269,5 +276,18 @@
 	.fence-note {
 		color: var(--fg-dim);
 		line-height: 1.5;
+	}
+	/* 名前は 1 行で切る。**折れて 2 段になると、札と重なって読めません**（写真で判明）。 */
+	.rail.vertical .pick > span:first-child {
+		flex: 1 1 auto;
+		min-width: 0;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+
+	.rail.vertical .pick.active {
+		background: var(--surface-2);
+		color: var(--fg);
+		box-shadow: inset 0 0 0 1px var(--hairline-strong);
 	}
 </style>
