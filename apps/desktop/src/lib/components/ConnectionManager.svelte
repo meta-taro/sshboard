@@ -1224,14 +1224,16 @@
 	/* **消す口。**目立たせませんが、**探さなくても見つかる**所に置きます。 */
 	.forget {
 		margin-left: 0.4rem;
-		border: 1px solid var(--hairline-strong);
-		background: transparent;
-		border-radius: var(--r-control);
-		padding: 0.1rem 0.45rem;
+		border: 0;
+		background: var(--shell-bg);
+		border-radius: var(--r-pill);
+		padding: 0 12px;
 		font: inherit;
 		font-size: var(--text-sm);
 		color: var(--fg-muted);
 		cursor: pointer;
+		box-shadow: inset 0 0 0 1px var(--hairline-strong);
+		height: var(--control-h);
 	}
 
 	.chip {

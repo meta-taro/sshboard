@@ -194,7 +194,7 @@
 		font-size: var(--text-sm);
 		color: var(--fg-control);
 		background: transparent;
-		border: 1px solid var(--hairline);
+		border: 0;
 		border-radius: var(--r-pill);
 		padding: 4px 10px;
 		cursor: pointer;
@@ -202,6 +202,7 @@
 		transition:
 			background var(--fast) var(--ease),
 			color var(--fast) var(--ease);
+		box-shadow: inset 0 0 0 1px var(--hairline-strong);
 	}
 
 	.band-who-pick:hover:not(:disabled) {

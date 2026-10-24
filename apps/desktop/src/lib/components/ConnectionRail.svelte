@@ -211,11 +211,13 @@
 		font: inherit;
 		font-size: var(--text-sm);
 		color: var(--fg-control);
-		background: transparent;
-		border: 1px solid var(--hairline);
+		background: var(--shell-bg);
+		border: 0;
 		border-radius: var(--r-pill);
-		padding: 0.14rem 0.5rem;
+		padding: 0 12px;
 		cursor: pointer;
+		box-shadow: inset 0 0 0 1px var(--hairline-strong);
+		height: var(--control-h);
 	}
 
 	.add:hover {
@@ -230,11 +232,12 @@
 		gap: 0.25rem;
 		flex: 0 0 auto;
 		padding: 0.5rem 0.6rem;
-		border: 1px solid var(--hairline);
+		border: 0;
 		border-radius: var(--r-core);
 		background: var(--surface-2);
 		font-size: var(--text-sm);
 		min-width: 0;
+		box-shadow: inset 0 0 0 1px var(--hairline);
 	}
 
 	/* **橙は AI の色。**「これは AI にかかっている制限」が色で読める。 */

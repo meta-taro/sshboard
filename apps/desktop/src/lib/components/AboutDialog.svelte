@@ -134,9 +134,9 @@
 		width: min(30rem, 92vw);
 		padding: 1.1rem;
 		background: var(--surface);
-		border: 1px solid var(--hairline);
+		border: 0;
 		border-radius: var(--r-shell);
-		box-shadow: var(--lift-3);
+		box-shadow: var(--shell-ring), var(--lift-3);
 	}
 
 	.head h2 {

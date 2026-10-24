@@ -146,10 +146,10 @@
 		max-height: 100%;
 		overflow: auto;
 		padding: 1rem 1.1rem;
-		border: 1px solid var(--hairline-strong);
+		border: 0;
 		border-radius: var(--r-shell);
 		background: var(--surface);
-		box-shadow: var(--lift-3);
+		box-shadow: var(--shell-ring), var(--lift-3);
 	}
 
 	/* **ここに `display: flex` を置きません**（`component-wiring.test.ts` の決まり）。 */
@@ -276,11 +276,13 @@
 		font: inherit;
 		font-size: var(--text-sm);
 		color: var(--fg-control);
-		background: var(--shell);
-		border: 1px solid var(--hairline);
+		background: var(--shell-bg);
+		border: 0;
 		border-radius: var(--r-pill);
-		padding: 0.16rem 0.6rem;
+		padding: 0 12px;
 		cursor: pointer;
+		box-shadow: inset 0 0 0 1px var(--hairline-strong);
+		height: var(--control-h);
 	}
 
 	.close:focus-visible {

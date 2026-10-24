@@ -214,13 +214,14 @@
 		margin: 0.7rem 0 0;
 		padding: 0.6rem 0.7rem;
 		background: var(--surface-2);
-		border: 1px solid var(--hairline);
+		border: 0;
 		border-radius: var(--r-item, 6px);
 		font-family: var(--font-mono);
 		font-size: var(--text-control);
 		line-height: 1.5;
 		white-space: pre-wrap;
 		word-break: break-all;
+		box-shadow: inset 0 0 0 1px var(--hairline);
 	}
 
 	/* **欄は広く取る。**打ったものが見えない入力なので、狭いと不安になります。 */
@@ -235,10 +236,11 @@
 		padding: 0.45rem 0.55rem;
 		background: var(--surface-2);
 		color: var(--fg);
-		border: 1px solid var(--hairline-strong);
+		border: 0;
 		border-radius: var(--r-item, 6px);
 		font-family: var(--font-mono);
 		font-size: var(--text-body);
+		box-shadow: inset 0 0 0 1px var(--hairline);
 	}
 
 	.actions {

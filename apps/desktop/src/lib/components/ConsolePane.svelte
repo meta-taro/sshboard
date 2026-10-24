@@ -226,9 +226,10 @@
 		flex-direction: column;
 		min-width: 0;
 		flex: 1 1 0;
-		border: 1px solid var(--hairline);
+		border: 0;
 		border-radius: var(--r-shell);
 		overflow: hidden;
+		box-shadow: inset 0 0 0 1px var(--hairline);
 	}
 
 	/* **いま打鍵が行く面を、はっきり分ける。**

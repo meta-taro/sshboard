@@ -105,11 +105,13 @@
 		font: inherit;
 		font-size: var(--text-control);
 		color: var(--fg-control);
-		background: var(--shell);
-		border: 1px solid var(--hairline-strong);
+		background: var(--shell-bg);
+		border: 0;
 		border-radius: var(--r-pill);
-		padding: 0.22rem 0.8rem;
+		padding: 0 12px;
 		cursor: pointer;
+		box-shadow: inset 0 0 0 1px var(--hairline-strong);
+		height: var(--control-h);
 	}
 
 	button:hover {

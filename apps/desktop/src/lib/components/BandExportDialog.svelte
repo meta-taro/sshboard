@@ -104,10 +104,10 @@
 		max-height: 100%;
 		overflow: auto;
 		padding: 1rem 1.1rem;
-		border: 1px solid var(--hairline-strong);
+		border: 0;
 		border-radius: var(--r-shell);
 		background: var(--surface);
-		box-shadow: var(--lift-3);
+		box-shadow: var(--shell-ring), var(--lift-3);
 	}
 
 	/* **ここに `display: flex` を置きません**（`component-wiring.test.ts` の決まり）。 */
@@ -221,8 +221,12 @@
 
 	.close {
 		color: var(--fg-control);
-		background: var(--shell);
-		border: 1px solid var(--hairline);
+		background: var(--shell-bg);
+		border: 0;
+		box-shadow: inset 0 0 0 1px var(--hairline-strong);
+		height: var(--control-h);
+		padding: 0 12px;
+		border-radius: var(--r-pill);
 	}
 
 	.go {

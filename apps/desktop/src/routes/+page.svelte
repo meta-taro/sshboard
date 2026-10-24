@@ -2462,11 +2462,11 @@
 		gap: 0.6rem;
 		max-width: min(24rem, calc(100vw - 2rem));
 		padding: 0.75rem 0.85rem;
-		border: 1px solid var(--hairline-strong);
+		border: 0;
 		border-radius: var(--r-shell);
 		background: var(--surface);
 		/* **他と違う面に見せる。**本文と同じ平面に置くと、見落とされます。 */
-		box-shadow: var(--lift-3);
+		box-shadow: var(--shell-ring), var(--lift-2);
 	}
 
 	.toast-icon {
@@ -2637,12 +2637,13 @@
 	.console-tab {
 		font-size: var(--text-control);
 		padding: 0.2rem 0.55rem;
-		border: 1px solid var(--hairline);
+		border: 0;
 		border-radius: var(--r-control);
 		background: transparent;
 		display: inline-flex;
 		align-items: center;
 		gap: 0.3rem;
+		box-shadow: var(--shell-ring);
 	}
 
 	/* **並んで出ている面**（半々のどちらか）。 */
@@ -2796,16 +2797,17 @@
 
 	.about-open {
 		flex: 0 0 auto;
-		width: 24px;
-		height: 24px;
+		width: 34px;
+		height: 34px;
 		padding: 0;
 		border-radius: var(--r-pill);
-		background: transparent;
-		border: 1px solid var(--hairline);
+		background: var(--shell-bg);
+		border: 0;
 		color: var(--fg-muted);
 		font-size: var(--text-control);
 		line-height: 1;
 		margin-left: auto;
+		box-shadow: inset 0 0 0 1px var(--hairline-strong);
 	}
 
 	.about-open:hover {
@@ -2847,10 +2849,10 @@
 		 * `100vw - 24px` は左右の余白ぶん。
 		 */
 		max-width: min(26rem, calc(100vw - 24px));
-		border: 1px solid var(--hairline);
+		border: 0;
 		border-radius: 8px;
 		background: var(--surface);
-		box-shadow: 0 8px 24px rgb(0 0 0 / 25%);
+		box-shadow: var(--shell-ring), var(--lift-3);
 	}
 
 	/*
@@ -3069,10 +3071,11 @@
 		height: var(--control-h);
 		padding: 0 0.75rem;
 		border-radius: var(--r-pill);
-		border: 1px solid var(--hairline);
-		background: var(--shell);
+		border: 0;
+		background: var(--shell-bg);
 		cursor: pointer;
 		transition: background var(--fast) var(--ease);
+		box-shadow: inset 0 0 0 1px var(--hairline-strong);
 	}
 
 	.mcp:hover:not(:disabled) {
@@ -3179,11 +3182,11 @@
 		font-size: var(--text-control);
 		color: var(--fg);
 		background: var(--surface);
-		border: 1px solid var(--hairline);
+		border: 0;
 		border-radius: var(--r-pill);
 		padding: 0.16rem 0.5rem;
 		margin-left: 0.15rem;
-		box-shadow: var(--inner-highlight);
+		box-shadow: inset 0 0 0 1px var(--hairline-strong);
 	}
 
 	.failure {
@@ -3275,13 +3278,15 @@
 		align-items: center;
 		gap: 0.3rem;
 		white-space: nowrap;
-		padding: 0.35rem 0.7rem;
-		border: 1px solid var(--hairline);
-		border-radius: var(--r-control);
-		background: var(--surface);
+		padding: 0 12px;
+		border: 0;
+		border-radius: var(--r-pill);
+		background: var(--shell-bg);
 		color: var(--fg);
 		font-size: var(--text-control);
 		cursor: pointer;
+		box-shadow: inset 0 0 0 1px var(--hairline-strong);
+		height: var(--control-h);
 	}
 
 	.console-head button.primary {
@@ -3298,9 +3303,10 @@
 		font-family: var(--font-mono);
 		font-size: var(--text-sm);
 		padding: 0.15rem 0.4rem;
-		border: 1px solid var(--hairline);
+		border: 0;
 		border-radius: var(--r-control);
 		color: var(--fg-muted);
+		box-shadow: inset 0 0 0 1px var(--hairline-strong);
 	}
 
 	/*
@@ -3414,13 +3420,14 @@
 		font: inherit;
 		font-size: var(--text-sm);
 		color: var(--fg);
-		background: var(--surface-2);
-		border: 1px solid var(--hairline);
+		background: var(--shell-bg);
+		border: 0;
 		border-radius: var(--r-pill);
-		padding: 0.22rem 0.75rem;
+		padding: 0 12px;
 		cursor: pointer;
-		box-shadow: var(--inner-highlight), var(--lift-1);
 		transition: transform var(--fast) var(--ease);
+		box-shadow: inset 0 0 0 1px var(--hairline-strong);
+		height: var(--control-h);
 	}
 
 	.stream-head button:active {

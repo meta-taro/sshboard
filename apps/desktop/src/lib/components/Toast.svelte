@@ -51,9 +51,9 @@
 		font-size: var(--text-control);
 		color: var(--fg);
 		background: var(--surface);
-		border: 1px solid var(--hairline-strong);
+		border: 0;
 		border-radius: var(--r-pill);
-		box-shadow: var(--lift-3);
+		box-shadow: var(--shell-ring), var(--lift-2);
 		max-width: min(28rem, calc(100vw - 2rem));
 	}
 

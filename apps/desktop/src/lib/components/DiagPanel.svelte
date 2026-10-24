@@ -98,11 +98,13 @@
 		font: inherit;
 		font-size: var(--text-sm);
 		color: var(--fg-control);
-		background: var(--shell);
-		border: 1px solid var(--hairline);
+		background: var(--shell-bg);
+		border: 0;
 		border-radius: var(--r-pill);
-		padding: 0.16rem 0.6rem;
+		padding: 0 12px;
 		cursor: pointer;
+		box-shadow: inset 0 0 0 1px var(--hairline-strong);
+		height: var(--control-h);
 	}
 
 	button:hover {
@@ -128,10 +130,11 @@
 		flex: 1 1 auto;
 		min-height: 0;
 		background: var(--surface);
-		border: 1px solid var(--hairline);
+		border: 0;
 		border-radius: var(--r-shell);
 		font-size: var(--text-sm);
 		line-height: 1.6;
+		box-shadow: inset 0 0 0 1px var(--hairline);
 	}
 
 	.diag-list li {
@@ -165,12 +168,15 @@
 		color: var(--fg-muted);
 		flex: none;
 		white-space: nowrap;
+		border: 0;
+		box-shadow: inset 0 0 0 1px var(--hairline);
 	}
 
 	.who {
 		padding: 0 0.3rem;
-		border: 1px solid var(--hairline);
+		border: 0;
 		border-radius: var(--r-pill);
+		box-shadow: inset 0 0 0 1px var(--hairline);
 	}
 
 	/*
