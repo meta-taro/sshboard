@@ -985,8 +985,9 @@
 		align-items: center;
 		gap: 10px;
 		padding: 10px 14px;
-		flex-wrap: nowrap;
-		overflow: hidden;
+		/* 英語の 1100px では「別の接続を開く」が右端で切れた。折り返して縦に伸ばす方がまし。 */
+		flex-wrap: wrap;
+		overflow: visible;
 	}
 
 	/* 開いている接続のタブ。**1 本残らずここに出る**（D25）。 */
