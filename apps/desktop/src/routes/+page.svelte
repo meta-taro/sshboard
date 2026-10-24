@@ -2965,9 +2965,9 @@
 		align-items: center;
 		gap: 0.4rem;
 		min-width: 0;
-		/* 縮めること（掴める所を残す・header-wiring.test）。狭い窓はヘッダー側の隙間で収める。 */
-		flex: 0 1 auto;
-		overflow: hidden;
+		/* **製品名は切らない。**掴む所は header 全体（data-tauri-drag-region）に在り、ロゴを縮める必要は無い。 */
+		flex: none;
+		overflow: visible;
 		font: inherit;
 		font-size: var(--text-control);
 		font-weight: 700;
@@ -3513,7 +3513,13 @@
 
 		/* 錠剤の中の余白も少し詰める（高さと字は変えない）。1100px で計測して 1 段に入る値。 */
 		.tabs button {
-			padding: 0 10px;
+			padding: 0 9px;
+		}
+
+		/* 長い文言（英語）は「…」で切る。製品名とタブは切らない。 */
+		.mask-toggle,
+		.stop-ai {
+			min-width: 3.5rem;
 		}
 
 		/* **MCP の釦は印だけ**（文言は title に残る）。実機（WebKit・1100px）では

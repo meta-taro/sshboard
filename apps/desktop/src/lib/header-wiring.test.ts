@@ -320,10 +320,15 @@ describe('メニューはロゴの下（UI 案・2026-10-21）', () => {
 
 	test('leaves enough of the bar to grab the window by', () => {
 		// この帯は OS のタイトルバー（D17）。**34px では窓を動かせない**と
-		// 実機から言われています。ロゴが伸びると掴める所が無くなります。
+		// 実機から言われています。
+		//
+		// 以前は「ロゴが縮む」ことで掴む所を残していましたが、**製品名が
+		// 「sshb…」に切れる**写真が出ました（2026-10-24）。掴む所は
+		// `header` 全体が `data-tauri-drag-region` なので、ロゴを縮める必要はありません。
+		expect(source).toContain('<header data-tauri-drag-region');
 		const at = source.indexOf('.brand {');
 		const rule = source.slice(at, source.indexOf('}', at));
-		expect(rule).toContain('flex: 0 1 auto');
+		expect(rule).toContain('flex: none');
 	});
 });
 
