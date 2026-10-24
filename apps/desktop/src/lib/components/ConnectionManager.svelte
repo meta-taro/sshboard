@@ -1008,13 +1008,14 @@
 	}
 
 	.list-core {
-		padding: 0.7rem 0.55rem 0.5rem;
-		gap: 0.4rem;
+		padding: 16px 12px;
+		gap: 8px;
 	}
 
+	/* 案: 詳細の芯は 22px 24px・項目の間は 20px。詰めると古く見えます。 */
 	.form-core {
-		padding: 1rem 1.1rem;
-		gap: 0.65rem;
+		padding: 22px 24px;
+		gap: 20px;
 		overflow-y: auto;
 	}
 
@@ -1157,8 +1158,9 @@
 	}
 
 	.list-head span {
-		font-size: var(--text-sm);
-		color: var(--fg-faint);
+		font-size: var(--text-body);
+		font-weight: 700;
+		color: var(--fg);
 	}
 
 	.list ul {
@@ -1178,16 +1180,19 @@
 		/* **中央寄せにしない。**あとから足した `button { align-items: center }` が
 		   ここにも当たり、列方向の flex なので全部が中央へ寄っていた。 */
 		align-items: stretch;
-		gap: 1px;
+		gap: 4px;
 		width: 100%;
 		text-align: left;
 		background: transparent;
-		border: 1px solid transparent;
-		border-radius: var(--r-control);
-		padding: 0.38rem 0.5rem;
+		border: 0;
+		border-radius: 14px;
+		/* **釦の既定（30px の錠剤）を打ち消す。**これはカードで、高さは中身で決まる。 */
+		height: auto;
+		box-shadow: none;
+		padding: 12px;
 		color: var(--fg);
 		font: inherit;
-		font-size: 0.84rem;
+		font-size: var(--text-body);
 		cursor: pointer;
 		transition:
 			background var(--fast) var(--ease),
@@ -1206,8 +1211,8 @@
 	/* **選択の枠はその接続の印の色。** */
 	.row.selected {
 		background: var(--surface-2);
-		border-color: color-mix(in srgb, var(--row-mark) 55%, transparent);
-		box-shadow: var(--lift-1);
+		/* 案: 選択は薄い塗り＋内側の輪。印の色を輪に薄く混ぜる。 */
+		box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--row-mark) 55%, var(--hairline-strong));
 	}
 
 	.row-top {
@@ -1246,14 +1251,13 @@
 	}
 
 	.row-tag {
-		font-family: var(--font-mono);
-		font-size: 9px;
-		letter-spacing: 0.06em;
-		border: 1px solid currentColor;
+		font-size: var(--text-xs);
+		font-weight: 700;
+		border: 0;
 		border-radius: var(--r-pill);
-		padding: 0 0.4rem;
+		padding: 2px 8px;
+		background: color-mix(in srgb, currentColor 14%, transparent);
 		flex: none;
-		opacity: 0.9;
 	}
 
 	.row-id {
@@ -1302,7 +1306,7 @@
 	label {
 		display: flex;
 		flex-direction: column;
-		gap: 0.22rem;
+		gap: 6px;
 	}
 
 	/* **大文字化しない。**日本語ラベルの中のラテン文字まで大文字になり、
@@ -1315,24 +1319,38 @@
 		color: var(--fg-faint);
 	}
 
-	input {
+	/* **丸と四角（radio / checkbox）には当てない。**40px の輪が付いて、細い縦線に見えました。 */
+	input:not([type='radio']):not([type='checkbox']),
+	textarea {
 		font: inherit;
-		font-size: var(--text-body);
+		font-size: var(--text-control);
 		color: var(--fg);
 		background: var(--surface-input);
-		border: 1px solid var(--hairline);
+		border: 0;
 		border-radius: var(--r-control);
-		padding: 0.42rem 0.6rem;
-		box-shadow: var(--inner-highlight);
-		transition:
-			border-color var(--fast) var(--ease),
-			box-shadow var(--fast) var(--ease);
+		/* 案: 高さ 40px・左右 12px・内側の輪。線ではなく輪。 */
+		height: 40px;
+		padding: 0 12px;
+		box-sizing: border-box;
+		box-shadow: inset 0 0 0 1px var(--hairline-strong);
+		transition: box-shadow var(--fast) var(--ease);
 	}
 
-	input:focus {
+	textarea {
+		height: auto;
+		min-height: 64px;
+		padding: 10px 12px;
+		font-family: var(--font-mono);
+		line-height: 1.6;
+		resize: vertical;
+	}
+
+	input:not([type='radio']):not([type='checkbox']):focus,
+	textarea:focus {
 		outline: none;
-		border-color: var(--accent);
-		box-shadow: var(--inner-highlight), 0 0 0 3px var(--accent-soft);
+		box-shadow:
+			inset 0 0 0 1px var(--accent),
+			0 0 0 3px var(--accent-soft);
 	}
 
 	input:disabled {
@@ -1356,22 +1374,28 @@
 	.auth {
 		display: flex;
 		flex-direction: column;
-		gap: 0.4rem;
+		gap: 8px;
 		margin: 0;
-		padding: 0.6rem 0.7rem 0.7rem;
-		border: 1px solid var(--hairline);
-		border-radius: var(--r-core);
+		padding: 0;
+		border: 0;
 	}
 
 	.auth legend {
 		font-size: var(--text-sm);
-		color: var(--fg-muted);
-		padding: 0 0.3rem;
+		color: var(--fg-faint);
+		padding: 0;
+		margin-bottom: 2px;
 	}
 
+	/* 案: 3 つを 1 つの錠剤の中に並べる。 */
 	.auth-choices {
-		display: flex;
-		gap: 0.4rem;
+		display: inline-flex;
+		gap: 2px;
+		padding: 4px;
+		border-radius: var(--r-pill);
+		background: var(--surface-input);
+		box-shadow: inset 0 0 0 1px var(--hairline-strong);
+		align-self: flex-start;
 		flex-wrap: wrap;
 	}
 
@@ -1379,12 +1403,16 @@
 	   （指針 §9「色を唯一の手がかりにしない」）。 */
 	.auth-choice {
 		display: inline-flex;
+		/* **`label` の既定（列方向）を打ち消す。**丸と言葉は横に並べる。 */
+		flex-direction: row;
 		align-items: center;
 		gap: 0.35rem;
 		font-size: var(--text-control);
-		padding: 0.3rem 0.7rem;
-		border: 1px solid var(--hairline);
-		border-radius: var(--r-control);
+		color: var(--fg-control);
+		height: var(--control-h);
+		padding: 0 var(--control-px);
+		border: 0;
+		border-radius: var(--r-pill);
 		cursor: pointer;
 		/* **折り返させない。**`ssh-agent` が 2 行に割れて読めませんでした（実機）。 */
 		white-space: nowrap;
@@ -1396,10 +1424,11 @@
 		flex: 0 0 auto;
 	}
 
+	/* 選んだものは地と字を入れ替える（案）。色だけに頼らない。 */
 	.auth-choice.on {
-		border-color: var(--accent);
-		color: var(--accent);
-		font-weight: 600;
+		background: var(--selected);
+		color: var(--selected-fg);
+		font-weight: 700;
 	}
 
 	/*
@@ -1502,20 +1531,19 @@
 	/* **2 行 × 8。**flex の中で潰れないよう幅を固定する。 */
 	.swatches {
 		display: grid;
-		grid-template-columns: repeat(8, 18px);
-		gap: 0.28rem;
+		grid-template-columns: repeat(8, 28px);
+		gap: 8px;
 		width: max-content;
 		flex: none;
 	}
 
 	.swatch {
-		width: 18px;
-		height: 18px;
+		width: 28px;
+		height: 28px;
 		padding: 0;
-		border-radius: 5px;
-		border: 1px solid var(--hairline-strong);
+		border-radius: 9px;
+		border: 0;
 		cursor: pointer;
-		box-shadow: var(--lift-1);
 		transition: transform var(--fast) var(--ease);
 	}
 
@@ -1524,11 +1552,20 @@
 	}
 
 	.swatch.picked {
-		outline: 2px solid var(--fg);
-		outline-offset: 2px;
+		box-shadow:
+			0 0 0 2px var(--surface),
+			0 0 0 4px var(--fg);
 	}
 
 	.clear-mark {
+		/* 文字だけの釦。**錠剤の既定（高さ・塗り・輪）を打ち消す。** */
+		height: auto;
+		padding: 0;
+		background: none;
+		box-shadow: none;
+		color: var(--fg-muted);
+		text-decoration: underline;
+		text-underline-offset: 3px;
 		/* **2 行に折らない**（英語の `No mark` で折れて、色見本と重なっていました）。 */
 		white-space: nowrap;
 		align-self: flex-start;
@@ -1558,12 +1595,14 @@
 		font: inherit;
 		font-size: var(--text-control);
 		color: var(--fg);
-		background: var(--surface-2);
-		border: 1px solid var(--hairline);
+		/* 案: 釦は錠剤・高さ 30px・薄い塗り＋内側の輪 */
+		background: var(--shell-bg);
+		border: 0;
+		box-shadow: inset 0 0 0 1px var(--hairline-strong);
+		height: var(--control-h);
+		padding: 0 var(--control-px);
 		border-radius: var(--r-pill);
-		padding: 0.3rem 0.85rem;
 		cursor: pointer;
-		box-shadow: var(--inner-highlight), var(--lift-1);
 		transition:
 			transform var(--fast) var(--ease),
 			background var(--fast) var(--ease);
@@ -1593,16 +1632,18 @@
 		display: inline-flex;
 		align-items: center;
 		gap: 0.55rem;
-		background: var(--accent);
-		color: var(--accent-fg);
-		border-color: transparent;
-		padding: 0.32rem 0.35rem 0.32rem 0.95rem;
+		/* 案: 主釦は地と字の反転・高さ 36px・右端に丸い印。 */
+		background: var(--selected);
+		color: var(--selected-fg);
+		height: 36px;
+		padding: 0 6px 0 18px;
 		font-weight: 700;
-		box-shadow: var(--lift-2);
+		box-shadow: none;
 	}
 
 	.cta:hover {
-		background: var(--accent);
+		background: var(--selected);
+		opacity: 0.92;
 	}
 
 	.cta-icon {
@@ -1612,7 +1653,8 @@
 		width: 22px;
 		height: 22px;
 		border-radius: var(--r-pill);
-		background: color-mix(in srgb, var(--accent-fg) 18%, transparent);
+		background: var(--selected-fg);
+		color: var(--selected);
 		font-size: var(--text-sm);
 		transition: transform var(--fast) var(--ease);
 	}
