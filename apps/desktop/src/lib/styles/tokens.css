@@ -164,8 +164,19 @@
 	--fast: 160ms;
 	--slow: 420ms;
 
-	--font-ui: 'Zen Kaku Gothic New', 'Hiragino Sans', system-ui, sans-serif;
-	--font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+	/*
+	 * **OS 標準の書体**（2026-10-24）。
+	 *
+	 * それまで先頭に 'Zen Kaku Gothic New' を置いていましたが、**どこからも読み込んでおらず、
+	 * どの機械にも入っていません。**実機は常に代替で描き、**太字は合成**されていました。
+	 * WebKit は合成した太字の幅を箱に反映しないので、**太字の札がことごとく右端で切れました**
+	 * （製品名・選んだタブ・AI を止める・選んだ ssh-agent —— 写真で判明）。
+	 *
+	 * 本物の太字を持つ標準の書体に揃えます。macOS は SF（日本語は Hiragino）、
+	 * Windows は Segoe UI / Yu Gothic UI。**読み込みも同梱も要りません。**
+	 */
+	--font-ui: system-ui, -apple-system, 'Segoe UI', 'Yu Gothic UI', 'Hiragino Sans', sans-serif;
+	--font-mono: ui-monospace, 'SF Mono', Menlo, 'Cascadia Mono', Consolas, monospace;
 
 	--mark-red: #e02b26;
 	--mark-orange: #e2761a;
