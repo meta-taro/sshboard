@@ -1421,6 +1421,7 @@
 		position: relative;
 		/* 縮めない。縮むと選んだ札の文字が右端で切れます（実機の写真で判明）。 */
 		flex: none;
+		min-width: max-content;
 	}
 
 	.auth-choice input {

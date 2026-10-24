@@ -2712,10 +2712,10 @@
 	}
 
 	.mask-toggle {
-		display: inline-block;
+		display: inline-flex;
 		align-items: center;
 		gap: 0.4rem;
-		flex: 0 1 auto;
+		flex: none;
 		font: inherit;
 		font-size: var(--text-control);
 		color: var(--fg-control);
@@ -2731,10 +2731,7 @@
 		transition:
 			background var(--fast) var(--ease),
 			color var(--fast) var(--ease);
-		min-width: 4.5rem;
-		overflow: hidden;
-		text-overflow: ellipsis;
-		line-height: var(--control-h-lg);
+		min-width: max-content;
 	}
 
 	.mask-toggle:hover {
@@ -2763,10 +2760,10 @@
 	 * （探して見つからない方が困る）。
 	 */
 	.stop-ai {
-		display: inline-block;
+		display: inline-flex;
 		align-items: center;
 		gap: 0.36rem;
-		flex: 0 1 auto;
+		flex: none;
 		font: inherit;
 		font-size: var(--text-control);
 		font-weight: 700;
@@ -2782,10 +2779,7 @@
 		transition:
 			background var(--fast) var(--ease),
 			opacity var(--fast) var(--ease);
-		min-width: 4.5rem;
-		overflow: hidden;
-		text-overflow: ellipsis;
-		line-height: var(--control-h-lg);
+		min-width: max-content;
 	}
 
 	.stop-ai:hover:not(:disabled) {
@@ -3153,6 +3147,7 @@
 			color var(--fast) var(--ease),
 			transform var(--fast) var(--ease);
 		flex: none;
+		min-width: max-content;
 	}
 
 	.view-panel button.icon-only {
