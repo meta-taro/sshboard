@@ -174,6 +174,7 @@
 		font-weight: 500;
 		color: var(--fg);
 		white-space: nowrap;
+		text-align: left;
 	}
 
 	.pick:hover {

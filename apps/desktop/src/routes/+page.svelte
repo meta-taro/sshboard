@@ -1758,9 +1758,9 @@
 					: 'MCP'}
 		>
 			<Icon name={mcpFailure ? 'warning' : mcpCopied ? 'check' : 'copy'} size={12} />
-			{#if mcpFailure}{i18n.t('mcp.failed', { port: String(mcpFailure.port) })}{:else if !mcp}{i18n.t(
+			<span class="mcp-text">{#if mcpFailure}{i18n.t('mcp.failed', { port: String(mcpFailure.port) })}{:else if !mcp}{i18n.t(
 					'mcp.starting'
-				)}{:else if mcpCopied}{i18n.t('mcp.copied')}{:else}{i18n.t('mcp.copy')}{/if}
+				)}{:else if mcpCopied}{i18n.t('mcp.copied')}{:else}{i18n.t('mcp.copy')}{/if}</span>
 		</button>
 
 		<!--
@@ -2709,10 +2709,10 @@
 	}
 
 	.mask-toggle {
-		display: inline-flex;
+		display: inline-block;
 		align-items: center;
 		gap: 0.4rem;
-		flex: none;
+		flex: 0 1 auto;
 		font: inherit;
 		font-size: var(--text-control);
 		color: var(--fg-control);
@@ -2728,6 +2728,10 @@
 		transition:
 			background var(--fast) var(--ease),
 			color var(--fast) var(--ease);
+		min-width: 4.5rem;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		line-height: var(--control-h-lg);
 	}
 
 	.mask-toggle:hover {
@@ -2756,10 +2760,10 @@
 	 * （探して見つからない方が困る）。
 	 */
 	.stop-ai {
-		display: inline-flex;
+		display: inline-block;
 		align-items: center;
 		gap: 0.36rem;
-		flex: none;
+		flex: 0 1 auto;
 		font: inherit;
 		font-size: var(--text-control);
 		font-weight: 700;
@@ -2775,6 +2779,10 @@
 		transition:
 			background var(--fast) var(--ease),
 			opacity var(--fast) var(--ease);
+		min-width: 4.5rem;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		line-height: var(--control-h-lg);
 	}
 
 	.stop-ai:hover:not(:disabled) {
@@ -3309,6 +3317,7 @@
 		border-radius: var(--r-control);
 		color: var(--fg-muted);
 		box-shadow: inset 0 0 0 1px var(--hairline-strong);
+		white-space: nowrap;
 	}
 
 	/*
@@ -3340,6 +3349,8 @@
 
 	.who-label {
 		color: var(--fg-control);
+		flex: none;
+		white-space: nowrap;
 	}
 
 	.who-badge {
@@ -3352,6 +3363,8 @@
 		background: var(--surface-2);
 		color: var(--fg-muted);
 		line-height: 1.2;
+		flex: none;
+		white-space: nowrap;
 	}
 
 	.who.mine {
@@ -3418,6 +3431,14 @@
 		min-width: 0;
 		font-family: var(--font-mono);
 		font-size: var(--text-sm);
+		height: 32px;
+		padding: 0 10px;
+		box-sizing: border-box;
+		border: 0;
+		border-radius: var(--r-control);
+		background: var(--surface-input);
+		box-shadow: inset 0 0 0 1px var(--hairline-strong);
+		color: var(--fg);
 	}
 
 	.stream-head button {
@@ -3495,8 +3516,21 @@
 			padding: 0 10px;
 		}
 
+		/* **MCP の釦は印だけ**（文言は title に残る）。実機（WebKit・1100px）では
+		   Chrome より文字が広く、この釦で窓の操作が 2 段目に落ちました。 */
 		.mcp {
-			padding: 0 8px;
+			padding: 0 10px;
 		}
+
+		.mcp .mcp-text {
+			display: none;
+		}
+	}
+	/* 出力の面の道の欄。**白い線の枠が残っていました**（写真で判明）。他の入力と同じ輪に。 */
+	.stream-head .path:focus {
+		outline: none;
+		box-shadow:
+			inset 0 0 0 1px var(--accent),
+			0 0 0 3px var(--accent-soft);
 	}
 </style>

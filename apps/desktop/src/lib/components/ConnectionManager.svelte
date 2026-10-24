@@ -1419,6 +1419,8 @@
 		/* **折り返させない。**`ssh-agent` が 2 行に割れて読めませんでした（実機）。 */
 		white-space: nowrap;
 		position: relative;
+		/* 縮めない。縮むと選んだ札の文字が右端で切れます（実機の写真で判明）。 */
+		flex: none;
 	}
 
 	.auth-choice input {

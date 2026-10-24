@@ -509,7 +509,7 @@ impl SshboardMcp {
             if redact {
                 "伏せて撮る"
             } else {
-                "**伏せずに撮る**"
+                "伏せずに撮る"
             }
         ))
         .await?;
