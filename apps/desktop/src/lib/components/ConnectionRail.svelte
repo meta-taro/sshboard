@@ -193,7 +193,7 @@
 		font-size: var(--text-xs);
 		padding: 0 0.3rem;
 		border-radius: var(--r-pill);
-		background: var(--shell);
+		background: var(--shell-bg);
 		color: var(--fg-muted);
 		flex: none;
 	}

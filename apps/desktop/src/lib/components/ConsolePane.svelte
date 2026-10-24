@@ -304,6 +304,8 @@
 		overflow: hidden;
 		text-overflow: ellipsis;
 		max-width: 14rem;
+		border: 0;
+		box-shadow: inset 0 0 0 1px var(--hairline);
 	}
 
 	.holder.ai {
@@ -344,7 +346,8 @@
 		flex: 0 0 auto;
 		padding: 0 0.3rem;
 		border-radius: var(--r-control);
-		border: 1px solid var(--hairline);
+		border: 0;
+		box-shadow: inset 0 0 0 1px var(--hairline);
 	}
 
 	/*

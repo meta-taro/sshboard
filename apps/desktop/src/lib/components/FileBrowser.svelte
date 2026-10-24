@@ -1387,9 +1387,10 @@
 		line-height: 1;
 		padding: 0.14rem 0.4rem;
 		border-radius: var(--r-pill);
-		border: 1px solid var(--hairline);
+		border: 0;
 		color: var(--fg-dim);
 		white-space: nowrap;
+		box-shadow: inset 0 0 0 1px var(--hairline);
 	}
 
 	.ai-write.open {
