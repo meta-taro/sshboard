@@ -3325,7 +3325,7 @@
 		gap: 10px;
 		margin-right: auto;
 		/* 案: 4px 4px 4px 14px・高さ 32px */
-		padding: 4px 4px 4px 14px;
+		padding: 3px 3px 3px 14px;
 		min-height: 32px;
 		border-radius: var(--r-pill);
 		background: var(--shell-bg);
@@ -3333,6 +3333,7 @@
 		box-shadow: var(--shell-ring);
 		font-size: var(--text-control);
 		white-space: nowrap;
+		line-height: 1.2;
 	}
 
 	.who-label {
@@ -3348,6 +3349,7 @@
 		/* 誰も握っていないときは、色で主張しない。 */
 		background: var(--surface-2);
 		color: var(--fg-muted);
+		line-height: 1.2;
 	}
 
 	.who.mine {

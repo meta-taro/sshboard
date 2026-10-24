@@ -85,6 +85,10 @@
 		flex: 0 1 auto;
 		min-height: 0;
 		min-width: 0;
+		background: var(--surface);
+		border-radius: 12px;
+		padding: 12px 14px;
+		box-shadow: var(--lift-core);
 	}
 
 	.head {
