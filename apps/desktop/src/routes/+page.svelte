@@ -2425,7 +2425,9 @@
 	header {
 		display: flex;
 		align-items: center;
-		gap: 0.5rem;
+		/* 案: gap 16px・左右 16px・高さ 52px。詰めると古く見えます。 */
+		gap: 1rem;
+		padding: 0 1rem;
 		/*
 		 * **折り返します**（2026-10-23 に実機で切れた）。
 		 *
@@ -2444,7 +2446,7 @@
 		 * 掴める高さを確保します。34px では**掴める隙間がほとんど無く、
 		 * 窓を動かせない**と言われました（実機）。
 		 */
-		min-height: 40px;
+		min-height: 52px;
 		/* 掴む所に文字を選ばせない。**掴んだつもりで選択が始まると、窓が動かない。** */
 		user-select: none;
 	}
@@ -2491,7 +2493,7 @@
 	}
 
 	.toast-body strong {
-		font-size: 0.8rem;
+		font-size: var(--text-control);
 		font-weight: 600;
 		line-height: 1.45;
 	}
@@ -2502,7 +2504,7 @@
 	}
 
 	.toast-actions button {
-		font-size: 0.75rem;
+		font-size: var(--text-control);
 		padding: 0.25rem 0.6rem;
 	}
 
@@ -2526,7 +2528,7 @@
 	.toast-notes {
 		margin: 0;
 		padding-left: 1.05rem;
-		font-size: 0.74rem;
+		font-size: var(--text-control);
 		line-height: 1.65;
 		color: var(--fg-muted);
 	}
@@ -2539,7 +2541,7 @@
 	/* 再起動で切れるもの。**危険側の色で、本文と区別する。** */
 	.toast-cut {
 		margin: 0;
-		font-size: 0.74rem;
+		font-size: var(--text-control);
 		line-height: 1.6;
 		font-weight: 500;
 		color: var(--warning);
@@ -2633,7 +2635,7 @@
 	}
 
 	.console-tab {
-		font-size: 0.75rem;
+		font-size: var(--text-control);
 		padding: 0.2rem 0.55rem;
 		border: 1px solid var(--hairline);
 		border-radius: var(--r-control);
@@ -2655,7 +2657,7 @@
 	}
 
 	.console-tablist .add {
-		font-size: 0.75rem;
+		font-size: var(--text-control);
 		padding: 0.2rem 0.55rem;
 		display: inline-flex;
 		align-items: center;
@@ -2700,7 +2702,7 @@
 	.ai-note {
 		display: block;
 		margin-top: 0.3rem;
-		font-size: 0.68rem;
+		font-size: var(--text-sm);
 		line-height: 1.55;
 		color: var(--warning);
 	}
@@ -2708,15 +2710,18 @@
 	.mask-toggle {
 		display: inline-flex;
 		align-items: center;
-		gap: 0.3rem;
+		gap: 0.4rem;
 		flex: none;
 		font: inherit;
-		font-size: 0.7rem;
+		font-size: var(--text-control);
 		color: var(--fg-control);
-		background: var(--shell);
-		border: 1px solid var(--hairline-strong);
+		/* 案: 透明に近い塗り＋内側の輪。暗い画面で明るい塗りにしない。 */
+		background: var(--shell-bg);
+		border: 0;
+		box-shadow: inset 0 0 0 1px var(--hairline-strong);
 		border-radius: var(--r-pill);
-		padding: 0.24rem 0.6rem;
+		height: var(--control-h-lg);
+		padding: 0 var(--control-px);
 		white-space: nowrap;
 		cursor: pointer;
 		transition:
@@ -2732,7 +2737,7 @@
 		color: var(--selected-fg);
 		background: var(--selected);
 		font-weight: 700;
-		border-color: transparent;
+		box-shadow: none;
 	}
 
 	.mask-toggle:focus-visible,
@@ -2755,13 +2760,15 @@
 		gap: 0.36rem;
 		flex: none;
 		font: inherit;
-		font-size: 0.7rem;
+		font-size: var(--text-control);
 		font-weight: 700;
 		color: var(--danger);
 		background: var(--danger-soft);
-		border: 1px solid var(--danger);
+		border: 0;
+		box-shadow: inset 0 0 0 1px rgba(255, 120, 120, 0.35);
 		border-radius: var(--r-pill);
-		padding: 0.24rem 0.65rem;
+		height: var(--control-h-lg);
+		padding: 0 1rem;
 		white-space: nowrap;
 		cursor: pointer;
 		transition:
@@ -2796,7 +2803,7 @@
 		background: transparent;
 		border: 1px solid var(--hairline);
 		color: var(--fg-muted);
-		font-size: 0.75rem;
+		font-size: var(--text-control);
 		line-height: 1;
 		margin-left: auto;
 	}
@@ -2866,7 +2873,7 @@
 	}
 
 	.view-label {
-		font-size: 0.75rem;
+		font-size: var(--text-control);
 		color: var(--fg-muted);
 		white-space: nowrap;
 	}
@@ -2894,7 +2901,7 @@
 		border: 0;
 		background: transparent;
 		color: var(--fg-muted);
-		font-size: 0.8rem;
+		font-size: var(--text-control);
 		line-height: 1;
 		cursor: default;
 		display: inline-flex;
@@ -2951,23 +2958,27 @@
 		flex: 0 1 auto;
 		overflow: hidden;
 		font: inherit;
+		font-size: var(--text-control);
+		font-weight: 700;
 		color: inherit;
-		background: transparent;
-		border: 1px solid transparent;
+		/* 案: 青の薄い塗り＋輪で「ここがメニュー」と常に言う。高さ 36px。 */
+		background: var(--human-soft);
+		border: 0;
+		box-shadow: inset 0 0 0 1px rgba(140, 194, 255, 0.35);
 		border-radius: var(--r-pill);
-		padding: 0.14rem 0.5rem 0.14rem 0.35rem;
+		height: 36px;
+		padding: 0 0.75rem 0 0.5rem;
+		gap: 0.5rem;
 		cursor: pointer;
 	}
 
 	.brand:hover {
-		background: var(--human-soft);
-		border-color: var(--human);
+		box-shadow: inset 0 0 0 1px var(--human);
 	}
 
 	/* **開いているあいだは、開いていると分かること。** */
 	.brand[aria-expanded='true'] {
-		background: var(--human-soft);
-		border-color: var(--human);
+		box-shadow: inset 0 0 0 1px var(--human);
 	}
 
 	.brand:focus-visible {
@@ -2991,7 +3002,7 @@
 	}
 
 	.brand-name {
-		font-size: 0.78rem;
+		font-size: var(--text-control);
 		font-weight: 700;
 		letter-spacing: 0.02em;
 		color: var(--fg);
@@ -3009,7 +3020,7 @@
 	}
 
 	.smaller-a {
-		font-size: 0.62rem;
+		font-size: var(--text-xs);
 	}
 
 	.larger-a {
@@ -3018,7 +3029,7 @@
 
 	/* いまどの段か。**出さないと、押した結果が分からない。** */
 	.text-now {
-		font-size: 0.62rem;
+		font-size: var(--text-xs);
 		color: var(--fg-muted);
 		white-space: nowrap;
 		padding: 0 0.1rem;
@@ -3043,7 +3054,7 @@
 		align-items: center;
 		gap: 0.28rem;
 		font-family: var(--font-ui);
-		font-size: 0.66rem;
+		font-size: var(--text-sm);
 		color: var(--fg-muted);
 		white-space: nowrap;
 		/*
@@ -3055,7 +3066,8 @@
 		min-width: 0;
 		overflow: hidden;
 		text-overflow: ellipsis;
-		padding: 0.2rem 0.5rem;
+		height: var(--control-h);
+		padding: 0 0.75rem;
 		border-radius: var(--r-pill);
 		border: 1px solid var(--hairline);
 		background: var(--shell);
@@ -3093,13 +3105,14 @@
 	.tabs {
 		display: flex;
 		align-items: center;
-		gap: 0.2rem;
+		gap: 2px;
 		flex-wrap: nowrap;
 		flex: none;
-		background: var(--shell);
-		border: 1px solid var(--hairline);
+		/* **半透明＋内側の輪**（案）。線ではなく濃淡。 */
+		background: var(--shell-bg);
+		box-shadow: var(--shell-ring);
 		border-radius: var(--r-pill);
-		padding: 3px;
+		padding: 4px;
 	}
 
 
@@ -3111,12 +3124,13 @@
 		align-items: center;
 		gap: 0.32rem;
 		font: inherit;
-		font-size: 0.74rem;
-		color: var(--fg-muted);
+		font-size: var(--text-control);
+		color: var(--fg-control);
 		background: transparent;
-		border: 1px solid transparent;
+		border: 0;
 		border-radius: var(--r-pill);
-		padding: 0.2rem 0.7rem;
+		height: var(--control-h);
+		padding: 0 var(--control-px);
 		white-space: nowrap;
 		cursor: pointer;
 		transition:
@@ -3126,7 +3140,7 @@
 	}
 
 	.view-panel button.icon-only {
-		padding: 0.26rem 0.4rem;
+		padding: 0 0.6rem;
 	}
 
 	.view-panel button:active,
@@ -3151,7 +3165,6 @@
 		color: var(--selected-fg);
 		background: var(--selected);
 		font-weight: 700;
-		box-shadow: var(--lift-1);
 	}
 
 	.view-panel button:focus-visible,
@@ -3163,7 +3176,7 @@
 
 	.view-panel select {
 		font: inherit;
-		font-size: 0.74rem;
+		font-size: var(--text-control);
 		color: var(--fg);
 		background: var(--surface);
 		border: 1px solid var(--hairline);
@@ -3179,7 +3192,7 @@
 		border-radius: var(--r-control);
 		background: var(--danger-soft);
 		color: var(--danger);
-		font-size: 0.78rem;
+		font-size: var(--text-control);
 	}
 
 	.stream {
@@ -3194,14 +3207,14 @@
 		display: flex;
 		align-items: center;
 		gap: 0.45rem;
-		font-size: 0.72rem;
+		font-size: var(--text-sm);
 		color: var(--fg-muted);
 		flex-wrap: wrap;
 	}
 
 	.stream-head .label {
 		flex: 1;
-		font-size: 0.72rem;
+		font-size: var(--text-sm);
 		color: var(--fg-faint);
 	}
 
@@ -3210,7 +3223,7 @@
 		display: flex;
 		align-items: center;
 		gap: 0.45rem;
-		font-size: 0.72rem;
+		font-size: var(--text-sm);
 		color: var(--fg-muted);
 		flex-wrap: wrap;
 	}
@@ -3219,7 +3232,7 @@
 		flex: 1 1 auto;
 		min-width: 0;
 		font-family: var(--font-mono);
-		font-size: 0.72rem;
+		font-size: var(--text-sm);
 	}
 
 	/* **無かったことを、その場に出す。**色に頼らず文字で言う。 */
@@ -3244,7 +3257,7 @@
 
 	/* **「何本開けるか」を言う文。**釦の隣に、控えめに置く（注意書きであって警告ではない）。 */
 	.onlyone {
-		font-size: 0.72rem;
+		font-size: var(--text-sm);
 		color: var(--fg-faint);
 	}
 
@@ -3267,7 +3280,7 @@
 		border-radius: var(--r-control);
 		background: var(--surface);
 		color: var(--fg);
-		font-size: 0.76rem;
+		font-size: var(--text-control);
 		cursor: pointer;
 	}
 
@@ -3283,7 +3296,7 @@
 
 	.console-head .on {
 		font-family: var(--font-mono);
-		font-size: 0.7rem;
+		font-size: var(--text-sm);
 		padding: 0.15rem 0.4rem;
 		border: 1px solid var(--hairline);
 		border-radius: var(--r-control);
@@ -3303,13 +3316,16 @@
 	.who {
 		display: inline-flex;
 		align-items: center;
-		gap: 0.45rem;
+		gap: 10px;
 		margin-right: auto;
-		padding: 0.16rem 0.16rem 0.16rem 0.6rem;
+		/* 案: 4px 4px 4px 14px・高さ 32px */
+		padding: 4px 4px 4px 14px;
+		min-height: 32px;
 		border-radius: var(--r-pill);
-		background: var(--shell);
-		border: 1px solid var(--hairline);
-		font-size: 0.7rem;
+		background: var(--shell-bg);
+		border: 0;
+		box-shadow: var(--shell-ring);
+		font-size: var(--text-control);
 		white-space: nowrap;
 	}
 
@@ -3319,9 +3335,9 @@
 
 	.who-badge {
 		font-family: var(--font-mono);
-		font-size: 0.66rem;
+		font-size: var(--text-sm);
 		font-weight: 600;
-		padding: 0.14rem 0.5rem;
+		padding: 4px 10px;
 		border-radius: var(--r-pill);
 		/* 誰も握っていないときは、色で主張しない。 */
 		background: var(--surface-2);
@@ -3330,7 +3346,7 @@
 
 	.who.mine {
 		background: var(--human-soft);
-		border-color: var(--human);
+		box-shadow: inset 0 0 0 1px rgba(140, 194, 255, 0.25);
 	}
 
 	.who.mine .who-badge {
@@ -3342,7 +3358,7 @@
 	   打てないのを不具合だと思われる。 */
 	.who.ai {
 		background: var(--ai-soft);
-		border-color: var(--ai);
+		box-shadow: inset 0 0 0 1px rgba(245, 166, 91, 0.3);
 	}
 
 	.who.ai .who-badge {
@@ -3371,7 +3387,7 @@
 		display: inline-flex;
 		align-items: center;
 		gap: 0.3rem;
-		font-size: 0.72rem;
+		font-size: var(--text-sm);
 		color: var(--fg-muted);
 	}
 
@@ -3381,7 +3397,7 @@
 	.what {
 		flex: 0 0 auto;
 		margin: 0 0 0.35rem;
-		font-size: 0.72rem;
+		font-size: var(--text-sm);
 		line-height: 1.6;
 		color: var(--fg-muted);
 	}
@@ -3391,12 +3407,12 @@
 		flex: 1 1 auto;
 		min-width: 0;
 		font-family: var(--font-mono);
-		font-size: 0.72rem;
+		font-size: var(--text-sm);
 	}
 
 	.stream-head button {
 		font: inherit;
-		font-size: 0.72rem;
+		font-size: var(--text-sm);
 		color: var(--fg);
 		background: var(--surface-2);
 		border: 1px solid var(--hairline);
@@ -3435,7 +3451,7 @@
 
 	.empty {
 		margin: 0;
-		font-size: 0.76rem;
+		font-size: var(--text-control);
 		color: var(--fg-faint);
 	}
 	/* **空の面にも言葉を置く。**無言の黒は「壊れている」と読まれます。 */
@@ -3443,7 +3459,7 @@
 		margin: 0;
 		padding: 1.2rem;
 		font-family: var(--font-ui);
-		font-size: 0.78rem;
+		font-size: var(--text-control);
 		line-height: 1.8;
 		color: var(--fg-faint);
 		text-align: center;

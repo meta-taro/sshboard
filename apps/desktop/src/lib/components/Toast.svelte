@@ -48,7 +48,7 @@
 		gap: 0.4rem;
 		margin: 0;
 		padding: 0.5rem 0.9rem;
-		font-size: 0.8rem;
+		font-size: var(--text-control);
 		color: var(--fg);
 		background: var(--surface);
 		border: 1px solid var(--hairline-strong);

@@ -1157,7 +1157,7 @@
 	}
 
 	.list-head span {
-		font-size: 0.72rem;
+		font-size: var(--text-sm);
 		color: var(--fg-faint);
 	}
 
@@ -1224,7 +1224,7 @@
 		border-radius: var(--r-control);
 		padding: 0.1rem 0.45rem;
 		font: inherit;
-		font-size: 0.7rem;
+		font-size: var(--text-sm);
 		color: var(--fg-muted);
 		cursor: pointer;
 	}
@@ -1258,7 +1258,7 @@
 
 	.row-id {
 		font-family: var(--font-mono);
-		font-size: 0.66rem;
+		font-size: var(--text-sm);
 		color: var(--fg-faint);
 		padding-left: 0.68rem;
 	}
@@ -1311,13 +1311,13 @@
 		display: flex;
 		align-items: center;
 		gap: 0.3rem;
-		font-size: 0.72rem;
+		font-size: var(--text-sm);
 		color: var(--fg-faint);
 	}
 
 	input {
 		font: inherit;
-		font-size: 0.85rem;
+		font-size: var(--text-body);
 		color: var(--fg);
 		background: var(--surface-input);
 		border: 1px solid var(--hairline);
@@ -1341,7 +1341,7 @@
 
 	small {
 		color: var(--fg-faint);
-		font-size: 0.7rem;
+		font-size: var(--text-sm);
 		line-height: 1.65;
 	}
 
@@ -1364,7 +1364,7 @@
 	}
 
 	.auth legend {
-		font-size: 0.7rem;
+		font-size: var(--text-sm);
 		color: var(--fg-muted);
 		padding: 0 0.3rem;
 	}
@@ -1381,7 +1381,7 @@
 		display: inline-flex;
 		align-items: center;
 		gap: 0.35rem;
-		font-size: 0.78rem;
+		font-size: var(--text-control);
 		padding: 0.3rem 0.7rem;
 		border: 1px solid var(--hairline);
 		border-radius: var(--r-control);
@@ -1413,7 +1413,7 @@
 		display: inline-flex;
 		align-items: center;
 		gap: 0.22rem;
-		font-size: 0.62rem;
+		font-size: var(--text-xs);
 		color: var(--fg-faint);
 		min-width: 0;
 	}
@@ -1441,7 +1441,7 @@
 	.import-none,
 	.import-found {
 		margin: 0 0.2rem 0.3rem;
-		font-size: 0.66rem;
+		font-size: var(--text-sm);
 		color: var(--fg-dim);
 		line-height: 1.5;
 	}
@@ -1464,7 +1464,7 @@
 	}
 
 	.import-id {
-		font-size: 0.7rem;
+		font-size: var(--text-sm);
 		font-weight: 600;
 		flex: none;
 	}
@@ -1472,7 +1472,7 @@
 	/* もう在る名前。**押せないことを、押せない所で言う。** */
 	.import-here {
 		flex: none;
-		font-size: 0.62rem;
+		font-size: var(--text-xs);
 		color: var(--fg-faint);
 	}
 
@@ -1481,7 +1481,7 @@
 		flex: 1 1 auto;
 		min-width: 0;
 		font-family: var(--font-mono);
-		font-size: 0.62rem;
+		font-size: var(--text-xs);
 		color: var(--fg-dim);
 		overflow: hidden;
 		text-overflow: ellipsis;
@@ -1533,7 +1533,7 @@
 		white-space: nowrap;
 		align-self: flex-start;
 		margin-top: 0.3rem;
-		font-size: 0.7rem;
+		font-size: var(--text-sm);
 		background: none;
 		border: none;
 		color: var(--fg-faint);
@@ -1556,7 +1556,7 @@
 		align-items: center;
 		gap: 0.35rem;
 		font: inherit;
-		font-size: 0.78rem;
+		font-size: var(--text-control);
 		color: var(--fg);
 		background: var(--surface-2);
 		border: 1px solid var(--hairline);
@@ -1613,7 +1613,7 @@
 		height: 22px;
 		border-radius: var(--r-pill);
 		background: color-mix(in srgb, var(--accent-fg) 18%, transparent);
-		font-size: 0.72rem;
+		font-size: var(--text-sm);
 		transition: transform var(--fast) var(--ease);
 	}
 
@@ -1628,7 +1628,7 @@
 
 	.empty,
 	.path {
-		font-size: 0.72rem;
+		font-size: var(--text-sm);
 		color: var(--fg-faint);
 	}
 
@@ -1642,7 +1642,7 @@
 		display: inline-flex;
 		align-items: center;
 		gap: 0.25rem;
-		font-size: 0.72rem;
+		font-size: var(--text-sm);
 		color: var(--danger);
 	}
 
@@ -1654,7 +1654,7 @@
 
 	.path {
 		font-family: var(--font-mono);
-		font-size: 0.62rem;
+		font-size: var(--text-xs);
 		word-break: break-all;
 		margin: 0;
 		padding: 0.3rem 0.3rem 0;
@@ -1671,7 +1671,7 @@
 		margin: 0;
 		padding: 0.55rem 0.7rem;
 		border-radius: var(--r-control);
-		font-size: 0.78rem;
+		font-size: var(--text-control);
 		line-height: 1.7;
 	}
 

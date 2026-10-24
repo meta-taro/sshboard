@@ -124,7 +124,7 @@
 
 	.note {
 		margin: 0 0 0.6rem;
-		font-size: 0.7rem;
+		font-size: var(--text-sm);
 		color: var(--fg-muted);
 		line-height: 1.6;
 	}
@@ -140,7 +140,7 @@
 		gap: 0.6rem;
 		padding: 0.22rem 0;
 		border-bottom: 1px solid var(--hairline);
-		font-size: 0.7rem;
+		font-size: var(--text-sm);
 	}
 
 	dt {
@@ -166,7 +166,7 @@
 	.warn {
 		margin: 0 0 0.5rem;
 		padding: 0.4rem 0.5rem;
-		font-size: 0.68rem;
+		font-size: var(--text-sm);
 		line-height: 1.6;
 		color: var(--danger);
 		background: var(--danger-soft);
@@ -175,7 +175,7 @@
 
 	.masked {
 		margin: 0 0 0.5rem;
-		font-size: 0.68rem;
+		font-size: var(--text-sm);
 		color: var(--fg-dim);
 		line-height: 1.6;
 	}
@@ -185,7 +185,7 @@
 	}
 
 	.preview-label {
-		font-size: 0.64rem;
+		font-size: var(--text-xs);
 		color: var(--fg-dim);
 	}
 
@@ -195,7 +195,7 @@
 		max-height: 7rem;
 		overflow: auto;
 		font-family: var(--font-mono);
-		font-size: 0.62rem;
+		font-size: var(--text-xs);
 		line-height: 1.5;
 		color: var(--fg-muted);
 		background: var(--surface-input);
@@ -213,7 +213,7 @@
 	.close,
 	.go {
 		font: inherit;
-		font-size: 0.72rem;
+		font-size: var(--text-sm);
 		border-radius: var(--r-pill);
 		padding: 0.16rem 0.7rem;
 		cursor: pointer;

@@ -138,7 +138,7 @@
 
 	.note {
 		margin: 0.7rem 0 0;
-		font-size: 0.78rem;
+		font-size: var(--text-control);
 		color: var(--fg-muted);
 		line-height: 1.6;
 	}

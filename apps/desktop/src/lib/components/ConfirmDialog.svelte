@@ -89,7 +89,7 @@
 
 	.body {
 		margin: 0;
-		font-size: 0.76rem;
+		font-size: var(--text-control);
 		line-height: 1.7;
 		color: var(--fg);
 	}
@@ -103,7 +103,7 @@
 
 	button {
 		font: inherit;
-		font-size: 0.74rem;
+		font-size: var(--text-control);
 		color: var(--fg-control);
 		background: var(--shell);
 		border: 1px solid var(--hairline-strong);

@@ -127,7 +127,7 @@
 		display: flex;
 		align-items: center;
 		gap: 0.45rem;
-		font-size: 0.78rem;
+		font-size: var(--text-control);
 		color: var(--fg-muted);
 		cursor: pointer;
 	}
@@ -187,12 +187,12 @@
 	.what {
 		margin: 0.7rem 0 0;
 		font-family: var(--font-mono);
-		font-size: 0.85rem;
+		font-size: var(--text-body);
 	}
 
 	.note {
 		margin: 0.7rem 0 0;
-		font-size: 0.75rem;
+		font-size: var(--text-control);
 		color: var(--fg-muted);
 		line-height: 1.6;
 	}

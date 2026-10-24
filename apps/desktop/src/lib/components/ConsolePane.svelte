@@ -261,7 +261,7 @@
 		gap: 0.4rem;
 		padding: 0.2rem 0.45rem;
 		border-bottom: 1px solid var(--hairline);
-		font-size: 0.72rem;
+		font-size: var(--text-sm);
 	}
 
 	/* **印の色。**無ければ透明で、場所だけ残します（並びが動かないように）。 */
@@ -321,7 +321,7 @@
 	.stop {
 		flex: none;
 		font: inherit;
-		font-size: 0.66rem;
+		font-size: var(--text-sm);
 		color: var(--danger);
 		background: var(--danger-soft);
 		border: 1px solid var(--danger);

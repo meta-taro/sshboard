@@ -76,14 +76,14 @@
 	}
 
 	.label {
-		font-size: 0.72rem;
+		font-size: var(--text-sm);
 		color: var(--fg);
 	}
 
 	.scaffold {
 		flex: 1 1 auto;
 		min-width: 0;
-		font-size: 0.68rem;
+		font-size: var(--text-sm);
 		color: var(--fg-dim);
 		overflow: hidden;
 		text-overflow: ellipsis;
@@ -96,7 +96,7 @@
 		gap: 0.3rem;
 		flex: none;
 		font: inherit;
-		font-size: 0.7rem;
+		font-size: var(--text-sm);
 		color: var(--fg-control);
 		background: var(--shell);
 		border: 1px solid var(--hairline);
@@ -116,7 +116,7 @@
 
 	.empty {
 		margin: 0;
-		font-size: 0.76rem;
+		font-size: var(--text-control);
 		color: var(--fg-faint);
 	}
 
@@ -130,7 +130,7 @@
 		background: var(--surface);
 		border: 1px solid var(--hairline);
 		border-radius: var(--r-shell);
-		font-size: 0.7rem;
+		font-size: var(--text-sm);
 		line-height: 1.6;
 	}
 
@@ -151,7 +151,7 @@
 
 	.at {
 		font-family: var(--font-mono);
-		font-size: 0.62rem;
+		font-size: var(--text-xs);
 		color: var(--fg-faint);
 		font-variant-numeric: tabular-nums;
 		flex: none;
@@ -161,7 +161,7 @@
 
 	.stage,
 	.who {
-		font-size: 0.62rem;
+		font-size: var(--text-xs);
 		color: var(--fg-muted);
 		flex: none;
 		white-space: nowrap;

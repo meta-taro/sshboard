@@ -1107,7 +1107,7 @@
 
 
 	.tag {
-		font-size: 0.62rem;
+		font-size: var(--text-xs);
 		padding: 0.05rem 0.32rem;
 		border-radius: var(--r-pill);
 		border: 1px solid var(--hairline);
@@ -1117,7 +1117,7 @@
 
 	.scope,
 	.hint {
-		font-size: 0.66rem;
+		font-size: var(--text-sm);
 		color: var(--fg-muted);
 		white-space: nowrap;
 		overflow: hidden;
@@ -1156,7 +1156,7 @@
 	}
 
 	.staging .hint {
-		font-size: 0.7rem;
+		font-size: var(--text-sm);
 		color: var(--fg-muted);
 	}
 
@@ -1188,7 +1188,7 @@
 		display: flex;
 		align-items: center;
 		gap: 0.4rem;
-		font-size: 0.75rem;
+		font-size: var(--text-control);
 		padding: 0 0.1rem 0.35rem;
 		/*
 		 * **札を 2 行に折らない**（英語の画面で踏みました）。
@@ -1200,7 +1200,7 @@
 
 	.sync .hint {
 		color: var(--fg-muted);
-		font-size: 0.7rem;
+		font-size: var(--text-sm);
 	}
 
 	/* 戻る／進む。**細い記号なので、当たり判定は文字より広く。** */
@@ -1274,7 +1274,7 @@
 	}
 
 	.title {
-		font-size: 0.72rem;
+		font-size: var(--text-sm);
 		color: var(--fg-muted);
 		flex: 1 1 auto;
 	}
@@ -1283,7 +1283,7 @@
 		flex: 1 1 auto;
 		min-width: 0;
 		font-family: var(--font-mono);
-		font-size: 0.68rem;
+		font-size: var(--text-sm);
 	}
 
 	.list {
@@ -1300,7 +1300,7 @@
 		align-items: center;
 		gap: 0.35rem;
 		padding: 0.14rem 0.5rem;
-		font-size: 0.72rem;
+		font-size: var(--text-sm);
 		/* **左寄せ。**中央寄せにすると一覧として読めない。 */
 		text-align: left;
 	}
@@ -1311,7 +1311,7 @@
 
 	.size {
 		font-family: var(--font-mono);
-		font-size: 0.64rem;
+		font-size: var(--text-xs);
 		color: var(--fg-faint);
 		font-variant-numeric: tabular-nums;
 		flex: none;
@@ -1353,7 +1353,7 @@
 		align-items: center;
 		gap: 0.2rem;
 		font-family: var(--font-mono);
-		font-size: 0.62rem;
+		font-size: var(--text-xs);
 		color: var(--fg-muted);
 		white-space: nowrap;
 		overflow: hidden;
@@ -1377,7 +1377,7 @@
 		align-items: center;
 		gap: 0.2rem;
 		flex: none;
-		font-size: 0.62rem;
+		font-size: var(--text-xs);
 		line-height: 1;
 		padding: 0.14rem 0.4rem;
 		border-radius: var(--r-pill);
@@ -1397,7 +1397,7 @@
 		display: inline-flex;
 		align-items: center;
 		gap: 0.3rem;
-		font-size: 0.66rem;
+		font-size: var(--text-sm);
 		color: var(--fg-muted);
 		cursor: pointer;
 	}
@@ -1409,7 +1409,7 @@
 	}
 
 	button.tiny {
-		font-size: 0.62rem;
+		font-size: var(--text-xs);
 		align-self: flex-start;
 		color: var(--fg-muted);
 	}
@@ -1437,14 +1437,14 @@
 	.empty {
 		margin: 0;
 		padding: 1.2rem 0.8rem;
-		font-size: 0.72rem;
+		font-size: var(--text-sm);
 		color: var(--fg-faint);
 		flex: 1 1 auto;
 	}
 
 	.failure {
 		margin: 0;
-		font-size: 0.72rem;
+		font-size: var(--text-sm);
 		padding: 0.3rem 0.5rem;
 		border-radius: var(--r-core);
 	}
@@ -1459,7 +1459,7 @@
 		align-items: center;
 		gap: 0.28rem;
 		font: inherit;
-		font-size: 0.7rem;
+		font-size: var(--text-sm);
 		padding: 0.22rem 0.5rem;
 		border-radius: var(--r-pill);
 		border: 1px solid var(--hairline);
@@ -1506,7 +1506,7 @@
 
 	input {
 		font: inherit;
-		font-size: 0.7rem;
+		font-size: var(--text-sm);
 		padding: 0.2rem 0.4rem;
 		border-radius: var(--r-core);
 		border: 1px solid var(--hairline);

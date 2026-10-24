@@ -95,14 +95,14 @@
 	}
 
 	.label {
-		font-size: 0.72rem;
+		font-size: var(--text-sm);
 		font-weight: 700;
 		color: var(--fg);
 		flex: none;
 	}
 
 	.note {
-		font-size: 0.66rem;
+		font-size: var(--text-sm);
 		color: var(--fg-dim);
 		overflow: hidden;
 		text-overflow: ellipsis;
@@ -112,7 +112,7 @@
 
 	.empty {
 		margin: 0;
-		font-size: 0.7rem;
+		font-size: var(--text-sm);
 		color: var(--fg-faint);
 	}
 
@@ -130,7 +130,7 @@
 		align-items: baseline;
 		gap: 0.4rem;
 		padding: 0.14rem 0.2rem;
-		font-size: 0.7rem;
+		font-size: var(--text-sm);
 		border-bottom: 1px solid var(--hairline);
 		min-width: 0;
 	}
@@ -149,7 +149,7 @@
 	/* 人は青、AI は橙。**文字が本体で、色は添え物。** */
 	.who {
 		font-family: var(--font-mono);
-		font-size: 0.64rem;
+		font-size: var(--text-xs);
 		font-weight: 600;
 		flex: none;
 		color: var(--human);
@@ -163,21 +163,21 @@
 		flex: 1 1 auto;
 		min-width: 0;
 		font-family: var(--font-mono);
-		font-size: 0.66rem;
+		font-size: var(--text-sm);
 		overflow-wrap: anywhere;
 	}
 
 	.size {
 		flex: none;
 		font-family: var(--font-mono);
-		font-size: 0.64rem;
+		font-size: var(--text-xs);
 		color: var(--fg-dim);
 		font-variant-numeric: tabular-nums;
 	}
 
 	.said {
 		flex: none;
-		font-size: 0.64rem;
+		font-size: var(--text-xs);
 		font-weight: 700;
 		color: var(--danger);
 	}

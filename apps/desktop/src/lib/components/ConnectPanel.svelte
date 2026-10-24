@@ -253,24 +253,24 @@
 
 	.none {
 		margin: 0;
-		font-size: 0.75rem;
+		font-size: var(--text-control);
 		color: var(--fg-muted);
 	}
 
 	.hint {
-		font-size: 0.7rem;
+		font-size: var(--text-sm);
 		color: var(--fg-faint);
 	}
 
 	.tag {
 		flex: none;
-		font-size: 0.66rem;
+		font-size: var(--text-sm);
 		color: var(--fg-faint);
 	}
 
 	.failure {
 		margin: 0.4rem 0 0;
-		font-size: 0.74rem;
+		font-size: var(--text-control);
 		color: var(--danger);
 	}
 
@@ -342,7 +342,7 @@
 		display: flex;
 		flex-direction: column;
 		gap: 0.1rem;
-		font-size: 0.66rem;
+		font-size: var(--text-sm);
 		color: var(--fg-faint);
 		line-height: 1.5;
 	}

@@ -145,7 +145,7 @@
 	.note,
 	.how {
 		margin: 0.7rem 0 0;
-		font-size: 0.78rem;
+		font-size: var(--text-control);
 		color: var(--fg-muted);
 		line-height: 1.6;
 	}
@@ -155,7 +155,7 @@
 		grid-template-columns: auto 1fr;
 		gap: 0.25rem 0.7rem;
 		margin: 0.7rem 0 0;
-		font-size: 0.78rem;
+		font-size: var(--text-control);
 	}
 
 	dt {
@@ -172,7 +172,7 @@
 	/* **指紋は等幅で。**1 文字違いを目で追える形にします。 */
 	.print {
 		font-family: var(--font-mono);
-		font-size: 0.74rem;
+		font-size: var(--text-control);
 	}
 
 	.was {

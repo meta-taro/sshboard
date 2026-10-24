@@ -95,7 +95,8 @@ def missing(files: dict[str, str]) -> list[str]:
 
 
 # **テーマに依らないもの。**書体・角丸・動きは暗い側に持たなくてよい。
-THEME_FREE = re.compile(r"^--(font|r|shell-pad|ease|fast|slow)")
+# `control-*` / `text-*` は**大きさの段**で、配色に依りません（2026-10-24）。
+THEME_FREE = re.compile(r"^--(font|r|shell-pad|control-[a-z-]+|text-[a-z-]+|ease|fast|slow)")
 
 TOKENS_CSS = SRC / "lib/styles/tokens.css"
 

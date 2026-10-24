@@ -51,9 +51,12 @@ describe('帯', () => {
 		expect(screen.getByText(i18n.t('band.empty'))).toBeTruthy();
 	});
 
-	test('does not offer a filter when there is nothing to filter', () => {
+	test('does not let you filter when there is nothing to filter', () => {
+		// **札は出したまま、押せなくする**（2026-10-24・案は絞り込みを常設にしている）。
+		// 出たり消えたりすると面の形が安定しません。**効かないことだけ見せます。**
 		render(BandPanel, { lines: [] });
-		expect(screen.queryByRole('button', { name: i18n.t('band.who.ai') })).toBeNull();
+		const pick = screen.getByRole('button', { name: i18n.t('band.who.ai') });
+		expect((pick as HTMLButtonElement).disabled).toBe(true);
 	});
 });
 

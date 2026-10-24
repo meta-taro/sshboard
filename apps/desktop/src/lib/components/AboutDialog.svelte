@@ -153,7 +153,7 @@
 	}
 
 	.meta dt {
-		font-size: 0.68rem;
+		font-size: var(--text-sm);
 		font-weight: 600;
 		letter-spacing: 0.04em;
 		text-transform: uppercase;
@@ -174,14 +174,14 @@
 	/* **写せなかった理由を出す。**押したのに何も起きない、を作らない。 */
 	.failure {
 		margin: 0 0 0.6rem;
-		font-size: 0.72rem;
+		font-size: var(--text-sm);
 		color: var(--danger);
 		overflow-wrap: anywhere;
 	}
 
 	.note {
 		margin: 0.7rem 0 0;
-		font-size: 0.76rem;
+		font-size: var(--text-control);
 		color: var(--fg-muted);
 		line-height: 1.6;
 	}

@@ -259,7 +259,7 @@
 
 	.count {
 		margin: 0.7rem 0 0;
-		font-size: 0.85rem;
+		font-size: var(--text-body);
 		font-weight: 600;
 	}
 
@@ -270,7 +270,7 @@
 	}
 
 	.label {
-		font-size: 0.68rem;
+		font-size: var(--text-sm);
 		font-weight: 600;
 		letter-spacing: 0.04em;
 		text-transform: uppercase;
@@ -285,7 +285,7 @@
 	}
 
 	.chosen {
-		font-size: 0.72rem;
+		font-size: var(--text-sm);
 		color: var(--fg-muted);
 		font-family: var(--font-mono);
 		overflow: hidden;
@@ -296,18 +296,18 @@
 	}
 
 	.hint {
-		font-size: 0.7rem;
+		font-size: var(--text-sm);
 		color: var(--fg-muted);
 	}
 
 	.warn {
-		font-size: 0.7rem;
+		font-size: var(--text-sm);
 		color: var(--warning);
 	}
 
 	.note {
 		margin: 0.7rem 0 0;
-		font-size: 0.78rem;
+		font-size: var(--text-control);
 		color: var(--danger);
 		line-height: 1.6;
 	}
@@ -317,7 +317,7 @@
 		align-items: center;
 		gap: 0.35rem;
 		margin: 0.7rem 0 0;
-		font-size: 0.85rem;
+		font-size: var(--text-body);
 		color: var(--ok);
 	}
 

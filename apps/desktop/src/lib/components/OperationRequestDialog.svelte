@@ -198,13 +198,13 @@
 	.what {
 		margin: 0.7rem 0 0;
 		font-family: var(--font-mono);
-		font-size: 0.85rem;
+		font-size: var(--text-body);
 	}
 
 	.lead,
 	.note {
 		margin: 0.7rem 0 0;
-		font-size: 0.78rem;
+		font-size: var(--text-control);
 		color: var(--fg-muted);
 		line-height: 1.6;
 	}
@@ -217,7 +217,7 @@
 		border: 1px solid var(--hairline);
 		border-radius: var(--r-item, 6px);
 		font-family: var(--font-mono);
-		font-size: 0.8rem;
+		font-size: var(--text-control);
 		line-height: 1.5;
 		white-space: pre-wrap;
 		word-break: break-all;
@@ -228,7 +228,7 @@
 		display: flex;
 		flex-direction: column;
 		gap: 0.3rem;
-		font-size: 0.78rem;
+		font-size: var(--text-control);
 	}
 
 	.secret input {
@@ -238,7 +238,7 @@
 		border: 1px solid var(--hairline-strong);
 		border-radius: var(--r-item, 6px);
 		font-family: var(--font-mono);
-		font-size: 0.85rem;
+		font-size: var(--text-body);
 	}
 
 	.actions {

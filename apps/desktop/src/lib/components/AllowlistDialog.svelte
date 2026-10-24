@@ -166,7 +166,7 @@
 
 	.note {
 		margin: 0 0 0.7rem;
-		font-size: 0.7rem;
+		font-size: var(--text-sm);
 		color: var(--fg-muted);
 		line-height: 1.6;
 	}
@@ -177,7 +177,7 @@
 
 	h3 {
 		margin: 0 0 0.25rem;
-		font-size: 0.74rem;
+		font-size: var(--text-control);
 		font-weight: 700;
 		color: var(--fg);
 	}
@@ -191,14 +191,14 @@
 	}
 
 	.where-label {
-		font-size: 0.64rem;
+		font-size: var(--text-xs);
 		color: var(--fg-dim);
 		flex: none;
 	}
 
 	.where code {
 		font-family: var(--font-mono);
-		font-size: 0.62rem;
+		font-size: var(--text-xs);
 		color: var(--fg-muted);
 		overflow-wrap: anywhere;
 		min-width: 0;
@@ -208,7 +208,7 @@
 	.trouble {
 		margin: 0;
 		padding: 0.3rem 0.4rem;
-		font-size: 0.68rem;
+		font-size: var(--text-sm);
 		color: var(--danger);
 		background: var(--danger-soft);
 		border-radius: var(--r-control);
@@ -218,7 +218,7 @@
 
 	.empty {
 		margin: 0;
-		font-size: 0.68rem;
+		font-size: var(--text-sm);
 		color: var(--fg-faint);
 		line-height: 1.5;
 	}
@@ -240,14 +240,14 @@
 
 	.id {
 		font-family: var(--font-mono);
-		font-size: 0.68rem;
+		font-size: var(--text-sm);
 		font-weight: 700;
 		color: var(--fg);
 	}
 
 	.run {
 		font-family: var(--font-mono);
-		font-size: 0.66rem;
+		font-size: var(--text-sm);
 		color: var(--fg-muted);
 		overflow-wrap: anywhere;
 		min-width: 0;
@@ -255,14 +255,14 @@
 
 	.why {
 		grid-column: 2;
-		font-size: 0.64rem;
+		font-size: var(--text-xs);
 		color: var(--fg-dim);
 		line-height: 1.5;
 	}
 
 	.ceiling {
 		grid-column: 2;
-		font-size: 0.62rem;
+		font-size: var(--text-xs);
 		color: var(--fg-faint);
 	}
 
@@ -274,7 +274,7 @@
 	/* **既存の `KeyHelpDialog` と同じ釦。**新しい見た目を増やしません（§11）。 */
 	.close {
 		font: inherit;
-		font-size: 0.72rem;
+		font-size: var(--text-sm);
 		color: var(--fg-control);
 		background: var(--shell);
 		border: 1px solid var(--hairline);

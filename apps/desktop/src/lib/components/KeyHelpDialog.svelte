@@ -144,7 +144,7 @@
 
 	.close {
 		font: inherit;
-		font-size: 0.72rem;
+		font-size: var(--text-sm);
 		color: var(--fg-control);
 		background: var(--shell);
 		border: 1px solid var(--hairline);
@@ -160,7 +160,7 @@
 
 	.note {
 		margin: 0 0 0.7rem;
-		font-size: 0.7rem;
+		font-size: var(--text-sm);
 		color: var(--fg-muted);
 		line-height: 1.6;
 	}
@@ -184,7 +184,7 @@
 	dt {
 		flex: 1 1 auto;
 		min-width: 0;
-		font-size: 0.74rem;
+		font-size: var(--text-control);
 		color: var(--fg);
 	}
 
@@ -196,7 +196,7 @@
 	/* 等幅で、押すものに見せる。 */
 	kbd {
 		font-family: var(--font-mono);
-		font-size: 0.68rem;
+		font-size: var(--text-sm);
 		color: var(--fg-control);
 		background: var(--surface-input);
 		border: 1px solid var(--hairline-strong);

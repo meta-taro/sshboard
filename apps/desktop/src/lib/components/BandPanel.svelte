@@ -46,16 +46,20 @@
 
 <section class="band" aria-label={i18n.t('band.label')}>
 	<!-- **帯が何なのかを書く。**「ここに何が出るのか」が分からないと、
-	     空のときに壊れているのか、何も起きていないのかが区別できない。 -->
-	<p class="what">{i18n.t('band.what')}</p>
+	     空のときに壊れているのか、何も起きていないのかが区別できない。
+	     案の形: 左に「帯」、右に短い説明（1 行で切れる）。 -->
+	<div class="head">
+		<span class="label">{i18n.t('band.label')}</span>
+		<span class="what">{i18n.t('band.what')}</span>
+	</div>
 
 	<!--
 		**誰の行かで絞る**（UI 案・2026-10-21）。
 		色だけで分けません（人と AI の色は明るさがほぼ同じ）——
 		**選んだ札は地と字を入れ替えます。**
 	-->
-	{#if lines.length > 0}
-		<div class="band-who" role="group" aria-label={i18n.t('band.label')}>
+	<!-- **空でも出す。**出たり消えたりすると、面の形が安定しません（案は常設）。 -->
+	<div class="band-who" role="group" aria-label={i18n.t('band.label')}>
 			{#each PICKS as pick (pick.who)}
 				<button
 					type="button"
@@ -64,13 +68,13 @@
 					class:ai={pick.who === 'ai'}
 					class:human={pick.who === 'human'}
 					aria-pressed={who === pick.who}
+					disabled={lines.length === 0}
 					onclick={() => (who = pick.who)}
 				>
 					{i18n.t(pick.key)}
 				</button>
 			{/each}
-		</div>
-	{/if}
+	</div>
 
 	{#if lines.length === 0}
 		<p class="empty">{i18n.t('band.empty')}</p>
@@ -96,24 +100,47 @@
 		   ウィンドウの外へはみ出します（Issue #22）。 */
 		min-height: 6rem;
 		overflow-y: auto;
-		background: var(--shell);
-		border: 1px solid var(--hairline);
-		border-radius: var(--r-shell);
-		padding: 0.6rem 0.75rem;
+		/* **芯として描く**（案: 外殻 22px の中に 16px の芯・内側 14px・落ち影）。 */
+		background: var(--surface);
+		box-shadow: var(--lift-core);
+		border-radius: var(--r-core);
+		padding: 14px;
+	}
+
+	/* 案: 左に太字の「帯」、右に説明。説明は 1 行で切る。 */
+	.head {
+		display: flex;
+		align-items: baseline;
+		justify-content: space-between;
+		gap: 0.75rem;
+		margin: 0 0 10px;
+		min-width: 0;
+	}
+
+	.label {
+		flex: none;
+		font-size: var(--text-body);
+		font-weight: 700;
+		color: var(--fg);
 	}
 
 	/* 面の説明文。**伸びません**（Issue #22 —— 伸びて 250px の空白を作っていました）。 */
 	.what {
-		flex: 0 0 auto;
-		margin: 0 0 0.35rem;
-		font-size: 0.72rem;
+		flex: 1 1 auto;
+		min-width: 0;
+		margin: 0;
+		font-size: var(--text-sm);
 		line-height: 1.6;
-		color: var(--fg-muted);
+		color: var(--fg-faint);
+		text-align: right;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
 	}
 
 	.empty {
 		margin: 0;
-		font-size: 0.76rem;
+		font-size: var(--text-control);
 		color: var(--fg-faint);
 	}
 
@@ -124,11 +151,18 @@
 	}
 
 	li {
-		white-space: pre;
+		white-space: pre-wrap;
+		overflow-wrap: anywhere;
 		font-family: var(--font-mono);
-		font-size: 0.76rem;
-		line-height: 1.75;
+		font-size: var(--text-sm);
+		line-height: 1.6;
 		color: var(--fg-muted);
+		padding: 7px 6px;
+		border-radius: 8px;
+	}
+
+	li + li {
+		margin-top: 2px;
 	}
 
 	/*
@@ -141,6 +175,7 @@
 	 */
 	li.ai {
 		color: var(--ai);
+		background: var(--ai-soft);
 	}
 
 	/*
@@ -149,19 +184,19 @@
 	 */
 	.band-who {
 		display: flex;
-		gap: 0.3rem;
+		gap: 6px;
 		flex: 0 0 auto;
-		margin: 0 0 0.45rem;
+		margin: 0 0 10px;
 	}
 
 	.band-who-pick {
 		font: inherit;
-		font-size: 0.68rem;
+		font-size: var(--text-sm);
 		color: var(--fg-control);
 		background: transparent;
 		border: 1px solid var(--hairline);
 		border-radius: var(--r-pill);
-		padding: 0.14rem 0.6rem;
+		padding: 4px 10px;
 		cursor: pointer;
 		white-space: nowrap;
 		transition:
@@ -169,8 +204,14 @@
 			color var(--fast) var(--ease);
 	}
 
-	.band-who-pick:hover {
+	.band-who-pick:hover:not(:disabled) {
 		background: var(--surface-2);
+	}
+
+	/* **空のときは押せない。**札は出したまま（面の形が安定する・案は常設）、効かないことだけ見せる。 */
+	.band-who-pick:disabled {
+		opacity: 0.45;
+		cursor: default;
 	}
 
 	.band-who-pick.ai {

@@ -151,7 +151,7 @@
 		align-items: center;
 		gap: 0.3rem;
 		font: inherit;
-		font-size: 0.72rem;
+		font-size: var(--text-sm);
 		color: var(--fg-control);
 		background: transparent;
 		border: 1px solid transparent;
@@ -190,7 +190,7 @@
 	}
 
 	.tag {
-		font-size: 0.62rem;
+		font-size: var(--text-xs);
 		padding: 0 0.3rem;
 		border-radius: var(--r-pill);
 		background: var(--shell);
@@ -209,7 +209,7 @@
 		gap: 0.25rem;
 		flex: none;
 		font: inherit;
-		font-size: 0.68rem;
+		font-size: var(--text-sm);
 		color: var(--fg-control);
 		background: transparent;
 		border: 1px solid var(--hairline);
@@ -233,7 +233,7 @@
 		border: 1px solid var(--hairline);
 		border-radius: var(--r-core);
 		background: var(--surface-2);
-		font-size: 0.7rem;
+		font-size: var(--text-sm);
 		min-width: 0;
 	}
 
@@ -258,7 +258,7 @@
 	/* **道は等幅で、1 本ずつ別の行。**長い道が折り返して読めなくならないように。 */
 	.fence-root {
 		font-family: var(--font-mono);
-		font-size: 0.68rem;
+		font-size: var(--text-sm);
 		color: var(--fg);
 		overflow-wrap: anywhere;
 	}

@@ -132,7 +132,7 @@
 
 	.what {
 		margin: 0 0 0.7rem;
-		font-size: 0.74rem;
+		font-size: var(--text-control);
 		line-height: 1.6;
 		color: var(--fg-muted);
 	}
@@ -146,20 +146,20 @@
 	}
 
 	dt {
-		font-size: 0.68rem;
+		font-size: var(--text-sm);
 		color: var(--fg-dim);
 		white-space: nowrap;
 	}
 
 	dd {
 		margin: 0;
-		font-size: 0.76rem;
+		font-size: var(--text-control);
 		min-width: 0;
 	}
 
 	.mono {
 		font-family: var(--font-mono);
-		font-size: 0.72rem;
+		font-size: var(--text-sm);
 	}
 
 	/* **全部出す。**折り返しても切らない。 */
@@ -174,7 +174,7 @@
 
 	.note {
 		margin: 0.8rem 0 0;
-		font-size: 0.7rem;
+		font-size: var(--text-sm);
 		line-height: 1.6;
 		color: var(--fg-muted);
 	}
@@ -188,7 +188,7 @@
 
 	button {
 		font: inherit;
-		font-size: 0.74rem;
+		font-size: var(--text-control);
 		color: var(--fg-control);
 		background: var(--shell);
 		border: 1px solid var(--hairline-strong);
