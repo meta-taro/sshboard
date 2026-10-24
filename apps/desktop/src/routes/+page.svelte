@@ -2967,7 +2967,7 @@
 		display: inline-flex;
 		align-items: center;
 		gap: 0.4rem;
-		min-width: 0;
+		min-width: max-content;
 		/* **製品名は切らない。**掴む所は header 全体（data-tauri-drag-region）に在り、ロゴを縮める必要は無い。 */
 		flex: none;
 		overflow: visible;
@@ -3021,9 +3021,9 @@
 		letter-spacing: 0.02em;
 		color: var(--fg);
 		white-space: nowrap;
-		overflow: hidden;
-		text-overflow: ellipsis;
-		min-width: 0;
+		overflow: visible;
+		text-overflow: clip;
+		min-width: auto;
 	}
 
 	/* **合言葉ごと写せるボタン。**起動ごとに変わる値を人に書き写させない（D23）。 */
@@ -3349,6 +3349,7 @@
 		font-size: var(--text-control);
 		white-space: nowrap;
 		line-height: 1.2;
+		min-width: max-content;
 	}
 
 	.who-label {
