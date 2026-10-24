@@ -966,25 +966,25 @@
 
 	/* 二重縁。外の受け皿と、中身の面（DESIGN.md）。 */
 	.shell {
-		background: var(--shell);
-		border: 1px solid var(--hairline);
+		background: var(--shell-bg);
 		border-radius: var(--r-shell);
 		padding: var(--shell-pad);
 		min-height: 0;
+		box-shadow: var(--shell-ring);
 	}
 
 	.core {
 		background: var(--surface);
 		border-radius: var(--r-core);
-		box-shadow: var(--inner-highlight);
+		box-shadow: var(--lift-core);
 		min-height: 0;
 	}
 
 	.bar .core {
 		display: flex;
 		align-items: center;
-		gap: 0.45rem;
-		padding: 0.4rem 0.6rem;
+		gap: 10px;
+		padding: 10px 14px;
 		flex-wrap: nowrap;
 		overflow: hidden;
 	}
@@ -1041,8 +1041,10 @@
 		 */
 		min-width: max-content;
 		border-radius: var(--r-pill);
-		border: 1px solid var(--hairline);
-		background: var(--shell);
+		border: 0;
+		background: var(--shell-bg);
+		box-shadow: var(--shell-ring);
+		height: 32px;
 	}
 
 	.conn-tab.active {
@@ -1108,10 +1110,12 @@
 
 	.tag {
 		font-size: var(--text-xs);
-		padding: 0.05rem 0.32rem;
+		padding: 2px 7px;
 		border-radius: var(--r-pill);
-		border: 1px solid var(--hairline);
+		border: 0;
 		color: var(--fg-muted);
+		font-weight: 700;
+		background: color-mix(in srgb, currentColor 12%, transparent);
 	}
 
 
@@ -1260,23 +1264,23 @@
 	.pane footer {
 		display: flex;
 		align-items: center;
-		gap: 0.35rem;
-		padding: 0.35rem 0.5rem;
+		gap: 8px;
+		padding: 10px 14px 12px;
 		flex: none;
 	}
 
 	.pane header {
-		border-bottom: 1px solid var(--hairline);
 	}
 
 	.pane footer {
-		border-top: 1px solid var(--hairline);
+		padding: 10px 14px 12px;
 	}
 
 	.title {
-		font-size: var(--text-sm);
-		color: var(--fg-muted);
+		font-size: var(--text-control);
+		color: var(--fg);
 		flex: 1 1 auto;
+		font-weight: 600;
 	}
 
 	.path {
@@ -1298,11 +1302,13 @@
 	.list li {
 		display: flex;
 		align-items: center;
-		gap: 0.35rem;
-		padding: 0.14rem 0.5rem;
-		font-size: var(--text-sm);
+		gap: 8px;
+		padding: 7px 8px;
+		font-size: var(--text-control);
 		/* **左寄せ。**中央寄せにすると一覧として読めない。 */
 		text-align: left;
+		margin: 0 6px;
+		border-radius: 8px;
 	}
 
 	.list li:hover {
@@ -1457,17 +1463,19 @@
 	button {
 		display: inline-flex;
 		align-items: center;
-		gap: 0.28rem;
+		gap: 0.35rem;
 		font: inherit;
-		font-size: var(--text-sm);
-		padding: 0.22rem 0.5rem;
+		font-size: var(--text-control);
+		padding: 0 12px;
 		border-radius: var(--r-pill);
-		border: 1px solid var(--hairline);
-		background: var(--shell);
+		border: 0;
+		background: var(--shell-bg);
 		color: var(--fg);
 		cursor: pointer;
 		flex: none;
 		transition: background 220ms var(--ease);
+		height: var(--control-h);
+		box-shadow: inset 0 0 0 1px var(--hairline-strong);
 	}
 
 	/*
@@ -1493,24 +1501,37 @@
 	}
 
 	button.primary {
-		border-color: transparent;
-		background: var(--accent);
-		color: var(--accent-fg);
+		background: var(--selected);
+		color: var(--selected-fg);
+		box-shadow: none;
+		font-weight: 700;
+		height: 32px;
+		padding: 0 14px;
 	}
 
 	button.ghost {
-		border-color: transparent;
 		background: none;
-		padding: 0.18rem;
+		padding: 4px;
+		box-shadow: none;
+		height: auto;
 	}
 
 	input {
 		font: inherit;
 		font-size: var(--text-sm);
-		padding: 0.2rem 0.4rem;
-		border-radius: var(--r-core);
-		border: 1px solid var(--hairline);
+		padding: 0 10px;
+		border-radius: var(--r-control);
+		border: 0;
 		background: var(--surface-input);
 		color: var(--fg);
+		height: 32px;
+		box-sizing: border-box;
+		box-shadow: inset 0 0 0 1px var(--hairline-strong);
+	}
+	input:focus {
+		outline: none;
+		box-shadow:
+			inset 0 0 0 1px var(--accent),
+			0 0 0 3px var(--accent-soft);
 	}
 </style>
