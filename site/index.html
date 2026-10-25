@@ -623,10 +623,10 @@
       </p>
 
       <pre># macOS
-claude mcp add sshboard -- /Applications/sshboard.app/Contents/MacOS/sshboard --mcp-stdio-proxy
+claude mcp add --scope user sshboard -- /Applications/sshboard.app/Contents/MacOS/sshboard --mcp-stdio-proxy
 
 # Windows
-claude mcp add sshboard -- "%LOCALAPPDATA%\\sshboard\\sshboard.exe" --mcp-stdio-proxy</pre>
+claude mcp add --scope user sshboard -- "%LOCALAPPDATA%\\sshboard\\sshboard.exe" --mcp-stdio-proxy</pre>
 
       <p data-t="agent.note">
         The relay holds no engine and opens no connection of its own — only the app does, which is

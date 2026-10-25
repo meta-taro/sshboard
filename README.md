@@ -81,7 +81,7 @@ Register `127.0.0.1:2222`, user `probe`, connect, then press **Copy the MCP comm
 the window's title bar and paste it into your agent:
 
 ```sh
-claude mcp add --transport http sshboard http://127.0.0.1:22022 \
+claude mcp add --scope user --transport http sshboard http://127.0.0.1:22022/mcp \
   --header "Authorization: Bearer <the token the button copied>"
 ```
 
@@ -442,11 +442,14 @@ sh tools/test-server/up.sh down   # down
 
 ```sh
 # macOS
-claude mcp add sshboard -- /Applications/sshboard.app/Contents/MacOS/sshboard --mcp-stdio-proxy
+claude mcp add --scope user sshboard -- /Applications/sshboard.app/Contents/MacOS/sshboard --mcp-stdio-proxy
 
 # Windows
-claude mcp add sshboard -- "%LOCALAPPDATA%\\sshboard\\sshboard.exe" --mcp-stdio-proxy
+claude mcp add --scope user sshboard -- "%LOCALAPPDATA%\\sshboard\\sshboard.exe" --mcp-stdio-proxy
 ```
+
+**`--scope user` registers it for every folder.** Without it, Claude Code keeps it only for the folder
+you typed the command in — open Claude Code anywhere else and sshboard **does not even appear in `/mcp`**.
 
 **This way the token is left nowhere** (Issue #2). Started with `--mcp-stdio-proxy`,
 sshboard **runs as a relay with no window.** It reads the token itself and passes it to
@@ -466,7 +469,7 @@ The **"Copy the MCP registration command" button** at the top right of the windo
 a single line, token included.
 
 ```sh
-claude mcp add --transport http sshboard http://127.0.0.1:22022/mcp \
+claude mcp add --scope user --transport http sshboard http://127.0.0.1:22022/mcp \
   --header "Authorization: Bearer <token>"
 ```
 

@@ -77,7 +77,7 @@ pnpm --filter desktop tauri dev
 **［MCP のコマンドをコピー］**を押して、AI へ貼ります。
 
 ```sh
-claude mcp add --transport http sshboard http://127.0.0.1:22022 \
+claude mcp add --scope user --transport http sshboard http://127.0.0.1:22022/mcp \
   --header "Authorization: Bearer <コピーされた合言葉>"
 ```
 
@@ -438,11 +438,14 @@ sh tools/test-server/up.sh down   # 片付ける
 
 ```sh
 # macOS
-claude mcp add sshboard -- /Applications/sshboard.app/Contents/MacOS/sshboard --mcp-stdio-proxy
+claude mcp add --scope user sshboard -- /Applications/sshboard.app/Contents/MacOS/sshboard --mcp-stdio-proxy
 
 # Windows
-claude mcp add sshboard -- "%LOCALAPPDATA%\\sshboard\\sshboard.exe" --mcp-stdio-proxy
+claude mcp add --scope user sshboard -- "%LOCALAPPDATA%\\sshboard\\sshboard.exe" --mcp-stdio-proxy
 ```
+
+**`--scope user` で、どのフォルダからでも使えるように登録します。**付けないと、Claude Code は
+コマンドを打ったフォルダにだけ覚え、**別のフォルダでは `/mcp` の一覧にすら出ません。**
 
 **この形なら、合言葉はどこにも残りません**（Issue #2）。
 `--mcp-stdio-proxy` で起動された sshboard は、**窓を作らず中継として走ります。**
@@ -461,7 +464,7 @@ claude mcp add sshboard -- "%LOCALAPPDATA%\\sshboard\\sshboard.exe" --mcp-stdio-
 画面右上の **「MCP の登録コマンドを写す」ボタン**から、合言葉ごと 1 行を写せます。
 
 ```sh
-claude mcp add --transport http sshboard http://127.0.0.1:22022/mcp \
+claude mcp add --scope user --transport http sshboard http://127.0.0.1:22022/mcp \
   --header "Authorization: Bearer <合言葉>"
 ```
 

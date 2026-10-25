@@ -36,10 +36,10 @@ shell history:
 
 ```sh
 # macOS
-claude mcp add sshboard -- /Applications/sshboard.app/Contents/MacOS/sshboard --mcp-stdio-proxy
+claude mcp add --scope user sshboard -- /Applications/sshboard.app/Contents/MacOS/sshboard --mcp-stdio-proxy
 
 # Windows
-claude mcp add sshboard -- "%LOCALAPPDATA%\sshboard\sshboard.exe" --mcp-stdio-proxy
+claude mcp add --scope user sshboard -- "%LOCALAPPDATA%\sshboard\sshboard.exe" --mcp-stdio-proxy
 ```
 
 The port is fixed at `22022` and the token is reused, so this is a one-time

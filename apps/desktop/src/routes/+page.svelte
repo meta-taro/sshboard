@@ -18,6 +18,7 @@
 	import { session } from '$lib/session.svelte';
 	import { menuLabels } from '$lib/i18n/messages-menu';
 	import { titlebar } from '$lib/window/titlebar.svelte';
+	import { mcpRegisterCommand } from '$lib/mcp/register-command';
 	import AboutDialog from '$lib/components/AboutDialog.svelte';
 	import { save as saveDialog } from '@tauri-apps/plugin-dialog';
 
@@ -724,11 +725,7 @@
 	 * **合言葉は起動ごとに変わる**（D23）ので、覚えて書き写す形にしない。
 	 * ここを写して貼るだけで済むようにする。
 	 */
-	const mcpCommand = $derived(
-		mcp
-			? `claude mcp add --transport http sshboard ${mcp.url} --header "Authorization: Bearer ${mcp.token}"`
-			: ''
-	);
+	const mcpCommand = $derived(mcp ? mcpRegisterCommand(mcp.url, mcp.token) : '');
 
 	async function copyMcpCommand() {
 		if (!mcpCommand) return;
