@@ -1764,6 +1764,8 @@
 			<span class="mcp-text">{#if mcpFailure}{i18n.t('mcp.failed', { port: String(mcpFailure.port) })}{:else if !mcp}{i18n.t(
 					'mcp.starting'
 				)}{:else if mcpCopied}{i18n.t('mcp.copied')}{:else}{i18n.t('mcp.copy')}{/if}</span>
+			<!-- 狭い窓での言い方。**「MCP」は固有名なので訳さない。** -->
+			<span class="mcp-short">MCP</span>
 		</button>
 
 		<!--
@@ -2444,6 +2446,14 @@
 		flex-wrap: wrap;
 		min-width: 0;
 		/*
+		 * **窓の操作（─ □ ×）は右上に釘付け**（2026-10-25・Windows 実機）。
+		 * 折り返しの流れに乗せると、帯が折れた日に × が 2 段目の左端へ逃げます。
+		 * その分の幅を右に空けて、他の札がその下へ潜らないようにします。
+		 */
+		position: relative;
+		--window-controls-w: 120px;
+		padding-right: var(--window-controls-w);
+		/*
 		 * **この帯が OS のタイトルバー**（D17）。
 		 *
 		 * 掴める高さを確保します。34px では**掴める隙間がほとんど無く、
@@ -2897,10 +2907,15 @@
 		display: flex;
 		align-items: stretch;
 		gap: 0;
-		margin-left: 0.25rem;
-		/* 帯の端まで届かせる。**Windows の人は右上の角を押しに行く。** */
-		margin-right: calc(-1 * var(--shell-pad, 0.6rem));
-		align-self: stretch;
+		/*
+		 * **右上の角に釘付け。**Windows の人は右上の角を押しに行く。
+		 * 流れに乗せると、狭い窓で帯が折れたとき 2 段目の左端へ落ちました（0.1.27）。
+		 */
+		position: absolute;
+		top: 0;
+		right: 0;
+		height: 52px;
+		width: var(--window-controls-w);
 	}
 
 	.wc {
@@ -3508,7 +3523,8 @@
 	@media (max-width: 1240px) {
 		header {
 			gap: 0.5rem;
-			padding: 0 0.6rem;
+			/* 右は窓の操作の分を空けたまま（詰めると × の下へ札が潜る）。 */
+			padding: 0 var(--window-controls-w) 0 0.6rem;
 		}
 
 		/* 錠剤の中の余白も少し詰める（高さと字は変えない）。1100px で計測して 1 段に入る値。 */
@@ -3536,6 +3552,11 @@
 		.mcp .mcp-text {
 			display: none;
 		}
+
+		/* **印だけにはしない。**0.1.27 で印だけにしたら、Windows で「MCP が無い」と読まれた。 */
+		.mcp .mcp-short {
+			display: inline;
+		}
 	}
 	/* 出力の面の道の欄。**白い線の枠が残っていました**（写真で判明）。他の入力と同じ輪に。 */
 	.stream-head .path:focus {
@@ -3544,7 +3565,8 @@
 			inset 0 0 0 1px var(--accent),
 			0 0 0 3px var(--accent-soft);
 	}
-	.label-short {
+	.label-short,
+	.mcp-short {
 		display: none;
 	}
 </style>

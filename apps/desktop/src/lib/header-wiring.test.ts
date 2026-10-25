@@ -332,6 +332,41 @@ describe('メニューはロゴの下（UI 案・2026-10-21）', () => {
 	});
 });
 
+describe('狭い窓でも、閉じる釦と MCP の釦は消えない（Windows 実機・2026-10-25）', () => {
+	/**
+	 * 0.1.27 で、**Windows の窓から右上の × が消え、MCP の釦が見えなくなりました。**
+	 *
+	 * - 製品名とタブを縮めない形にしたので、狭い窓では帯が折り返し、
+	 *   **窓の操作（─ □ ×）が 2 段目の左端へ落ちた**（900px で計測: 高さ 13px）
+	 * - 1240px 未満で MCP の文言を隠したので、**釦が印だけになり、MCP と読めなくなった**
+	 *
+	 * Windows の窓は、表示倍率のせいで 1240px（論理）を下回るのが普通です。
+	 */
+	function rule(selector: string): string {
+		const at = source.indexOf(`\n\t${selector} {`);
+		expect(at, `${selector} の規則が無い`).toBeGreaterThan(-1);
+		return source.slice(at, source.indexOf('\n\t}', at));
+	}
+
+	test('pins the window controls to the top right, whatever wraps', () => {
+		// **折り返しの流れに乗せない。**乗せると、帯が折れた日に × が逃げます。
+		expect(rule('.window-controls')).toContain('position: absolute');
+		expect(rule('.window-controls')).toContain('right: 0');
+		expect(rule('header')).toContain('position: relative');
+	});
+
+	test('keeps room on the right so nothing slides under the controls', () => {
+		expect(rule('header')).toContain('padding-right: var(--window-controls-w)');
+	});
+
+	test('never lets the MCP button become a bare icon', () => {
+		// 文言を隠すなら、**短い言い方を出す。**印だけでは何の釦か分かりません。
+		expect(source).toContain('class="mcp-short"');
+		const narrow = source.slice(source.indexOf('@media (max-width: 1240px)'));
+		expect(narrow).toMatch(/\.mcp \.mcp-short \{\s*display: inline;/);
+	});
+});
+
 describe('AI の提案と、人の登録（実運用の報告・2026-10-23）', () => {
 	/**
 	 * **これは `run_command` ではありません。**
