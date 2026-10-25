@@ -2318,6 +2318,18 @@
 											? i18n.t('console.none.connected')
 											: i18n.t('console.none.disconnected')}
 									</p>
+									<!--
+										**言った釦を、言った所に置く**（Windows 実機・2026-10-25）。
+										上の［端末を開く］は、別の接続で端末を握っていると出ません。
+										そのとき「上の［端末を開く］を押して」と言っても、人は押せませんでした。
+										**ここは見ている接続に新しく 1 枚開く**ので、握りの状態に左右されません。
+									-->
+									{#if session.open}
+										<button type="button" class="primary" onclick={openAnotherConsole}>
+											<Icon name="terminal" />
+											{i18n.t('console.open')}
+										</button>
+									{/if}
 								</div>
 							</div>
 						{:else}
@@ -3294,7 +3306,8 @@
 
 	/* **この面のボタンは自前で整える。**素のままだと OS 既定の灰色になり、
 	   アイコンの下に文字が回り込んで潰れる（実際に潰れた）。 */
-	.console-head button {
+	.console-head button,
+	.terminal-core.empty button {
 		display: inline-flex;
 		align-items: center;
 		gap: 0.3rem;
@@ -3310,7 +3323,8 @@
 		height: var(--control-h);
 	}
 
-	.console-head button.primary {
+	.console-head button.primary,
+	.terminal-core.empty button.primary {
 		border-color: var(--accent);
 		color: var(--accent);
 	}
@@ -3498,6 +3512,15 @@
 		font-size: var(--text-control);
 		color: var(--fg-faint);
 	}
+	/* 空の面は、言葉と［端末を開く］を真ん中に縦に並べる。 */
+	.terminal-core.empty {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		gap: 0.25rem;
+	}
+
 	/* **空の面にも言葉を置く。**無言の黒は「壊れている」と読まれます。 */
 	.nothing {
 		margin: 0;
