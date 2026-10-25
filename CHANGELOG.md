@@ -6,6 +6,26 @@
 > **版の見出しは `## <バージョン> — <一行>`。**この形を崩すと、AI 側に届かなくなります。
 > 新しい版を上に足してください。
 
+## 0.1.29 — MCP の登録が、どのフォルダの Claude Code からも見えるようにした
+
+### 直したこと
+
+- **`/mcp` の一覧に sshboard が出なかった**（Windows 実機）——
+  MCP の釦が写すコマンドと README の例に範囲の指定が無く、`claude mcp add` の既定
+  （local ＝打ったフォルダだけ）で登録されていました。別のフォルダで Claude Code を開くと、
+  一覧にすら出ません。**`--scope user` を付けました**
+- README の最初の例で、URL の `/mcp` が抜けていました
+- 狭い窓でなくても、MCP の釦が「立ち上げ中…」のときは MCP と読めませんでした
+
+### 確かめ方を足しました
+
+- **画面の配置を本物のブラウザで測るハーネス**（Playwright・D70）。
+  Chromium（≈ WebView2）と WebKit で、幅 860〜1400px × 日本語・英語の 120 本。CI で毎回走ります
+- `tools/check-mcp-register.sh` —— 本物の Claude Code で、登録 → 3 つのフォルダで一覧 → 消す、を測ります
+
+**すでに local で登録している人は**、一度 `claude mcp remove sshboard` してから
+`--scope user` で登録し直してください。
+
 ## 0.1.28 — Windows で右上の × と MCP の釦が消えていたのを戻した
 
 ### 直したこと
