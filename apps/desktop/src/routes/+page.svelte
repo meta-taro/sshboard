@@ -1761,9 +1761,9 @@
 					: 'MCP'}
 		>
 			<Icon name={mcpFailure ? 'warning' : mcpCopied ? 'check' : 'copy'} size={12} />
-			<span class="mcp-text">{#if mcpFailure}{i18n.t('mcp.failed', { port: String(mcpFailure.port) })}{:else if !mcp}{i18n.t(
+			<span class="mcp-text">{#if mcpFailure}{i18n.t('mcp.failed', { port: String(mcpFailure.port) })}{:else if !mcp}{i18n.t('mcp.label')} {i18n.t(
 					'mcp.starting'
-				)}{:else if mcpCopied}{i18n.t('mcp.copied')}{:else}{i18n.t('mcp.copy')}{/if}</span>
+				)}{:else if mcpCopied}{i18n.t('mcp.label')} {i18n.t('mcp.copied')}{:else}{i18n.t('mcp.copy')}{/if}</span>
 			<!-- 狭い窓での言い方。**「MCP」は固有名なので訳さない。** -->
 			<span class="mcp-short">MCP</span>
 		</button>

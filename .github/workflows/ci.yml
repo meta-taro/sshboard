@@ -140,6 +140,19 @@ jobs:
       - name: フロントのテスト
         run: pnpm --filter desktop test
 
+      # **本物のブラウザで画面の配置を測る**（2026-10-25）。
+      #
+      # 上の試験はソースの文字列しか見ません。0.1.27 は**それを全部通したまま、
+      # Windows の窓から右上の × を消しました。**配置は描いて測るまで分かりません。
+      # Windows は WebView2 と同じ Chromium、macOS は Tauri と同じ WebKit で測ります。
+      - name: 画面の配置（ブラウザ）
+        shell: bash
+        run: |
+          set -eu
+          if [ "$RUNNER_OS" = "Windows" ]; then ENGINE=chromium; else ENGINE=webkit; fi
+          pnpm --filter desktop exec playwright install --with-deps "$ENGINE"
+          pnpm --filter desktop test:layout --project="$ENGINE"
+
       - name: フロントをビルド
         run: pnpm --filter desktop build
 
