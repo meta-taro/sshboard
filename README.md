@@ -11,10 +11,10 @@ happens.**
 
 ![The connection list, with a connection being edited](site/shots/en/connections.png)
 
-> ⚠️ **This is alpha.** It **started being used on a production server** on 2026-09-09
-> (investigating a failed certificate renewal). **747 tests pass** (418 Rust, 329
-> frontend) and installers are bundled for Windows (x64 / ARM64) and macOS.
-> **None of that means it works as a tool** — we shipped a build whose terminal
+> ⚠️ **This is alpha.** It is in use on production servers (investigating a failed
+> certificate renewal, restarting pm2, and so on). Installers are published for Windows
+> (x64 / ARM64) and macOS.
+> **Passing tests does not mean it works as a tool** — we shipped a build whose terminal
 > displayed *not one byte* for three days (Issue #10).
 
 **[⬇ Download](https://github.com/meta-taro/sshboard/releases/latest)** ·
@@ -33,9 +33,6 @@ work. Not "the agent runs it for you": **the agent watches what you are doing an
 you which pane went wrong.**
 
 ![One shared console; the tabs along the top are the open connections](site/shots/en/console.png)
-
-*(This shot predates the split view — it shows one console with the open connections as
-tabs. Two panes side by side landed in 0.1.21.)*
 
 ### "Mail stopped arriving and I don't know where to look"
 
@@ -368,8 +365,10 @@ max_per_hour = 6
 **This does not apply to the read allowlist (`readonly.toml`).** If it did, **every read
 would ask for a password.** Reads that need root belong in `operations.toml`.
 
-Becoming root first with `su` is **not recommended** — **the scope disappears.** A route
-for servers that only have `su -` **does not exist yet** (`.claude/decisions.md` D48).
+Becoming root first with `su` is **not recommended** — **the scope disappears.** On servers
+that only have `su -`, **use the console**: the person types `su -`, presses [Hand to the AI],
+the agent carries on in the same shell, and hands it back with `console_release` **without
+closing it**. The person can always take it back.
 
 ### What the product cannot guarantee
 
@@ -385,9 +384,9 @@ answer. With nobody there, the operation does not run.
 
 | not doing | why |
 |---|---|
-| Give the agent write access (Phase 1) | Every use is reading. Lets us target production on day one |
+| Let the agent write outside the fence | The person sets where it may write, per connection. Empty by default = not one byte |
 | Give the agent arbitrary commands | An allowlist prevents it structurally |
-| Give the agent sudo | Phase 1 does not deal with privilege escalation |
+| Give the agent sudo | Raising privileges happens only inside operations the person wrote in `operations.toml`; the password is typed by the person for that one run and never stored |
 | Build our own key store | Delegate to the OS credential store and ssh-agent. What you do not hold, you need not guard |
 | Embed an AI chat UI | The agent lives outside the app |
 | Generate reports | If it can read, the agent writes the proposal. Nothing to add |
@@ -528,7 +527,7 @@ guaranteed here is that the update came from us.
 - **The terminal is shared between you and the agent.** While the agent holds it your
   input is locked out, and **[Stop] always works**
 - **Installers are attached to each Release** (D32).
-  Windows gets `.msi` and an NSIS `-setup.exe`, macOS gets `.app.zip`.
+  Windows gets `.msi` and an NSIS `-setup.exe`, macOS gets a `.dmg`.
   **They are unsigned, so Windows shows SmartScreen and macOS shows Gatekeeper.**
   **If a warning stopped you and you did not know what to do, please open an issue** —
   that is what decides whether we buy a certificate (D12)
