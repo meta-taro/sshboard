@@ -465,3 +465,68 @@ async fn handing_over_twice_is_not_an_error() {
         Some(Actor::Ai)
     );
 }
+
+// --- AI の側から人へ返す（Windows 実機・2026-10-26）--------------------------
+//
+// > 毎回 AI から端末を取り返しているが、MCP に「人に返す」は無いのか
+//
+// AI の口は `console_stop` だけで、**シェルごと閉じます。**人が `su -` した状態を
+// 保ったまま、人と AI が交互に打つ段取りが成り立ちませんでした。
+//
+// **返すのは AI の力を狭める向き**なので、MCP に置いてよい（D29 / D42 を崩さない）。
+// **AI が握り直すには、人の［AI に渡す］か、頼んで人が許すかのどちらか**のまま。
+
+#[tokio::test]
+async fn the_ai_can_hand_the_console_back_without_closing_it() {
+    let dir = tempfile::tempdir().expect("一時ディレクトリが作れない");
+    let engine = engine_in(&dir);
+    engine.console_give(ON).await.expect("渡せない");
+
+    engine
+        .console_release(Actor::Ai, ON)
+        .await
+        .expect("AI が返せない");
+    assert_eq!(
+        engine.console_holder("test-connection").await,
+        Some(Actor::Human),
+        "返したのに人が打てる状態になっていない"
+    );
+}
+
+#[tokio::test]
+async fn handing_back_is_not_a_way_to_take_it_again() {
+    // **返したあと、AI が自分で握り直せない。**握り直すには人の許可か、人が渡すか。
+    let dir = tempfile::tempdir().expect("一時ディレクトリが作れない");
+    let engine = engine_in(&dir);
+    engine.console_give(ON).await.expect("渡せない");
+    engine
+        .console_release(Actor::Ai, ON)
+        .await
+        .expect("AI が返せない");
+
+    let again = engine.console_take(Actor::Ai, ON).await;
+    assert!(
+        matches!(again, Err(EngineError::ConsoleApprovalNeeded)),
+        "返したあと、AI が許可なく握り直せる: {again:?}"
+    );
+}
+
+#[tokio::test]
+async fn the_ai_cannot_hand_back_what_it_does_not_hold() {
+    // 人が握っている端末を AI が「返す」と言っても、何も動かさない（赤くもしない）。
+    let dir = tempfile::tempdir().expect("一時ディレクトリが作れない");
+    let engine = engine_in(&dir);
+    engine
+        .console_take(Actor::Human, ON)
+        .await
+        .expect("人が握れない");
+
+    engine
+        .console_release(Actor::Ai, ON)
+        .await
+        .expect("握っていないのに赤くしている");
+    assert_eq!(
+        engine.console_holder("test-connection").await,
+        Some(Actor::Human)
+    );
+}

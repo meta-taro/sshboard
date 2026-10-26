@@ -46,7 +46,7 @@ GROUPS = [
     # それでも `cmds` に置きます: 人が読むときの関心は「コマンドの話」で同じだからです。
     ("cmds", ["list_readonly_commands", "run_readonly", "list_operations",
               "run_operation", "propose_operation"]),
-    ("console", ["console_open", "console_type", "console_stop", "read_stream",
+    ("console", ["console_open", "console_type", "console_stop", "console_release", "read_stream",
                  "list_consoles", "read_console"]),
     ("screen", ["show_view", "capture_window", "pending_status", "await_answer", "diagnostics"]),
     ("itself", ["about_sshboard", "ping"]),

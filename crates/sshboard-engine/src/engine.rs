@@ -1577,6 +1577,42 @@ impl Engine {
         Ok(())
     }
 
+    /// **AI の側から人へ返す**（Windows 実機・2026-10-26）。**シェルは閉じません。**
+    ///
+    /// それまで AI の口は `console_stop` だけで、シェルごと閉じました。
+    /// 人が `su -` した状態を保ったまま、人と AI が交互に打つ段取りが成り立たず、
+    /// **人は毎回画面で取り返していました。**
+    ///
+    /// **AI の力を狭める向き**なので、MCP に置きます。握り直すには、
+    /// 人の［AI に渡す］か、頼んで人が許すか（D42）のどちらかのまま。
+    ///
+    /// **握っていないものは動かしません**（人の握りを AI が触らない）。赤くもしません。
+    pub async fn console_release(&self, actor: Actor, on: Option<&str>) -> Result<(), EngineError> {
+        let target = self
+            .console_where(on)
+            .await
+            .ok_or(EngineError::ConsoleNotOpen)?;
+        let mut slot = self.console.lock().await;
+        let holds = slot
+            .the_one_on(&target)
+            .ok()
+            .flatten()
+            .is_some_and(|open| open.holder == actor);
+        if !holds || actor == Actor::Human {
+            return Ok(());
+        }
+        slot.hold(&target, Actor::Human);
+        drop(slot);
+        self.diag.info(
+            Stage::Exec,
+            Some(&target),
+            format!("{}が握りを人へ返しました（シェルはそのまま）", who(actor)),
+        );
+        let _ = self.console_changed.send_replace(Some(Actor::Human));
+        self.publish_consoles().await;
+        Ok(())
+    }
+
     /// **AI が端末を使いたいと言っているか**（D42）。画面はこれを見て問いを出します。
     pub async fn console_request(&self) -> Option<Actor> {
         self.console

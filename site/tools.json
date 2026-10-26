@@ -1,5 +1,5 @@
 {
- "total": 39,
+ "total": 40,
  "groups": [
   {
    "key": "connect",
@@ -139,6 +139,10 @@
     {
      "name": "console_stop",
      "line": "Let go of the console and close the shell."
+    },
+    {
+     "name": "console_release",
+     "line": "Hand the console back to the person WITHOUT closing the shell."
     },
     {
      "name": "read_stream",

@@ -1576,6 +1576,36 @@ impl SshboardMcp {
             mine.id, mine.connection
         ))
     }
+
+    /// **シェルを閉じずに人へ返す**（2026-10-26）。AI の力を狭める向きなので、ここに置きます。
+    #[tool(
+        description = "Hand the console back to the person WITHOUT closing the shell. Use this \
+                       when it is the person's turn to type - for example they want to `su -` \
+                       or check something - and you will continue afterwards in the same shell. \
+                       After this you cannot type until the person presses [Hand to the AI] on \
+                       their screen, or you ask again with console_open and they allow it. \
+                       Use console_stop instead when you are completely done. Never fails."
+    )]
+    pub async fn console_release(&self) -> Result<String, ErrorData> {
+        let engine = self.engine()?;
+        // **自分が握っている 1 本**を返します（D60）。宛先が動いていても返せるように。
+        let mine = engine
+            .console_list()
+            .await
+            .into_iter()
+            .find(|held| held.holder == Actor::Ai);
+        let Some(mine) = mine else {
+            return Ok("no console was held".to_string());
+        };
+        engine
+            .console_release(Actor::Ai, Some(&mine.connection))
+            .await
+            .map_err(refuse)?;
+        Ok(format!(
+            "console #{} on {} handed back to the person; the shell is still open",
+            mine.id, mine.connection
+        ))
+    }
 }
 
 /// `read_console` の引数。
