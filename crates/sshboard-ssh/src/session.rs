@@ -495,7 +495,8 @@ async fn authenticate(
     };
 
     if result.success() {
-        diag.info(Stage::Auth, id, "認証が通りました");
+        // **ここでは書きません。**通ったことは呼んだ側（`connect`）が 1 回だけ書きます ——
+        // 両方で書くと同じ時刻に 2 行並び、「2 回認証した」と読まれました（2026-10-26）。
         return Ok(());
     }
 

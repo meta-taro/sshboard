@@ -1178,3 +1178,37 @@ async fn an_empty_stdin_does_not_hang_sudo() {
     .expect("コマンド自体は返るはず（失敗で）");
     assert_ne!(ran.out.trim(), "0");
 }
+
+/// **「認証が通りました」を 1 回だけ書く**（オーナーの画面・2026-10-26）。
+///
+/// 同じ時刻に 2 行出ていました。診断は人が issue へ貼る物なので、
+/// **同じ事実が 2 回あると「2 回認証した」と読まれます。**
+#[tokio::test]
+async fn a_successful_login_is_recorded_once() {
+    if !server_is_up().await {
+        println!("テスト用サーバーが建っていません（想定内・飛ばします）");
+        return;
+    }
+    let fingerprint = known_fingerprint().await.clone();
+    let mut target = target(Some(&fingerprint));
+    target.user = "pw".into();
+    let diag = Diagnostics::new();
+
+    let _session = SshSession::connect(
+        &target,
+        &Auth::Password {
+            password: "sshboard-test-password".into(),
+        },
+        Band::new(),
+        &diag,
+    )
+    .await
+    .expect("パスワードで繋がらない");
+
+    let said = diag
+        .recent(50)
+        .into_iter()
+        .filter(|event| event.message == "認証が通りました")
+        .count();
+    assert_eq!(said, 1, "「認証が通りました」が {said} 回出ている");
+}
