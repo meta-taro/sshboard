@@ -115,3 +115,25 @@ test('the band beside the terminal scrolls inside itself, so its last line can b
 	// **溢れた行が、窓の外ではなく帯の中で読めること。**
 	await expect(band.locator('li').last()).toBeInViewport();
 });
+
+test('the window cannot scroll even when something inside overshoots by a few pixels', async ({
+	page
+}) => {
+	// **実機（Windows・端末の面）で、数 px ぶん窓ごとの縦スクロールが出た**（2026-10-26）。
+	// 試験の中では再現しませんでした（表示倍率 125〜175% も試した）。端末の部品が実機で
+	// 測る高さなど、試験に無いものが数 px はみ出す余地があります。
+	// **はみ出しても窓は動かない**ことを、作りで保証します。
+	await crowded(page);
+	await page.setViewportSize({ width: 1100, height: 700 });
+	await page.goto('/');
+	await page.getByRole('button', { name: '端末', exact: true }).click();
+	await page.evaluate(() => {
+		const extra = document.createElement('div');
+		extra.style.height = '6px';
+		// **main の中に足すと、他が縮んで吸い込みます。**吸い込めないはみ出しを作るため、外に足す。
+		document.body.appendChild(extra);
+		window.scrollTo(0, 9999);
+	});
+	const moved = await page.evaluate(() => window.scrollY);
+	expect(moved, '窓ごとスクロールした').toBe(0);
+});

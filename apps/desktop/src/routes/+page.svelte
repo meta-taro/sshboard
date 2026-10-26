@@ -2427,6 +2427,21 @@
 
 <style>
 	/* 色は tokens.css の変数だけ。**ここに 16 進数を書かない。** */
+	/*
+	 * **窓そのものはスクロールしない**（オーナー・2026-10-26 ——
+	 * 「ソフト全体のスクロールを廃止。おのおの内部スクロールで」）。
+	 *
+	 * 中身を窓に収める作りは入れてありますが、実機（Windows・端末の面）で
+	 * **数 px ぶん窓ごとの縦スクロールが出ました。**試験では再現せず、端末の部品が
+	 * 実機で測る高さなどが数 px はみ出す余地があります。**はみ出しても窓は動かない**よう、
+	 * 根元で止めます。各面は自分の中でスクロールします。
+	 */
+	:global(html),
+	:global(body) {
+		height: 100%;
+		overflow: hidden;
+	}
+
 	:global(body) {
 		margin: 0;
 		background: var(--ground);
@@ -2438,7 +2453,8 @@
 	main {
 		display: flex;
 		flex-direction: column;
-		height: 100vh;
+		/* **100vh ではなく 100%。**表示倍率で 100vh が窓より端数ぶん大きくなることがある。 */
+		height: 100%;
 		padding: 0.9rem 1rem 1rem;
 		box-sizing: border-box;
 		gap: 0.7rem;
