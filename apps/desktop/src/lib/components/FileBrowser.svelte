@@ -535,7 +535,10 @@
 <svelte:window onkeydown={onKey} />
 
 <section class="files" class:dropping>
-	<!-- 開いている接続。**1 本残らずここに出る**（D25）。裏に持つ場所は無い。 -->
+	<!-- 開いている接続。**1 本残らずここに出る**（D25）。裏に持つ場所は無い。
+	     **1 本も開いていないときは出しません** —— 見出しは下の選ぶ箱の上端に入ります
+	     （見出しだけの箱が浮き、角がずれていた・2026-10-26）。 -->
+	{#if session.all.length > 0}
 	<div class="bar shell">
 		<div class="core">
 			{#if session.all.length > 0}
@@ -580,11 +583,6 @@
 						{/if}
 					</span>
 				{/if}
-			{:else}
-				<span class="title">{i18n.t('files.choose')}</span>
-				{#if registered.length === 0}
-					<span class="hint">{i18n.t('files.none')}</span>
-				{/if}
 			{/if}
 
 			{#if session.all.length > 0}
@@ -607,6 +605,7 @@
 			{/if}
 		</div>
 	</div>
+	{/if}
 
 	<!--
 		**繋ぐ、は 1 つの部品**（`ConnectPanel`）。端末の面でも同じものを出します。
@@ -614,6 +613,7 @@
 	-->
 	{#if showPicker}
 		<ConnectPanel
+			heading={session.all.length === 0 ? i18n.t('files.choose') : undefined}
 			onconnected={() => {
 				remotePath = '.';
 				addingAnother = false;
@@ -1275,13 +1275,6 @@
 
 	.pane footer {
 		padding: 10px 14px 12px;
-	}
-
-	.title {
-		font-size: var(--text-control);
-		color: var(--fg);
-		flex: 1 1 auto;
-		font-weight: 600;
 	}
 
 	.path {

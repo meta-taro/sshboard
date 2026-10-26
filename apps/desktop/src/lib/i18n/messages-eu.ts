@@ -314,7 +314,7 @@ export const de: Catalog = {
 	"text.large": "Groß",
 	"text.xlarge": "Sehr groß",
 	// 初動で迷わせない。**繋がるまでの 3 手順。**
-	"files.step1": "Unten einen Server wählen und auf Verbinden drücken.",
+	"files.step1": "Oben einen Server wählen und auf Verbinden drücken.",
 	"files.step2": "Beim ersten Mal den angezeigten Fingerabdruck prüfen und hinterlegen.",
 	"files.step3": "Dateien links ablegen und auf Hochladen drücken.",
 	"files.notconnected": "Nicht verbunden. Oben einen Server wählen und auf Verbinden drücken.",
@@ -658,7 +658,7 @@ export const fr: Catalog = {
 	"text.large": "Grand",
 	"text.xlarge": "Très grand",
 	// 初動で迷わせない。**繋がるまでの 3 手順。**
-	"files.step1": "Choisissez un serveur ci-dessous, puis appuyez sur Connecter.",
+	"files.step1": "Choisissez un serveur ci-dessus, puis appuyez sur Connecter.",
 	"files.step2": "La première fois, vérifiez l'empreinte affichée et enregistrez-la.",
 	"files.step3": "Déposez des fichiers à gauche, puis appuyez sur Envoyer.",
 	"files.notconnected": "Non connecté. Choisissez un serveur ci-dessus et appuyez sur Connecter.",
@@ -1002,7 +1002,7 @@ export const es: Catalog = {
 	"text.large": "Grande",
 	"text.xlarge": "Muy grande",
 	// 初動で迷わせない。**繋がるまでの 3 手順。**
-	"files.step1": "Elija un servidor abajo y pulse Conectar.",
+	"files.step1": "Elija un servidor arriba y pulse Conectar.",
 	"files.step2": "La primera vez, compruebe la huella mostrada y regístrela.",
 	"files.step3": "Suelte archivos a la izquierda y pulse Subir.",
 	"files.notconnected": "Sin conexión. Elija un servidor arriba y pulse Conectar.",

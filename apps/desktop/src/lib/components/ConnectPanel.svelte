@@ -37,10 +37,16 @@
 		/** 繋がったあと、呼んだ側がやること（一覧の読み直しなど）。 */
 		onconnected = () => {},
 		/** 登録が 1 件も無いときに押させる逃げ道。 */
-		onregister = undefined
+		onregister = undefined,
+		/**
+		 * **見出し。**箱の上端に入れます（2026-10-26）。
+		 * 呼んだ側が別の箱に見出しを置くと、見出しだけが浮いて角がずれました。
+		 */
+		heading = undefined
 	}: {
 		onconnected?: () => void;
 		onregister?: () => void;
+		heading?: string;
 	} = $props();
 
 	let registered = $state<Connection[]>([]);
@@ -138,6 +144,7 @@
 		前は何も出ず、人は「押す所が無い」に遭いました。
 	-->
 	<div class="picker shell">
+		{#if heading}<span class="heading">{heading}</span>{/if}
 		<div class="core empty-core">
 			<p class="none">{i18n.t('files.none')}</p>
 			{#if onregister}
@@ -151,6 +158,7 @@
 {:else}
 	<!-- 繋いでいないときは、印つきの一覧から選ぶ。**色とタグが見えたまま選べる。** -->
 	<div class="picker shell">
+		{#if heading}<span class="heading">{heading}</span>{/if}
 		<ul class="core">
 			{#each registered as entry (entry.id)}
 				<li>
@@ -232,23 +240,43 @@
 
 <style>
 	/*
-	 * **`FileBrowser` から動かしただけ**（書き直していません）。
-	 * 見た目を変えずに置き場所だけ移すのが目的なので、
-	 * **規則はそのまま**運んでいます。
+	 * **箱は 1 つ、中は上から縦に並べる**（2026-10-26・Windows 実機の崩れ）。
+	 *
+	 * 以前は `.picker` に「折り返して中央寄せ」と「縦並び」の 2 つの規則が重なり、
+	 * **折り返す縦並び**になっていました。一覧・［接続］・3 手順が横の列へ散り、
+	 * 一覧は余った高さで段を引き伸ばして、札の段の間が約 70px 空いていました。
 	 *
 	 * 色は tokens.css の変数だけ。**ここに 16 進数を書かない。**
 	 */
+	.picker {
+		display: flex;
+		flex-direction: column;
+		align-items: stretch;
+		gap: 8px;
+		padding: 12px 14px;
+		flex: 0 1 auto;
+		/*
+		 * **`.shell` の `min-height: 0` をここだけ打ち消す。**
+		 * 0 のままだと、場所が足りないときに枠が中身より小さくなり、
+		 * **はみ出した中身が下の要素の上に重なって出ます**（実際に 2 回起きました）。
+		 */
+		min-height: min-content;
+	}
 
-	/* 枠。**`.shell` はこの部品の外にあった**ので、ここで持ち直します。 */
-	.picker,
-	.picker .core,
+	/* 見出し。**箱の上端に入れる**（別の箱に浮かせない）。 */
+	.heading {
+		font-size: var(--text-control);
+		font-weight: 600;
+		color: var(--fg);
+	}
+
 	/* 1 件も登録が無いとき。**空の枠だけを出さない。** */
 	.empty-core {
 		display: flex;
 		align-items: center;
 		gap: 0.6rem;
 		flex-wrap: wrap;
-		padding: 0.7rem;
+		padding: 10px 12px;
 	}
 
 	.none {
@@ -274,13 +302,25 @@
 		color: var(--danger);
 	}
 
-	/* 接続を選ぶところ。**印（色とタグ）が見えたまま選べる。** */
+	/*
+	 * 接続を選ぶところ。**印（色とタグ）が見えたまま選べる。**
+	 *
+	 * **段は上から詰める**（`align-content: flex-start`）。既定の stretch だと、
+	 * 余った高さで段の間が広がります。高さは中身に合わせ、多いときだけ中で巻き取ります。
+	 */
 	.picker .core {
+		display: flex;
+		flex-wrap: wrap;
+		align-content: flex-start;
+		gap: 4px;
 		list-style: none;
 		margin: 0;
-		padding: 0.2rem;
+		padding: 6px;
 		max-height: 8.5rem;
+		/* 1 行だけでも残す。**0 まで潰れると、何を選ぶ所か分からなくなる。** */
+		min-height: 2.4rem;
 		overflow: auto;
+		flex: 0 1 auto;
 	}
 
 	.picker li {
@@ -291,13 +331,17 @@
 		display: flex;
 		align-items: center;
 		gap: 0.4rem;
-		width: 100%;
 		/* **左寄せ。**一覧として読むもの。 */
 		text-align: left;
 		border: none;
 		background: none;
-		border-radius: var(--r-control);
-		padding: 0.2rem 0.4rem;
+		border-radius: var(--r-pill);
+		height: var(--control-h);
+		padding: 0 12px;
+		font: inherit;
+		font-size: var(--text-control);
+		color: var(--fg-control);
+		cursor: pointer;
 	}
 
 	.pick:hover {
@@ -335,9 +379,41 @@
 		display: inline-flex;
 	}
 
+	.picker-foot {
+		display: flex;
+		align-items: center;
+		flex-wrap: wrap;
+		gap: 0.5rem;
+		flex: 0 0 auto;
+	}
+
+	/* ［接続］。他の面の釦と同じ錠剤の形に揃える。 */
+	.picker-foot .primary,
+	.empty-core .primary {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.3rem;
+		height: var(--control-h);
+		padding: 0 14px;
+		border: 0;
+		border-radius: var(--r-pill);
+		background: var(--accent-soft);
+		color: var(--accent);
+		box-shadow: inset 0 0 0 1px var(--accent);
+		font: inherit;
+		font-size: var(--text-control);
+		font-weight: 600;
+		cursor: pointer;
+	}
+
+	.picker-foot .primary:disabled {
+		opacity: 0.45;
+		cursor: default;
+	}
+
 	/* 3 手順。**繋がるまでのあいだだけ出す。**繋がったら消える。 */
 	.steps {
-		margin: 0.15rem 0 0;
+		margin: 0;
 		padding: 0 0 0 1.1rem;
 		display: flex;
 		flex-direction: column;
@@ -345,46 +421,6 @@
 		font-size: var(--text-sm);
 		color: var(--fg-faint);
 		line-height: 1.5;
-	}
-
-	.picker-foot {
-		display: flex;
-		align-items: center;
-		gap: 0.5rem;
-		padding: 0.35rem 0.2rem 0.05rem;
-	}
-
-	/*
-	 * **縮むのは中の一覧だけ。**枠ごと縮むと、中身がはみ出して
-	 * 下の要素の上に重なって出ます（`.shell` は `min-height: 0` を持っていて、
-	 * **縮んでも中身を隠しません**）。実際に接続ボタンと重なりました。
-	 *
-	 * かといって縮ませないと、窓が低いときに**下のファイル 2 ペインが潰れます。**
-	 * 縦に並べ直して、**足りない分は一覧が巻き取る**形にします。
-	 */
-	.picker {
-		display: flex;
-		flex-direction: column;
-		flex: 0 1 auto;
-		/*
-		 * **`.shell` の `min-height: 0` をここだけ打ち消す。**
-		 *
-		 * 0 のままだと、場所が足りないときに枠が中身より小さくなり、
-		 * **はみ出した中身が下の要素の上に重なって出ます**（実際に 2 回起きました）。
-		 * `min-content` なら「これ以上は縮めない」を中身が決めます。
-		 * 一覧は下で 1 行分まで縮むので、**最小はかなり小さい**まま保てます。
-		 */
-		min-height: min-content;
-	}
-
-	.picker .core {
-		flex: 0 1 auto;
-		/* 1 行だけでも残す。**0 まで潰れると、何を選ぶ所か分からなくなる。** */
-		min-height: 2.4rem;
-	}
-
-	.picker-foot,
-	.steps {
 		flex: 0 0 auto;
 	}
 </style>

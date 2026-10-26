@@ -314,7 +314,7 @@ export const ko: Catalog = {
 	"text.large": "크게",
 	"text.xlarge": "아주 크게",
 	// 初動で迷わせない。**繋がるまでの 3 手順。**
-	"files.step1": "아래 목록에서 서버를 고르고 [연결]을 누릅니다.",
+	"files.step1": "위 목록에서 서버를 고르고 [연결]을 누릅니다.",
 	"files.step2": "처음이라면 표시된 지문을 확인하고 등록합니다.",
 	"files.step3": "왼쪽에 파일을 끌어다 놓고 [올리기]를 누릅니다.",
 	"files.notconnected": "연결되지 않았습니다. 위에서 서버를 고르고 [연결]을 누르세요.",
@@ -658,7 +658,7 @@ export const zhCN: Catalog = {
 	"text.large": "大",
 	"text.xlarge": "特大",
 	// 初動で迷わせない。**繋がるまでの 3 手順。**
-	"files.step1": "在下面选一台服务器，按［连接］。",
+	"files.step1": "在上面选一台服务器，按［连接］。",
 	"files.step2": "第一次连接时，核对显示的指纹并登记。",
 	"files.step3": "把文件拖到左边，按［上传］。",
 	"files.notconnected": "尚未连接。请在上面选一台服务器并按［连接］。",
@@ -1002,7 +1002,7 @@ export const zhTW: Catalog = {
 	"text.large": "大",
 	"text.xlarge": "特大",
 	// 初動で迷わせない。**繋がるまでの 3 手順。**
-	"files.step1": "在下面選一台伺服器，按［連線］。",
+	"files.step1": "在上面選一台伺服器，按［連線］。",
 	"files.step2": "第一次連線時，核對顯示的指紋並登記。",
 	"files.step3": "把檔案拖到左邊，按［上傳］。",
 	"files.notconnected": "尚未連線。請在上面選一台伺服器並按［連線］。",

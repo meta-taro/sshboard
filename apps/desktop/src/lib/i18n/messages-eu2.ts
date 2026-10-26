@@ -314,7 +314,7 @@ export const ptBR: Catalog = {
 	"text.large": "Grande",
 	"text.xlarge": "Muito grande",
 	// 初動で迷わせない。**繋がるまでの 3 手順。**
-	"files.step1": "Escolha um servidor abaixo e aperte Conectar.",
+	"files.step1": "Escolha um servidor acima e aperte Conectar.",
 	"files.step2": "Na primeira vez, confira a impressão mostrada e registre.",
 	"files.step3": "Solte arquivos à esquerda e aperte Enviar.",
 	"files.notconnected": "Sem conexão. Escolha um servidor acima e aperte Conectar.",
@@ -658,7 +658,7 @@ export const ru: Catalog = {
 	"text.large": "Крупный",
 	"text.xlarge": "Очень крупный",
 	// 初動で迷わせない。**繋がるまでの 3 手順。**
-	"files.step1": "Выберите сервер ниже и нажмите «Подключиться».",
+	"files.step1": "Выберите сервер выше и нажмите «Подключиться».",
 	"files.step2": "В первый раз сверьте показанный отпечаток и запишите его.",
 	"files.step3": "Перетащите файлы слева и нажмите «Загрузить».",
 	"files.notconnected": "Нет подключения. Выберите сервер выше и нажмите «Подключиться».",
@@ -1002,7 +1002,7 @@ export const it: Catalog = {
 	"text.large": "Grande",
 	"text.xlarge": "Molto grande",
 	// 初動で迷わせない。**繋がるまでの 3 手順。**
-	"files.step1": "Scegli un server qui sotto e premi Connetti.",
+	"files.step1": "Scegli un server qui sopra e premi Connetti.",
 	"files.step2": "La prima volta, verifica l'impronta mostrata e registrala.",
 	"files.step3": "Trascina i file a sinistra e premi Carica.",
 	"files.notconnected": "Non connesso. Scegli un server qui sopra e premi Connetti.",

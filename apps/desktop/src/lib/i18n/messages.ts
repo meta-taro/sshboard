@@ -350,7 +350,7 @@ const en = {
 	"text.large": "Large",
 	"text.xlarge": "X-Large",
 	// 初動で迷わせない。**繋がるまでの 3 手順。**
-	"files.step1": "Pick a server below, then press Connect.",
+	"files.step1": "Pick a server above, then press Connect.",
 	"files.step2": "The first time, check the fingerprint shown and register it.",
 	"files.step3": "Drop files on the left, then press Upload.",
 	"files.notconnected": "Not connected. Pick a server above and press Connect.",
@@ -734,7 +734,7 @@ const ja: Catalog = {
 	"text.large": "大",
 	"text.xlarge": "特大",
 	// 初動で迷わせない。**繋がるまでの 3 手順。**
-	"files.step1": "下の一覧からサーバーを選び、［接続］を押す。",
+	"files.step1": "上の一覧からサーバーを選び、［接続］を押す。",
 	"files.step2": "初めての相手なら、出てくる指紋を確かめて登録する。",
 	"files.step3": "左へファイルを放り込み、［上げる］を押す。",
 	"files.notconnected": "繋がっていません。上でサーバーを選び、［接続］を押してください。",
