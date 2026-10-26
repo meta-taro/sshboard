@@ -213,6 +213,12 @@ pub fn run() {
             // **何枚描けばよいかを画面へ**（分割）。押し出さないと、
             // 2 枚目を開いても画面は 1 枚のままです。
             session_cmd::spawn_consoles_bridge(app.handle().clone(), Arc::clone(&engine));
+            // **シェルが終わった端末を閉じる**（2026-10-26）。`exit` でログアウトしても
+            // 終わった端末が画面に残っていた。閉じれば上の橋が画面へ押し出します。
+            {
+                let engine = Arc::clone(&engine);
+                tauri::async_runtime::spawn(async move { engine.run_console_reaper().await });
+            }
             // **AI からの頼みを画面へ**（D42）。出せない問いは無いのと同じ。
             session_cmd::spawn_console_request_bridge(app.handle().clone(), Arc::clone(&engine));
             // **出せない画面を案内しない**（Issue #13）。

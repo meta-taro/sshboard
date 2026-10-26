@@ -256,6 +256,18 @@ impl Consoles {
         previous
     }
 
+    /// **その端末だけの出力**で番号を引く（シェルが終わった知らせの印）。
+    pub(crate) fn id_of_stream(&self, mark: &Arc<OutputStream>) -> Option<u64> {
+        self.items
+            .iter()
+            .find(|open| {
+                open.stream
+                    .as_ref()
+                    .is_some_and(|held| Arc::ptr_eq(held, mark))
+            })
+            .map(|open| open.id)
+    }
+
     /// 番号で取り除く。
     pub(crate) fn remove(&mut self, id: u64) -> Option<OpenConsole> {
         let at = self.items.iter().position(|open| open.id == id)?;

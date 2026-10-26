@@ -974,6 +974,9 @@ impl SshSession {
         cols: u32,
         rows: u32,
         into: Vec<Arc<sshboard_stream::OutputStream>>,
+        // **シェルが自分で終わったとき**（`exit` でログアウトした など）に 1 回だけ呼ぶ。
+        // こちらが止めたとき（流し先が止まった）は呼びません（2026-10-26）。
+        on_end: Option<Box<dyn FnOnce() + Send + 'static>>,
     ) -> Result<Console, SshError> {
         // **握ったことは帯に出す**（D29）。打鍵は出さないが、開始は出す。
         self.show(actor, "console opened").await?;
@@ -1004,6 +1007,7 @@ impl SshSession {
         // **同じチャネルを 2 回読むのではありません**（PRD §4-1）。
         // 1 回読んだものを両方へ配るだけです。
         tokio::spawn(async move {
+            let mut stopped_by_us = false;
             while let Some(message) = read.wait().await {
                 let chunk = match message {
                     ChannelMsg::Data { ref data } => data.to_vec(),
@@ -1015,7 +1019,15 @@ impl SshSession {
                 // **1 つでも止まっていたら止めます** —— 止める相手を選ばせると、
                 // 「［止める］を押したのに流れ続ける面がある」が起きます。
                 if into.iter().any(|out| out.push(&chunk).is_err()) {
+                    stopped_by_us = true;
                     break;
+                }
+            }
+            // **シェルが終わったことを知らせる。**知らせないと、終わった端末が
+            // 一覧にも画面にも残り続けました（「ログアウト」のまま・2026-10-26）。
+            if !stopped_by_us {
+                if let Some(on_end) = on_end {
+                    on_end();
                 }
             }
         });

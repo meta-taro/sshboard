@@ -1007,7 +1007,7 @@ async fn a_root_only_log_can_be_read_once_the_person_types_the_password() {
     // 1. AI が呼ぶ。**人に尋ねて、そこで止まる。**
     let stopped = engine.run_operation(Actor::Ai, "read-maillog").await;
     assert!(
-        matches!(stopped, Err(EngineError::ConsoleApprovalNeeded)),
+        matches!(stopped, Err(EngineError::OperationApprovalNeeded { .. })),
         "承認なしで走ろうとしている: {stopped:?}"
     );
 
@@ -1069,7 +1069,7 @@ async fn a_root_only_log_can_be_read_once_the_person_types_the_password() {
     // 6. **使い切り。**もう一度呼んだら、また尋ねる。
     let again = engine.run_operation(Actor::Ai, "read-maillog").await;
     assert!(
-        matches!(again, Err(EngineError::ConsoleApprovalNeeded)),
+        matches!(again, Err(EngineError::OperationApprovalNeeded { .. })),
         "**秘密が残っている**: {again:?}"
     );
 
@@ -2578,4 +2578,61 @@ async fn a_stalled_send_does_not_lock_up_every_other_console_call() {
     // 後始末。止めれば送りも終わる。
     let _ = engine.console_stop(Actor::Human, None).await;
     typing.abort();
+}
+
+// --- シェルが終わったら、その端末は閉じた扱いにする（実機・2026-10-26）-------------
+//
+// > こうなったとき、ターミナル表示をもどしてほしいですね。初期？のときとか。
+// > いわゆるクローズされるはずなのでターミナルの場合
+//
+// `su -` → `exit` → もう一度 `exit` でログインシェルも抜けると、「ログアウト」の
+// 文字が出たまま、終わった端末が一覧にも画面にも残っていました。読む側はシェルの
+// 終わりで止まっていたが、**実行体へ知らせる道が無かった。**
+
+#[tokio::test]
+async fn a_console_whose_shell_exits_is_closed() {
+    if !server_is_up().await {
+        println!("テスト用サーバーが建っていません（想定内・飛ばします）");
+        return;
+    }
+    let dir = tempfile::tempdir().expect("一時ディレクトリ");
+    let engine = std::sync::Arc::new(engine_connected(&dir).await);
+    let reaper = {
+        let engine = std::sync::Arc::clone(&engine);
+        tokio::spawn(async move { engine.run_console_reaper().await })
+    };
+    engine
+        .console_open(Actor::Human, None, 80, 24)
+        .await
+        .expect("開けない");
+    assert_eq!(engine.console_list().await.len(), 1);
+
+    engine
+        .console_type(Actor::Human, None, b"exit\n")
+        .await
+        .expect("打てない");
+
+    let closed = tokio::time::timeout(std::time::Duration::from_secs(5), async {
+        while !engine.console_list().await.is_empty() {
+            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+        }
+    })
+    .await;
+    assert!(closed.is_ok(), "**シェルが終わったのに、端末が残っている**");
+    assert_eq!(
+        engine.console_holder_active().await,
+        None,
+        "握りが残っている"
+    );
+    let said = engine
+        .diagnostics()
+        .recent(20)
+        .into_iter()
+        .map(|event| event.message)
+        .collect::<Vec<_>>();
+    assert!(
+        said.iter().any(|line| line.contains("シェルが終わった")),
+        "閉じた理由が残っていない: {said:?}"
+    );
+    reaper.abort();
 }

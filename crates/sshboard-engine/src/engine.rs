@@ -17,7 +17,7 @@ use sshboard_ssh::{
     Target, WriteScope,
 };
 use sshboard_stream::OutputStream;
-use tokio::sync::{watch, Mutex};
+use tokio::sync::{mpsc, watch, Mutex};
 // **`tokio` の時計を使う。**`std` のものだと、テストで時間を進められない
 // （`tokio::time::pause` が効かず、**上限も札の寿命も確かめようがない**）。
 use tokio::time::{Duration, Instant};
@@ -230,6 +230,10 @@ pub struct Engine {
     console: Mutex<Consoles>,
     /// 誰が握っているかを配る。**画面が知らないまま AI が打っている、を作らない。**
     console_changed: watch::Sender<Option<Actor>>,
+    /// **シェルが自分で終わった端末**の知らせ（2026-10-26）。印はその端末だけの出力。
+    /// 受け取って閉じるのは [`Engine::run_console_reaper`]。
+    console_ended: mpsc::UnboundedSender<Arc<OutputStream>>,
+    console_ended_rx: Mutex<Option<mpsc::UnboundedReceiver<Arc<OutputStream>>>>,
     /// **画面にいま何が見えているか**（PRD §4-0 の「同じ視点」・2026-10-07）。
     ///
     /// **画面が言うまでは `None`。**「分からない」と「見えていない」を分けます ——
@@ -301,6 +305,7 @@ impl Engine {
     ) -> Self {
         let (changed, _) = watch::channel(Vec::new());
         let (console_changed, _) = watch::channel(None);
+        let (console_ended, console_ended_rx) = mpsc::unbounded_channel();
         let (consoles_changed, _) = watch::channel(Vec::new());
         let (console_request_changed, _) = watch::channel(None);
         let (passphrase_request, _) = watch::channel(None);
@@ -317,6 +322,8 @@ impl Engine {
             held: Mutex::new(Held::default()),
             console: Mutex::new(Consoles::default()),
             console_changed,
+            console_ended,
+            console_ended_rx: Mutex::new(Some(console_ended_rx)),
             screen: Mutex::new(None),
             consoles_changed,
             console_request_changed,
@@ -1255,6 +1262,7 @@ impl Engine {
                 cols,
                 rows,
                 vec![Arc::clone(&only_this), self.stream_for(&target).await],
+                Some(self.tell_when_ended(&only_this)),
             )
             .await?;
 
@@ -1350,6 +1358,7 @@ impl Engine {
                 cols,
                 rows,
                 vec![Arc::clone(&only_this), self.stream_for(on).await],
+                Some(self.tell_when_ended(&only_this)),
             )
             .await?;
 
@@ -1728,6 +1737,56 @@ impl Engine {
     ///
     /// 帯の受け取りを待ちません。切断と同じ扱いです — **止まらない停止は、
     /// 無い方がまし。**握りも外すので、次の側が開き直せます。
+    /// シェルが自分で終わったときに呼ぶ手を作る。**印はその端末だけの出力**（番号はまだ無いので）。
+    fn tell_when_ended(&self, only_this: &Arc<OutputStream>) -> Box<dyn FnOnce() + Send + 'static> {
+        let tell = self.console_ended.clone();
+        let mark = Arc::clone(only_this);
+        Box::new(move || {
+            // 受け手が居なければ（片付けが回っていない）、閉じられないだけ。止めない。
+            let _ = tell.send(mark);
+        })
+    }
+
+    /// **シェルが終わった端末を閉じ続ける**（2026-10-26）。アプリが起動時に 1 本だけ回します。
+    ///
+    /// > こうなったとき、ターミナル表示をもどしてほしいですね。初期？のときとか。
+    ///
+    /// `exit` でログインシェルを抜けると、「ログアウト」の字が出たまま、終わった端末が
+    /// 一覧にも画面にも残っていました。**［止める］と同じ片付け**をして、画面を
+    /// 端末を開く前の形へ戻します。2 回目以降の呼び出しは何もしません。
+    pub async fn run_console_reaper(&self) {
+        let Some(mut ended) = self.console_ended_rx.lock().await.take() else {
+            return;
+        };
+        while let Some(mark) = ended.recv().await {
+            self.close_ended_console(&mark).await;
+        }
+    }
+
+    async fn close_ended_console(&self, mark: &Arc<OutputStream>) {
+        let mut slot = self.console.lock().await;
+        let Some(id) = slot.id_of_stream(mark) else {
+            // もう止めてある（［止める］で閉じたあとに、遅れて知らせが来た）。
+            return;
+        };
+        let on = slot
+            .by_id(id)
+            .map(|open| open.connection.clone())
+            .unwrap_or_default();
+        let gone = slot.remove(id);
+        drop(slot);
+        if let Some(console) = gone.and_then(|open| open.console) {
+            console.close().await;
+        }
+        self.diag.info(
+            Stage::Exec,
+            (!on.is_empty()).then_some(on.as_str()),
+            format!("シェルが終わったので、端末を閉じました（#{id}）"),
+        );
+        let _ = self.console_changed.send_replace(None);
+        self.publish_consoles().await;
+    }
+
     pub async fn console_stop_of(&self, actor: Actor, id: u64) -> Result<(), EngineError> {
         let mut slot = self.console.lock().await;
         let Some(here) = slot.by_id(id) else {
