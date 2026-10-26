@@ -1573,6 +1573,10 @@
 	.clear-mark {
 		/* 文字だけの釦。**錠剤の既定（高さ・塗り・輪）を打ち消す。** */
 		height: auto;
+		/* **押せる大きさは 24px から**（WCAG 2.2）。WebKit では 15px だった（見栄えの検め 2026-10-26）。 */
+		display: inline-flex;
+		align-items: center;
+		min-height: 24px;
 		padding: 0;
 		background: none;
 		box-shadow: none;

@@ -1413,6 +1413,8 @@
 		font-size: var(--text-xs);
 		align-self: flex-start;
 		color: var(--fg-muted);
+		/* **押せる大きさは 24px から**（WCAG 2.2・見栄えの検め 2026-10-26）。21px だった。 */
+		min-height: 24px;
 	}
 
 	/* ディレクトリは移動、ファイルは選択。**見た目で区別する。** */

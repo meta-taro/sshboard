@@ -349,6 +349,15 @@
 	box-shadow: var(--shell-ring);
 	border-radius: var(--r-shell);
 	padding: var(--shell-pad);
+	/*
+	 * **芯は外殻の内側を埋める。**縦に並べて、芯を残りへ伸ばします。
+	 *
+	 * 以前は芯の `height: 100%` で埋めていましたが、外殻が flex の子だと
+	 * 100% が**外殻の外寸**で解かれ、芯が padding の分（6〜14px）だけ外殻の外へ
+	 * はみ出していました（端末・出力・ファイルの肩・2026-10-26 の見栄えの検めで判明）。
+	 */
+	display: flex;
+	flex-direction: column;
 }
 
 /* 芯。角丸は外殻から padding ぶん引いて同心円にする。 */
@@ -357,7 +366,8 @@
 	border-radius: var(--r-core);
 	/* **芯は前に出す。**上端の光と、足元の柔らかい落ち影（案の値）。 */
 	box-shadow: var(--lift-core);
-	height: 100%;
+	/* 外殻の残りを埋める（上の `.shell` を参照）。`height: 100%` ははみ出した。 */
+	flex: 1 1 auto;
 	min-height: 0;
 }
 

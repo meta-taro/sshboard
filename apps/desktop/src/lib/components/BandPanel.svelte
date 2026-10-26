@@ -196,7 +196,11 @@
 		background: transparent;
 		border: 0;
 		border-radius: var(--r-pill);
-		padding: 4px 10px;
+		/* **押せる大きさは 24px から**（WCAG 2.2・見栄えの検め 2026-10-26）。23px だった。 */
+		display: inline-flex;
+		align-items: center;
+		min-height: 24px;
+		padding: 0 10px;
 		cursor: pointer;
 		white-space: nowrap;
 		transition:
