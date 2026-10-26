@@ -121,6 +121,11 @@ pub enum EngineError {
     /// **空のまま投げると、別のものが返ってきます**（`systemctl status` は
     /// 名前が無いと全ユニットを吐く）。サーバーへ行く前に断ります。
     BadArgument(String),
+    /// **別の提案が、まだ人の画面で答えを待っている**（2026-10-26）。
+    ///
+    /// 提案は 1 枠で、2 件目が 1 件目を黙って上書きしていました。
+    /// 人の画面から先の提案が消え、AI からは「出した」ように見えます。
+    ProposalPending { id: String },
     /// SSH 側の失敗。ホスト鍵の不一致もここに入る。
     Ssh(sshboard_ssh::SshError),
     /// ローカルのファイルが読めない・書けない。
@@ -262,6 +267,12 @@ impl fmt::Display for EngineError {
                  読めない一覧を空として扱わないので、いまは 1 本も走りません"
             ),
             EngineError::BadArgument(detail) => write!(f, "{detail}"),
+            EngineError::ProposalPending { id } => write!(
+                f,
+                "the proposal `{id}` is still waiting for the person's answer on screen. \
+                 Only one proposal is shown at a time - wait until they register or dismiss it \
+                 (pending_status shows it), then propose the next one"
+            ),
             EngineError::Ssh(error) => write!(f, "{error}"),
             EngineError::Local(detail) => write!(f, "手元のファイルを扱えません: {detail}"),
         }

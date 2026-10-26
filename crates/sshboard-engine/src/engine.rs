@@ -1975,6 +1975,27 @@ impl Engine {
         );
         Operations::parse(&as_toml).map_err(|error| EngineError::BadArgument(error.to_string()))?;
 
+        // **黙って上書きしない**（2026-10-26）。**帯へ出す前に**見ます ——
+        // 断ったものを「聞いています」と帯に出すと、人は聞かれたと読みます。
+        // 別の提案が答えを待っていたら断る。
+        // 同じ id の出し直し（直した版を見せる）は通す。
+        let waiting = self
+            .operation_proposal
+            .borrow()
+            .as_ref()
+            .map(|held| held.id.clone());
+        if let Some(waiting) = waiting.filter(|held| *held != proposal.id) {
+            self.diag.warn(
+                Stage::Exec,
+                None,
+                format!(
+                    "提案 {} を断りました（{waiting} がまだ人の答えを待っています）",
+                    proposal.id
+                ),
+            );
+            return Err(EngineError::ProposalPending { id: waiting });
+        }
+
         // **帯に出す。**提案そのものが人の目に触れないと、
         // 画面の外へ出るのを止められません。
         let told = self

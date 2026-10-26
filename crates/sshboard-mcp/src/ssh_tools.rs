@@ -68,6 +68,8 @@ fn refuse(error: EngineError) -> ErrorData {
         | EngineError::Allowlist(_)
         // 値が足りないだけ。**AI が直せる。**
         | EngineError::BadArgument(_)
+        // **人が前の提案に答えるのを待つ。**AI が待てば通る。
+        | EngineError::ProposalPending { .. }
         // **指紋を確かめて登録できるのは人だけ。**AI へは「人に頼め」と返す。
         | EngineError::UntrustedHost { .. } => {
             ErrorData::invalid_params(error.to_string(), None)

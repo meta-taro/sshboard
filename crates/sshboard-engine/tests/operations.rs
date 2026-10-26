@@ -822,3 +822,69 @@ async fn a_proposal_survives_with_nobody_watching_at_all() {
         "**受け手が 0 本のときに提案が消えています。**`send` の失敗を捨てています"
     );
 }
+
+// --- 提案を続けて 2 件出すと、先の 1 件が消えていた（実機・2026-10-26）-------------
+//
+// 提案は 1 枠で、2 件目が 1 件目を**黙って上書き**していました。
+// 人の画面からは先の提案が消え、登録もされません。AI からは「出した」ように見えます。
+// **黙って消さない。**人が答えるまで、別の提案は断って「待ってから」と言います。
+
+fn proposal(id: &str) -> OperationProposal {
+    OperationProposal {
+        id: id.into(),
+        run: format!("sudo pm2 {id}"),
+        description: "試し".into(),
+        max_per_hour: 4,
+    }
+}
+
+#[tokio::test]
+async fn a_second_proposal_does_not_silently_replace_the_first() {
+    let dir = tempfile::tempdir().expect("一時ディレクトリが作れない");
+    let engine = engine_in(&dir);
+    engine
+        .propose_operation(Actor::Ai, proposal("restart"))
+        .await
+        .expect("1 件目が通らない");
+
+    let second = engine.propose_operation(Actor::Ai, proposal("list")).await;
+    assert!(
+        matches!(second, Err(EngineError::ProposalPending { ref id }) if id == "restart"),
+        "**2 件目が黙って通った**: {second:?}"
+    );
+    let shown = engine.operation_proposal().expect("提案が消えた");
+    assert_eq!(shown.id, "restart", "**先の提案が上書きされた**");
+}
+
+#[tokio::test]
+async fn proposing_the_same_one_again_updates_it() {
+    // 同じ id を出し直すのは、直した版を見せたいとき。断らない。
+    let dir = tempfile::tempdir().expect("一時ディレクトリが作れない");
+    let engine = engine_in(&dir);
+    engine
+        .propose_operation(Actor::Ai, proposal("restart"))
+        .await
+        .expect("1 件目");
+    let mut fixed = proposal("restart");
+    fixed.max_per_hour = 2;
+    engine
+        .propose_operation(Actor::Ai, fixed)
+        .await
+        .expect("同じ id の出し直しが断られた");
+    assert_eq!(engine.operation_proposal().expect("消えた").max_per_hour, 2);
+}
+
+#[tokio::test]
+async fn the_next_proposal_goes_through_once_the_person_has_answered() {
+    let dir = tempfile::tempdir().expect("一時ディレクトリが作れない");
+    let engine = engine_in(&dir);
+    engine
+        .propose_operation(Actor::Ai, proposal("restart"))
+        .await
+        .expect("1 件目");
+    engine.dismiss_proposal();
+    engine
+        .propose_operation(Actor::Ai, proposal("list"))
+        .await
+        .expect("答えたあとの 2 件目が通らない");
+}
