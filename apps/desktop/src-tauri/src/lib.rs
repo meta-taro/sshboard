@@ -130,6 +130,10 @@ pub fn run() {
             session_cmd::operation_register,
             session_cmd::operation_dismiss,
             session_cmd::operation_answer,
+            session_cmd::operation_answer_standing,
+            session_cmd::standing_list,
+            session_cmd::standing_revoke,
+            session_cmd::standing_revoke_all,
             session_cmd::passphrase_request,
             session_cmd::passphrase_dismiss,
             // **ホスト鍵の問いに、人が答える口**（Issue #26）。

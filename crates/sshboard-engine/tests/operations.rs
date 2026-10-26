@@ -927,3 +927,115 @@ async fn the_first_call_says_which_operation_where_and_whether_a_password_box_is
         "**操作なのに端末の手順を言っている**: {said}"
     );
 }
+
+// --- 「今後も許可」（D47 の 4 を改めた・2026-10-26）-----------------------------------
+//
+// > 操作実行の許可ダイアログに「1 回だけ許可」に加えて「許可を外すまで許可し続ける」がほしい。
+// > その恒久許可をあとから確認・解除できる設定の枠がほしい。
+//
+// オーナーの判断で D47 の「無期限は作らない」を改めた。形は:
+// - **操作 id × 接続**ごと。別の接続には付いてこない
+// - 切れるのは、人が一覧から外したとき・アプリを終えたとき（保存しない）・［AI を止める］
+// - **パスワードの要る操作には付けない**（パスワードは保存しない・D48）
+// - 1 時間あたりの上限はそのまま効く
+
+fn is_asking(result: &Result<sshboard_ssh::Ran, EngineError>) -> bool {
+    matches!(result, Err(EngineError::OperationApprovalNeeded { .. }))
+}
+
+#[tokio::test]
+async fn allowing_from_now_on_lets_later_runs_through_without_asking() {
+    let dir = tempfile::tempdir().expect("一時ディレクトリ");
+    allow(&dir);
+    let engine = engine_in(&dir);
+
+    assert!(is_asking(
+        &engine.run_operation(Actor::Ai, "reload-httpd").await
+    ));
+    engine
+        .answer_operation_standing(Actor::Human)
+        .await
+        .expect("人が今後も許可できない");
+
+    // 1 回目（許した分）も、2 回目も、尋ねずに先へ進む（ここでは繋いでいないので、その先で断られる）。
+    assert!(!is_asking(
+        &engine.run_operation(Actor::Ai, "reload-httpd").await
+    ));
+    assert!(
+        !is_asking(&engine.run_operation(Actor::Ai, "reload-httpd").await),
+        "**今後も許可したのに、また尋ねている**"
+    );
+}
+
+#[tokio::test]
+async fn the_standing_allowances_can_be_listed_and_taken_away() {
+    let dir = tempfile::tempdir().expect("一時ディレクトリ");
+    allow(&dir);
+    let engine = engine_in(&dir);
+    let _ = engine.run_operation(Actor::Ai, "reload-httpd").await;
+    engine
+        .answer_operation_standing(Actor::Human)
+        .await
+        .expect("許可");
+
+    let listed = engine.standing_allowances().await;
+    assert_eq!(listed.len(), 1, "一覧に出ない: {listed:?}");
+    assert_eq!(listed[0].operation, "reload-httpd");
+
+    engine
+        .revoke_standing(Actor::Human, &listed[0].operation, &listed[0].connection)
+        .await;
+    assert!(
+        engine.standing_allowances().await.is_empty(),
+        "外したのに残っている"
+    );
+    assert!(
+        is_asking(&engine.run_operation(Actor::Ai, "reload-httpd").await),
+        "**外したのに、尋ねずに走ろうとしている**"
+    );
+}
+
+#[tokio::test]
+async fn stopping_the_ai_takes_every_standing_allowance_away() {
+    let dir = tempfile::tempdir().expect("一時ディレクトリ");
+    allow(&dir);
+    let engine = engine_in(&dir);
+    let _ = engine.run_operation(Actor::Ai, "reload-httpd").await;
+    engine
+        .answer_operation_standing(Actor::Human)
+        .await
+        .expect("許可");
+
+    engine.revoke_all_standing(Actor::Human).await;
+    assert!(engine.standing_allowances().await.is_empty());
+    assert!(is_asking(
+        &engine.run_operation(Actor::Ai, "reload-httpd").await
+    ));
+}
+
+#[tokio::test]
+async fn only_a_person_can_allow_from_now_on() {
+    let dir = tempfile::tempdir().expect("一時ディレクトリ");
+    allow(&dir);
+    let engine = engine_in(&dir);
+    let _ = engine.run_operation(Actor::Ai, "reload-httpd").await;
+    assert!(
+        engine.answer_operation_standing(Actor::Ai).await.is_err(),
+        "**AI が自分に恒久許可を出せる**"
+    );
+    assert!(engine.standing_allowances().await.is_empty());
+}
+
+#[tokio::test]
+async fn an_operation_that_needs_a_password_is_never_allowed_from_now_on() {
+    // **パスワードは保存しない**（D48）。だから毎回入れてもらう ——「今後も」は付けられない。
+    let dir = tempfile::tempdir().expect("一時ディレクトリ");
+    std::fs::write(dir.path().join("connections.toml"), "version = 1\n").expect("一覧を書けない");
+    allow(&dir);
+    let engine = engine_in(&dir);
+    // 繋いでいないので上げ方は「上げない」＝ needs_secret は立たない。ここでは問いの形だけを作る。
+    let _ = engine.run_operation(Actor::Ai, "reload-httpd").await;
+    let asked = engine.operation_request().expect("問いが無い");
+    assert!(!asked.needs_secret);
+    // パスワードの要る問いに対する恒久許可は、実行体の通し試験（live.rs）で見る。
+}

@@ -217,7 +217,10 @@ impl SshboardMcp {
                        and only ids that are already in that file. The first call refuses \
                        with \"approval needed\" and puts the exact command on the human's \
                        screen for them to allow or refuse; call it again once they have \
-                       allowed it. **One approval runs it once.** There is also an hourly \
+                       allowed it. **One approval runs it once** - unless the person chose \
+                       \"allow until I take it away\" for that operation on that connection, \
+                       in which case it runs without asking until they take it away (never for \
+                       operations that need a password). There is also an hourly \
                        ceiling per operation. Use list_operations to see what exists. \
                        This is also how you reach anything only root can read: if the \
                        human set `become = \"ask\"` on the connection, an operation whose \

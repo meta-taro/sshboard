@@ -2728,3 +2728,75 @@ async fn an_old_allowance_does_not_make_the_persons_new_console_count_twice() {
         "**見えているのは 1 本なのに、AI が開けない**: {opened:?}"
     );
 }
+
+// --- 「今後も許可」を本物の接続で（D47 改・2026-10-26）--------------------------------
+
+#[tokio::test]
+async fn allowing_from_now_on_stays_with_that_connection_and_still_has_a_ceiling() {
+    if !server_is_up().await {
+        println!("テスト用サーバーが建っていません（想定内・飛ばします）");
+        return;
+    }
+    let dir = tempfile::tempdir().expect("一時ディレクトリ");
+    let engine = engine_at(registry_two_ways(&dir).await);
+    let pw = || Some("sshboard-test-password".into());
+    engine
+        .connect(Actor::Human, "with-ask", pw())
+        .await
+        .expect("with-ask");
+    engine
+        .connect(Actor::Human, "plain", pw())
+        .await
+        .expect("plain");
+    engine.focus("plain").await.expect("宛先");
+
+    let _ = engine.run_operation(Actor::Ai, "whoami-root").await;
+    engine
+        .answer_operation_standing(Actor::Human)
+        .await
+        .expect("今後も許可できない");
+
+    // **別の接続には付いてこない。**with-ask はパスワードの要る問いになる。
+    engine.focus("with-ask").await.expect("宛先");
+    let elsewhere = engine.run_operation(Actor::Ai, "whoami-root").await;
+    assert!(
+        matches!(
+            elsewhere,
+            Err(EngineError::OperationApprovalNeeded {
+                needs_secret: true,
+                ..
+            })
+        ),
+        "**plain の今後も許可が with-ask に付いてきた**: {elsewhere:?}"
+    );
+    // **パスワードの要る問いには、今後も許可を付けられない。**
+    assert!(
+        engine
+            .answer_operation_standing(Actor::Human)
+            .await
+            .is_err(),
+        "**パスワードの要る操作を今後も許可できてしまう**"
+    );
+    assert_eq!(
+        engine.standing_allowances().await.len(),
+        1,
+        "with-ask の分が増えた"
+    );
+
+    // 上限は**操作ごと**（接続をまたいで数える・D45）。plain へ戻って使い切る。
+    engine.focus("plain").await.expect("宛先");
+    // 上限（5 回/時）まで、尋ねずに走る。
+    for n in 0..5 {
+        let ran = engine.run_operation(Actor::Ai, "whoami-root").await;
+        assert!(
+            !matches!(ran, Err(EngineError::OperationApprovalNeeded { .. })),
+            "{n} 回目で尋ねている: {ran:?}"
+        );
+    }
+    // **上限はそのまま効く。**
+    let over = engine.run_operation(Actor::Ai, "whoami-root").await;
+    assert!(
+        matches!(over, Err(EngineError::OperationCeiling { .. })),
+        "**今後も許可で、上限が効いていない**: {over:?}"
+    );
+}

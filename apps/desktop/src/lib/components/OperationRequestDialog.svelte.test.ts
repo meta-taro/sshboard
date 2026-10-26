@@ -159,3 +159,35 @@ describe('どの接続で走るか（Windows 実機・2026-10-26）', () => {
 		expect(screen.getByText(i18n.t('operation.request.on'))).toBeTruthy();
 	});
 });
+
+describe('今後も許可（D47 改・2026-10-26）', () => {
+	function mountWith(needsSecret: boolean) {
+		const onAllow = vi.fn();
+		const onDeny = vi.fn();
+		const onAllowStanding = vi.fn();
+		render(OperationRequestDialog, {
+			props: { id: 'pm2-list', runs: 'pm2 list', needsSecret, connection: 'web-01', onAllow, onDeny, onAllowStanding }
+		});
+		return { onAllow, onDeny, onAllowStanding };
+	}
+
+	test('offers to keep allowing it until the person takes it away', async () => {
+		const { onAllowStanding, onAllow } = mountWith(false);
+		await fireEvent.click(screen.getByRole('button', { name: i18n.t('operation.request.standing') }));
+		expect(onAllowStanding).toHaveBeenCalledOnce();
+		expect(onAllow).not.toHaveBeenCalled();
+	});
+
+	test('says it applies to this connection only', () => {
+		// **別の接続には付いてこない。**押す前に分かること。
+		mountWith(false);
+		expect(screen.getByText(i18n.t('operation.request.standing.note'))).toBeTruthy();
+	});
+
+	test('does not offer it when a password is needed, since the password is never kept', () => {
+		mountWith(true);
+		expect(
+			screen.queryByRole('button', { name: i18n.t('operation.request.standing') })
+		).toBeNull();
+	});
+});

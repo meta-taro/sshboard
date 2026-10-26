@@ -9,6 +9,7 @@
 	import ConsoleRequestDialog from '$lib/components/ConsoleRequestDialog.svelte';
 	import HostKeyDialog from '$lib/components/HostKeyDialog.svelte';
 	import OperationRequestDialog from '$lib/components/OperationRequestDialog.svelte';
+	import StandingDialog, { type Standing } from '$lib/components/StandingDialog.svelte';
 	import PassphraseDialog from '$lib/components/PassphraseDialog.svelte';
 	import ConnectPanel from '$lib/components/ConnectPanel.svelte';
 	import ConsolePaneView from '$lib/components/ConsolePane.svelte';
@@ -92,6 +93,9 @@
 	 * 「〜について」／ヘルプです（dbboard も同じ形）。
 	 */
 	let aboutOpen = $state(false);
+	/** **許可を続けている操作**の枠（D47 改）。開くたびに実行体から読み直す。 */
+	let standingOpen = $state(false);
+	let standingList = $state<Standing[]>([]);
 
 	/** メニューの文言は**既にある**（`messages-menu`）。新しい言い方を増やさない。 */
 	const menu = $derived(menuLabels(i18n.locale));
@@ -206,6 +210,9 @@
 			//
 			// **戻すにはアプリを立ち上げ直します。**開き直す口は作りません ——
 			// 「止めたのに勝手に戻る」を作らないためです。
+			//
+			// **「外すまで許可」も全部外す**（D47 改）。止めたのに許可だけ残る、を作らない。
+			await invoke('standing_revoke_all');
 			await invoke('mcp_stop');
 			mcp = null;
 		} catch (error: unknown) {
@@ -412,6 +419,34 @@
 	 * **どこにも残しません。**ここでは変数にすら置かず、そのまま渡します ——
 	 * 画面側に持つと、**次の問いまで居座ります。**
 	 */
+	/** **外すまで許可する**（D47 改・2026-10-26）。その接続で、外すまで尋ねない。 */
+	async function answerOperationStanding() {
+		operationAsk = null;
+		try {
+			await invoke('operation_answer_standing');
+		} catch (error: unknown) {
+			failure = String(error);
+		}
+	}
+
+	async function openStanding() {
+		try {
+			standingList = await invoke<Standing[]>('standing_list');
+			standingOpen = true;
+		} catch (error: unknown) {
+			failure = String(error);
+		}
+	}
+
+	async function revokeStanding(held: Standing) {
+		try {
+			await invoke('standing_revoke', { operation: held.operation, connection: held.connection });
+			standingList = await invoke<Standing[]>('standing_list');
+		} catch (error: unknown) {
+			failure = String(error);
+		}
+	}
+
 	async function answerOperation(allow: boolean, secret?: string) {
 		// **先に画面から消す。**残っていると二重に押します。
 		operationAsk = null;
@@ -1648,6 +1683,9 @@
 							>
 								{i18n.t('band.export.title')}
 							</button>
+							<button type="button" onclick={() => { viewMenuOpen = false; void openStanding(); }}>
+								{i18n.t('standing.title')}
+							</button>
 							<button type="button" onclick={() => { viewMenuOpen = false; aboutOpen = true; }}>
 								{i18n.t('about.title')}
 							</button>
@@ -2006,6 +2044,7 @@
 			connection={operationAsk.connection}
 			onAllow={(secret) => answerOperation(true, secret)}
 			onDeny={() => answerOperation(false)}
+			onAllowStanding={answerOperationStanding}
 		/>
 	{/if}
 
@@ -2039,6 +2078,14 @@
 
 	{#if aboutOpen}
 		<AboutDialog onClose={() => (aboutOpen = false)} />
+	{/if}
+
+	{#if standingOpen}
+		<StandingDialog
+			allowances={standingList}
+			onRevoke={revokeStanding}
+			onClose={() => (standingOpen = false)}
+		/>
 	{/if}
 
 	<!--

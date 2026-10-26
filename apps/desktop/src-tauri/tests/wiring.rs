@@ -13,3 +13,16 @@ fn the_app_starts_the_console_reaper() {
         "**シェルが終わった端末を閉じる片付けを、アプリが回していません**"
     );
 }
+
+#[test]
+fn the_app_exposes_the_standing_allowance_commands() {
+    // 「外すまで許可」の口。**登録し忘れると、画面から呼んでも届きません。**
+    for command in [
+        "session_cmd::operation_answer_standing",
+        "session_cmd::standing_list",
+        "session_cmd::standing_revoke",
+        "session_cmd::standing_revoke_all",
+    ] {
+        assert!(LIB.contains(command), "{command} が登録されていません");
+    }
+}

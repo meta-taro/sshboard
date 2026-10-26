@@ -148,6 +148,16 @@ pub struct OperationAsk {
     pub connection: String,
 }
 
+/// **「今後も許可」**（D47 の 4 を改めた・2026-10-26）。**操作 id × 接続**ごと。
+///
+/// 切れるのは、人が一覧から外したとき・アプリを終えたとき（**保存しません**）・
+/// ［AI を止める］。**パスワードの要る操作には付けません**（D48）。
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StandingAllowance {
+    pub operation: String,
+    pub connection: String,
+}
+
 /// **AI が「これを足してよいか」と出す提案**（実運用の報告・2026-10-23）。
 ///
 /// ## なぜ要るか
@@ -273,6 +283,8 @@ pub struct Engine {
     /// **`max_per_hour` が一度も効いていませんでした** ——
     /// 札は走るときに消えるので、走った回数が 1 件も残らなかったからです。
     operation_approvals: Mutex<Vec<Approval>>,
+    /// **今後も許可**している操作（保存しない・D47 改）。
+    standing: Mutex<Vec<StandingAllowance>>,
     /// **実際に走った記録。**`max_per_hour` を数えるのはこちら。
     ///
     /// **走ったものだけ**が入ります。許可しただけでは増えません
@@ -334,6 +346,7 @@ impl Engine {
             transfers: Mutex::new(Transfers::new()),
             transfer_feed,
             operation_approvals: Mutex::new(Vec::new()),
+            standing: Mutex::new(Vec::new()),
             operation_runs: Mutex::new(Vec::new()),
             changed,
         }
@@ -2267,6 +2280,91 @@ impl Engine {
         Ok(())
     }
 
+    /// **今後も許可する**（D47 改・2026-10-26）。いま出ている問いの操作を、その接続で、
+    /// 外すまで尋ねずに走らせます。**パスワードの要る問いには付けません**（D48）。
+    pub async fn answer_operation_standing(&self, actor: Actor) -> Result<(), EngineError> {
+        if actor != Actor::Human {
+            // **AI が自分へ権限を渡せたら、承認の意味がありません。**
+            return Err(EngineError::ConsoleApprovalNeeded);
+        }
+        let Some(asked) = self.operation_request.borrow().clone() else {
+            return Ok(());
+        };
+        if asked.needs_secret {
+            return Err(EngineError::BadArgument(
+                "パスワードの要る操作は「今後も許可」できません。パスワードは保存しないので、毎回入れてください"
+                    .to_string(),
+            ));
+        }
+        let allowance = StandingAllowance {
+            operation: asked.id.clone(),
+            connection: asked.connection.clone(),
+        };
+        {
+            let mut standing = self.standing.lock().await;
+            if !standing.contains(&allowance) {
+                standing.push(allowance);
+            }
+        }
+        // 出ている 1 回分も、そのまま通す（1 回の許可と同じ札を置く）。
+        self.answer_operation(Actor::Human, true, None).await?;
+        self.diag.info(
+            Stage::Exec,
+            Some(&asked.connection),
+            format!(
+                "人が {} を「今後も許可」しました（外すまで尋ねません）",
+                asked.id
+            ),
+        );
+        Ok(())
+    }
+
+    /// 今後も許可している操作の一覧。**画面の設定の枠が出します。**
+    pub async fn standing_allowances(&self) -> Vec<StandingAllowance> {
+        self.standing.lock().await.clone()
+    }
+
+    /// 1 件外す。**外したら、次からまた尋ねます。**
+    pub async fn revoke_standing(&self, actor: Actor, operation: &str, connection: &str) {
+        let mut standing = self.standing.lock().await;
+        let before = standing.len();
+        standing.retain(|held| !(held.operation == operation && held.connection == connection));
+        let removed = before != standing.len();
+        drop(standing);
+        // **まだ使われていない 1 回分も引き取る。**外したのに 1 回走る、を作らない。
+        self.operation_approvals
+            .lock()
+            .await
+            .retain(|held| !(held.id == operation && held.connection == connection));
+        if removed {
+            self.diag.info(
+                Stage::Exec,
+                (!connection.is_empty()).then_some(connection),
+                format!("{}が {operation} の「今後も許可」を外しました", who(actor)),
+            );
+        }
+    }
+
+    /// 全部外す。**［AI を止める］で呼びます。**
+    pub async fn revoke_all_standing(&self, actor: Actor) {
+        let mut standing = self.standing.lock().await;
+        let count = standing.len();
+        standing.clear();
+        drop(standing);
+        // **まだ使われていない許可も全部引き取る**（止めたのに 1 回走る、を作らない）。
+        self.operation_approvals.lock().await.clear();
+        if count > 0 {
+            self.diag.info(
+                Stage::Exec,
+                None,
+                format!(
+                    "{}が「今後も許可」を全部外しました（{count} 件）",
+                    who(actor)
+                ),
+            );
+        }
+    }
+
     /// **状態を変える操作を走らせる**（D45 / D47）。
     ///
     /// **AI が渡せるのは id だけ**（D3）。走るのは人が `operations.toml` へ
@@ -2336,11 +2434,31 @@ impl Engine {
 
         // **札を取るのは、承認が要るときか、秘密が要るとき。**
         // 人が自分で走らせるだけなら、承認も秘密も間に挟みません。
-        let approval = if actor != Actor::Human || raised.needs_secret {
+        let mut approval = if actor != Actor::Human || raised.needs_secret {
             self.take_operation_approval(id, &on).await
         } else {
             None
         };
+        // **今後も許可**（D47 改）。パスワードの要らない操作で、その接続の分だけ。
+        if approval.is_none() && actor != Actor::Human && !raised.needs_secret {
+            let standing = self.standing.lock().await.contains(&StandingAllowance {
+                operation: id.to_owned(),
+                connection: on.clone(),
+            });
+            if standing {
+                self.diag.info(
+                    Stage::Exec,
+                    Some(&on),
+                    format!("{id} を「今後も許可」に基づいて走らせます"),
+                );
+                approval = Some(Approval {
+                    id: id.to_owned(),
+                    connection: on.clone(),
+                    at: Instant::now(),
+                    secret: None,
+                });
+            }
+        }
 
         // **問いを立てるのは 2 つの場合。**
         //

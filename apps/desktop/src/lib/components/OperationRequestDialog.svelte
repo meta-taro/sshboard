@@ -52,8 +52,14 @@
 		/** 入れたものは**そのまま engine へ渡り、走った瞬間に捨てられます。** */
 		onAllow: (secret?: string) => void;
 		onDeny: () => void;
+		/**
+		 * **外すまで許可する**（D47 改・2026-10-26）。渡されたときだけ釦を出します。
+		 * **パスワードの要る問いには出しません**（パスワードは保存しない・D48）。
+		 */
+		onAllowStanding?: () => void;
 	}
-	let { id, runs, needsSecret = false, connection, onAllow, onDeny }: Props = $props();
+	let { id, runs, needsSecret = false, connection, onAllow, onDeny, onAllowStanding }: Props =
+		$props();
 
 	let denyButton: HTMLButtonElement | undefined = $state();
 	let secretField: HTMLInputElement | undefined = $state();
@@ -146,10 +152,20 @@
 			<p class="note">{i18n.t('operation.request.secret.note')}</p>
 		{/if}
 
+		{#if onAllowStanding && !needsSecret}
+			<!-- **押す前に、どこまで効くかを言う。**別の接続には付いてこない。 -->
+			<p class="note">{i18n.t('operation.request.standing.note')}</p>
+		{/if}
+
 		<div class="actions">
 			<button type="button" bind:this={denyButton} onclick={onDeny}>
 				{i18n.t('operation.request.deny')}
 			</button>
+			{#if onAllowStanding && !needsSecret}
+				<button type="button" onclick={onAllowStanding}>
+					{i18n.t('operation.request.standing')}
+				</button>
+			{/if}
 			<button type="button" class="cta" onclick={allow}>
 				{i18n.t('operation.request.allow')}
 			</button>

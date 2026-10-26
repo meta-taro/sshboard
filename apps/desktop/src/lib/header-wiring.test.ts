@@ -447,3 +447,26 @@ describe('立ち上げ直したあとの繋ぎ直し（UI 案・5 枚目）', ()
 		expect(body).not.toContain('Actor::Ai');
 	});
 });
+
+describe('今後も許可の配線（D47 改・2026-10-26）', () => {
+	test('the request dialog can allow from now on', () => {
+		expect(source).toContain("invoke('operation_answer_standing')");
+		expect(source).toMatch(/onAllowStanding=\{/);
+	});
+
+	test('stopping the AI takes every standing allowance away, before closing the mouth', () => {
+		// **止めたのに、許可だけ残る**を作らない。
+		const at = source.indexOf('async function stopAi()');
+		const body = source.slice(at, source.indexOf('\n\t}\n', at));
+		expect(body).toContain("invoke('standing_revoke_all')");
+		expect(body.indexOf("invoke('standing_revoke_all')")).toBeLessThan(
+			body.indexOf("invoke('mcp_stop')")
+		);
+	});
+
+	test('the menu opens the list, and taking one away reaches the engine', () => {
+		expect(source).toContain('<StandingDialog');
+		expect(source).toContain("invoke<Standing[]>('standing_list')");
+		expect(source).toContain("invoke('standing_revoke'");
+	});
+});

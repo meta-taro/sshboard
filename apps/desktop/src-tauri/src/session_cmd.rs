@@ -915,6 +915,59 @@ pub async fn operation_answer(
         .map_err(|error| error.to_string())
 }
 
+// --- 今後も許可（D47 改・2026-10-26）------------------------------------------
+
+/// 許可を続けている 1 件。**操作 id × 接続**（接続は識別子だけ）。
+#[derive(Serialize, Clone)]
+pub struct Standing {
+    pub operation: String,
+    pub connection: String,
+}
+
+/// **外すまで許可する。**いま出ている問いの操作を、その接続で。
+/// パスワードの要る問いは実行体が断ります（パスワードは保存しない・D48）。
+#[tauri::command]
+pub async fn operation_answer_standing(engine: State<'_, Arc<Engine>>) -> Result<(), String> {
+    engine
+        .answer_operation_standing(Actor::Human)
+        .await
+        .map_err(|error| error.to_string())
+}
+
+/// 許可を続けている操作の一覧（設定の枠が出す）。
+#[tauri::command]
+pub async fn standing_list(engine: State<'_, Arc<Engine>>) -> Result<Vec<Standing>, String> {
+    Ok(engine
+        .standing_allowances()
+        .await
+        .into_iter()
+        .map(|held| Standing {
+            operation: held.operation,
+            connection: held.connection,
+        })
+        .collect())
+}
+
+/// 1 件外す。**次からまた尋ねます。**
+#[tauri::command]
+pub async fn standing_revoke(
+    operation: String,
+    connection: String,
+    engine: State<'_, Arc<Engine>>,
+) -> Result<(), String> {
+    engine
+        .revoke_standing(Actor::Human, &operation, &connection)
+        .await;
+    Ok(())
+}
+
+/// 全部外す。**［AI を止める］が呼びます。**
+#[tauri::command]
+pub async fn standing_revoke_all(engine: State<'_, Arc<Engine>>) -> Result<(), String> {
+    engine.revoke_all_standing(Actor::Human).await;
+    Ok(())
+}
+
 // --- 画面を「こちらを見て」と動かす（D44 / Issue #15） ----------------------
 
 /// 見てほしい画面を配るイベント。
