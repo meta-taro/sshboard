@@ -2392,3 +2392,118 @@ async fn a_sudo_that_wants_a_password_says_become_is_not_set() {
         "**become が書かれていないことを、人へ言っていない**: {said:?}"
     );
 }
+
+// --- 2 本繋いでいると、操作は「画面が見ている方」へ行く（Windows 実機・2026-10-26 続き）------
+//
+// dk008 には `become = "ask"` が書いてあった（2 日前から）。なのにパスワードの欄は出ず、
+// 診断は「尋ねています」「許可しました」の 2 行だけ。**そのとき接続は 2 本開いていた。**
+//
+// 操作は「いま宛先の接続」で走ります（人がタブを押すと宛先が変わる・D?）。
+// 宛先が become の無い方なら、欄が出ないのは**正しい**。
+// **欠けていたのは、どの接続で尋ね・どの接続で走ったかが、どこにも出ていないこと**でした。
+
+/// `pw` で 2 本。**片方だけ become = "ask"。**
+async fn registry_two_ways(dir: &tempfile::TempDir) -> PathBuf {
+    let path = dir.path().join("connections.toml");
+    let fingerprint = known_fingerprint().await;
+    let toml = format!(
+        "version = 1\n\n\
+         [[connections]]\nid = \"with-ask\"\nname = \"asks\"\nhost = \"{HOST}\"\nport = {PORT}\n\
+         user = \"pw\"\nfingerprint = \"{fingerprint}\"\ntag = \"test\"\nwrite_roots = []\nbecome = \"ask\"\n\n\
+         [[connections]]\nid = \"plain\"\nname = \"plain\"\nhost = \"{HOST}\"\nport = {PORT}\n\
+         user = \"pw\"\nfingerprint = \"{fingerprint}\"\ntag = \"test\"\nwrite_roots = []\n"
+    );
+    std::fs::write(&path, toml).expect("接続一覧を書けない");
+    std::fs::write(
+        dir.path().join("operations.toml"),
+        "version = 1\n\n[[operation]]\nid = \"whoami-root\"\n\
+         run = \"sudo id -u\"\ndescription = \"root になれるか\"\nmax_per_hour = 5\n",
+    )
+    .expect("操作の一覧を書けない");
+    path
+}
+
+#[tokio::test]
+async fn the_question_names_the_connection_it_will_run_on() {
+    if !server_is_up().await {
+        println!("テスト用サーバーが建っていません（想定内・飛ばします）");
+        return;
+    }
+    let dir = tempfile::tempdir().expect("一時ディレクトリ");
+    let engine = engine_at(registry_two_ways(&dir).await);
+    let pw = || Some("sshboard-test-password".into());
+    engine
+        .connect(Actor::Human, "with-ask", pw())
+        .await
+        .expect("with-ask");
+    engine
+        .connect(Actor::Human, "plain", pw())
+        .await
+        .expect("plain");
+    // 人が become の無い方のタブを見ている。
+    engine.focus("plain").await.expect("宛先を変えられない");
+
+    let _ = engine.run_operation(Actor::Ai, "whoami-root").await;
+    let standing = engine.operation_request().expect("問いが立っていない");
+    // **画面の問いに、どの接続で走るかが載っていること。**
+    assert_eq!(standing.connection, "plain", "問いに宛先が載っていない");
+    assert!(
+        !standing.needs_secret,
+        "become の無い方でパスワードを聞いている"
+    );
+
+    // **診断にも、どの接続の話かが残ること。**実機ではここが空で、割れなかった。
+    let asked = engine
+        .diagnostics()
+        .recent(50)
+        .into_iter()
+        .find(|event| event.message.contains("whoami-root を走らせてよいか"))
+        .expect("尋ねた行が無い");
+    assert_eq!(
+        asked.connection.as_deref(),
+        Some("plain"),
+        "診断に接続が残っていない"
+    );
+}
+
+#[tokio::test]
+async fn an_approval_does_not_follow_the_focus_to_another_connection() {
+    // **人が許したのは「その接続で」走らせること。**
+    // 許したあとでタブを移したら、移った先で走らせない（問い直す）。
+    if !server_is_up().await {
+        println!("テスト用サーバーが建っていません（想定内・飛ばします）");
+        return;
+    }
+    let dir = tempfile::tempdir().expect("一時ディレクトリ");
+    let engine = engine_at(registry_two_ways(&dir).await);
+    let pw = || Some("sshboard-test-password".into());
+    engine
+        .connect(Actor::Human, "with-ask", pw())
+        .await
+        .expect("with-ask");
+    engine
+        .connect(Actor::Human, "plain", pw())
+        .await
+        .expect("plain");
+    engine.focus("plain").await.expect("宛先");
+
+    let _ = engine.run_operation(Actor::Ai, "whoami-root").await;
+    engine
+        .answer_operation(Actor::Human, true, None)
+        .await
+        .expect("人が許せない");
+    // 許したあとで、人が別のタブへ移った。
+    engine.focus("with-ask").await.expect("宛先");
+
+    let moved = engine.run_operation(Actor::Ai, "whoami-root").await;
+    assert!(
+        matches!(moved, Err(EngineError::ConsoleApprovalNeeded)),
+        "plain で許した札で、with-ask で走っている: {moved:?}"
+    );
+    let standing = engine.operation_request().expect("問い直していない");
+    assert_eq!(standing.connection, "with-ask");
+    assert!(
+        standing.needs_secret,
+        "with-ask は become = ask なのにパスワードを聞いていない"
+    );
+}

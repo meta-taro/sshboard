@@ -44,11 +44,16 @@
 		 * `become = "ask"` の接続で `sudo` を打つときだけ true になります。
 		 */
 		needsSecret?: boolean;
+		/**
+		 * **どの接続で走るか**（識別子だけ・2026-10-26）。
+		 * 2 本開いていると、人はどちらで許すのか分かりませんでした。
+		 */
+		connection?: string;
 		/** 入れたものは**そのまま engine へ渡り、走った瞬間に捨てられます。** */
 		onAllow: (secret?: string) => void;
 		onDeny: () => void;
 	}
-	let { id, runs, needsSecret = false, onAllow, onDeny }: Props = $props();
+	let { id, runs, needsSecret = false, connection, onAllow, onDeny }: Props = $props();
 
 	let denyButton: HTMLButtonElement | undefined = $state();
 	let secretField: HTMLInputElement | undefined = $state();
@@ -99,6 +104,13 @@
 		</header>
 
 		<p class="what">{id}</p>
+		{#if connection}
+			<!-- **どこで走るか。**接続先なので伏せられる印を付けます（禁止事項 4）。 -->
+			<p class="on">
+				<span>{i18n.t('operation.request.on')}</span>
+				<strong data-secret>{connection}</strong>
+			</p>
+		{/if}
 		<p class="lead">{i18n.t('operation.request.body')}</p>
 
 		<!--
@@ -146,6 +158,20 @@
 </div>
 
 <style>
+	.on {
+		display: flex;
+		gap: 0.5rem;
+		align-items: baseline;
+		margin: 0;
+		font-size: var(--text-sm);
+		color: var(--fg-muted);
+	}
+
+	.on strong {
+		font-family: var(--font-mono);
+		color: var(--fg);
+	}
+
 	.backdrop {
 		position: fixed;
 		inset: 0;

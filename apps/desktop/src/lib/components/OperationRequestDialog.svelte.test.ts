@@ -135,3 +135,27 @@ describe('AI が操作を走らせたいときの問い（D45 / D48）', () => {
 		expect(field.value).toBe('');
 	});
 });
+
+describe('どの接続で走るか（Windows 実機・2026-10-26）', () => {
+	/**
+	 * 2 本開いていると、操作は「いま宛先の接続」で走ります。
+	 * 問いに接続が無かったので、人は**どちらで許すのか分からないまま**押し、
+	 * become の無い方で走って sudo が落ちました。
+	 */
+	test('names the connection it will run on', () => {
+		render(OperationRequestDialog, {
+			props: {
+				id: 'pm2-list',
+				runs: 'sudo pm2 list',
+				connection: 'web-01',
+				onAllow: vi.fn(),
+				onDeny: vi.fn()
+			}
+		});
+		const on = screen.getByText('web-01');
+		expect(on).toBeTruthy();
+		// **接続先は伏せられる印を付ける**（禁止事項 4・画面共有の前に人が伏せる）。
+		expect(on.hasAttribute('data-secret')).toBe(true);
+		expect(screen.getByText(i18n.t('operation.request.on'))).toBeTruthy();
+	});
+});

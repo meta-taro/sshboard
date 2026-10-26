@@ -474,6 +474,8 @@ impl SshboardMcp {
                     "id": asked.id,
                     "runs": asked.runs,
                     "needsSecret": asked.needs_secret,
+                    // **どの接続で走るか。**人がタブを移すと宛先が変わり、許可は付いてこない。
+                    "connection": asked.connection,
                 })
             }),
         }))

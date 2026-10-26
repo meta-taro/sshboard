@@ -727,6 +727,8 @@ pub struct OperationAsk {
     pub runs: String,
     /// **人がその場でパスワードを入れる必要があるか**（D48 / Issue #19）。
     pub needs_secret: bool,
+    /// **どの接続で走るか**（識別子だけ）。2 本開いていると、どちらで許すのか分からなかった。
+    pub connection: String,
 }
 
 impl From<EngineOperationAsk> for OperationAsk {
@@ -735,6 +737,7 @@ impl From<EngineOperationAsk> for OperationAsk {
             id: asked.id,
             runs: asked.runs,
             needs_secret: asked.needs_secret,
+            connection: asked.connection,
         }
     }
 }

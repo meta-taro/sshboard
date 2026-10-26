@@ -373,7 +373,7 @@
 	 *
 	 * `needsSecret` は **その場でパスワードを聞く必要があるか**（Issue #19）。
 	 */
-	type OperationAsk = { id: string; runs: string; needsSecret: boolean };
+	type OperationAsk = { id: string; runs: string; needsSecret: boolean; connection: string };
 	let operationAsk = $state<OperationAsk | null>(null);
 
 	/**
@@ -1993,6 +1993,7 @@
 			id={operationAsk.id}
 			runs={operationAsk.runs}
 			needsSecret={operationAsk.needsSecret}
+			connection={operationAsk.connection}
 			onAllow={(secret) => answerOperation(true, secret)}
 			onDeny={() => answerOperation(false)}
 		/>

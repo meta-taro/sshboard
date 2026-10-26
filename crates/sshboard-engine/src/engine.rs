@@ -141,6 +141,11 @@ pub struct OperationAsk {
     pub runs: String,
     /// **人がその場でパスワードを入れる必要があるか**（D48）。
     pub needs_secret: bool,
+    /// **どの接続で走るか**（識別子だけ・Windows 実機 2026-10-26）。
+    ///
+    /// 操作は「いま宛先の接続」で走ります。2 本開いていると、人は**どちらで**
+    /// 許すのかが分からず、診断からも割れませんでした。
+    pub connection: String,
 }
 
 /// **AI が「これを足してよいか」と出す提案**（実運用の報告・2026-10-23）。
@@ -190,6 +195,8 @@ const CEILING_WINDOW: Duration = Duration::from_secs(60 * 60);
 /// 人が出した許可 1 枚。**使い切りです。**
 struct Approval {
     id: String,
+    /// **人が許した接続。**許したあとで宛先が移っても、移った先では使いません。
+    connection: String,
     /// いつ押されたか。**古い札を捨てるため**（[`APPROVAL_LIVES_FOR`]）。
     at: Instant,
     /// 人がその場で入れたもの（D48）。**保存しません。**
@@ -2100,22 +2107,24 @@ impl Engine {
             return Ok(());
         };
         let id = asked.id;
+        let on = asked.connection;
         self.operation_request.send_replace(None);
         if allow {
             let mut approvals = self.operation_approvals.lock().await;
             approvals.push(Approval {
                 id: id.clone(),
+                connection: on.clone(),
                 at: Instant::now(),
                 secret,
             });
             drop(approvals);
             // **記録に出すのは識別子だけ。**入れたものは 1 バイトも書きません。
             self.diag
-                .info(Stage::Exec, None, format!("人が {id} を許可しました"));
+                .info(Stage::Exec, Some(&on), format!("人が {id} を許可しました"));
         } else {
             // `secret` はここで落ちます（断ったのに残る、を作らない）。
             self.diag
-                .info(Stage::Exec, None, format!("人が {id} を断りました"));
+                .info(Stage::Exec, Some(&on), format!("人が {id} を断りました"));
         }
         Ok(())
     }
@@ -2144,6 +2153,8 @@ impl Engine {
         // 何も変わりません（`Elevation::None` なら、そもそも 1 文字も変わりません）。
         let how = self.elevation().await;
         let raised = elevated(&operation.run, how);
+        // **どの接続で走るか。**問いにも診断にも載せます（2 本開いていると割れなかった）。
+        let on = self.held.lock().await.active.clone().unwrap_or_default();
 
         // **書き換えたのに効いていない、を黙らない**（実機の報告・2026-10-23）。
         //
@@ -2175,7 +2186,7 @@ impl Engine {
         if actor != Actor::Human && lately >= operation.max_per_hour {
             self.diag.error(
                 Stage::Exec,
-                None,
+                Some(&on),
                 format!("{id} は 1 時間に {} 回までです", operation.max_per_hour),
                 "時間を空けるか、人に operations.toml を見直してもらってください",
             );
@@ -2188,7 +2199,7 @@ impl Engine {
         // **札を取るのは、承認が要るときか、秘密が要るとき。**
         // 人が自分で走らせるだけなら、承認も秘密も間に挟みません。
         let approval = if actor != Actor::Human || raised.needs_secret {
-            self.take_operation_approval(id).await
+            self.take_operation_approval(id, &on).await
         } else {
             None
         };
@@ -2206,10 +2217,11 @@ impl Engine {
                 id: operation.id.clone(),
                 runs: raised.command.clone(),
                 needs_secret: raised.needs_secret,
+                connection: on.clone(),
             }));
             self.diag.info(
                 Stage::Exec,
-                None,
+                Some(&on),
                 format!("{id} を走らせてよいか、人に尋ねています"),
             );
             return Err(EngineError::ConsoleApprovalNeeded);
@@ -2248,12 +2260,12 @@ impl Engine {
             if fed.trim_end_matches('\n').is_empty() {
                 self.diag.warn(
                     Stage::Exec,
-                    None,
+                    Some(&on),
                     format!("{id} へ渡す秘密が空でした（人が入れたものが届いていません）"),
                 );
             } else {
                 self.diag
-                    .info(Stage::Exec, None, format!("{id} へ秘密を渡しました"));
+                    .info(Stage::Exec, Some(&on), format!("{id} へ秘密を渡しました"));
             }
         }
 
@@ -2276,7 +2288,7 @@ impl Engine {
         if !ran.succeeded() && sudo_is_unavailable(&ran.err) {
             self.diag.warn(
                 Stage::Exec,
-                None,
+                Some(&on),
                 format!(
                     "{id}: このサーバーは sudo を使えないようです。                     パスワードの問題ではありません（`su -` 運用なら端末から上げてください）"
                 ),
@@ -2292,7 +2304,7 @@ impl Engine {
             // **進めなかったこと**なので error。次に何をすればよいかを必ず添える。
             self.diag.error(
                 Stage::Exec,
-                None,
+                Some(&on),
                 format!(
                     "{id}: sudo がパスワードを求めましたが、この接続には become が書かれていません"
                 ),
@@ -2308,12 +2320,15 @@ impl Engine {
     ///
     /// **秘密も札と一緒に出ていきます。**残すと、人が見ていない間に
     /// 何度でも権限を上げられます。
-    async fn take_operation_approval(&self, id: &str) -> Option<Approval> {
+    async fn take_operation_approval(&self, id: &str, connection: &str) -> Option<Approval> {
         let mut approvals = self.operation_approvals.lock().await;
         // **古い札は、取る前に捨てます。**抱えている秘密ごと落とすため、
         // 「取れなかった」より先に**必ずここを通します。**
         approvals.retain(|held| held.at.elapsed() < APPROVAL_LIVES_FOR);
-        let at = approvals.iter().position(|held| held.id == id)?;
+        // **許した接続でだけ使う。**許したあとで宛先が移ったら、移った先では問い直す。
+        let at = approvals
+            .iter()
+            .position(|held| held.id == id && held.connection == connection)?;
         Some(approvals.remove(at))
     }
 
