@@ -11,7 +11,7 @@ use rmcp::handler::server::wrapper::Parameters;
 use rmcp::{tool, tool_router, ErrorData};
 use serde::Deserialize;
 use sshboard_band::Actor;
-use sshboard_connections::sudo_is_unavailable;
+use sshboard_connections::sudo_note;
 use sshboard_engine::EngineError;
 use tokio_util::sync::CancellationToken;
 
@@ -252,9 +252,19 @@ impl SshboardMcp {
         //
         // **stderr は 1 バイトも変えません**（サーバーが言ったことは、そのまま渡す）。
         // 読み方の手掛かりを、別の欄として添えます。
-        let note = (!ran.succeeded() && sudo_is_unavailable(&ran.err)).then_some(
-            "This server does not appear to have sudo. This is NOT a wrong password -              re-entering it will never work. If the server is administered with `su -`,              ask the person to raise privileges from the terminal instead.",
-        );
+        //
+        // **become が書かれていないのに sudo がパスワードを求めた**ときも同じく添えます
+        // （Windows 実機・2026-10-26 —— 人の画面に欄が出ないまま落ちていた）。
+        let note = if ran.succeeded() {
+            None
+        } else {
+            let run = engine
+                .operations()
+                .ok()
+                .and_then(|listed| listed.get(&request.operation_id).map(|op| op.run.clone()))
+                .unwrap_or_default();
+            sudo_note(&run, engine.elevation().await, &ran.err)
+        };
         let (out, out_cut) = capped(ran.out);
         let (err, err_cut) = capped(ran.err);
         serde_json::to_string(&serde_json::json!({

@@ -2320,3 +2320,75 @@ async fn a_wrong_password_typed_by_the_person_gives_sudos_three_lines() {
         ran.err
     );
 }
+
+// --- become を書いていない接続で、パスワードの要る sudo（Windows 実機・2026-10-26）------
+//
+// `operations.toml` の `sudo pm2 list` を AI が頼み、人は［許可］を押した。
+// **パスワードの欄は出ず**、sudo は「パスワードが与えられませんでした」で落ちた。
+// 診断には「秘密を渡しました／空でした」が 1 行も無い ——
+// **その接続の上げ方が「上げない」（既定）だった。**
+//
+// 既定は正しい（NOPASSWD ならそのまま通る）。**欠けていたのは、落ちたときに
+// 「この接続には become が書かれていない」と人へ言うこと。**
+
+/// `pw` で繋ぐ一覧。**become を書かない**（既定の「上げない」）。
+async fn registry_without_become(dir: &tempfile::TempDir) -> PathBuf {
+    let path = dir.path().join("connections.toml");
+    let toml = format!(
+        "version = 1\n\n[[connections]]\nid = \"pw\"\nname = \"password user\"\n\
+         host = \"{HOST}\"\nport = {PORT}\nuser = \"pw\"\n\
+         fingerprint = \"{}\"\ntag = \"test\"\nwrite_roots = []\n",
+        known_fingerprint().await
+    );
+    std::fs::write(&path, toml).expect("接続一覧を書けない");
+    std::fs::write(
+        dir.path().join("operations.toml"),
+        "version = 1\n\n[[operation]]\nid = \"whoami-root\"\n\
+         run = \"sudo id -u\"\ndescription = \"root になれるか\"\nmax_per_hour = 5\n",
+    )
+    .expect("操作の一覧を書けない");
+    path
+}
+
+#[tokio::test]
+async fn a_sudo_that_wants_a_password_says_become_is_not_set() {
+    if !server_is_up().await {
+        println!("テスト用サーバーが建っていません（想定内・飛ばします）");
+        return;
+    }
+    let dir = tempfile::tempdir().expect("一時ディレクトリ");
+    let engine = engine_at(registry_without_become(&dir).await);
+    engine
+        .connect(Actor::Human, "pw", Some("sshboard-test-password".into()))
+        .await
+        .expect("パスワードで繋がらない");
+
+    // 実機と同じ並び: AI が頼む → 人が許す（**パスワードの欄は出ない**）→ AI がもう一度。
+    let _ = engine.run_operation(Actor::Ai, "whoami-root").await;
+    let standing = engine.operation_request().expect("問いが立っていない");
+    assert!(
+        !standing.needs_secret,
+        "become が無いのにパスワードを聞いている"
+    );
+    engine
+        .answer_operation(Actor::Human, true, None)
+        .await
+        .expect("人が許せない");
+    let ran = engine
+        .run_operation(Actor::Ai, "whoami-root")
+        .await
+        .expect("コマンド自体は返るはず（失敗で）");
+    assert_ne!(ran.out.trim(), "0", "パスワード無しで root になれている");
+
+    let said = engine
+        .diagnostics()
+        .recent(50)
+        .into_iter()
+        .map(|event| event.message)
+        .collect::<Vec<_>>();
+    assert!(
+        said.iter()
+            .any(|line| line.contains("whoami-root") && line.contains("become")),
+        "**become が書かれていないことを、人へ言っていない**: {said:?}"
+    );
+}

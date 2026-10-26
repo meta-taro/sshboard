@@ -154,3 +154,100 @@ fn a_wrong_password_is_not_mistaken_for_a_missing_sudo() {
     ));
     assert!(!sudo_is_unavailable(""));
 }
+
+/// **become を書いていない接続で、パスワードの要る sudo が走った**（Windows 実機・2026-10-26）。
+///
+/// `operations.toml` の `sudo pm2 list` を AI が走らせ、人は［許可］を押しました。
+/// **パスワードの欄は出ず**、sudo は「パスワードが与えられませんでした」で落ちました。
+/// 診断には「秘密を渡しました／空でした」のどちらも出ていません ——
+/// **その接続の上げ方が「上げない」（既定）だった**からです。
+///
+/// 上げないのは正しい既定です（`NOPASSWD` の sudoers ならそのまま通る）。
+/// 足りなかったのは、**落ちたときに「become が書かれていない」と言うこと**でした。
+#[test]
+fn a_sudo_that_wanted_a_password_on_a_connection_without_become_is_named() {
+    use sshboard_connections::sudo_needs_become;
+
+    let japanese = "残念、また試してください。\nsudo: パスワードが与えられませんでした\nsudo: 1 回パスワード試行を間違えました";
+    assert!(sudo_needs_become(
+        "sudo pm2 list",
+        Elevation::None,
+        japanese
+    ));
+    assert!(sudo_needs_become(
+        "sudo pm2 list",
+        Elevation::None,
+        "sudo: a terminal is required to read the password; either use the -S option to read from standard input or configure an askpass helper"
+    ));
+    assert!(sudo_needs_become(
+        "sudo pm2 list",
+        Elevation::None,
+        "sudo: no password was provided\nsudo: 1 incorrect password attempt"
+    ));
+}
+
+/// **言うのは「become が書かれていない」ときだけ。**
+///
+/// `ask` で打ち間違えた人に「become を書け」と言うと、**書いてあるのに迷わせます。**
+/// sudo が無いサーバーは、別の説明（`sudo_is_unavailable`）が受け持ちます。
+#[test]
+fn it_does_not_blame_become_where_become_is_not_the_reason() {
+    use sshboard_connections::sudo_needs_become;
+
+    let wrong = "sudo: no password was provided\nsudo: 1 incorrect password attempt";
+    assert!(!sudo_needs_become("sudo pm2 list", Elevation::Ask, wrong));
+    assert!(!sudo_needs_become(
+        "sudo pm2 list",
+        Elevation::Sudoers,
+        wrong
+    ));
+    // sudo で始まらない操作は関係が無い。
+    assert!(!sudo_needs_become("pm2 list", Elevation::None, wrong));
+    // sudo が無いサーバー。**入れ直しても、become を書いても通らない。**
+    assert!(!sudo_needs_become(
+        "sudo pm2 list",
+        Elevation::None,
+        "probe is not in the sudoers file.  This incident will be reported."
+    ));
+    // パスワードとは関係の無い失敗（pm2 そのものが落ちた）。
+    assert!(!sudo_needs_become(
+        "sudo pm2 list",
+        Elevation::None,
+        "pm2: command not found"
+    ));
+}
+
+/// **AI へ添える読み方**（`run_operation` の `note`）。
+///
+/// stderr は 1 バイトも変えずに返します。**読み方の手掛かりだけを別の欄に添えます** ——
+/// 添えないと、AI は「パスワードが違う」と読んで人に打ち直しを頼みます。
+#[test]
+fn the_ai_is_told_how_to_read_a_failed_sudo() {
+    use sshboard_connections::sudo_note;
+
+    let no_password = "sudo: no password was provided\nsudo: 1 incorrect password attempt";
+    let become_note = sudo_note("sudo pm2 list", Elevation::None, no_password)
+        .expect("become が無いことを言っていない");
+    assert!(become_note.contains("become"), "{become_note}");
+    assert!(
+        become_note.contains("NOT a wrong password"),
+        "打ち直しを止めていない: {become_note}"
+    );
+
+    let missing = sudo_note(
+        "sudo pm2 list",
+        Elevation::None,
+        "probe is not in the sudoers file.  This incident will be reported.",
+    )
+    .expect("sudo が無いことを言っていない");
+    assert!(
+        missing.contains("does not appear to have sudo"),
+        "{missing}"
+    );
+
+    // ask で打ち間違えた。**入れ直せば通る**ので、何も添えない。
+    assert_eq!(
+        sudo_note("sudo pm2 list", Elevation::Ask, no_password),
+        None
+    );
+}

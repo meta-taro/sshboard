@@ -12,7 +12,10 @@ pub mod ssh_config;
 mod store;
 mod watch;
 
-pub use elevation::{drift_note, drifted, elevated, sudo_is_unavailable, Elevated, Elevation};
+pub use elevation::{
+    drift_note, drifted, elevated, sudo_is_unavailable, sudo_needs_become, sudo_note, Elevated,
+    Elevation,
+};
 pub use entry::{ConnectionEntry, ConnectionSummary};
 pub use external::{look_for_external_changes, look_once, FileStamp, Look};
 pub use mark::{

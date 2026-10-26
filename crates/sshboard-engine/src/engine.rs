@@ -6,7 +6,8 @@ use std::sync::Arc;
 
 use sshboard_band::{Actor, Band};
 use sshboard_connections::{
-    drift_note, drifted, elevated, sudo_is_unavailable, ConnectionEntry, Connections, Elevation,
+    drift_note, drifted, elevated, sudo_is_unavailable, sudo_needs_become, ConnectionEntry,
+    Connections, Elevation,
 };
 use sshboard_credentials::SecretStore;
 use sshboard_diag::{Diagnostics, Stage};
@@ -2043,7 +2044,7 @@ impl Engine {
     }
 
     /// いまの宛先での権限の上げ方（D48）。**繋がっていなければ「上げない」。**
-    async fn elevation(&self) -> Elevation {
+    pub async fn elevation(&self) -> Elevation {
         let held = self.held.lock().await;
         held.active
             .as_ref()
@@ -2141,7 +2142,8 @@ impl Engine {
         //
         // 上げ方は**接続ごとに人が書きます**。`sudo` で始まらないものは
         // 何も変わりません（`Elevation::None` なら、そもそも 1 文字も変わりません）。
-        let raised = elevated(&operation.run, self.elevation().await);
+        let how = self.elevation().await;
+        let raised = elevated(&operation.run, how);
 
         // **書き換えたのに効いていない、を黙らない**（実機の報告・2026-10-23）。
         //
@@ -2278,6 +2280,24 @@ impl Engine {
                 format!(
                     "{id}: このサーバーは sudo を使えないようです。                     パスワードの問題ではありません（`su -` 運用なら端末から上げてください）"
                 ),
+            );
+        }
+
+        // **become を書いていない接続で、sudo がパスワードを欲しがった**（実機・2026-10-26）。
+        //
+        // 既定の「上げない」は正しい（NOPASSWD ならそのまま通る）。ただ、パスワードの
+        // 要る sudo だと人の画面に欄は出ず、「許可したのに通らない」だけが残りました。
+        // **直す所（connections.toml の become）を、ここで名指しします。**
+        if !ran.succeeded() && sudo_needs_become(&operation.run, how, &ran.err) {
+            // **進めなかったこと**なので error。次に何をすればよいかを必ず添える。
+            self.diag.error(
+                Stage::Exec,
+                None,
+                format!(
+                    "{id}: sudo がパスワードを求めましたが、この接続には become が書かれていません"
+                ),
+                "connections.toml のこの接続に become = \"ask\" を書いて繋ぎ直すと、\
+                 許可のときにパスワードの欄が出ます（NOPASSWD の sudoers なら become = \"sudoers\"）",
             );
         }
 

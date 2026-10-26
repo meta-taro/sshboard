@@ -96,6 +96,48 @@ pub fn elevated(run: &str, how: Elevation) -> Elevated {
     }
 }
 
+/// **become を書いていない接続で、sudo がパスワードを欲しがって落ちたか**
+/// （Windows 実機・2026-10-26）。
+///
+/// 上げ方が「上げない」（既定）だと `sudo …` はそのまま走ります。
+/// `NOPASSWD` の sudoers ならそれで通るので、**既定は正しい。**
+/// ただしパスワードの要る sudo だと、**人の画面にパスワードの欄は出ず**、
+/// sudo は「パスワードが与えられませんでした」で落ちます。
+/// 人からは「許可したのに通らない」で、**どこを直せばいいか書いてありませんでした。**
+///
+/// `sudo` が無いサーバーは別の説明（[`sudo_is_unavailable`]）に任せます ——
+/// そこでは become を書いても通りません。
+pub fn sudo_needs_become(run: &str, how: Elevation, stderr: &str) -> bool {
+    if how != Elevation::None || !run.starts_with("sudo ") || sudo_is_unavailable(stderr) {
+        return false;
+    }
+    let said = stderr.to_ascii_lowercase();
+    // **sudo の言い方は訳されます。**どの言語でも残る「password」と、日本語の「パスワード」を見ます。
+    said.contains("sudo") && (said.contains("password") || said.contains("パスワード"))
+}
+
+/// **失敗した sudo の読み方を、AI へ添える 1 文**（`run_operation` の `note`）。
+///
+/// stderr は変えません。AI が「パスワード違い」と読んで、人に打ち直しを頼む形を止めます。
+pub fn sudo_note(run: &str, how: Elevation, stderr: &str) -> Option<&'static str> {
+    if sudo_is_unavailable(stderr) {
+        return Some(
+            "This server does not appear to have sudo. This is NOT a wrong password - \
+             re-entering it will never work. If the server is administered with `su -`, \
+             ask the person to raise privileges from the terminal instead.",
+        );
+    }
+    if sudo_needs_become(run, how, stderr) {
+        return Some(
+            "sudo asked for a password, but this connection has no `become` set, so the \
+             person was never shown a password box. This is NOT a wrong password. Ask the \
+             person to add `become = \"ask\"` to this connection in connections.toml and \
+             reconnect (or `become = \"sudoers\"` if the server allows it without a password).",
+        );
+    }
+    None
+}
+
 /// **サーバーが `sudo` を持っていない形跡か**（2026-09-25）。
 ///
 /// 実運用で 3 時間溶けました。**この製品は `sudo` しか組み立てません。**
