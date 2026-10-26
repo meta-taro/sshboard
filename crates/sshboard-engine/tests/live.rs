@@ -2636,3 +2636,95 @@ async fn a_console_whose_shell_exits_is_closed() {
     );
     reaper.abort();
 }
+
+// --- 人の端末が在る接続で、AI が許可をもらってから開くと「2 本」と断られた（実機・2026-10-26）------
+//
+// kd001 で人が端末 #3 を開いて su していた。AI が console_open を頼み、人が許可。
+// 呼び直すと「その接続には端末が 2 本あります。番号で指してください」—— list_consoles には
+// #3 の 1 本だけ。**許可の印（シェルの無い握りだけの控え）まで数えていた。**
+// console_open には番号の引数が無いので、AI からは抜け出せない。
+
+#[tokio::test]
+async fn the_ai_takes_over_the_persons_console_once_allowed() {
+    if !server_is_up().await {
+        println!("テスト用サーバーが建っていません（想定内・飛ばします）");
+        return;
+    }
+    let dir = tempfile::tempdir().expect("一時ディレクトリ");
+    let engine = engine_connected(&dir).await;
+    engine
+        .console_open(Actor::Human, None, 80, 24)
+        .await
+        .expect("人が開けない");
+    let persons = engine.console_list().await;
+    assert_eq!(persons.len(), 1);
+
+    let asked = engine.console_open(Actor::Ai, None, 80, 24).await;
+    assert!(
+        matches!(asked, Err(EngineError::ConsoleApprovalNeeded)),
+        "頼まずに握った: {asked:?}"
+    );
+    engine
+        .console_answer(Actor::Human, true)
+        .await
+        .expect("人が許せない");
+
+    let opened = engine.console_open(Actor::Ai, None, 80, 24).await;
+    assert!(
+        matches!(opened, Ok(sshboard_engine::ConsoleOpened::TookOver)),
+        "**許可したのに AI が開けない**: {opened:?}"
+    );
+    let now = engine.console_list().await;
+    assert_eq!(
+        now.len(),
+        1,
+        "端末が増えた（人のシェルを引き継いでいない）: {now:?}"
+    );
+    assert_eq!(now[0].id, persons[0].id, "別の端末になった");
+    assert_eq!(now[0].holder, Actor::Ai);
+}
+
+#[tokio::test]
+async fn an_old_allowance_does_not_make_the_persons_new_console_count_twice() {
+    // 実機の並び: AI が頼み、人が許可（シェルはまだ無い・許可の控えだけ）→
+    // 人が同じ接続に新しく 1 枚開く → AI も人も、接続の名前で指すと「2 本」と断られた。
+    if !server_is_up().await {
+        println!("テスト用サーバーが建っていません（想定内・飛ばします）");
+        return;
+    }
+    let dir = tempfile::tempdir().expect("一時ディレクトリ");
+    let engine = engine_connected(&dir).await;
+    let on = engine.active().await.expect("宛先が無い").id;
+
+    let _ = engine.console_open(Actor::Ai, None, 80, 24).await;
+    engine
+        .console_answer(Actor::Human, true)
+        .await
+        .expect("人が許せない");
+    // AI はまだ開いていない。人が先に、同じ接続へ新しく開く。
+    engine
+        .console_open_new(Actor::Human, &on, 80, 24)
+        .await
+        .expect("人が新しく開けない");
+    assert_eq!(
+        engine.console_list().await.len(),
+        1,
+        "見えている端末は 1 本のはず"
+    );
+
+    // 人が渡せること（画面の［AI に渡す］）。
+    engine
+        .console_give(None)
+        .await
+        .expect("**見えているのは 1 本なのに、人が渡せない**");
+    let now = engine.console_list().await;
+    assert_eq!(now.len(), 1);
+    assert_eq!(now[0].holder, Actor::Ai);
+
+    // AI が接続の名前で開けること（握り直し）。
+    let opened = engine.console_open(Actor::Ai, None, 80, 24).await;
+    assert!(
+        matches!(opened, Ok(sshboard_engine::ConsoleOpened::TookOver)),
+        "**見えているのは 1 本なのに、AI が開けない**: {opened:?}"
+    );
+}

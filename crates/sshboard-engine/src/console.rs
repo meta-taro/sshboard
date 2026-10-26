@@ -174,12 +174,30 @@ impl Consoles {
     /// 接続の名前だけで指す口（画面がこれを使います）は、
     /// **本数が増えた日に「どれの話か」を言えなくなります。**
     pub(crate) fn the_one_on(&self, connection: &str) -> Result<Option<&OpenConsole>, Ambiguous> {
+        // **数えるのは、まずシェルの立っている端末**（2026-10-26・実機）。
+        //
+        // 許可の控え（握りだけ・シェル無し）まで数えると、人が同じ接続に新しく開いた日に
+        // 「2 本あります」と断り、一覧（立っているものだけ）には 1 本しか出ない。
+        // 接続の名前で指す口（AI の console_open・人の［AI に渡す］）が両方とも詰まった。
         let here = self.on(connection);
-        match here.len() {
+        let up: Vec<&OpenConsole> = here.iter().copied().filter(|open| open.is_up()).collect();
+        let pool = if up.is_empty() { here } else { up };
+        match pool.len() {
             0 => Ok(None),
-            1 => Ok(Some(here[0])),
+            1 => Ok(Some(pool[0])),
             many => Err(Ambiguous(many)),
         }
+    }
+
+    /// **シェルの無い控え**をその接続から外す（人が新しく開いたとき）。
+    ///
+    /// 人が新しく開いたら、それより前の許可の控えは古い。残すと AI からは
+    /// 「許可されている」と見え、開くと「人が握っています」と断られる、が起きます。
+    pub(crate) fn drop_unopened_on(&mut self, connection: &str) -> usize {
+        let before = self.items.len();
+        self.items
+            .retain(|open| open.connection != connection || open.is_up());
+        before - self.items.len()
     }
 
     /// **その相手が握っている、立っている端末。**AI は全体で 1 本だけ（D60）。

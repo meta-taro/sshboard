@@ -1363,6 +1363,13 @@ impl Engine {
             .await?;
 
         let mut slot = self.console.lock().await;
+        // **人が新しく開いたら、それより前の許可の控えは外す**（2026-10-26・実機）。
+        // 残すと、接続の名前で指す口が「2 本あります」で詰まりました。
+        let dropped = if actor == Actor::Human {
+            slot.drop_unopened_on(on)
+        } else {
+            0
+        };
         let id = slot.add(on, actor);
         let previous = slot.attach(id, console, only_this);
         drop(slot);
@@ -1375,6 +1382,14 @@ impl Engine {
             Some(on),
             format!("端末を開きました（#{id}・{}・{cols}×{rows}）", who(actor)),
         );
+        if dropped > 0 {
+            self.diag.info(
+                Stage::Exec,
+                Some(on),
+                "人が新しく開いたので、それより前の AI への許可を外しました（使うなら、もう一度渡すか頼んでください）"
+                    .to_string(),
+            );
+        }
         let _ = self.console_changed.send_replace(Some(actor));
         self.publish_consoles().await;
         Ok(id)
