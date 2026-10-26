@@ -694,8 +694,11 @@ mod concurrency_tests {
         let waited = started.elapsed();
 
         assert!(answer.is_err(), "黒い穴から返事が来ました");
+        // **見ているのは「いつまでも待たない」こと**（実機では 120 秒だった）。
+        // 8 秒にしていた頃は、他の試験と並べて走らせると繋ぎの準備だけで 8 秒を超え、
+        // 何も壊れていないのに落ちていました（2026-10-26・3 回）。120 秒の待ちは 30 秒でも捕まります。
         assert!(
-            waited < Duration::from_secs(8),
+            waited < Duration::from_secs(30),
             "**返事の無い相手を {waited:?} 待ちました。**\
              実機では、これが 120 秒返らない形になります"
         );
