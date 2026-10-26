@@ -1404,8 +1404,12 @@ impl Engine {
             );
             return Err(held_by(holder));
         }
-        match here.console.as_ref() {
-            Some(console) => Ok(console.type_in(bytes).await?),
+        match here.console.clone() {
+            Some(console) => {
+                // **錠を離してから送ります。**送りが詰まっても、他の呼び出しは止めません。
+                drop(slot);
+                Ok(console.type_in(bytes).await?)
+            }
             None => {
                 let on = here.connection.clone();
                 drop(slot);
@@ -1462,10 +1466,13 @@ impl Engine {
             .only_console_on(&target)
             .await?
             .ok_or(EngineError::ConsoleNotOpen)?;
-        let slot = self.console.lock().await;
-        let console = slot
+        // **錠の外で送ります**（打鍵と同じ理由）。
+        let console = self
+            .console
+            .lock()
+            .await
             .by_id(id)
-            .and_then(|open| open.console.as_ref())
+            .and_then(|open| open.console.clone())
             .ok_or(EngineError::ConsoleNotOpen)?;
         Ok(console.resize(cols, rows).await?)
     }

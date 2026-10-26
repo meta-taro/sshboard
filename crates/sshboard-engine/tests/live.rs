@@ -2507,3 +2507,75 @@ async fn an_approval_does_not_follow_the_focus_to_another_connection() {
         "with-ask は become = ask なのにパスワードを聞いていない"
     );
 }
+
+// --- 送りが詰まっても、他の端末の呼び出しは返る（Windows 実機・2026-10-26）---------
+//
+// 人が握りを取り返して `su -` を打ち、［AI に渡す］を押した直後から、
+// AI の `read_console` も `list_consoles` も 120 秒返らなくなった（同じ日に 3 回）。
+//
+// 打鍵（`console_type_into`）と窓の大きさ（`console_resize`）が、
+// **端末全体の錠を握ったまま SSH の送りを待っていました。**
+// 送りが詰まると（流量制御・眠りから覚めた直後の通り道など）、
+// 錠を待つ他の呼び出しが**全部**止まります。
+//
+// ここでは送りを本当に詰まらせます —— 改行の無い大きな貼り付けは、
+// 端末の行の入れ物（canonical モード）が一杯になったところで読まれなくなり、
+// SSH の窓が閉じて `data` の送りが返らなくなります。
+
+#[tokio::test]
+async fn a_stalled_send_does_not_lock_up_every_other_console_call() {
+    if !server_is_up().await {
+        println!("テスト用サーバーが建っていません（想定内・飛ばします）");
+        return;
+    }
+    let dir = tempfile::tempdir().expect("一時ディレクトリ");
+    let engine = std::sync::Arc::new(engine_connected(&dir).await);
+    engine
+        .console_open(Actor::Human, None, 80, 24)
+        .await
+        .expect("開けない");
+    let opened = engine
+        .console_list()
+        .await
+        .into_iter()
+        .next()
+        .expect("端末が無い");
+
+    // 改行の無い 8 MiB。**SSH の窓（既定 2 MiB 前後）を超えて詰まる。**
+    let flood = vec![b'x'; 8 * 1024 * 1024];
+    let typing = {
+        let engine = std::sync::Arc::clone(&engine);
+        tokio::spawn(async move { engine.console_type(Actor::Human, None, &flood).await })
+    };
+    tokio::time::sleep(std::time::Duration::from_millis(1500)).await;
+
+    // **詰まっている間も、他の呼び出しは返ること。**
+    let listed =
+        tokio::time::timeout(std::time::Duration::from_secs(3), engine.console_list()).await;
+    assert!(
+        listed.is_ok(),
+        "**送りが詰まると、list_consoles まで返らない**"
+    );
+    let tail = tokio::time::timeout(
+        std::time::Duration::from_secs(3),
+        engine.console_tail_of(opened.id),
+    )
+    .await;
+    assert!(
+        tail.is_ok(),
+        "**送りが詰まると、read_console まで返らない**"
+    );
+    let resized = tokio::time::timeout(
+        std::time::Duration::from_secs(3),
+        engine.console_resize(None, 100, 30),
+    )
+    .await;
+    assert!(
+        resized.is_ok(),
+        "**送りが詰まると、窓の大きさも伝えられない**"
+    );
+
+    // 後始末。止めれば送りも終わる。
+    let _ = engine.console_stop(Actor::Human, None).await;
+    typing.abort();
+}

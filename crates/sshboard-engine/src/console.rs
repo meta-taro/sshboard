@@ -81,7 +81,10 @@ pub(crate) struct OpenConsole {
     pub(crate) id: u64,
     pub(crate) connection: String,
     pub(crate) holder: Actor,
-    pub(crate) console: Option<Console>,
+    /// **`Arc` で持ちます**（2026-10-26）。送る側は取り出してから錠を離し、
+    /// 錠の外で待ちます —— 錠を握ったまま SSH の送りを待つと、送りが詰まった日に
+    /// 端末の呼び出しが**全部**止まりました。
+    pub(crate) console: Option<Arc<Console>>,
     /// **この端末だけの出力**（Issue #21）。`console_tail` が読むのはここ。
     ///
     /// 接続ごとの出力とは別です。同じ接続の中に、端末の出力と
@@ -242,13 +245,13 @@ impl Consoles {
         id: u64,
         console: Console,
         stream: Arc<OutputStream>,
-    ) -> Option<Console> {
+    ) -> Option<Arc<Console>> {
         let Some(open) = self.by_id_mut(id) else {
             // **番号が無いなら、載せる先がありません。**
             // 呼んだ側が閉じられるように、そのまま返します。
-            return Some(console);
+            return Some(Arc::new(console));
         };
-        let previous = open.console.replace(console);
+        let previous = open.console.replace(Arc::new(console));
         open.stream = Some(stream);
         previous
     }
