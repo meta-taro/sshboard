@@ -359,6 +359,7 @@ const en = {
 	"diag.label": "What happened",
 	"diag.help": "Same log the AI reads over MCP. No hostnames, usernames or secrets.",
 	"diag.refresh": "Reload",
+	"diag.all": "All",
 	"diag.empty": "Nothing yet. Try connecting, and the steps appear here.",
 	// 左ペインの選択
 	"files.clear": "Clear the selection",
@@ -742,6 +743,7 @@ const ja: Catalog = {
 	"diag.label": "何が起きたか",
 	"diag.help": "AI が MCP から読むのと同じ記録です。ホスト名・利用者名・秘密は入りません。",
 	"diag.refresh": "読み直す",
+	"diag.all": "すべて",
 	"diag.empty": "まだ何もありません。接続を試すと、その経過がここに出ます。",
 	// 左ペインの選択
 	"files.clear": "選択を外す",

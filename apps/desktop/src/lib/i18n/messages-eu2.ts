@@ -323,6 +323,7 @@ export const ptBR: Catalog = {
 	"diag.label": "O que aconteceu",
 	"diag.help": "O mesmo registro que a IA lê pelo MCP. Sem nomes de host, usuários ou segredos.",
 	"diag.refresh": "Recarregar",
+	"diag.all": "Tudo",
 	"diag.empty": "Nada ainda. Tente conectar e os passos aparecem aqui.",
 	// 左ペインの選択
 	"files.clear": "Limpar a seleção",
@@ -666,6 +667,7 @@ export const ru: Catalog = {
 	"diag.label": "Что произошло",
 	"diag.help": "Тот же журнал, что ИИ читает через MCP. Без имён хостов, пользователей и секретов.",
 	"diag.refresh": "Обновить",
+	"diag.all": "Все",
 	"diag.empty": "Пока пусто. Попробуйте подключиться — здесь появятся шаги.",
 	// 左ペインの選択
 	"files.clear": "Снять выделение",
@@ -1009,6 +1011,7 @@ export const it: Catalog = {
 	"diag.label": "Cosa è successo",
 	"diag.help": "Lo stesso registro che l'IA legge via MCP. Senza nomi host, utenti o segreti.",
 	"diag.refresh": "Ricarica",
+	"diag.all": "Tutto",
 	"diag.empty": "Ancora niente. Prova a connetterti e i passaggi appariranno qui.",
 	// 左ペインの選択
 	"files.clear": "Annulla la selezione",

@@ -73,8 +73,10 @@ describe('診断の面', () => {
 		// **この製品は画面そのものに接続先が写り込みます**（D26 / 禁止事項 4）。
 		// 伏せる印が無い所は、画面を伏せても残ってしまいます。
 		render(DiagPanel, { found: EVENTS, onrefresh: () => {} });
-		const who = screen.getByText('web-01');
-		expect(who.hasAttribute('data-secret')).toBe(true);
+		// 接続ごとのタブにも名前が出るので、**出ている所すべてに**印があること。
+		const shown = screen.getAllByText('web-01');
+		expect(shown.length).toBeGreaterThan(0);
+		for (const who of shown) expect(who.hasAttribute('data-secret')).toBe(true);
 	});
 
 	test('asks for a fresh read when the person presses it', () => {
@@ -83,5 +85,51 @@ describe('診断の面', () => {
 
 		fireEvent.click(screen.getByRole('button', { name: i18n.t('diag.refresh') }));
 		expect(asked).toBe(1);
+	});
+});
+
+describe('接続ごとのタブ（オーナー・2026-10-26）', () => {
+	const MIXED: DiagEvent[] = [
+		{ seq: 3, atMs: 3000, level: 'info', stage: 'exec', connection: 'db-01', message: 'db の行' },
+		{ seq: 2, atMs: 2000, level: 'info', stage: 'exec', message: '接続の無い行' },
+		{ seq: 1, atMs: 1000, level: 'info', stage: 'auth', connection: 'web-01', message: 'web の行' }
+	];
+
+	test('offers "all" and one tab per connection', () => {
+		render(DiagPanel, { found: MIXED, onrefresh: () => {} });
+		const tabs = screen.getAllByRole('tab');
+		expect(tabs.map((tab) => tab.textContent?.trim())).toEqual([
+			i18n.t('diag.all'),
+			'db-01',
+			'web-01'
+		]);
+	});
+
+	test('starts on "all", showing every line', () => {
+		render(DiagPanel, { found: MIXED, onrefresh: () => {} });
+		expect(screen.getByRole('tab', { name: i18n.t('diag.all') }).getAttribute('aria-selected')).toBe(
+			'true'
+		);
+		expect(screen.getAllByRole('listitem')).toHaveLength(3);
+	});
+
+	test('shows only that connection’s lines when its tab is pressed', async () => {
+		render(DiagPanel, { found: MIXED, onrefresh: () => {} });
+		await fireEvent.click(screen.getByRole('tab', { name: 'db-01' }));
+		const shown = screen.getAllByRole('listitem').map((li) => li.textContent);
+		expect(shown).toHaveLength(1);
+		expect(shown[0]).toContain('db の行');
+	});
+
+	test('marks the connection names on the tabs as hideable', () => {
+		// **接続の名前は伏せられる所**（D26・禁止事項 4）。
+		render(DiagPanel, { found: MIXED, onrefresh: () => {} });
+		const tab = screen.getByRole('tab', { name: 'web-01' });
+		expect(tab.querySelector('[data-secret]')).not.toBeNull();
+	});
+
+	test('does not offer tabs when no line names a connection', () => {
+		render(DiagPanel, { found: [EVENTS[0]], onrefresh: () => {} });
+		expect(screen.queryAllByRole('tab')).toHaveLength(0);
 	});
 });

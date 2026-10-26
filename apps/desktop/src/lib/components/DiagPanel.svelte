@@ -14,7 +14,7 @@
 	 * 案（UI 案・2026-10-21）は端末の横に接続と帯を常設するので、
 	 * **面を入れ替えられる形**にしておく必要があります。
 	 */
-	import type { DiagEvent } from '$lib/diagnostics';
+	import { ALL, diagConnections, diagFor, type DiagEvent, type DiagPick } from '$lib/diagnostics';
 	import { i18n } from '$lib/i18n/i18n.svelte';
 
 	import Icon from './Icon.svelte';
@@ -28,6 +28,15 @@
 	 * （実際にそうなりました）。
 	 */
 	let { found, onrefresh }: { found: readonly DiagEvent[]; onrefresh: () => void } = $props();
+
+	/**
+	 * **接続ごとのタブ**（オーナー・2026-10-26 ——「サーバごっちゃで読めない」）。
+	 * 選んだ接続の行が消えたら（読み直しで流れたなど）、「すべて」へ戻します。
+	 */
+	let picked = $state<DiagPick>(ALL);
+	const connections = $derived(diagConnections(found));
+	const pick = $derived(picked !== ALL && !connections.includes(picked) ? ALL : picked);
+	const shown = $derived(diagFor(found, pick));
 </script>
 
 <section class="diag" aria-label={i18n.t('tab.diag')}>
@@ -39,11 +48,36 @@
 			{i18n.t('diag.refresh')}
 		</button>
 	</div>
+	{#if connections.length > 0}
+		<div class="diag-tabs" role="tablist" aria-label={i18n.t('diag.label')}>
+			<button
+				type="button"
+				role="tab"
+				aria-selected={pick === ALL}
+				class:active={pick === ALL}
+				onclick={() => (picked = ALL)}
+			>
+				{i18n.t('diag.all')}
+			</button>
+			{#each connections as id (id)}
+				<!-- **接続の名前は伏せられる所**（D26）。 -->
+				<button
+					type="button"
+					role="tab"
+					aria-selected={pick === id}
+					class:active={pick === id}
+					onclick={() => (picked = id)}
+				>
+					<span data-secret>{id}</span>
+				</button>
+			{/each}
+		</div>
+	{/if}
 	{#if found.length === 0}
 		<p class="empty">{i18n.t('diag.empty')}</p>
 	{:else}
 		<ol class="diag-list">
-			{#each found as event (event.seq)}
+			{#each shown as event (event.seq)}
 				<li class={event.level}>
 					<!-- **起動からの経過。**日付ではありません（秒に直して出します）。 -->
 					<span class="at">{(event.atMs / 1000).toFixed(1)}s</span>
@@ -61,6 +95,35 @@
 </section>
 
 <style>
+	/* 接続ごとのタブ。帯の絞り込みと同じ錠剤の形。 */
+	.diag-tabs {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 4px;
+	}
+
+	.diag-tabs button {
+		display: inline-flex;
+		align-items: center;
+		height: var(--control-h);
+		padding: 0 12px;
+		border: 0;
+		border-radius: var(--r-pill);
+		background: var(--shell-bg);
+		box-shadow: inset 0 0 0 1px var(--hairline-strong);
+		color: var(--fg-control);
+		font: inherit;
+		font-size: var(--text-control);
+		white-space: nowrap;
+		cursor: pointer;
+	}
+
+	.diag-tabs button.active {
+		background: var(--surface-2);
+		color: var(--fg);
+		font-weight: 700;
+	}
+
 	.diag {
 		display: flex;
 		flex-direction: column;
