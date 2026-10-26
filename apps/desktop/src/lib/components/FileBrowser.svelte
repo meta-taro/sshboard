@@ -1518,7 +1518,11 @@
 		height: auto;
 	}
 
-	input {
+	/*
+	 * **字を打つ欄だけ。**チェックボックスにまで高さ 32px が当たり、
+	 * 「左右を連れて歩く」の左に上下へはみ出す細い枠が出ていました（#28・0.1.31 の実機）。
+	 */
+	input:not([type='checkbox']):not([type='radio']) {
 		font: inherit;
 		font-size: var(--text-sm);
 		padding: 0 10px;
@@ -1530,7 +1534,7 @@
 		box-sizing: border-box;
 		box-shadow: inset 0 0 0 1px var(--hairline-strong);
 	}
-	input:focus {
+	input:not([type='checkbox']):not([type='radio']):focus {
 		outline: none;
 		box-shadow:
 			inset 0 0 0 1px var(--accent),

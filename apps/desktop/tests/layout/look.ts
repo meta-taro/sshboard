@@ -12,6 +12,7 @@ import type { Page } from '@playwright/test';
  * 3. **箱から中身がはみ出す** —— 「接続先」の見出しが外枠に乗り上げた（0.1.30）
  * 4. **窓の外へ出る** —— 右上の × が 2 段目へ落ちた（0.1.27）・横スクロール
  * 5. **押せないほど小さい釦** —— 素の釦が 20px に潰れた
+ * 6. **引き伸ばされたチェックボックス** —— 入力欄の高さが当たり、上下に細い線が出た（#28・0.1.31）
  *
  * 見つけたものを、**何がどこで**の文で返します（空なら崩れ無し）。
  */
@@ -79,6 +80,17 @@ export async function lookFindings(page: Page): Promise<string[]> {
 			const h = el.getBoundingClientRect().height;
 			if ((el.textContent ?? '').trim() && h < MIN_TARGET) {
 				found.push(`釦が小さすぎる（${Math.round(h)}px）: ${label(el)}`);
+			}
+		}
+
+		// 6. 引き伸ばされたチェックボックス・ラジオ（入力欄の高さが当たると、上下に線が出る）
+		for (const el of document.querySelectorAll('input[type="checkbox"], input[type="radio"]')) {
+			if (!shown(el)) continue;
+			const r = el.getBoundingClientRect();
+			if (r.height > 22 || Math.abs(r.height - r.width) > 4) {
+				found.push(
+					`チェックボックスが引き伸ばされている（${Math.round(r.width)}×${Math.round(r.height)}）: ${label(el.parentElement ?? el)}`
+				);
 			}
 		}
 
