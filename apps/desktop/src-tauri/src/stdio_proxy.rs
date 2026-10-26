@@ -198,19 +198,34 @@ fn report_startup_failure(message: &str) {
     }
 }
 
-/// 1 本ぶんの往復。**返事が来たら、その場で書き出します。**
+/// 1 行を本体へ送り、**相手（stdin の向こう）へ書く行**を返す。
 ///
-/// **呼びごとに分けてあります**（実運用の指摘・2026-09-28）——
 /// 前は `for` の中で `await` していたので、**遅い呼び 1 本で後ろが全部止まりました。**
+/// （並べるのは `pump` の役目。ここは 1 本ぶんだけを扱います。）
 async fn forward(
     client: &reqwest::Client,
     url: &str,
     token: &str,
     session: &std::sync::Mutex<Option<String>>,
+    hello: &std::sync::Mutex<Option<String>>,
     out: &std::sync::Mutex<std::io::Stdout>,
     line: String,
 ) {
-    let id = request_id(&line);
+    if let Some(lines) = exchange(client, url, token, session, hello, line).await {
+        for line in lines {
+            say(out, Some(line));
+        }
+    }
+}
+
+/// 送る。**会期の番号があれば載せる。**返事の番号が来たら控える。
+async fn send(
+    client: &reqwest::Client,
+    url: &str,
+    token: &str,
+    session: Option<String>,
+    body: String,
+) -> reqwest::Result<reqwest::Response> {
     let mut request = client
         .post(url)
         .header(reqwest::header::AUTHORIZATION, format!("Bearer {token}"))
@@ -220,67 +235,145 @@ async fn forward(
             reqwest::header::ACCEPT,
             "application/json, text/event-stream",
         )
-        .body(line);
-
-    if let Some(held) = session.lock().ok().and_then(|held| held.clone()) {
+        .body(body);
+    if let Some(held) = session {
         request = request.header("mcp-session-id", held);
     }
+    request.send().await
+}
 
-    let response = match request.send().await {
-        Ok(response) => response,
-        Err(error) => {
-            // **繋がらない理由を、人の言葉で返す。**
-            // ここが一番出やすい失敗（本体を起動していない）です。
-            eprintln!("[sshboard] {NOT_RUNNING}（{error}）");
-            say(out, error_response(id, NOT_RUNNING));
-            return;
-        }
-    };
-
-    if response.status() == reqwest::StatusCode::UNAUTHORIZED {
-        // 合言葉が古い＝本体が作り直した、が唯一の筋。
-        let message = "sshboard の合言葉が合いません。アプリを再起動してください。";
-        eprintln!("[sshboard] {message}");
-        say(out, error_response(id, message));
-        return;
-    }
-
-    if let Some(fresh) = response
+fn session_of(response: &reqwest::Response) -> Option<String> {
+    response
         .headers()
         .get("mcp-session-id")
         .and_then(|value| value.to_str().ok())
-    {
-        if let Ok(mut held) = session.lock() {
-            *held = Some(fresh.to_string());
-        }
-    }
+        .map(str::to_string)
+}
 
-    let is_sse = response
-        .headers()
-        .get(reqwest::header::CONTENT_TYPE)
-        .and_then(|value| value.to_str().ok())
-        .is_some_and(|value| value.starts_with("text/event-stream"));
-
-    let body = match response.text().await {
-        Ok(body) => body,
-        Err(error) => {
-            eprintln!("[sshboard] 返事を読めません: {error}");
-            say(out, error_response(id, "返事を読めませんでした。"));
-            return;
-        }
+/// **会期を張り直す**（本体が立ち上がり直した・2026-10-26）。
+///
+/// 相手が最初に送った `initialize` をそのまま送り直し、新しい番号を受け取って、
+/// `notifications/initialized` を送ります（MCP の始まりの手順）。張れたら `true`。
+async fn reopen(
+    client: &reqwest::Client,
+    url: &str,
+    token: &str,
+    session: &std::sync::Mutex<Option<String>>,
+    hello: &std::sync::Mutex<Option<String>>,
+) -> bool {
+    let Some(opening) = hello.lock().ok().and_then(|held| held.clone()) else {
+        return false;
     };
-
-    // 通知（`id` 無し）には、本体は空の 202 を返します。**何も書きません。**
-    if body.trim().is_empty() {
-        return;
+    let Ok(response) = send(client, url, token, None, opening).await else {
+        return false;
+    };
+    let Some(fresh) = response
+        .status()
+        .is_success()
+        .then(|| session_of(&response))
+        .flatten()
+    else {
+        return false;
+    };
+    // 返事の中身（相手は既に受け取っている）は読み捨てる。
+    let _ = response.text().await;
+    if let Ok(mut held) = session.lock() {
+        *held = Some(fresh.clone());
     }
+    let initialized = r#"{"jsonrpc":"2.0","method":"notifications/initialized"}"#.to_string();
+    send(client, url, token, Some(fresh), initialized)
+        .await
+        .is_ok_and(|done| done.status().is_success())
+}
 
-    if is_sse {
-        for message in parse_sse(&body) {
-            say(out, Some(message));
+/// 1 本ぶんのやりとり。**相手へ返す行**を返します（通知なら `None`）。
+///
+/// **呼びには必ず答えます**（`id` があるもの）。素の文字や空を流すと、相手はその呼びの
+/// 返事を受け取れず、**時間切れまで待ち続けます**（実機・2026-10-26 の 120 秒）。
+async fn exchange(
+    client: &reqwest::Client,
+    url: &str,
+    token: &str,
+    session: &std::sync::Mutex<Option<String>>,
+    hello: &std::sync::Mutex<Option<String>>,
+    line: String,
+) -> Option<Vec<String>> {
+    let id = request_id(&line);
+    let mut retried = false;
+    loop {
+        let held = session.lock().ok().and_then(|held| held.clone());
+        let response = match send(client, url, token, held.clone(), line.clone()).await {
+            Ok(response) => response,
+            Err(error) => {
+                // **繋がらない理由を、人の言葉で返す。**
+                // ここが一番出やすい失敗（本体を起動していない）です。
+                eprintln!("[sshboard] {NOT_RUNNING}（{error}）");
+                return error_response(id, NOT_RUNNING).map(|line| vec![line]);
+            }
+        };
+
+        if response.status() == reqwest::StatusCode::UNAUTHORIZED {
+            // 合言葉が古い＝本体が作り直した、が唯一の筋。
+            let message = "sshboard の合言葉が合いません。アプリを再起動してください。";
+            eprintln!("[sshboard] {message}");
+            return error_response(id, message).map(|line| vec![line]);
         }
-    } else {
-        say(out, Some(body.trim().to_string()));
+
+        // **知らない会期**＝本体が立ち上がり直した。1 回だけ張り直して、送り直す。
+        if response.status() == reqwest::StatusCode::NOT_FOUND && held.is_some() && !retried {
+            retried = true;
+            if let Ok(mut lost) = session.lock() {
+                *lost = None;
+            }
+            if reopen(client, url, token, session, hello).await {
+                eprintln!("[sshboard] 本体が立ち上がり直したので、会期を張り直しました");
+                continue;
+            }
+            let message = "sshboard が立ち上がり直しました。会期を張り直せなかったので、\
+                           /mcp で繋ぎ直してください。";
+            eprintln!("[sshboard] {message}");
+            return error_response(id, message).map(|line| vec![line]);
+        }
+
+        if let Some(fresh) = session_of(&response) {
+            if let Ok(mut held) = session.lock() {
+                *held = Some(fresh);
+            }
+        }
+
+        let status = response.status();
+        let is_sse = response
+            .headers()
+            .get(reqwest::header::CONTENT_TYPE)
+            .and_then(|value| value.to_str().ok())
+            .is_some_and(|value| value.starts_with("text/event-stream"));
+
+        let body = match response.text().await {
+            Ok(body) => body,
+            Err(error) => {
+                eprintln!("[sshboard] 返事を読めません: {error}");
+                return error_response(id, "返事を読めませんでした。").map(|line| vec![line]);
+            }
+        };
+
+        // 通知（`id` 無し）には、本体は空の 202 を返します。**何も書きません。**
+        if body.trim().is_empty() && id.is_none() {
+            return None;
+        }
+
+        // **失敗の素の文字を、そのまま流さない。**JSON-RPC の失敗として返す。
+        if !status.is_success() && !is_sse && serde_json::from_str::<Value>(body.trim()).is_err() {
+            let message = format!("sshboard が {status} を返しました: {}", body.trim());
+            eprintln!("[sshboard] {message}");
+            return error_response(id, &message).map(|line| vec![line]);
+        }
+
+        let lines = if is_sse {
+            parse_sse(&body)
+        } else {
+            vec![body.trim().to_string()]
+        };
+        return Some(lines.into_iter().filter(|line| !line.is_empty()).collect());
     }
 }
 
@@ -317,6 +410,8 @@ async fn relay(url: String, token: String) {
     // Streamable HTTP は `initialize` の返事で会期の番号をよこします。
     // **以後それを載せないと、毎回新しい会期になります。**
     let session = std::sync::Arc::new(std::sync::Mutex::new(None::<String>));
+    // **相手が最初に送った `initialize`。**本体が立ち上がり直したとき、これで張り直します。
+    let hello = std::sync::Arc::new(std::sync::Mutex::new(None::<String>));
     let out = std::sync::Arc::new(std::sync::Mutex::new(std::io::stdout()));
 
     // **stdin を読むのは、別の糸。**
@@ -343,6 +438,7 @@ async fn relay(url: String, token: String) {
         std::sync::Arc::new(url),
         std::sync::Arc::new(token),
         session,
+        hello,
         out,
     )
     .await;
@@ -359,10 +455,20 @@ async fn pump(
     url: std::sync::Arc<String>,
     token: std::sync::Arc<String>,
     session: std::sync::Arc<std::sync::Mutex<Option<String>>>,
+    hello: std::sync::Arc<std::sync::Mutex<Option<String>>>,
     out: std::sync::Arc<std::sync::Mutex<std::io::Stdout>>,
 ) {
     let mut running = Vec::new();
     while let Some(line) = rx.recv().await {
+        // **始まりの挨拶を控える**（張り直すときに送り直すため）。
+        if serde_json::from_str::<Value>(&line)
+            .ok()
+            .is_some_and(|message| message["method"] == "initialize")
+        {
+            if let Ok(mut held) = hello.lock() {
+                *held = Some(line.clone());
+            }
+        }
         // **会期の番号が決まるまでは、1 本ずつ。**
         //
         // `initialize` の返事で番号が来ます。それより先に別の呼びを投げると、
@@ -370,7 +476,7 @@ async fn pump(
         // 決まったあとは**並べて流します** —— そこが詰まっていた所です。
         let known = session.lock().ok().and_then(|held| held.clone()).is_some();
         if !known {
-            forward(&client, &url, &token, &session, &out, line).await;
+            forward(&client, &url, &token, &session, &hello, &out, line).await;
             continue;
         }
 
@@ -378,9 +484,10 @@ async fn pump(
         let token = std::sync::Arc::clone(&token);
         let url = std::sync::Arc::clone(&url);
         let session = std::sync::Arc::clone(&session);
+        let hello = std::sync::Arc::clone(&hello);
         let out = std::sync::Arc::clone(&out);
         running.push(tokio::spawn(async move {
-            forward(&client, &url, &token, &session, &out, line).await;
+            forward(&client, &url, &token, &session, &hello, &out, line).await;
         }));
     }
 
@@ -532,6 +639,7 @@ mod concurrency_tests {
                 std::sync::Arc::new(url),
                 std::sync::Arc::new("test".to_string()),
                 session,
+                std::sync::Arc::new(std::sync::Mutex::new(None)),
                 out,
             )
             .await;
@@ -708,5 +816,174 @@ mod tests {
     fn an_empty_body_yields_nothing() {
         assert!(parse_sse("").is_empty());
         assert!(parse_sse("\n\n").is_empty());
+    }
+}
+
+/// **本体が立ち上がり直したら、会期を張り直す**（実機・2026-10-26）。
+///
+/// 本体が立ち上がり直す（自動更新の再起動を含む）と、中継が持っている会期の番号は
+/// 本体にとって知らないものになり、`404 Session not found`（素の文字）が返ります。
+/// 中継はそれを**そのまま返事として流していました** —— JSON-RPC ではないので、
+/// 相手（Claude Code）はその呼びの返事を受け取れず、**120 秒待って時間切れ**でした。
+/// `/mcp` で繋ぎ直すと中継ごと作り直されるので、毎回それで戻っていました。
+#[cfg(test)]
+mod session_tests {
+    use std::io::{BufRead, BufReader, Read, Write};
+    use std::net::TcpListener;
+
+    type Seen = std::sync::Arc<std::sync::Mutex<Vec<(String, Option<String>)>>>;
+
+    /// 会期を持つ本体のまね。**`fresh` だけを知っています**（立ち上がり直したあと）。
+    /// `initialize` には `fresh` を渡し、知らない会期には 404 を素の文字で返します。
+    fn restarted_server() -> (String, Seen) {
+        let listener = TcpListener::bind("127.0.0.1:0").expect("口を開けない");
+        let port = listener.local_addr().unwrap().port();
+        let seen: Seen = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+        let record = std::sync::Arc::clone(&seen);
+        std::thread::spawn(move || {
+            for stream in listener.incoming() {
+                let Ok(mut stream) = stream else { continue };
+                let mut reader = BufReader::new(stream.try_clone().unwrap());
+                let (mut length, mut session) = (0usize, None::<String>);
+                loop {
+                    let mut line = String::new();
+                    if reader.read_line(&mut line).unwrap_or(0) == 0 {
+                        break;
+                    }
+                    let lower = line.to_ascii_lowercase();
+                    if let Some(rest) = lower.strip_prefix("content-length:") {
+                        length = rest.trim().parse().unwrap_or(0);
+                    }
+                    if let Some(rest) = lower.strip_prefix("mcp-session-id:") {
+                        session = Some(rest.trim().to_string());
+                    }
+                    if line == "\r\n" || line == "\n" {
+                        break;
+                    }
+                }
+                let mut body = vec![0u8; length];
+                let _ = reader.read_exact(&mut body);
+                let body: serde_json::Value =
+                    serde_json::from_slice(&body).unwrap_or(serde_json::Value::Null);
+                let method = body["method"].as_str().unwrap_or("").to_string();
+                record
+                    .lock()
+                    .unwrap()
+                    .push((method.clone(), session.clone()));
+
+                let reply = if method == "initialize" {
+                    let payload = r#"{"jsonrpc":"2.0","id":0,"result":{}}"#;
+                    format!(
+                        "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nmcp-session-id: fresh\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{payload}",
+                        payload.len()
+                    )
+                } else if session.as_deref() != Some("fresh") {
+                    let text = "Not Found: Session not found";
+                    format!(
+                        "HTTP/1.1 404 Not Found\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{text}",
+                        text.len()
+                    )
+                } else if body.get("id").is_none() {
+                    "HTTP/1.1 202 Accepted\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+                        .to_string()
+                } else {
+                    let payload = format!(
+                        r#"{{"jsonrpc":"2.0","id":{},"result":{{"ok":true}}}}"#,
+                        body["id"]
+                    );
+                    format!(
+                        "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{payload}",
+                        payload.len()
+                    )
+                };
+                let _ = stream.write_all(reply.as_bytes());
+                let _ = stream.flush();
+            }
+        });
+        (format!("http://127.0.0.1:{port}/mcp"), seen)
+    }
+
+    #[test]
+    fn a_lost_session_is_set_up_again_and_the_call_goes_through() {
+        let (url, seen) = restarted_server();
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .expect("runtime");
+        let answered = runtime.block_on(async {
+            let client = reqwest::Client::builder().build().expect("client");
+            // 立ち上がり直す前の会期と、そのとき相手が送った `initialize` を持っている状態。
+            let session = std::sync::Mutex::new(Some("stale".to_string()));
+            let hello = std::sync::Mutex::new(Some(
+                r#"{"jsonrpc":"2.0","id":0,"method":"initialize","params":{}}"#.to_string(),
+            ));
+            super::exchange(
+                &client,
+                &url,
+                "test",
+                &session,
+                &hello,
+                r#"{"jsonrpc":"2.0","id":7,"method":"tools/call"}"#.to_string(),
+            )
+            .await
+        });
+
+        let answered = answered.expect("**返事が 1 つも無い（相手は待ち続ける）**");
+        let parsed: serde_json::Value =
+            serde_json::from_str(&answered[0]).expect("**返事が JSON-RPC になっていない**");
+        assert_eq!(parsed["id"], 7, "別の呼びの返事になっている: {answered:?}");
+        assert_eq!(
+            parsed["result"]["ok"], true,
+            "張り直したあとの返事ではない: {answered:?}"
+        );
+
+        let methods: Vec<String> = seen
+            .lock()
+            .unwrap()
+            .iter()
+            .map(|(m, _)| m.clone())
+            .collect();
+        assert_eq!(
+            methods,
+            [
+                "tools/call",
+                "initialize",
+                "notifications/initialized",
+                "tools/call"
+            ],
+            "張り直しの手順が違う"
+        );
+    }
+
+    #[test]
+    fn without_the_opening_handshake_it_still_answers_in_json() {
+        // **何も返さない、を作らない。**張り直せないときも、その呼びには必ず答える。
+        let (url, _) = restarted_server();
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .expect("runtime");
+        let answered = runtime.block_on(async {
+            let client = reqwest::Client::builder().build().expect("client");
+            let session = std::sync::Mutex::new(Some("stale".to_string()));
+            let hello = std::sync::Mutex::new(None::<String>);
+            super::exchange(
+                &client,
+                &url,
+                "test",
+                &session,
+                &hello,
+                r#"{"jsonrpc":"2.0","id":9,"method":"tools/call"}"#.to_string(),
+            )
+            .await
+        });
+        let answered = answered.expect("**返事が 1 つも無い（相手は待ち続ける）**");
+        let parsed: serde_json::Value =
+            serde_json::from_str(&answered[0]).expect("**返事が JSON-RPC になっていない**");
+        assert_eq!(parsed["id"], 9);
+        assert!(
+            parsed.get("error").is_some(),
+            "失敗を失敗として返していない: {answered:?}"
+        );
     }
 }
