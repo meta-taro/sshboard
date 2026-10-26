@@ -2288,7 +2288,11 @@ impl Engine {
                 Some(&on),
                 format!("{id} を走らせてよいか、人に尋ねています"),
             );
-            return Err(EngineError::ConsoleApprovalNeeded);
+            return Err(EngineError::OperationApprovalNeeded {
+                id: id.to_owned(),
+                connection: on,
+                needs_secret: raised.needs_secret,
+            });
         }
 
         // **`-S` を付けたら、標準入力を必ず閉じます。**

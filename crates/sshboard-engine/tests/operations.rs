@@ -64,7 +64,7 @@ async fn the_ai_cannot_run_one_until_the_person_allows_it() {
     let refused = engine.run_operation(Actor::Ai, "reload-httpd").await;
 
     assert!(
-        matches!(refused, Err(EngineError::ConsoleApprovalNeeded)),
+        matches!(refused, Err(EngineError::OperationApprovalNeeded { .. })),
         "**承認なしで走ろうとしている**: {refused:?}"
     );
 }
@@ -124,7 +124,7 @@ async fn a_secret_the_person_typed_is_spent_with_the_approval() {
     // 2 回目は、また尋ねる。**秘密も一緒に消えています。**
     let again = engine.run_operation(Actor::Ai, "reload-httpd").await;
     assert!(
-        matches!(again, Err(EngineError::ConsoleApprovalNeeded)),
+        matches!(again, Err(EngineError::OperationApprovalNeeded { .. })),
         "**秘密が残っている**: {again:?}"
     );
 }
@@ -144,7 +144,7 @@ async fn refusing_throws_the_secret_away_too() {
 
     let again = engine.run_operation(Actor::Ai, "reload-httpd").await;
     assert!(
-        matches!(again, Err(EngineError::ConsoleApprovalNeeded)),
+        matches!(again, Err(EngineError::OperationApprovalNeeded { .. })),
         "断ったのに走ろうとしている: {again:?}"
     );
 }
@@ -195,7 +195,7 @@ async fn refusing_leaves_the_operation_unrunnable() {
     // 断ったのだから、次に呼んでも走らない（また尋ねる）。
     let again = engine.run_operation(Actor::Ai, "reload-httpd").await;
     assert!(
-        matches!(again, Err(EngineError::ConsoleApprovalNeeded)),
+        matches!(again, Err(EngineError::OperationApprovalNeeded { .. })),
         "断ったのに走ろうとしている: {again:?}"
     );
 }
@@ -223,7 +223,7 @@ async fn an_approval_is_spent_once() {
     // 2 回目は、また尋ねる。
     let again = engine.run_operation(Actor::Ai, "reload-httpd").await;
     assert!(
-        matches!(again, Err(EngineError::ConsoleApprovalNeeded)),
+        matches!(again, Err(EngineError::OperationApprovalNeeded { .. })),
         "**1 回の許可で 2 回走ろうとしている**: {again:?}"
     );
 }
@@ -338,7 +338,7 @@ async fn an_approval_that_is_never_used_does_not_keep_the_secret_forever() {
     let refused = engine.run_operation(Actor::Ai, "reload-httpd").await;
 
     assert!(
-        matches!(refused, Err(EngineError::ConsoleApprovalNeeded)),
+        matches!(refused, Err(EngineError::OperationApprovalNeeded { .. })),
         "**古い許可がそのまま使えている**: {refused:?}"
     );
 }
@@ -887,4 +887,43 @@ async fn the_next_proposal_goes_through_once_the_person_has_answered() {
         .propose_operation(Actor::Ai, proposal("list"))
         .await
         .expect("答えたあとの 2 件目が通らない");
+}
+
+// --- 操作の問いは、操作の言葉で返す（実機・2026-10-26）-----------------------------
+//
+// run_operation の 1 回目は「端末を使ってよいか、いま人に尋ねています … console_open を
+// 1 回呼べば握れます」と返していました。**操作なのに端末の話**で、次の手も違います。
+// AI は人の画面に何が出ているか（パスワードの欄があるか・どの接続か）を知らないまま
+// 待ち、欄が出ていないことに気づけませんでした。
+
+#[tokio::test]
+async fn the_first_call_says_which_operation_where_and_whether_a_password_box_is_shown() {
+    let dir = tempfile::tempdir().expect("一時ディレクトリ");
+    allow(&dir);
+    let engine = engine_in(&dir);
+
+    let asked = engine.run_operation(Actor::Ai, "reload-httpd").await;
+    match asked {
+        Err(EngineError::OperationApprovalNeeded {
+            ref id,
+            needs_secret,
+            ..
+        }) => {
+            assert_eq!(id, "reload-httpd");
+            assert!(
+                !needs_secret,
+                "繋いでいない（上げ方なし）のにパスワードを聞くと言っている"
+            );
+        }
+        other => panic!("**操作の問いになっていない**: {other:?}"),
+    }
+    let said = engine
+        .run_operation(Actor::Ai, "reload-httpd")
+        .await
+        .expect_err("許可なしで走った")
+        .to_string();
+    assert!(
+        !said.contains("console_open"),
+        "**操作なのに端末の手順を言っている**: {said}"
+    );
 }

@@ -2251,7 +2251,7 @@ async fn a_password_the_person_typed_reaches_sudo_through_the_whole_engine() {
     // AI が頼む。**まだ走りません。**
     let asked = engine.run_operation(Actor::Ai, "whoami-root").await;
     assert!(
-        matches!(asked, Err(EngineError::ConsoleApprovalNeeded)),
+        matches!(asked, Err(EngineError::OperationApprovalNeeded { .. })),
         "頼まずに走っている: {asked:?}"
     );
     let standing = engine.operation_request().expect("問いが立っていない");
@@ -2497,7 +2497,7 @@ async fn an_approval_does_not_follow_the_focus_to_another_connection() {
 
     let moved = engine.run_operation(Actor::Ai, "whoami-root").await;
     assert!(
-        matches!(moved, Err(EngineError::ConsoleApprovalNeeded)),
+        matches!(moved, Err(EngineError::OperationApprovalNeeded { .. })),
         "plain で許した札で、with-ask で走っている: {moved:?}"
     );
     let standing = engine.operation_request().expect("問い直していない");
