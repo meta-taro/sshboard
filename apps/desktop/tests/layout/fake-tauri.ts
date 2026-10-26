@@ -21,6 +21,8 @@ export interface Called {
 export async function fakeTauri(page: Page, replies: Replies): Promise<void> {
 	await page.addInitScript((given: Replies) => {
 		const calls: { cmd: string; args: unknown }[] = [];
+		// **試験の途中で返事を変えられるように**、窓に置きます（`setReply`）。
+		(window as unknown as { __fakeReplies: Replies }).__fakeReplies = given;
 		let nextCallback = 1;
 		(window as unknown as { __fakeCalls: typeof calls }).__fakeCalls = calls;
 		// 購読を外す口。**無いと、画面を離れるたびに未処理の拒否が出ます。**
@@ -35,7 +37,8 @@ export async function fakeTauri(page: Page, replies: Replies): Promise<void> {
 				calls.push({ cmd, args });
 				if (cmd === 'plugin:event|listen') return nextCallback++;
 				if (cmd.startsWith('plugin:')) return null;
-				return cmd in given ? given[cmd] : null;
+				const now = (window as unknown as { __fakeReplies: Replies }).__fakeReplies;
+				return cmd in now ? now[cmd] : null;
 			}
 		};
 	}, replies);
@@ -61,4 +64,14 @@ export function opened(id: string, name: string) {
 		hostKeyAlgorithm: 'ssh-ed25519',
 		write: { aiRoots: [], humanUnrestricted: true }
 	};
+}
+
+/** 試験の途中で返事を変える。**時間が経って実行体の状態が変わった**ことを作るため。 */
+export async function setReply(page: Page, cmd: string, reply: unknown): Promise<void> {
+	await page.evaluate(
+		([name, value]) => {
+			(window as unknown as { __fakeReplies: Replies }).__fakeReplies[name as string] = value;
+		},
+		[cmd, reply] as const
+	);
 }

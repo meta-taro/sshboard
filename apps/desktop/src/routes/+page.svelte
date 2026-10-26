@@ -714,9 +714,19 @@
 		}
 	}
 
+	/** 診断の面を開いている間、読み直す間隔。 */
+	const DIAG_REFRESH_MS = 1000;
+
 	// 診断を開いたら、その場で読む。**古い記録を見せない。**
+	//
+	// **開いている間も読み直します**（Windows 実機・2026-10-26）。
+	// 開いた瞬間に 1 回読むだけだったので、MCP が固まった最中に人が見ると
+	// **約 400 秒前の行で止まっていました**。固まった瞬間こそ見に行く所です。
 	$effect(() => {
-		if (view === 'diag') loadDiagnostics();
+		if (view !== 'diag') return;
+		loadDiagnostics();
+		const timer = setInterval(loadDiagnostics, DIAG_REFRESH_MS);
+		return () => clearInterval(timer);
 	});
 
 	/**
