@@ -638,13 +638,16 @@
 							（既存の操作を変えない）。チェックは別の当たり判定にして、
 							**押し間違いで接続先が 1 つ余計に渡ることを防ぎます。**
 						-->
-						<input
-							type="checkbox"
-							class="tick"
-							checked={ticked.includes(item.id)}
-							onchange={() => toggleTicked(item.id)}
-							aria-label={i18n.t('bundle.tick', { name: item.name || item.id })}
-						/>
+						<!-- **押せる範囲は見た目より広く**（label が受け持つ）。枠は印そのものに描く。 -->
+						<label class="tick-hit">
+							<input
+								type="checkbox"
+								class="tick"
+								checked={ticked.includes(item.id)}
+								onchange={() => toggleTicked(item.id)}
+								aria-label={i18n.t('bundle.tick', { name: item.name || item.id })}
+							/>
+						</label>
 						<button
 							type="button"
 							class="row"
@@ -1060,17 +1063,24 @@
 	 * ここで押し間違えると、**渡すつもりのないサーバーが 1 台混ざります。**
 	 * 押せる範囲は見た目より広く取ります。
 	 */
-	.tick {
+	/*
+	 * 見た目より広い当たり判定。**枠を広げずに押しやすくする。**
+	 * padding で当たり判定を広げ、同じ分の負のマージンで見た目の位置を戻す。
+	 * **padding は印ではなく包む label に持たせる** —— 印は自分で枠を描くので（tokens.css）、
+	 * 印に padding があると、枠が広げた範囲の外周に描かれてしまう。
+	 */
+	.tick-hit {
 		flex: 0 0 auto;
+		display: inline-flex;
+		align-items: center;
+		padding: 8px;
+		margin: -8px -4px -8px 0;
+		cursor: pointer;
+	}
+
+	.tick {
 		width: 18px;
 		height: 18px;
-		/* 見た目より広い当たり判定。**枠を広げずに押しやすくする。**
-		   padding で当たり判定を広げ、同じ分の負のマージンで見た目の位置を戻す。 */
-		padding: 8px;
-		box-sizing: content-box;
-		margin: -8px -4px -8px 0;
-		accent-color: var(--accent);
-		cursor: pointer;
 	}
 
 	.tick:focus-visible {
