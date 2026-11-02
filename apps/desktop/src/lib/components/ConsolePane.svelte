@@ -214,6 +214,7 @@
 	<div
 		class="screen"
 		bind:this={host}
+		data-secret-area
 		role="presentation"
 		onmousedown={() => onpick(pane.id)}
 		onfocusin={() => onpick(pane.id)}

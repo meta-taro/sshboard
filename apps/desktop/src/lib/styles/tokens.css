@@ -450,6 +450,23 @@ input[type='checkbox']:disabled {
 	text-shadow: none !important;
 }
 
+/*
+ * **面ごと伏せる所**（端末・出力）。2026-11-02 の実機で、伏せて撮ったのに
+ * 端末の中のログイン元の IP とプロンプトのホスト名がそのまま写った。
+ * 端末（xterm）は字ごとに色を付けて描くので、上の data-secret（自分の字の色だけ消す）では
+ * 中まで届かない。**中の字すべての色を消し、面を塗る。**形（大きさ・位置）は残す。
+ */
+[data-redact='on'] [data-secret-area] {
+	background: var(--fg-muted) !important;
+}
+
+[data-redact='on'] [data-secret-area] * {
+	color: transparent !important;
+	background-color: transparent !important;
+	text-shadow: none !important;
+	border-color: transparent !important;
+}
+
 /* 入力欄は中身が接続先そのもの。**印を付け忘れても伏せる**（漏れても閉じる側に倒す）。 */
 [data-redact='on'] input:not([type='checkbox']):not([type='radio']),
 [data-redact='on'] textarea {

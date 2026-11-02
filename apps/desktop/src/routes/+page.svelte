@@ -2464,7 +2464,8 @@
 		</div>
 		{@render searchBar('output')}
 		<div class="terminal shell">
-			<div class="core terminal-core" bind:this={terminalHost}></div>
+			<!-- **端末の中身は伏せる所**（ホスト名・IP・パスが出る・禁止事項 4）。 -->
+			<div class="core terminal-core" bind:this={terminalHost} data-secret-area></div>
 		</div>
 	</section>
 
