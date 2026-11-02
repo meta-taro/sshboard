@@ -1200,7 +1200,14 @@ impl Engine {
         // **AI が握るには、人の許可が要る**（D42）。**サーバーへ行く前に**尋ねます。
         self.ask_first(actor, &target).await?;
 
-        let existing = self.only_console_on(&target).await?;
+        // **自分が握っている端末があれば、それを使う**（2026-11-02・実機）。
+        // 同じ接続に本物のシェルが 2 本あると、人の許可で 1 本が AI へ渡っていても
+        // 「2 本あります。番号で指して」と断っていた（console_open に番号の引数は無い）。
+        let mine = self.console.lock().await.held_by_on(&target, actor);
+        let existing = match mine {
+            Some(id) => Some(id),
+            None => self.only_console_on(&target).await?,
+        };
         {
             let slot = self.console.lock().await;
             // **この接続の端末を、別の側が握っているか。**

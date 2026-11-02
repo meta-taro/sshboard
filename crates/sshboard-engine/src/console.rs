@@ -189,6 +189,16 @@ impl Consoles {
         }
     }
 
+    /// その接続で**その相手が握っている**端末（シェルの立っているもの）が 1 本だけなら、その番号。
+    pub(crate) fn held_by_on(&self, connection: &str, actor: Actor) -> Option<u64> {
+        let mine: Vec<&OpenConsole> = self
+            .items
+            .iter()
+            .filter(|open| open.connection == connection && open.holder == actor && open.is_up())
+            .collect();
+        (mine.len() == 1).then(|| mine[0].id)
+    }
+
     /// **シェルの無い控え**をその接続から外す（人が新しく開いたとき）。
     ///
     /// 人が新しく開いたら、それより前の許可の控えは古い。残すと AI からは

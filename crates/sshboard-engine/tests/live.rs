@@ -2800,3 +2800,51 @@ async fn allowing_from_now_on_stays_with_that_connection_and_still_has_a_ceiling
         "**今後も許可で、上限が効いていない**: {over:?}"
     );
 }
+
+#[tokio::test]
+async fn with_two_real_shells_the_ai_opens_the_one_it_was_given() {
+    // 実機（2026-11-02・0.1.34）: 人が同じ接続に本物のシェルを 2 本（#1・#2）立てた。
+    // AI が頼み、人が許可（#1 の握りが AI へ）。呼び直すと「2 本あります。番号で指して」。
+    // list_consoles では #1 を AI が握っているのに。console_open に番号の引数は無い。
+    if !server_is_up().await {
+        println!("テスト用サーバーが建っていません（想定内・飛ばします）");
+        return;
+    }
+    let dir = tempfile::tempdir().expect("一時ディレクトリ");
+    let engine = engine_connected(&dir).await;
+    let on = engine.active().await.expect("宛先が無い").id;
+    engine
+        .console_open(Actor::Human, None, 80, 24)
+        .await
+        .expect("人の 1 本目");
+    engine
+        .console_open_new(Actor::Human, &on, 80, 24)
+        .await
+        .expect("人の 2 本目");
+    assert_eq!(engine.console_list().await.len(), 2);
+
+    let _ = engine.console_open(Actor::Ai, None, 80, 24).await;
+    engine
+        .console_answer(Actor::Human, true)
+        .await
+        .expect("人が許せない");
+    let held = engine
+        .console_list()
+        .await
+        .into_iter()
+        .find(|c| c.holder == Actor::Ai)
+        .expect("許可したのに、AI の握っている端末が無い");
+
+    let opened = engine.console_open(Actor::Ai, None, 80, 24).await;
+    assert!(
+        matches!(opened, Ok(sshboard_engine::ConsoleOpened::TookOver)),
+        "**握っている端末があるのに、AI が開けない**: {opened:?}"
+    );
+    let now = engine.console_list().await;
+    assert_eq!(now.len(), 2, "端末が増えた・減った: {now:?}");
+    assert_eq!(
+        now.iter().find(|c| c.holder == Actor::Ai).map(|c| c.id),
+        Some(held.id),
+        "渡された端末とは別のものを握った"
+    );
+}

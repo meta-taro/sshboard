@@ -202,7 +202,10 @@ impl fmt::Display for EngineError {
             EngineError::ConsoleAmbiguous { open } => write!(
                 f,
                 "その接続には端末が {open} 本あります。\
-                 **どれの話か、番号で指してください**（list_consoles に出ています）"
+                 **どれの話か、番号で指してください**（list_consoles に出ています。\
+                 read_console・console_type は番号を受けます）。\
+                 console_open は番号を受けないので、使いたい端末を人に［AI に渡す］で\
+                 渡してもらってから呼び直してください（渡された端末を使います）"
             ),
             EngineError::ConsoleLimitReached { limit } => write!(
                 f,
