@@ -1,5 +1,5 @@
 {
- "total": 40,
+ "total": 42,
  "groups": [
   {
    "key": "connect",
@@ -110,6 +110,14 @@
     {
      "name": "run_readonly",
      "line": "Run one of the commands a human listed in sshboard's allowlist, chosen by its id."
+    },
+    {
+     "name": "list_checks",
+     "line": "List the health checks a human wrote for sshboard."
+    },
+    {
+     "name": "run_check",
+     "line": "Run one health check by its id from list_checks, on the connection operations currently go to."
     },
     {
      "name": "list_operations",

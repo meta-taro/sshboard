@@ -4,6 +4,7 @@
 
 mod about;
 mod capture;
+mod check_tools;
 mod http;
 mod server;
 mod ssh_tools;
@@ -11,6 +12,7 @@ mod view;
 
 pub use about::{changes_since, releases, Release, CHANGELOG};
 pub use capture::{WindowCapture, WindowShot};
+pub use check_tools::CheckId;
 pub use http::{new_token, serve, McpEndpoint, ServeParts, MCP_PATH};
 pub use server::{
     CaptureWindow, MarkConnection, RegisterConnection, SshboardMcp, DEFAULT_ACK_TIMEOUT,

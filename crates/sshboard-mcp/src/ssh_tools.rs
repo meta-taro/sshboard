@@ -53,7 +53,7 @@ pub(crate) async fn until_cancelled<T>(
     }
 }
 
-fn refuse(error: EngineError) -> ErrorData {
+pub(crate) fn refuse(error: EngineError) -> ErrorData {
     match error {
         // 設定漏れ・人にしかできないことは、AI が次に何をすべきか分かる形で返す。
         EngineError::NotConnected
@@ -66,6 +66,9 @@ fn refuse(error: EngineError) -> ErrorData {
         | EngineError::OperationNotAllowed { .. }
         | EngineError::OperationCeiling { .. }
         | EngineError::Allowlist(_)
+        // **点検表を書けるのも人だけ**（D72）。
+        | EngineError::Checks(_)
+        | EngineError::UnknownCheck { .. }
         // 値が足りないだけ。**AI が直せる。**
         | EngineError::BadArgument(_)
         // **人が前の提案に答えるのを待つ。**AI が待てば通る。

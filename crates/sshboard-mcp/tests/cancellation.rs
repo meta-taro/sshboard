@@ -121,6 +121,7 @@ fn the_message_says_the_remote_may_still_be_running() {
     let at = text
         .find("async fn until_cancelled")
         .expect("見つかりません");
-    let note = &text[at..at + 700];
+    // **字の途中で切らない**（バイトで切ると、前の行が数文字ずれただけで落ちる）。
+    let note: String = text[at..].chars().take(700).collect();
     assert!(note.contains("may still be running"), "{note}");
 }
