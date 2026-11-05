@@ -290,6 +290,8 @@ pub struct Engine {
     /// **走ったものだけ**が入ります。許可しただけでは増えません
     /// （許して、やっぱりやめた分を数に入れない）。
     operation_runs: Mutex<Vec<(String, Instant)>>,
+    /// **点検の前回の結果**（D72・保存しない）。
+    checks: crate::checks::CheckMemory,
     /// **AI が繋ごうとして、パスフレーズで止まった接続**（Issue #13）。
     ///
     /// 識別子だけを持ちます。**パスフレーズ本体はここへ来ません**（D14）——
@@ -348,6 +350,7 @@ impl Engine {
             operation_approvals: Mutex::new(Vec::new()),
             standing: Mutex::new(Vec::new()),
             operation_runs: Mutex::new(Vec::new()),
+            checks: crate::checks::CheckMemory::default(),
             changed,
         }
     }
@@ -2614,6 +2617,10 @@ impl Engine {
 
         // 帯へは `exec` が `$ ...` を出します。**二重に出しません。**
         self.exec(actor, &command.run).await
+    }
+
+    pub(crate) fn check_memory(&self) -> &crate::checks::CheckMemory {
+        &self.checks
     }
 
     fn allowlist(&self) -> Result<Allowlist, EngineError> {

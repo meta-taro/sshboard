@@ -21,11 +21,15 @@
 //! 何が足りなかったかは記録が出し、**足す判断は人**がします。
 
 mod allowlist;
+mod checks;
 mod command;
+mod judge;
 mod operations;
 mod refusals;
 
 pub use allowlist::{Allowlist, AllowlistError, CURRENT_VERSION};
+pub use checks::{Check, Checks, ChecksError, Step, CHECKS_VERSION};
 pub use command::ReadonlyCommand;
+pub use judge::{Expect, Judged, StepOutcome, Verdict};
 pub use operations::{Operation, Operations, OperationsError};
 pub use refusals::{Refusals, MAX_ID_CHARS};

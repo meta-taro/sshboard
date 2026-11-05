@@ -2848,3 +2848,55 @@ async fn with_two_real_shells_the_ai_opens_the_one_it_was_given() {
         "渡された端末とは別のものを握った"
     );
 }
+
+#[tokio::test]
+async fn a_check_runs_each_step_judges_it_and_remembers_the_last_value() {
+    // **点検表（D72）。**手順は許可リストの id を指すだけで、走るのは人が書いた文字列。
+    // 悪しが出ても最後まで回し、2 回目には前回の値を添える。
+    if !server_is_up().await {
+        println!("テスト用サーバーが建っていません（想定内・飛ばします）");
+        return;
+    }
+    let dir = tempfile::tempdir().expect("一時ディレクトリ");
+    std::fs::write(
+        dir.path().join("readonly.toml"),
+        "version = 1\n\
+         [[command]]\nid = \"disk\"\nrun = \"echo ' 42%'\"\n\
+         [[command]]\nid = \"svc\"\nrun = \"echo inactive; exit 3\"\n\
+         [[command]]\nid = \"quiet\"\nrun = \"echo all quiet\"\n",
+    )
+    .expect("許可リストを書けない");
+    std::fs::write(
+        dir.path().join("checks.toml"),
+        "version = 1\n[[check]]\nid = \"morning\"\n\
+         [[check.step]]\nreadonly = \"disk\"\nbelow = 90\n\
+         [[check.step]]\nreadonly = \"svc\"\ncontains = \"active\"\n\
+         [[check.step]]\nreadonly = \"quiet\"\nabsent = \"Out of memory\"\n",
+    )
+    .expect("点検表を書けない");
+    let engine = engine_connected(&dir).await;
+
+    let first = engine
+        .run_check(Actor::Human, "morning")
+        .await
+        .expect("回せない");
+
+    assert_eq!(
+        (first.good, first.bad, first.unknown),
+        (2, 1, 0),
+        "実際: {first:#?}"
+    );
+    assert_eq!(first.steps[0].judged.value, "42%");
+    assert!(
+        first.steps.iter().all(|step| step.previous.is_none()),
+        "初回に前回がある"
+    );
+    assert_eq!(first.connection.as_deref(), Some("local"));
+
+    let second = engine
+        .run_check(Actor::Human, "morning")
+        .await
+        .expect("回せない");
+    let earlier = second.steps[0].previous.as_ref().expect("前回の値が無い");
+    assert_eq!(earlier.value, "42%");
+}

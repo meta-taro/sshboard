@@ -116,6 +116,14 @@ pub enum EngineError {
     /// **空として扱いません。**扱うと「許可したのに断られる」になり、
     /// 原因がファイルの書き間違いだと誰も気づけません。
     Allowlist(String),
+    /// 点検表（`checks.toml`）が読めない（D72）。**空として扱いません。**
+    Checks(String),
+    /// 知らない点検。**在るものと、書く所を添えて断ります。**
+    UnknownCheck {
+        id: String,
+        have: Vec<String>,
+        path: String,
+    },
     /// 用途別ツールに渡す値が足りない・使えない。
     ///
     /// **空のまま投げると、別のものが返ってきます**（`systemctl status` は
@@ -278,6 +286,20 @@ impl fmt::Display for EngineError {
                 f,
                 "コマンドの許可リストを読めません: {detail}。\
                  読めない一覧を空として扱わないので、いまは 1 本も走りません"
+            ),
+            EngineError::Checks(detail) => write!(
+                f,
+                "点検表を読めません: {detail}。読めない表を空として扱わないので、いまは 1 本も回しません"
+            ),
+            EngineError::UnknownCheck { id, have, path } if have.is_empty() => write!(
+                f,
+                "点検 `{id}` はありません。**点検表には、まだ 1 本も書かれていません。**\
+                 書けるのは人だけです（{path}）"
+            ),
+            EngineError::UnknownCheck { id, have, path } => write!(
+                f,
+                "点検 `{id}` はありません（在るもの: {}）。足すなら人が {path} へ書きます",
+                have.join(" , ")
             ),
             EngineError::BadArgument(detail) => write!(f, "{detail}"),
             EngineError::OperationApprovalNeeded {

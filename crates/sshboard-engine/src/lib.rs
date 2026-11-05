@@ -10,6 +10,7 @@
 //! - **手元へ落とす側**（`download_file`）に囲いはかかりません。守る相手が
 //!   サーバーではなく手元なので、**黙って上書きしない**ことで守ります。
 
+mod checks;
 mod console;
 mod engine;
 mod error;
@@ -27,6 +28,7 @@ pub mod transfers;
 /// 引数は例外なく囲われます（`tests/probes.rs` が見張っています）。
 pub mod probes;
 
+pub use checks::{CheckReport, StepReport};
 pub use console::{ConsoleFacts, PER_CONNECTION_LIMIT};
 pub use engine::{
     Answered, ConsoleOpened, Engine, HostKeyAsk, OnConflict, OnScreen, OperationAsk,
