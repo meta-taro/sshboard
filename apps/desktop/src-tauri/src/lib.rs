@@ -8,6 +8,7 @@ mod attention;
 mod bridge;
 mod bundle_cmd;
 mod capture;
+mod check_cmd;
 mod commands;
 mod connections_cmd;
 mod mcp_host;
@@ -96,6 +97,8 @@ pub fn run() {
             connections_cmd::connections_list,
             connections_cmd::ssh_config_candidates,
             allowlist_cmd::allowlist_overview,
+            check_cmd::checks_overview,
+            check_cmd::check_run,
             connections_cmd::connections_path,
             connections_cmd::connection_save,
             connections_cmd::connection_delete,

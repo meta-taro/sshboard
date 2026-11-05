@@ -1,0 +1,62 @@
+# 点検表のひな型（D72）。**これは棚で、既定ではありません。**
+#
+# sshboard は `checks.toml` を**既定で 1 本も持ちません。**
+# 置き場所は `readonly.toml` と同じディレクトリです（メニュー［点検］に絶対パスで出ます）。
+#
+# ## 形
+#
+# 1 つの点検は、手順の並びです。手順は **`readonly.toml` の id を指すだけ**で、
+# 手順の中にコマンドを書く欄はありません（書くと読めない表として断られます）。
+# 手順ごとに、次の基準を 0 個以上書けます。**書いたものを全部満たせば「良し」。**
+#
+#   contains = "字"   … 出力にこの字が出ていれば良し
+#   absent   = "字"   … 出力にこの字が出ていなければ良し
+#   below    = 数     … 出力の最初の数が、これ未満なら良し
+#   above    = 数     … 出力の最初の数が、これより大きければ良し
+#
+# 何も書かなければ「終了コード 0 なら良し」。終了コードが 0 以外なら、字が合っていても「悪し」。
+# 数が読めない・許可リストに無い・繋がっていない手順は「測れず」で、**良しにはしません。**
+#
+# ## 先に readonly.toml へ書くもの（例）
+#
+#   [[command]]
+#   id = "disk-root"
+#   run = "df --output=pcent / | tail -1"
+#
+#   [[command]]
+#   id = "mem-available-mb"
+#   run = "free -m | awk '/^Mem:/ {print $7}'"
+#
+#   [[command]]
+#   id = "nginx-active"
+#   run = "systemctl is-active nginx"
+#
+#   [[command]]
+#   id = "listen-443"
+#   run = "ss -ltn 'sport = :443' | tail -n +2 | wc -l"
+
+version = 1
+
+[[check]]
+id = "morning"
+description = "毎朝の点検"
+
+[[check.step]]
+readonly = "disk-root"
+label = "ルートのディスク使用率（%）"
+below = 90
+
+[[check.step]]
+readonly = "mem-available-mb"
+label = "使えるメモリ（MB）"
+above = 200
+
+[[check.step]]
+readonly = "nginx-active"
+label = "nginx が動いている"
+contains = "active"
+
+[[check.step]]
+readonly = "listen-443"
+label = "443 番で待ち受けている数"
+above = 0

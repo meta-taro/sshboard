@@ -145,7 +145,7 @@ Filesystem      Size  Used Avail Use% Mounted on
 
 `list_connections` / `list_directory` / `stat` / `read_file` / `search` / `download` /
 `disk_usage` / `process_list` / `service_status` / `runtime_versions` / `read_log` /
-`network_listen` / `run_readonly`（許可リスト方式）
+`network_listen` / `run_readonly`（許可リスト方式）/ `list_checks` / `run_check`（点検表）
 
 **`run_command(cmd)` を作りません。**1 つ置けば全部できてしまい、破壊的操作を防ぐ手段が
 「使わない約束」しか残らないからです。**約束は手順書であって、ゲートではありません。**
@@ -236,6 +236,20 @@ description = "稼働時間"
 **人（GUI）の側は制限しません。**普通の SFTP クライアント / ターミナルとして自由に使えます。
 制限するのは AI の口だけです。
 
+## 点検表（`checks.toml`）
+
+ディスク・メモリ・サービス・待ち受けのように、**毎回同じ順で見る項目**を 1 つの点検にまとめられます。
+一度書けば、人はメニュー［点検］の［回す］で、AI は `run_check` で、同じ点検を回せます。
+
+- 手順は **`readonly.toml` の id を指すだけ**です。手順の中にコマンドを書く欄はありません
+- 基準は決まった形だけです —— 字が出る（`contains`）／出ない（`absent`）／数が下（`below`）／上（`above`）
+- 結果は **良し／悪し／測れず**。測れなかったものを良しにはしません
+- 悪しが出ても最後まで回し、**前回の値を隣に並べます**（アプリを終えるまで）
+- 各手順は帯に出てから走ります。**AI が回した点検も、画面の［点検］に出ます**
+- **既定は空**です。書くのは人で、AI は書けません
+
+ひな型は [`docs/checks.example.toml`](docs/checks.example.toml) です。
+
 ## 状態を変える操作（`operations.toml`）
 
 > **既定は空です。**このファイルを書くまで、AI は 1 本も走らせられません。
@@ -283,7 +297,7 @@ max_per_hour = 3
 - 檻そのもの —— `sudoers` / `visudo` / `authorized_keys`
 - **鍵** —— `.ssh` / `id_rsa` / `id_ed25519` / `id_ecdsa`
 - **パスワードの入れ物** —— `/etc/shadow` / `/etc/gshadow`
-- sshboard 自身の設定 —— `connections.toml` / `readonly.toml` / `operations.toml`
+- sshboard 自身の設定 —— `connections.toml` / `readonly.toml` / `operations.toml` / `checks.toml`
 - 利用者とロール —— `useradd` / `usermod` / `userdel` / `groupadd`
 - 壊す操作 —— `mkfs` / `fdisk` / `dd ` / `rm -rf`
 

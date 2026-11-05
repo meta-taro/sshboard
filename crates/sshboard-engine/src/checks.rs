@@ -74,6 +74,14 @@ impl Engine {
             .map_err(|error| EngineError::Checks(error.to_string()))
     }
 
+    /// **いまの宛先で最後に回した結果**（人でも AI でも）。画面が読みます。
+    pub async fn last_check(&self, id: &str) -> Option<CheckReport> {
+        let connection = self.active().await.map(|opened| opened.id);
+        self.check_memory()
+            .previous(id, connection.as_deref().unwrap_or_default())
+            .await
+    }
+
     /// 点検を 1 つ回す。**悪しや測れずが出ても、最後の手順まで回します。**
     pub async fn run_check(&self, actor: Actor, id: &str) -> Result<CheckReport, EngineError> {
         let checks = self.checks()?;

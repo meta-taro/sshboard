@@ -10,6 +10,10 @@
 	import HostKeyDialog from '$lib/components/HostKeyDialog.svelte';
 	import OperationRequestDialog from '$lib/components/OperationRequestDialog.svelte';
 	import StandingDialog, { type Standing } from '$lib/components/StandingDialog.svelte';
+	import CheckDialog, {
+		type CheckReport,
+		type ChecksOverview
+	} from '$lib/components/CheckDialog.svelte';
 	import PassphraseDialog from '$lib/components/PassphraseDialog.svelte';
 	import ConnectPanel from '$lib/components/ConnectPanel.svelte';
 	import ConsolePaneView from '$lib/components/ConsolePane.svelte';
@@ -96,6 +100,9 @@
 	/** **許可を続けている操作**の枠（D47 改）。開くたびに実行体から読み直す。 */
 	let standingOpen = $state(false);
 	let standingList = $state<Standing[]>([]);
+	/** **点検**（D72）。開いている間だけ一覧を持つ。 */
+	let checksOverview = $state<ChecksOverview | null>(null);
+	let checkRunning = $state<string | null>(null);
 
 	/** メニューの文言は**既にある**（`messages-menu`）。新しい言い方を増やさない。 */
 	const menu = $derived(menuLabels(i18n.locale));
@@ -435,6 +442,32 @@
 			standingOpen = true;
 		} catch (error: unknown) {
 			failure = String(error);
+		}
+	}
+
+	async function openChecks() {
+		try {
+			checksOverview = await invoke<ChecksOverview>('checks_overview');
+		} catch (error: unknown) {
+			failure = String(error);
+		}
+	}
+
+	async function runCheck(id: string) {
+		checkRunning = id;
+		try {
+			const report = await invoke<CheckReport>('check_run', { id });
+			const shown = checksOverview;
+			if (shown) {
+				checksOverview = {
+					...shown,
+					checks: shown.checks.map((line) => (line.id === id ? { ...line, last: report } : line))
+				};
+			}
+		} catch (error: unknown) {
+			failure = String(error);
+		} finally {
+			checkRunning = null;
 		}
 	}
 
@@ -1686,6 +1719,9 @@
 							<button type="button" onclick={() => { viewMenuOpen = false; void openStanding(); }}>
 								{i18n.t('standing.title')}
 							</button>
+							<button type="button" onclick={() => { viewMenuOpen = false; void openChecks(); }}>
+								{i18n.t('check.title')}
+							</button>
 							<button type="button" onclick={() => { viewMenuOpen = false; aboutOpen = true; }}>
 								{i18n.t('about.title')}
 							</button>
@@ -2078,6 +2114,15 @@
 
 	{#if aboutOpen}
 		<AboutDialog onClose={() => (aboutOpen = false)} />
+	{/if}
+
+	{#if checksOverview}
+		<CheckDialog
+			overview={checksOverview}
+			running={checkRunning}
+			onRun={(id) => void runCheck(id)}
+			onClose={() => (checksOverview = null)}
+		/>
 	{/if}
 
 	{#if standingOpen}

@@ -31,7 +31,7 @@ use serde::Deserialize;
 /// dbboard が `GRANT` / `DROP` を恒久的に断っているのと同じ形です。
 ///
 /// **AI が自分の檻を広げられない**ことが、この一覧の芯です。
-const NEVER: [&str; 20] = [
+const NEVER: [&str; 21] = [
     // 檻そのものを書き換える
     "sudoers",
     "visudo",
@@ -46,6 +46,7 @@ const NEVER: [&str; 20] = [
     "connections.toml",
     "readonly.toml",
     "operations.toml",
+    "checks.toml",
     // **パスワードの入れ物。**`become = "ask"`（D48）を入れるまで、
     // root しか読めないものは**そもそも読めませんでした。**
     // 届くようになった以上、ここも塞ぎます。

@@ -148,7 +148,7 @@ other SFTP client and terminal. **Only the agent's side is fenced.**
 
 `list_connections` / `list_directory` / `stat` / `read_file` / `search` / `download` /
 `disk_usage` / `process_list` / `service_status` / `runtime_versions` / `read_log` /
-`network_listen` / `run_readonly` (allowlist)
+`network_listen` / `run_readonly` (allowlist) / `list_checks` / `run_check` (health checks)
 
 **There is no `run_command(cmd)`.** One such tool does everything, and once you have it
 the only thing standing between an agent and a destructive command is a promise not to
@@ -239,6 +239,25 @@ this prevents is exactly one thing: **the agent composing a command string.**
 **The human side (the GUI) is not restricted.** Use it as an ordinary SFTP client and
 terminal. Only the agent's side is fenced.
 
+## Health checks (`checks.toml`)
+
+Group the things you look at **in the same order every time** — disk, memory, a service, a
+listening port — into one check. Write it once; a person runs it from the menu (**Checks →
+Run**) and an agent runs the same check with `run_check`.
+
+- A step **only names an id from `readonly.toml`**. There is no field for a command line
+- Criteria come in fixed shapes only: text present (`contains`) / absent (`absent`), a number
+  `below` / `above` a limit
+- Each step comes back **good, bad or unknown**. Something that could not be measured is never
+  counted as good
+- The run does not stop at the first bad step, and **the previous value sits beside the new one**
+  (until the app quits)
+- Every step shows on the band before it runs. **Checks the agent runs appear in the Checks
+  dialog too**
+- **The list ships empty.** A person writes it; the agent cannot
+
+A template lives in [`docs/checks.example.toml`](docs/checks.example.toml).
+
 ## State-changing operations (`operations.toml`)
 
 > **The list ships empty.** Until you write this file, the agent can run nothing.
@@ -286,7 +305,7 @@ credential, and **the product cannot invent it.**
 - The cage itself — `sudoers` / `visudo` / `authorized_keys`
 - **Keys** — `.ssh` / `id_rsa` / `id_ed25519` / `id_ecdsa`
 - **Where passwords live** — `/etc/shadow` / `/etc/gshadow`
-- sshboard's own config — `connections.toml` / `readonly.toml` / `operations.toml`
+- sshboard's own config — `connections.toml` / `readonly.toml` / `operations.toml` / `checks.toml`
 - Users and roles — `useradd` / `usermod` / `userdel` / `groupadd`
 - Destruction — `mkfs` / `fdisk` / `dd ` / `rm -rf`
 

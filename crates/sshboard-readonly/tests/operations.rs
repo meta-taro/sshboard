@@ -75,6 +75,8 @@ fn what_must_never_run_is_refused_even_when_written_down() {
         "rm -rf /var",
         "mkfs.ext4 /dev/sda1",
         "dd if=/dev/zero of=/dev/sda",
+        // **点検表も sshboard 自身の設定**（D72）。AI が操作で書き換えられない。
+        "cp /tmp/x ~/.config/sshboard/checks.toml",
     ] {
         let toml = format!(
             "version = 1\n\n[[operation]]\nid = \"bad\"\nrun = \"{forbidden}\"\n\

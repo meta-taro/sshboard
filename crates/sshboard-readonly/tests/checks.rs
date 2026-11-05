@@ -237,3 +237,11 @@ fn the_value_shown_is_the_first_line_trimmed_and_capped() {
     let long = "x".repeat(500);
     assert!(disk.judge(&ran(&long, Some(0))).value.chars().count() <= 200);
 }
+
+#[test]
+fn the_template_in_docs_is_a_valid_check_list() {
+    // **ひな型が読めない表だと、写した人が最初に詰まる。**
+    let template = include_str!("../../../docs/checks.example.toml");
+    let checks = Checks::parse(template).expect("docs/checks.example.toml が読めない");
+    assert_eq!(checks.get("morning").expect("morning").steps.len(), 4);
+}

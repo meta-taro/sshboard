@@ -121,3 +121,22 @@ async fn every_step_is_tried_and_one_that_could_not_run_says_why() {
         }
     }
 }
+
+#[tokio::test]
+async fn the_last_run_can_be_read_back_by_the_screen() {
+    // **AI が回した点検を、人も画面で見られる**（D72）。回すのはどちらでも、残る所は 1 つ。
+    let dir = tempfile::tempdir().expect("一時ディレクトリ");
+    write(&dir, "checks.toml", CHECKS);
+    let engine = engine_in(&dir);
+
+    assert!(
+        engine.last_check("morning").await.is_none(),
+        "回す前から結果がある"
+    );
+    let ran = engine
+        .run_check(Actor::Ai, "morning")
+        .await
+        .expect("回せない");
+
+    assert_eq!(engine.last_check("morning").await, Some(ran));
+}

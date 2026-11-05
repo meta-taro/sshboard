@@ -26,3 +26,11 @@ fn the_app_exposes_the_standing_allowance_commands() {
         assert!(LIB.contains(command), "{command} が登録されていません");
     }
 }
+
+#[test]
+fn the_app_exposes_the_check_commands() {
+    // 点検表（D72）。**登録し忘れると、画面の［回す］が届きません。**
+    for command in ["check_cmd::checks_overview", "check_cmd::check_run"] {
+        assert!(LIB.contains(command), "{command} が登録されていません");
+    }
+}
