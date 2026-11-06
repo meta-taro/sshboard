@@ -4,6 +4,7 @@
 
 mod about;
 mod capture;
+mod channel;
 mod check_tools;
 mod http;
 mod server;
@@ -12,6 +13,7 @@ mod view;
 
 pub use about::{changes_since, releases, Release, CHANGELOG};
 pub use capture::{WindowCapture, WindowShot};
+pub use channel::{answered, channel_notice, Waiting, CHANNEL_CAPABILITY, CHANNEL_METHOD};
 pub use check_tools::CheckId;
 pub use http::{new_token, serve, McpEndpoint, ServeParts, MCP_PATH};
 pub use server::{

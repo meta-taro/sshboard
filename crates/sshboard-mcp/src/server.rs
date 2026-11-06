@@ -13,10 +13,10 @@ use base64::Engine as _;
 use rmcp::handler::server::router::tool::ToolRouter;
 use rmcp::handler::server::wrapper::Parameters;
 use rmcp::model::{
-    CallToolResult, ContentBlock, ListResourcesResult, PaginatedRequestParams,
-    ReadResourceRequestParams, ReadResourceResponse, ReadResourceResult, Resource,
-    ResourceContents, ResourceUpdatedNotificationParam, ServerCapabilities, ServerInfo,
-    SubscribeRequestParams,
+    CallToolResult, ContentBlock, CustomNotification, JsonObject, ListResourcesResult,
+    PaginatedRequestParams, ReadResourceRequestParams, ReadResourceResponse, ReadResourceResult,
+    Resource, ResourceContents, ResourceUpdatedNotificationParam, ServerCapabilities, ServerInfo,
+    ServerNotification, SubscribeRequestParams,
 };
 use rmcp::service::{NotificationContext, RequestContext, RoleServer};
 use rmcp::{tool, tool_handler, tool_router, ErrorData, ServerHandler};
@@ -679,6 +679,8 @@ impl ServerHandler for SshboardMcp {
             let mut passphrase = engine.subscribe_passphrase_request();
             let mut host_key = engine.subscribe_host_key_request();
             let mut operation = engine.subscribe_operation_request();
+            // **いま尋ねているもの。**消えたもの ＝ 人が答えたもの（Issue #29・channels）。
+            let mut before = crate::channel::Waiting::default();
 
             loop {
                 // **どれか 1 つでも動いたら、まとめて今の形を送ります。**
@@ -689,6 +691,26 @@ impl ServerHandler for SshboardMcp {
                     changed = passphrase.changed() => if changed.is_err() { break },
                     changed = host_key.changed() => if changed.is_err() { break },
                     changed = operation.changed() => if changed.is_err() { break },
+                }
+
+                // **人が答えたら、入力待ちの AI も起こす**（Claude Code の channels）。
+                // 購読とは別です —— channels を付けずに立ち上げた側は黙って捨てます。
+                let after = crate::channel::Waiting {
+                    console: console.borrow().is_some(),
+                    passphrase: passphrase.borrow().is_some(),
+                    host_key: host_key.borrow().is_some(),
+                    operation: operation.borrow().is_some(),
+                };
+                let gone = crate::channel::answered(before, after);
+                before = after;
+                if let Some(notice) = crate::channel::channel_notice(&gone) {
+                    let pushed = ServerNotification::CustomNotification(CustomNotification::new(
+                        crate::channel::CHANNEL_METHOD,
+                        Some(notice),
+                    ));
+                    if peer.send_notification(pushed).await.is_err() {
+                        break;
+                    }
                 }
 
                 // **購読されていなければ送りません**（MCP の決まり）。
@@ -772,8 +794,15 @@ impl ServerHandler for SshboardMcp {
         // SEP-2577 で廃止予定で、**消える口に乗せると、ある日黙って止まります。**
         // 代わりに**資源の更新**（`notifications/resources/updated`）を使います。
         // こちらは廃止されておらず、**AI が同じものを読める**という利点もあります。
+        // **`claude/channel` を名乗る**（Issue #29）。名乗らないと、Claude Code は押し出しを受けません。
+        let mut channel = std::collections::BTreeMap::new();
+        channel.insert(
+            crate::channel::CHANNEL_CAPABILITY.to_owned(),
+            JsonObject::new(),
+        );
         let mut info = ServerInfo::new(
             ServerCapabilities::builder()
+                .enable_experimental_with(channel)
                 .enable_tools()
                 .enable_resources()
                 .enable_resources_subscribe()

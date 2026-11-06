@@ -519,6 +519,22 @@ Restarting keeps the same URL.
 > The window says "failed to start (port 22022)".
 > Set `SSHBOARD_MCP_PORT` to move it.
 
+#### Wake the agent when the person answers (Claude Code channels)
+
+When the person answers a passphrase, host key, console permission or operation approval on screen,
+sshboard pushes that fact to the agent's session. **Even if the agent ended its turn instead of
+waiting, it wakes up and carries on** — nobody has to tell it "I pressed it".
+
+This uses Claude Code's **channels** (a research preview). Start Claude Code with:
+
+```bash
+claude --dangerously-load-development-channels server:sshboard
+```
+
+Started without it, Claude Code silently drops the notice (`await_answer` still works as before).
+The notice says **only which kind of question was answered** — never where the connection points.
+In Team / Enterprise organisations an admin has to enable channels first.
+
 ### Updates
 
 **When a new version exists, the window tells you at startup** (D34).

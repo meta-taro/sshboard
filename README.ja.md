@@ -509,6 +509,22 @@ claude mcp add --scope user --transport http sshboard http://127.0.0.1:22022/mcp
 > 画面に「立ち上がりませんでした（ポート 22022）」と出します。
 > 移すときは環境変数 `SSHBOARD_MCP_PORT` を設定してください。
 
+#### 人が答えたら、AI を起こす（Claude Code の channels）
+
+パスフレーズ・ホスト鍵・端末の許可・操作の承認に人が画面で答えると、sshboard はそのことを
+AI のセッションへ押し出します。**AI が返事を待たずにターンを閉じていても、起きて続きを始めます。**
+人が「押したよ」と声をかける必要はありません。
+
+Claude Code の **channels**（研究段階の機能）を使います。受け取るには、立ち上げるときに付けます。
+
+```bash
+claude --dangerously-load-development-channels server:sshboard
+```
+
+付けずに立ち上げた Claude Code は、この知らせを黙って捨てます（いままでどおり `await_answer` で待てます）。
+知らせに載るのは**何の問いが解けたかだけ**で、接続先は載りません。
+Team / Enterprise の組織では、管理者が channels を有効にしていないと使えません。
+
 ### 更新
 
 **新しい版が出ると、起動したときに画面へ出ます**（D34）。

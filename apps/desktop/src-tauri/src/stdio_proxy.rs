@@ -432,16 +432,25 @@ async fn relay(url: String, token: String) {
         }
     });
 
-    pump(
-        rx,
-        std::sync::Arc::new(client),
-        std::sync::Arc::new(url),
-        std::sync::Arc::new(token),
-        session,
-        hello,
-        out,
-    )
-    .await;
+    let client = std::sync::Arc::new(client);
+    let url = std::sync::Arc::new(url);
+    let token = std::sync::Arc::new(token);
+
+    // **呼んでいないのに本体から来るもの**（人が答えた知らせ・Issue #29）を受け続ける。
+    // 書く先は返事と同じ stdout で、**同じ錠を通します**（2 本が混ざって 1 行にならない）。
+    let listening = {
+        let out = std::sync::Arc::clone(&out);
+        tokio::spawn(crate::stdio_listen::listen(
+            std::sync::Arc::clone(&client),
+            std::sync::Arc::clone(&url),
+            std::sync::Arc::clone(&token),
+            std::sync::Arc::clone(&session),
+            move |line| say(&out, Some(line)),
+        ))
+    };
+
+    pump(rx, client, url, token, session, hello, out).await;
+    listening.abort();
 }
 
 /// 来た行を流す。**会期の番号が決まったあとは、並べて流します。**

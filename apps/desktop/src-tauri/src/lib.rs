@@ -15,6 +15,7 @@ mod mcp_host;
 mod menu;
 mod pending;
 mod session_cmd;
+mod stdio_listen;
 mod stdio_proxy;
 mod stream_host;
 mod version;
