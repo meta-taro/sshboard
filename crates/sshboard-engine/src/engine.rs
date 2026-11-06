@@ -877,7 +877,7 @@ impl Engine {
     /// 帯へ 1 行載せ、**画面が受け取るまで待つ**（D16）。
     ///
     /// サーバーへ触らない操作（切断）でも通す。**片方だけ見えない、を作らない。**
-    async fn show(&self, actor: Actor, text: &str) -> Result<(), EngineError> {
+    pub(crate) async fn show(&self, actor: Actor, text: &str) -> Result<(), EngineError> {
         let delivery = self.band.record(actor, text);
         match delivery.wait_acked(std::time::Duration::from_secs(2)).await {
             sshboard_band::DeliveryOutcome::Delivered => Ok(()),
@@ -2617,6 +2617,11 @@ impl Engine {
 
         // 帯へは `exec` が `$ ...` を出します。**二重に出しません。**
         self.exec(actor, &command.run).await
+    }
+
+    /// 診断へ注意を 1 行（点検の側から使う）。
+    pub(crate) fn diag_warn(&self, text: String) {
+        self.diag.warn(Stage::Exec, None, text);
     }
 
     pub(crate) fn check_memory(&self) -> &crate::checks::CheckMemory {

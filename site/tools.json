@@ -1,5 +1,5 @@
 {
- "total": 42,
+ "total": 43,
  "groups": [
   {
    "key": "connect",
@@ -118,6 +118,10 @@
     {
      "name": "run_check",
      "line": "Run one health check by its id from list_checks, on the connection operations currently go to."
+    },
+    {
+     "name": "propose_check",
+     "line": "Propose a new health check to the person."
     },
     {
      "name": "list_operations",

@@ -148,7 +148,7 @@ other SFTP client and terminal. **Only the agent's side is fenced.**
 
 `list_connections` / `list_directory` / `stat` / `read_file` / `search` / `download` /
 `disk_usage` / `process_list` / `service_status` / `runtime_versions` / `read_log` /
-`network_listen` / `run_readonly` (allowlist) / `list_checks` / `run_check` (health checks)
+`network_listen` / `run_readonly` (allowlist) / `list_checks` / `run_check` / `propose_check` (health checks)
 
 **There is no `run_command(cmd)`.** One such tool does everything, and once you have it
 the only thing standing between an agent and a destructive command is a promise not to
@@ -255,6 +255,8 @@ Run**) and an agent runs the same check with `run_check`.
 - Every step shows on the band before it runs. **Checks the agent runs appear in the Checks
   dialog too**
 - **The list ships empty.** A person writes it; the agent cannot
+- The agent can **propose** a check with `propose_check`. Every step and criterion appears on screen,
+  and only the person can save it (saving runs nothing)
 
 A template lives in [`docs/checks.example.toml`](docs/checks.example.toml).
 

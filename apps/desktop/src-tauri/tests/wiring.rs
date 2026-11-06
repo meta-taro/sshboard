@@ -34,3 +34,16 @@ fn the_app_exposes_the_check_commands() {
         assert!(LIB.contains(command), "{command} が登録されていません");
     }
 }
+
+#[test]
+fn the_app_exposes_the_check_proposal_and_pushes_it_to_the_screen() {
+    // AI の点検の案（D72 の次の段）。**押し出さないと人は気づかず、登録しないと保存の口が届かない。**
+    for wired in [
+        "check_cmd::check_proposal",
+        "check_cmd::check_proposal_save",
+        "check_cmd::check_proposal_dismiss",
+        "check_cmd::spawn_check_proposal_bridge(",
+    ] {
+        assert!(LIB.contains(wired), "{wired} が繋がっていません");
+    }
+}

@@ -7,7 +7,8 @@ use std::sync::Arc;
 
 use sshboard_band::Actor;
 use sshboard_engine::{CheckReport, Engine};
-use tauri::State;
+use sshboard_readonly::Check;
+use tauri::{AppHandle, Emitter, State};
 
 /// 点検 1 つの見出しと手順の名前。
 #[derive(serde::Serialize)]
@@ -56,4 +57,40 @@ pub async fn check_run(engine: State<'_, Arc<Engine>>, id: String) -> Result<Che
         .run_check(Actor::Human, &id)
         .await
         .map_err(|error| error.to_string())
+}
+
+/// **AI が出した点検の案**を画面へ渡すイベント（D72 の次の段）。
+pub const CHECK_PROPOSAL_EVENT: &str = "check://proposal";
+
+/// 案を画面へ押し出す。**案が人の目に触れないと、保存されないまま消えます。**
+pub fn spawn_check_proposal_bridge(app: AppHandle, engine: Arc<Engine>) {
+    tauri::async_runtime::spawn(async move {
+        let mut watching = engine.subscribe_check_proposal();
+        while watching.changed().await.is_ok() {
+            let proposed: Option<Check> = watching.borrow().clone();
+            if let Err(error) = app.emit(CHECK_PROPOSAL_EVENT, proposed) {
+                eprintln!("[sshboard] 点検の案を画面へ渡せません: {error}");
+            }
+        }
+    });
+}
+
+/// いま答えを待っている点検の案。**起動直後の取りこぼし対策。**
+#[tauri::command]
+pub fn check_proposal(engine: State<'_, Arc<Engine>>) -> Option<Check> {
+    engine.check_proposal()
+}
+
+/// **人が案を保存する。**`checks.toml` へ書き足します。**この口は画面にしか在りません。**
+#[tauri::command]
+pub fn check_proposal_save(engine: State<'_, Arc<Engine>>) -> Result<Check, String> {
+    engine
+        .save_check_proposal()
+        .map_err(|error| error.to_string())
+}
+
+/// **人が案を断る。**何も書きません。
+#[tauri::command]
+pub fn check_proposal_dismiss(engine: State<'_, Arc<Engine>>) {
+    engine.dismiss_check_proposal();
 }

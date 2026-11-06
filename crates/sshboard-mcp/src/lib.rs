@@ -14,7 +14,7 @@ mod view;
 pub use about::{changes_since, releases, Release, CHANGELOG};
 pub use capture::{WindowCapture, WindowShot};
 pub use channel::{answered, channel_notice, Waiting, CHANNEL_CAPABILITY, CHANNEL_METHOD};
-pub use check_tools::CheckId;
+pub use check_tools::{CheckId, ProposedCheck, ProposedStep};
 pub use http::{new_token, serve, McpEndpoint, ServeParts, MCP_PATH};
 pub use server::{
     CaptureWindow, MarkConnection, RegisterConnection, SshboardMcp, DEFAULT_ACK_TIMEOUT,

@@ -45,7 +45,7 @@ GROUPS = [
     # `propose_operation` は**走らせる口ではありません**（2026-10-23）——
     # 人へ「これを足してよいか」と出すだけで、**書くのは画面**です。
     # それでも `cmds` に置きます: 人が読むときの関心は「コマンドの話」で同じだからです。
-    ("cmds", ["list_readonly_commands", "run_readonly", "list_checks", "run_check", "list_operations",
+    ("cmds", ["list_readonly_commands", "run_readonly", "list_checks", "run_check", "propose_check", "list_operations",
               "run_operation", "propose_operation"]),
     ("console", ["console_open", "console_type", "console_stop", "console_release", "read_stream",
                  "list_consoles", "read_console"]),

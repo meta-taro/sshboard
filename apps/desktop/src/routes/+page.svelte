@@ -14,6 +14,9 @@
 		type CheckReport,
 		type ChecksOverview
 	} from '$lib/components/CheckDialog.svelte';
+	import CheckProposalDialog, {
+		type ProposedCheck
+	} from '$lib/components/CheckProposalDialog.svelte';
 	import PassphraseDialog from '$lib/components/PassphraseDialog.svelte';
 	import ConnectPanel from '$lib/components/ConnectPanel.svelte';
 	import ConsolePaneView from '$lib/components/ConsolePane.svelte';
@@ -103,6 +106,8 @@
 	/** **点検**（D72）。開いている間だけ一覧を持つ。 */
 	let checksOverview = $state<ChecksOverview | null>(null);
 	let checkRunning = $state<string | null>(null);
+	/** **AI が出した点検の案**（D72 の次の段）。保存するのは人。 */
+	let checkProposal = $state<ProposedCheck | null>(null);
 
 	/** メニューの文言は**既にある**（`messages-menu`）。新しい言い方を増やさない。 */
 	const menu = $derived(menuLabels(i18n.locale));
@@ -469,6 +474,26 @@
 		} finally {
 			checkRunning = null;
 		}
+	}
+
+	async function saveCheckProposal() {
+		failure = null;
+		try {
+			await invoke('check_proposal_save');
+			checkProposal = null;
+		} catch (error: unknown) {
+			// **握り潰さない。**押したのに入っていない、を作らない。
+			failure = String(error);
+		}
+	}
+
+	async function dismissCheckProposal() {
+		try {
+			await invoke('check_proposal_dismiss');
+		} catch (error: unknown) {
+			failure = String(error);
+		}
+		checkProposal = null;
 	}
 
 	async function revokeStanding(held: Standing) {
@@ -1298,6 +1323,14 @@
 		}).then((off) => stops.push(off));
 		listen<OperationProposal | null>('operation://proposal', (event) => {
 			operationProposal = event.payload;
+		}).then((off) => stops.push(off));
+		invoke<ProposedCheck | null>('check_proposal')
+			.then((proposed) => {
+				checkProposal = proposed;
+			})
+			.catch(() => {});
+		listen<ProposedCheck | null>('check://proposal', (event) => {
+			checkProposal = event.payload;
 		}).then((off) => stops.push(off));
 		listen<OperationAsk | null>('operation://request', (event) => {
 			operationAsk = event.payload;
@@ -2198,6 +2231,14 @@
 				void stopAi();
 			}}
 			onno={() => (stopAiAsking = false)}
+		/>
+	{/if}
+
+	{#if checkProposal}
+		<CheckProposalDialog
+			proposal={checkProposal}
+			onSave={() => void saveCheckProposal()}
+			onDismiss={() => void dismissCheckProposal()}
 		/>
 	{/if}
 

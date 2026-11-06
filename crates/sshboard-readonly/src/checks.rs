@@ -72,6 +72,18 @@ pub struct Check {
     pub steps: Vec<Step>,
 }
 
+impl Check {
+    /// **表へ書き足す 1 塊**（`[[check]]` と手順）。AI の案を人が保存するときに使います。
+    pub fn to_toml_block(&self) -> String {
+        #[derive(Serialize)]
+        struct One<'a> {
+            check: [&'a Check; 1],
+        }
+        // 型が決まっているので、書けないことはありません（書けなければ空を返して、読み直しで断られます）。
+        toml::to_string(&One { check: [self] }).unwrap_or_default()
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Checks {

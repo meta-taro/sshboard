@@ -105,3 +105,68 @@ async fn a_step_that_could_not_run_is_reported_as_unknown_not_good() {
     assert_eq!(parsed["steps"][0]["title"], "ディスク");
     assert_eq!(parsed["steps"][0]["judged"]["verdict"]["kind"], "unknown");
 }
+
+// --- propose_check（D72 の次の段）：AI は案を出すだけ。保存するのは画面の人 ---------
+
+fn proposal(readonly: &str) -> Parameters<sshboard_mcp::ProposedCheck> {
+    Parameters(sshboard_mcp::ProposedCheck {
+        check_id: "daily".to_owned(),
+        description: Some("毎朝".to_owned()),
+        steps: vec![sshboard_mcp::ProposedStep {
+            readonly: readonly.to_owned(),
+            label: Some("ディスク".to_owned()),
+            contains: None,
+            absent: None,
+            below: Some(90.0),
+            above: None,
+        }],
+    })
+}
+
+#[tokio::test]
+async fn a_proposal_is_put_in_front_of_the_person_and_nothing_is_written() {
+    let dir = tempfile::tempdir().expect("一時ディレクトリ");
+    std::fs::write(
+        dir.path().join("readonly.toml"),
+        "version = 1\n[[command]]\nid = \"disk\"\nrun = \"df\"\n",
+    )
+    .expect("書けない");
+    let server = server_in(&dir);
+
+    let said = server
+        .propose_check(proposal("disk"))
+        .await
+        .expect("出せない");
+
+    assert!(
+        said.contains("person"),
+        "人が保存すると言っていない: {said}"
+    );
+    assert!(
+        !dir.path().join("checks.toml").exists(),
+        "**AI の口から書いた**"
+    );
+}
+
+#[tokio::test]
+async fn a_proposal_with_a_step_outside_the_allowlist_comes_back_as_something_the_ai_can_fix() {
+    let dir = tempfile::tempdir().expect("一時ディレクトリ");
+    std::fs::write(
+        dir.path().join("readonly.toml"),
+        "version = 1\n[[command]]\nid = \"disk\"\nrun = \"df\"\n",
+    )
+    .expect("書けない");
+    let server = server_in(&dir);
+
+    let error = server
+        .propose_check(proposal("cat-shadow"))
+        .await
+        .expect_err("通った");
+
+    assert_eq!(error.code, rmcp::model::ErrorCode::INVALID_PARAMS);
+    assert!(
+        error.message.contains("disk"),
+        "在るものを言っていない: {}",
+        error.message
+    );
+}

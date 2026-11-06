@@ -33,6 +33,7 @@ sshboard-connections = { path = "../../../crates/sshboard-connections" }
 sshboard-credentials = { path = "../../../crates/sshboard-credentials" }
 sshboard-diag = { path = "../../../crates/sshboard-diag" }
 sshboard-engine = { path = "../../../crates/sshboard-engine" }
+sshboard-readonly = { path = "../../../crates/sshboard-readonly" }
 sshboard-mcp = { path = "../../../crates/sshboard-mcp" }
 sshboard-stream = { path = "../../../crates/sshboard-stream" }
 tauri = { version = "2", features = [] }

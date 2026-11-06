@@ -145,7 +145,7 @@ Filesystem      Size  Used Avail Use% Mounted on
 
 `list_connections` / `list_directory` / `stat` / `read_file` / `search` / `download` /
 `disk_usage` / `process_list` / `service_status` / `runtime_versions` / `read_log` /
-`network_listen` / `run_readonly`（許可リスト方式）/ `list_checks` / `run_check`（点検表）
+`network_listen` / `run_readonly`（許可リスト方式）/ `list_checks` / `run_check` / `propose_check`（点検表）
 
 **`run_command(cmd)` を作りません。**1 つ置けば全部できてしまい、破壊的操作を防ぐ手段が
 「使わない約束」しか残らないからです。**約束は手順書であって、ゲートではありません。**
@@ -247,6 +247,7 @@ description = "稼働時間"
 - 悪しが出ても最後まで回し、**前回の値を隣に並べます**（アプリを終えるまで）
 - 各手順は帯に出てから走ります。**AI が回した点検も、画面の［点検］に出ます**
 - **既定は空**です。書くのは人で、AI は書けません
+- AI は `propose_check` で**点検の案を出せます。**画面に手順と基準が全部出て、保存するのは人です（保存しても回りません）
 
 ひな型は [`docs/checks.example.toml`](docs/checks.example.toml) です。
 

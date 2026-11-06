@@ -100,6 +100,9 @@ pub fn run() {
             allowlist_cmd::allowlist_overview,
             check_cmd::checks_overview,
             check_cmd::check_run,
+            check_cmd::check_proposal,
+            check_cmd::check_proposal_save,
+            check_cmd::check_proposal_dismiss,
             connections_cmd::connections_path,
             connections_cmd::connection_save,
             connections_cmd::connection_delete,
@@ -235,6 +238,7 @@ pub fn run() {
             // **走らせてよいかを人へ問う**（D45 / D47）。
             session_cmd::spawn_operation_bridge(app.handle().clone(), Arc::clone(&engine));
             session_cmd::spawn_proposal_bridge(app.handle().clone(), Arc::clone(&engine));
+            check_cmd::spawn_check_proposal_bridge(app.handle().clone(), Arc::clone(&engine));
             session_cmd::spawn_transfer_bridge(app.handle().clone(), Arc::clone(&engine));
 
             mcp_host::spawn(

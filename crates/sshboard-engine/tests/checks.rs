@@ -140,3 +140,145 @@ async fn the_last_run_can_be_read_back_by_the_screen() {
 
     assert_eq!(engine.last_check("morning").await, Some(ran));
 }
+
+// --- AI が点検の案を出し、画面の人が保存する（D72 の次の段） ---------------------------
+
+const ALLOWED: &str = "version = 1\n[[command]]\nid = \"disk\"\nrun = \"df\"\n[[command]]\nid = \"uptime\"\nrun = \"uptime\"\n";
+
+fn proposed(id: &str, readonly: &str) -> sshboard_readonly::Check {
+    let text = format!(
+        "version = 1\n[[check]]\nid = \"{id}\"\ndescription = \"案\"\n[[check.step]]\nreadonly = \"{readonly}\"\nbelow = 90\n"
+    );
+    sshboard_readonly::Checks::parse(&text)
+        .expect("案が読めない")
+        .get(id)
+        .expect("案が無い")
+        .clone()
+}
+
+fn engine_with_screen(dir: &tempfile::TempDir) -> Engine {
+    let band = Band::new();
+    let mut seen = band.subscribe();
+    tokio::spawn(async move {
+        while let Ok(event) = seen.recv().await {
+            event.ack();
+        }
+    });
+    let path = dir.path().join("connections.toml");
+    std::fs::write(&path, "version = 1\n").expect("接続一覧を書けない");
+    Engine::new(band, Arc::new(OutputStream::new()), path)
+}
+
+#[tokio::test]
+async fn a_proposal_naming_a_command_that_is_not_allowed_is_refused_before_the_person_sees_it() {
+    let dir = tempfile::tempdir().expect("一時ディレクトリ");
+    write(&dir, "readonly.toml", ALLOWED);
+    let engine = engine_with_screen(&dir);
+
+    let refused = engine
+        .propose_check(Actor::Ai, proposed("daily", "rm-everything"))
+        .await;
+
+    match refused {
+        Err(EngineError::BadArgument(why)) => {
+            assert!(why.contains("disk"), "在るものを言っていない: {why}")
+        }
+        other => panic!("通った: {other:?}"),
+    }
+    assert!(engine.check_proposal().is_none(), "断ったのに画面へ出した");
+}
+
+#[tokio::test]
+async fn a_proposal_waits_for_the_person_and_only_one_waits_at_a_time() {
+    let dir = tempfile::tempdir().expect("一時ディレクトリ");
+    write(&dir, "readonly.toml", ALLOWED);
+    let engine = engine_with_screen(&dir);
+
+    engine
+        .propose_check(Actor::Ai, proposed("daily", "disk"))
+        .await
+        .expect("出せない");
+    assert_eq!(
+        engine.check_proposal().map(|check| check.id),
+        Some("daily".to_owned())
+    );
+
+    let second = engine
+        .propose_check(Actor::Ai, proposed("weekly", "uptime"))
+        .await;
+    assert!(
+        matches!(second, Err(EngineError::ProposalPending { .. })),
+        "上書きした: {second:?}"
+    );
+    // **同じ id の出し直しは通す**（直した版を見せる）。
+    engine
+        .propose_check(Actor::Ai, proposed("daily", "uptime"))
+        .await
+        .expect("出し直せない");
+}
+
+#[tokio::test]
+async fn saving_writes_a_check_list_that_reads_back_and_clears_the_proposal() {
+    let dir = tempfile::tempdir().expect("一時ディレクトリ");
+    write(&dir, "readonly.toml", ALLOWED);
+    write(&dir, "checks.toml", "version = 1\n\n# 人が書いた注記\n[[check]]\nid = \"old\"\n[[check.step]]\nreadonly = \"uptime\"\n");
+    let engine = engine_with_screen(&dir);
+    engine
+        .propose_check(Actor::Ai, proposed("daily", "disk"))
+        .await
+        .expect("出せない");
+
+    let saved = engine.save_check_proposal().expect("保存できない");
+
+    assert_eq!(saved.id, "daily");
+    assert!(
+        engine.check_proposal().is_none(),
+        "保存したのに案が残っている"
+    );
+    let text = std::fs::read_to_string(dir.path().join("checks.toml")).expect("読めない");
+    assert!(
+        text.contains("# 人が書いた注記"),
+        "人の書いたものを消した: {text}"
+    );
+    let checks = engine.checks().expect("保存した表が読めない");
+    assert!(
+        checks.get("old").is_some() && checks.get("daily").is_some(),
+        "{text}"
+    );
+}
+
+#[tokio::test]
+async fn a_check_that_already_exists_is_not_proposed_over() {
+    let dir = tempfile::tempdir().expect("一時ディレクトリ");
+    write(&dir, "readonly.toml", ALLOWED);
+    write(
+        &dir,
+        "checks.toml",
+        "version = 1\n[[check]]\nid = \"daily\"\n[[check.step]]\nreadonly = \"uptime\"\n",
+    );
+    let engine = engine_with_screen(&dir);
+
+    let refused = engine
+        .propose_check(Actor::Ai, proposed("daily", "disk"))
+        .await;
+    assert!(
+        matches!(refused, Err(EngineError::BadArgument(_))),
+        "上書きの案が通った: {refused:?}"
+    );
+}
+
+#[tokio::test]
+async fn declining_writes_nothing() {
+    let dir = tempfile::tempdir().expect("一時ディレクトリ");
+    write(&dir, "readonly.toml", ALLOWED);
+    let engine = engine_with_screen(&dir);
+    engine
+        .propose_check(Actor::Ai, proposed("daily", "disk"))
+        .await
+        .expect("出せない");
+
+    engine.dismiss_check_proposal();
+
+    assert!(engine.check_proposal().is_none());
+    assert!(!dir.path().join("checks.toml").exists(), "断ったのに書いた");
+}
