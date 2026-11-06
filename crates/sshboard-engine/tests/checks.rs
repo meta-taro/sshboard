@@ -228,7 +228,8 @@ async fn saving_writes_a_check_list_that_reads_back_and_clears_the_proposal() {
         .await
         .expect("出せない");
 
-    let saved = engine.save_check_proposal().expect("保存できない");
+    let shown = engine.check_proposal().expect("案が出ていない");
+    let saved = engine.save_check_proposal(&shown).expect("保存できない");
 
     assert_eq!(saved.id, "daily");
     assert!(
@@ -281,4 +282,94 @@ async fn declining_writes_nothing() {
 
     assert!(engine.check_proposal().is_none());
     assert!(!dir.path().join("checks.toml").exists(), "断ったのに書いた");
+}
+
+// --- レビューの指摘（2026-11-06） --------------------------------------------------------
+
+#[tokio::test]
+async fn a_proposal_swapped_after_the_person_saw_it_is_not_saved() {
+    // **人が見た案だけを保存する**（セキュリティレビュー MEDIUM-1）。
+    let dir = tempfile::tempdir().expect("一時ディレクトリ");
+    write(&dir, "readonly.toml", ALLOWED);
+    let engine = engine_with_screen(&dir);
+    engine
+        .propose_check(Actor::Ai, proposed("daily", "disk"))
+        .await
+        .expect("出せない");
+    let seen = engine.check_proposal().expect("案が出ていない");
+    // 押す直前に、AI が同じ id で手順の違う案に差し替える。
+    engine
+        .propose_check(Actor::Ai, proposed("daily", "uptime"))
+        .await
+        .expect("出し直せない");
+
+    let refused = engine.save_check_proposal(&seen);
+
+    assert!(
+        matches!(refused, Err(EngineError::BadArgument(_))),
+        "見ていない案を保存した: {refused:?}"
+    );
+    assert!(!dir.path().join("checks.toml").exists());
+    assert_eq!(
+        engine
+            .check_proposal()
+            .map(|check| check.steps[0].readonly.clone()),
+        Some("uptime".to_owned())
+    );
+}
+
+#[tokio::test]
+async fn an_oversized_proposal_is_refused_before_the_person_sees_it() {
+    // **画面を埋める案で、大事な手順を見落とさせない**（セキュリティレビュー LOW-1）。
+    let dir = tempfile::tempdir().expect("一時ディレクトリ");
+    write(&dir, "readonly.toml", ALLOWED);
+    let engine = engine_with_screen(&dir);
+
+    let mut many = proposed("daily", "disk");
+    many.steps = vec![many.steps[0].clone(); 21];
+    assert!(matches!(
+        engine.propose_check(Actor::Ai, many).await,
+        Err(EngineError::BadArgument(_))
+    ));
+
+    let mut wordy = proposed("daily", "disk");
+    wordy.description = Some("x".repeat(500));
+    assert!(matches!(
+        engine.propose_check(Actor::Ai, wordy).await,
+        Err(EngineError::BadArgument(_))
+    ));
+    assert!(engine.check_proposal().is_none());
+}
+
+#[tokio::test]
+async fn saving_leaves_no_half_written_file_behind() {
+    // **書いている途中で落ちても、人の育てた表を空にしない**（コードレビュー L1）。一時ファイルに書いて置き換える。
+    let dir = tempfile::tempdir().expect("一時ディレクトリ");
+    write(&dir, "readonly.toml", ALLOWED);
+    let engine = engine_with_screen(&dir);
+    engine
+        .propose_check(Actor::Ai, proposed("daily", "disk"))
+        .await
+        .expect("出せない");
+    let shown = engine.check_proposal().expect("案");
+
+    engine.save_check_proposal(&shown).expect("保存できない");
+
+    let left: Vec<String> = std::fs::read_dir(dir.path())
+        .expect("読めない")
+        .filter_map(|entry| entry.ok()?.file_name().into_string().ok())
+        .filter(|name| name.starts_with("checks") && name != "checks.toml")
+        .collect();
+    assert!(left.is_empty(), "書きかけが残っている: {left:?}");
+}
+
+#[test]
+fn a_run_stops_measuring_once_the_target_has_moved() {
+    // **回している途中で宛先が変わったら、残りは測らない**（コードレビュー M2）。
+    // 前半は A・後半は B の値が A の記録に混ざるのを防ぐ。
+    use sshboard_engine::moved_since;
+    assert!(moved_since(Some("a"), Some("a")).is_none());
+    let why = moved_since(Some("a"), Some("b")).expect("変わったのに測った");
+    assert!(why.contains("a") && why.contains("b"), "{why}");
+    assert!(moved_since(Some("a"), None).is_some(), "切れたのに測った");
 }

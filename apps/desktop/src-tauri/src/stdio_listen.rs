@@ -13,24 +13,48 @@ use std::time::Duration;
 /// 開け直すまでの間。**本体が落ちている間に、張り付いて叩かない。**
 const RETRY_AFTER: Duration = Duration::from_secs(1);
 
+/// 溜めておける上限。**区切りの来ない流れで、手元のメモリを使い切らない**（レビュー LOW-6）。
+pub const MAX_HELD_BYTES: usize = 1024 * 1024;
+
+/// 上限を超えた。**流れを切って開け直します。**
+#[derive(Debug)]
+pub struct Overflow;
+
 /// SSE の流れを、**届いた切れ端から**イベントごとに組み直す。
 ///
-/// 流れは好きな所で切れて届きます（イベントの途中・行の途中）。
-/// **空行で終わったイベントだけを渡し、残りは次の切れ端と繋ぎます。**
+/// 流れは好きな所で切れて届きます（イベントの途中・行の途中・**字の途中**）。
+/// **バイトのまま溜め**、空行で終わったイベントだけを字に直して渡します ——
+/// 切れ端ごとに字に直すと、日本語が切れ目で壊れます（レビュー M4）。
 #[derive(Default)]
 pub struct SseBuffer {
-    held: String,
+    held: Vec<u8>,
 }
 
 impl SseBuffer {
-    pub fn push(&mut self, chunk: &str) -> Vec<String> {
-        self.held.push_str(&chunk.replace("\r\n", "\n"));
-        let Some(end) = self.held.rfind("\n\n") else {
-            return Vec::new();
+    pub fn push(&mut self, chunk: &[u8]) -> Result<Vec<String>, Overflow> {
+        self.held.extend_from_slice(chunk);
+        let Some(end) = last_break(&self.held) else {
+            if self.held.len() > MAX_HELD_BYTES {
+                self.held.clear();
+                return Err(Overflow);
+            }
+            return Ok(Vec::new());
         };
-        let done: String = self.held.drain(..end + 2).collect();
-        crate::stdio_proxy::parse_sse(&done)
+        let done: Vec<u8> = self.held.drain(..end).collect();
+        let text = String::from_utf8_lossy(&done).replace("\r\n", "\n");
+        Ok(crate::stdio_proxy::parse_sse(&text))
     }
+}
+
+/// 最後のイベントの区切り（空行）の**直後**の位置。`\n\n` と `\r\n\r\n` の両方を見ます。
+fn last_break(bytes: &[u8]) -> Option<usize> {
+    (1..bytes.len()).rev().find_map(|at| {
+        let ends_line = bytes[at] == b'\n';
+        let blank_before = bytes[at - 1] == b'\n'
+            || (at >= 3 && bytes[at - 1] == b'\r' && bytes[at - 2] == b'\n')
+            || (at >= 3 && &bytes[at - 3..at] == b"\r\n\r");
+        (ends_line && blank_before).then_some(at + 1)
+    })
 }
 
 /// 受け続ける。**戻りません**（中継が終わるときに一緒に落ちます）。
@@ -69,7 +93,13 @@ pub async fn listen(
         };
         let mut buffer = SseBuffer::default();
         while let Ok(Some(chunk)) = response.chunk().await {
-            for line in buffer.push(&String::from_utf8_lossy(&chunk)) {
+            let Ok(lines) = buffer.push(&chunk) else {
+                eprintln!(
+                    "[sshboard] 本体からの知らせが区切られないまま大きすぎるので、開け直します"
+                );
+                break;
+            };
+            for line in lines {
                 emit(line);
             }
         }
@@ -87,23 +117,68 @@ mod tests {
     const NOTICE: &str = r#"{"jsonrpc":"2.0","method":"notifications/claude/channel","params":{"content":"answered"}}"#;
 
     #[test]
+    fn a_character_split_between_two_chunks_is_not_broken() {
+        // **バイトの切れ目で字を壊さない**（レビュー M4・LOW-4）。日本語は 3 バイト。
+        let event = format!(
+            "data: {}\n\n",
+            r#"{"jsonrpc":"2.0","method":"x","params":{"content":"人が答えました"}}"#
+        );
+        let bytes = event.as_bytes();
+        let cut = event.find('人').expect("字") + 1;
+        let mut buffer = SseBuffer::default();
+
+        assert!(buffer.push(&bytes[..cut]).expect("溢れていない").is_empty());
+        let out = buffer.push(&bytes[cut..]).expect("溢れていない");
+
+        assert_eq!(out.len(), 1);
+        assert!(out[0].contains("人が答えました"), "字が壊れた: {}", out[0]);
+    }
+
+    #[test]
+    fn a_crlf_break_split_between_chunks_still_ends_the_event() {
+        // `\r\n\r\n` の途中で切れても、区切りを見落とさない（レビュー LOW-5）。
+        let mut buffer = SseBuffer::default();
+        assert!(buffer
+            .push(format!("data: {NOTICE}\r\n\r").as_bytes())
+            .expect("ok")
+            .is_empty());
+        assert_eq!(buffer.push(b"\n").expect("ok"), vec![NOTICE.to_string()]);
+    }
+
+    #[test]
+    fn a_stream_that_never_ends_an_event_is_cut_off() {
+        // **終わらない流れで、手元のメモリを使い切らない**（レビュー LOW-6）。
+        let mut buffer = SseBuffer::default();
+        let huge = vec![b'x'; MAX_HELD_BYTES + 1];
+        assert!(buffer.push(&huge).is_err(), "上限を超えても溜め続けた");
+    }
+
+    #[test]
     fn an_event_cut_in_the_middle_comes_out_whole_once_it_ends() {
         let mut buffer = SseBuffer::default();
         let (head, tail) = NOTICE.split_at(20);
 
-        assert!(buffer.push(&format!("data: {head}")).is_empty());
+        assert!(buffer
+            .push(format!("data: {head}").as_bytes())
+            .expect("ok")
+            .is_empty());
         assert!(
-            buffer.push(&format!("{tail}\n")).is_empty(),
+            buffer
+                .push(format!("{tail}\n").as_bytes())
+                .expect("ok")
+                .is_empty(),
             "終わる前に渡した"
         );
-        assert_eq!(buffer.push("\n"), vec![NOTICE.to_string()]);
+        assert_eq!(buffer.push(b"\n").expect("ok"), vec![NOTICE.to_string()]);
     }
 
     #[test]
     fn the_empty_retry_frame_is_not_passed_on() {
         // 繋いだ直後の `data: \nid: 0\nretry: 3000` は JSON-RPC ではない（stdio_proxy と同じ）。
         let mut buffer = SseBuffer::default();
-        let out = buffer.push(&format!("data: \nid: 0\nretry: 3000\n\ndata: {NOTICE}\n\n"));
+        let out = buffer
+            .push(format!("data: \nid: 0\nretry: 3000\n\ndata: {NOTICE}\n\n").as_bytes())
+            .expect("ok");
         assert_eq!(out, vec![NOTICE.to_string()]);
     }
 

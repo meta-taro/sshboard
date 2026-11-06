@@ -32,7 +32,8 @@ pub struct Waiting {
     pub operation: bool,
 }
 
-/// 前に在って、いま無いもの ＝ **人が答えたもの。**
+/// 前に在って、いま無いもの。**多くは人が答えたもの**ですが、時間切れ・取り下げでも消えます
+/// （コードレビュー L4）—— 知らせの文はそのどれでもよい言い方にしてあります。
 #[must_use]
 pub fn answered(before: Waiting, after: Waiting) -> Vec<&'static str> {
     [
@@ -55,8 +56,9 @@ pub fn channel_notice(kinds: &[&str]) -> Option<Value> {
     let list = kinds.join(",");
     Some(serde_json::json!({
         "content": format!(
-            "The person answered on sshboard's screen ({list}). \
-             Call pending_status to see the outcome, then retry the call that was waiting."
+            "A question on sshboard's screen is no longer waiting ({list}) - the person \
+             answered or refused it, or it was withdrawn. Call pending_status to see the \
+             outcome, then retry the call that was waiting."
         ),
         "meta": { "answered": list },
     }))

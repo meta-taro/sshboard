@@ -122,16 +122,78 @@ fn unknown(why: &str) -> Verdict {
     }
 }
 
-/// 出力の中の最初の数（`-` と小数点を含む）。
+/// 出力の中の**最初の数**。
+///
+/// **語の頭からだけ読みます**（コードレビュー M3・2026-11-06）—— 語の途中の数字
+/// （`eth0`・`db01`）や、語を繋ぐ `-`（`web-1`）を数にすると、どんな値でも基準に通って
+/// 「良し」になります。`-` は行頭か、空白・`=`・`:`・`(` のあとだけ符号です。
+/// 3 桁ごとの `,` と指数（`1.5e-05`）は続けて読みます。日付（`2024-01-05`）は 2024 です。
 fn first_number(out: &str) -> Option<f64> {
-    let start = out.find(|c: char| c.is_ascii_digit())?;
-    let signed = start > 0 && out.as_bytes()[start - 1] == b'-';
-    let digits: String = out[start..]
-        .chars()
-        .take_while(|c| c.is_ascii_digit() || *c == '.')
-        .collect();
-    let number: f64 = digits.trim_end_matches('.').parse().ok()?;
+    let chars: Vec<char> = out.chars().collect();
+    (0..chars.len()).find_map(|at| number_at(&chars, at))
+}
+
+/// `at` から数が始まっていれば読む。
+fn number_at(chars: &[char], at: usize) -> Option<f64> {
+    let before = at.checked_sub(1).map(|i| chars[i]);
+    let signed = chars[at] == '-';
+    let digits_from = if signed { at + 1 } else { at };
+    if !chars.get(digits_from).is_some_and(char::is_ascii_digit) {
+        return None;
+    }
+    let starts_a_word = match before {
+        None => true,
+        Some(c) if signed => c.is_whitespace() || "=:(,[".contains(c),
+        Some(c) => !(c.is_alphanumeric() || c == '.' || c == '_' || c == '-'),
+    };
+    if !starts_a_word {
+        return None;
+    }
+    let text: String = read_number(chars, digits_from);
+    let number: f64 = text.parse().ok()?;
     Some(if signed { -number } else { number })
+}
+
+/// 数字・3 桁区切り・小数・指数を読み、**区切りを落とした**文字列を返す。
+fn read_number(chars: &[char], from: usize) -> String {
+    let mut text = String::new();
+    let mut i = from;
+    let digit = |i: usize| chars.get(i).is_some_and(char::is_ascii_digit);
+    while i < chars.len() {
+        let c = chars[i];
+        if c.is_ascii_digit() {
+            text.push(c);
+            i += 1;
+        } else if c == ',' && (1..=3).all(|k| digit(i + k)) && !digit(i + 4) {
+            i += 1;
+        } else {
+            break;
+        }
+    }
+    if chars.get(i) == Some(&'.') && digit(i + 1) {
+        text.push('.');
+        i += 1;
+        while digit(i) {
+            text.push(chars[i]);
+            i += 1;
+        }
+    }
+    if matches!(chars.get(i), Some('e' | 'E')) {
+        let sign = matches!(chars.get(i + 1), Some('+' | '-'));
+        let first = if sign { i + 2 } else { i + 1 };
+        if digit(first) {
+            text.push('e');
+            if sign {
+                text.push(chars[i + 1]);
+            }
+            i = first;
+            while digit(i) {
+                text.push(chars[i]);
+                i += 1;
+            }
+        }
+    }
+    text
 }
 
 fn shown(out: &str) -> String {

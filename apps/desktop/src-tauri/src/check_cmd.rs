@@ -82,10 +82,12 @@ pub fn check_proposal(engine: State<'_, Arc<Engine>>) -> Option<Check> {
 }
 
 /// **人が案を保存する。**`checks.toml` へ書き足します。**この口は画面にしか在りません。**
+///
+/// **画面が見せていた案を受け取ります。**いま持っている案と違えば保存しません。
 #[tauri::command]
-pub fn check_proposal_save(engine: State<'_, Arc<Engine>>) -> Result<Check, String> {
+pub fn check_proposal_save(engine: State<'_, Arc<Engine>>, shown: Check) -> Result<Check, String> {
     engine
-        .save_check_proposal()
+        .save_check_proposal(&shown)
         .map_err(|error| error.to_string())
 }
 

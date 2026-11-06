@@ -57,7 +57,9 @@ test('save goes through the screen-only command and the dialog closes', async ({
 
 	await dialog.getByRole('button', { name: '保存する' }).click();
 
-	expect(await calledWith(page, 'check_proposal_save')).toHaveLength(1);
+	// **見せていた案を渡す。**実行体は、いま持っている案と違えば保存しない（差し替え対策）。
+	const sent = await calledWith(page, 'check_proposal_save');
+	expect(sent.map((c) => c.args)).toEqual([{ shown: PROPOSAL }]);
 	await expect(dialog).toBeHidden();
 });
 
@@ -70,6 +72,24 @@ test('declining writes nothing and the dialog closes', async ({ page }) => {
 	expect(await calledWith(page, 'check_proposal_dismiss')).toHaveLength(1);
 	expect(await calledWith(page, 'check_proposal_save')).toHaveLength(0);
 	await expect(dialog).toBeHidden();
+});
+
+test('escape typed somewhere else, like the terminal, does not throw the proposal away', async ({
+	page
+}) => {
+	// **端末で vim を打っている人の Esc で、案が消えない**（セキュリティレビュー LOW-2）。
+	await shown(page);
+	const dialog = page.getByRole('dialog', { name: '点検の案' });
+
+	await page.locator('body').press('Escape');
+	await expect(dialog).toBeVisible();
+	expect(await calledWith(page, 'check_proposal_dismiss')).toHaveLength(0);
+
+	// 案に目を移してからの Esc は、断るの意味。
+	await dialog.getByRole('button', { name: '断る' }).focus();
+	await page.keyboard.press('Escape');
+	await expect(dialog).toBeHidden();
+	expect(await calledWith(page, 'check_proposal_dismiss')).toHaveLength(1);
 });
 
 for (const scheme of ['light', 'dark'] as const) {

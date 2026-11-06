@@ -245,3 +245,64 @@ fn the_template_in_docs_is_a_valid_check_list() {
     let checks = Checks::parse(template).expect("docs/checks.example.toml が読めない");
     assert_eq!(checks.get("morning").expect("morning").steps.len(), 4);
 }
+
+// --- 「最初の数」を取り違えない（コードレビュー M3・2026-11-06） ---------------------
+//
+// 測り違えて「良し」を出すのが、点検でいちばん困る転び方です。**数は語の頭から読み**、
+// 語の途中の数字（`eth0`・`db01`）や、区切りの `-`（`web-1`）を数にしません。
+
+fn below(limit: f64) -> sshboard_readonly::Step {
+    let text = format!(
+        "version = 1\n[[check]]\nid = \"a\"\n[[check.step]]\nreadonly = \"x\"\nbelow = {limit}\n"
+    );
+    Checks::parse(&text)
+        .expect("読めない")
+        .get("a")
+        .expect("a")
+        .steps[0]
+        .clone()
+}
+
+#[test]
+fn digits_inside_a_word_are_not_the_number() {
+    // `eth0` の 0 を読むと、どんな値でも「90 未満」で良しになる。
+    let step = below(90.0);
+    assert!(matches!(
+        step.judge(&ran("eth0 rx 95", Some(0))).verdict,
+        Verdict::Bad { .. }
+    ));
+    assert!(matches!(
+        step.judge(&ran("db01: 95%", Some(0))).verdict,
+        Verdict::Bad { .. }
+    ));
+}
+
+#[test]
+fn a_hyphen_joining_words_is_not_a_minus_sign() {
+    // `web-1: 95` の `-1` を負の数と読むと「90 未満」で良しになる。
+    let step = below(90.0);
+    assert!(matches!(
+        step.judge(&ran("web-1: 95", Some(0))).verdict,
+        Verdict::Bad { .. }
+    ));
+    // 行頭や空白のあとの `-` は符号。
+    assert_eq!(step.judge(&ran("-5", Some(0))).verdict, Verdict::Good);
+    assert_eq!(
+        step.judge(&ran("delta = -5", Some(0))).verdict,
+        Verdict::Good
+    );
+}
+
+#[test]
+fn thousands_separators_and_exponents_are_read_whole() {
+    let step = below(1000.0);
+    assert!(matches!(
+        step.judge(&ran("1,234 MB", Some(0))).verdict,
+        Verdict::Bad { .. }
+    ));
+    assert!(matches!(
+        step.judge(&ran("1.5e+05", Some(0))).verdict,
+        Verdict::Bad { .. }
+    ));
+    assert_eq!(step.judge(&ran("1.5e-05", Some(0))).verdict, Verdict::Good);
+}

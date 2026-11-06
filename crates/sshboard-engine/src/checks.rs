@@ -43,8 +43,13 @@ pub struct CheckReport {
 
 /// **前回の結果と、AI の案。メモリだけ**（アプリを終えると消える・D72）。
 pub(crate) struct CheckMemory {
-    /// 点検 id × 接続ごとの最後の結果。
+    /// 点検 id × 接続ごとの最後の結果（画面に出すもの）。
     last: Mutex<HashMap<(String, String), CheckReport>>,
+    /// **手順ごとの、最後に実際に測れた値**（前回の値はここから）。
+    ///
+    /// 測れなかった回（繋がっていない・許可外）で上書きすると、
+    /// 前回の値が空になって比べられなくなります（コードレビュー M1）。
+    measured: Mutex<HashMap<StepKey, Judged>>,
     /// **AI が出した点検の案**（まだ保存されていない）。1 枠。
     proposal: watch::Sender<Option<Check>>,
 }
@@ -53,12 +58,24 @@ impl Default for CheckMemory {
     fn default() -> Self {
         Self {
             last: Mutex::default(),
+            measured: Mutex::default(),
             proposal: watch::channel(None).0,
         }
     }
 }
 
+/// 点検 id・接続・手順の位置・手順の id。**位置か id が変われば別の手順**です。
+type StepKey = (String, String, usize, String);
+
 impl CheckMemory {
+    async fn measured(&self, key: &StepKey) -> Option<Judged> {
+        self.measured.lock().await.get(key).cloned()
+    }
+
+    async fn remember_measured(&self, key: StepKey, judged: Judged) {
+        self.measured.lock().await.insert(key, judged);
+    }
+
     async fn previous(&self, check: &str, connection: &str) -> Option<CheckReport> {
         let key = (check.to_owned(), connection.to_owned());
         self.last.lock().await.get(&key).cloned()
@@ -109,31 +126,40 @@ impl Engine {
         };
 
         let connection = self.active().await.map(|opened| opened.id);
-        let before = self
-            .check_memory()
-            .previous(id, connection.as_deref().unwrap_or_default())
-            .await;
+        let on = connection.clone().unwrap_or_default();
 
         let mut steps = Vec::with_capacity(check.steps.len());
+        let mut moved: Option<String> = None;
         for (index, step) in check.steps.iter().enumerate() {
-            let outcome = match self.run_readonly(actor, &step.readonly).await {
-                Ok(ran) => StepOutcome::Ran {
-                    out: ran.out,
-                    status: ran.status,
-                },
-                Err(error) => StepOutcome::DidNotRun {
-                    why: error.to_string(),
+            // **途中で宛先が変わったら、残りは測らない**（コードレビュー M2）。
+            if moved.is_none() {
+                let now = self.active().await.map(|opened| opened.id);
+                moved = moved_since(connection.as_deref(), now.as_deref());
+            }
+            let outcome = match &moved {
+                Some(why) => StepOutcome::DidNotRun { why: why.clone() },
+                None => match self.run_readonly(actor, &step.readonly).await {
+                    Ok(ran) => StepOutcome::Ran {
+                        out: ran.out,
+                        status: ran.status,
+                    },
+                    Err(error) => StepOutcome::DidNotRun {
+                        why: error.to_string(),
+                    },
                 },
             };
-            let previous = before
-                .as_ref()
-                .and_then(|report| report.steps.get(index))
-                .filter(|earlier| earlier.readonly == step.readonly)
-                .map(|earlier| earlier.judged.clone());
+            let key = (id.to_owned(), on.clone(), index, step.readonly.clone());
+            let previous = self.check_memory().measured(&key).await;
+            let judged = step.judge(&outcome);
+            if matches!(outcome, StepOutcome::Ran { .. }) {
+                self.check_memory()
+                    .remember_measured(key, judged.clone())
+                    .await;
+            }
             steps.push(StepReport {
                 readonly: step.readonly.clone(),
                 title: step.title().to_owned(),
-                judged: step.judge(&outcome),
+                judged,
                 previous,
             });
         }
@@ -159,8 +185,15 @@ impl Engine {
     /// 人に見せる前に検品します。許可リストに無い手順・既に在る点検の上書き・
     /// 別の案が答えを待っている、はここで断ります（見せてから断ると「押したのに入らない」になる）。
     pub async fn propose_check(&self, actor: Actor, check: Check) -> Result<(), EngineError> {
-        Checks::parse(&format!("version = 1\n{}", check.to_toml_block()))
+        within_limits(&check)?;
+        let parsed = Checks::parse(&format!("version = 1\n{}", check.to_toml_block()))
             .map_err(|error| EngineError::BadArgument(error.to_string()))?;
+        if parsed.get(&check.id) != Some(&check) {
+            return Err(EngineError::BadArgument(format!(
+                "点検 `{}` の案を表の形に直せませんでした",
+                check.id
+            )));
+        }
         self.only_listed_steps(&check)?;
         if self.checks()?.get(&check.id).is_some() {
             return Err(EngineError::BadArgument(format!(
@@ -195,12 +228,21 @@ impl Engine {
     /// **人が案を保存する。**`checks.toml` へ書き足します（人の書いたものは消しません）。
     ///
     /// **ここを呼べるのは画面だけ**です。AI がこのファイルを書く道はありません。
-    pub fn save_check_proposal(&self) -> Result<Check, EngineError> {
+    ///
+    /// **画面が見せていた案を渡します。**いま持っている案と違えば保存しません ——
+    /// 見せたあとで AI が差し替えた案を、人が見ないまま保存しない（セキュリティレビュー MEDIUM-1）。
+    pub fn save_check_proposal(&self, shown: &Check) -> Result<Check, EngineError> {
         let Some(check) = self.check_proposal() else {
             return Err(EngineError::BadArgument(
                 "保存する点検の案がありません".to_owned(),
             ));
         };
+        if check != *shown {
+            return Err(EngineError::BadArgument(format!(
+                "点検 `{}` の案は、画面に出たあとで差し替わりました。いまの案を見直してから保存してください",
+                check.id
+            )));
+        }
         let path = self.checks_path();
         let held = match std::fs::read_to_string(&path) {
             Ok(text) => text,
@@ -219,9 +261,7 @@ impl Engine {
                 check.id
             )));
         }
-        std::fs::write(&path, text).map_err(|error| {
-            EngineError::Checks(format!("{} へ書けません: {error}", path.display()))
-        })?;
+        write_whole(&path, &text)?;
         self.check_memory().proposal.send_replace(None);
         Ok(check)
     }
@@ -250,6 +290,71 @@ impl Engine {
             have.join(" , ")
         )))
     }
+}
+
+/// **一時ファイルに書いて置き換える**（コードレビュー L1）。
+///
+/// そのまま書くと、書いている途中で落ちたとき、人が育てた表が空になります。
+fn write_whole(path: &std::path::Path, text: &str) -> Result<(), EngineError> {
+    let fail = |error: std::io::Error| {
+        EngineError::Checks(format!("{} へ書けません: {error}", path.display()))
+    };
+    let partial = path.with_extension("toml.partial");
+    std::fs::write(&partial, text).map_err(fail)?;
+    std::fs::rename(&partial, path).map_err(|error| {
+        // 置き換えられなかった書きかけは残さない。**消せなくても、元の表は無傷です。**
+        let _ = std::fs::remove_file(&partial);
+        fail(error)
+    })
+}
+
+/// 案の手順の上限。**画面を埋める案で、大事な手順を見落とさせない**（セキュリティレビュー LOW-1）。
+const MAX_PROPOSED_STEPS: usize = 20;
+/// 案の 1 つの欄の文字数の上限。
+const MAX_PROPOSED_CHARS: usize = 200;
+
+/// **AI の案だけに掛ける上限。**人が自分で書く表は縛りません。
+fn within_limits(check: &Check) -> Result<(), EngineError> {
+    if check.steps.len() > MAX_PROPOSED_STEPS {
+        return Err(EngineError::BadArgument(format!(
+            "手順は {MAX_PROPOSED_STEPS} 個までです（{} 個ありました）。分けて出してください",
+            check.steps.len()
+        )));
+    }
+    let texts = [Some(check.id.as_str()), check.description.as_deref()]
+        .into_iter()
+        .chain(check.steps.iter().flat_map(|step| {
+            [
+                Some(step.readonly.as_str()),
+                step.label.as_deref(),
+                step.expect.contains.as_deref(),
+                step.expect.absent.as_deref(),
+            ]
+        }));
+    if texts
+        .flatten()
+        .any(|text| text.chars().count() > MAX_PROPOSED_CHARS)
+    {
+        return Err(EngineError::BadArgument(format!(
+            "案の欄は {MAX_PROPOSED_CHARS} 文字までです。短くして出してください"
+        )));
+    }
+    Ok(())
+}
+
+/// **回し始めた宛先から、いまの宛先が変わったか。**変わっていれば理由を返します。
+///
+/// 前半は A・後半は B の値が A の記録に混ざるのを防ぐため、変わったら残りは測りません。
+pub fn moved_since(started: Option<&str>, now: Option<&str>) -> Option<String> {
+    if started == now {
+        return None;
+    }
+    let name = |id: Option<&str>| id.unwrap_or("（繋がっていない）").to_owned();
+    Some(format!(
+        "回している途中で宛先が変わりました（{} → {}）。もう一度回してください",
+        name(started),
+        name(now)
+    ))
 }
 
 fn summarise(check: &Check, connection: Option<String>, steps: Vec<StepReport>) -> CheckReport {

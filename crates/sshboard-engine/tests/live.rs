@@ -2900,3 +2900,46 @@ async fn a_check_runs_each_step_judges_it_and_remembers_the_last_value() {
     let earlier = second.steps[0].previous.as_ref().expect("前回の値が無い");
     assert_eq!(earlier.value, "42%");
 }
+
+#[tokio::test]
+async fn a_run_that_could_not_measure_keeps_the_last_measured_value() {
+    // **測れなかった回で、前回の値を空にしない**（コードレビュー M1・2026-11-06）。
+    if !server_is_up().await {
+        println!("テスト用サーバーが建っていません（想定内・飛ばします）");
+        return;
+    }
+    let dir = tempfile::tempdir().expect("一時ディレクトリ");
+    std::fs::write(
+        dir.path().join("readonly.toml"),
+        "version = 1\n[[command]]\nid = \"disk\"\nrun = \"echo ' 42%'\"\n",
+    )
+    .expect("許可リストを書けない");
+    std::fs::write(
+        dir.path().join("checks.toml"),
+        "version = 1\n[[check]]\nid = \"morning\"\n[[check.step]]\nreadonly = \"disk\"\nbelow = 90\n",
+    )
+    .expect("点検表を書けない");
+    let engine = engine_connected(&dir).await;
+    engine
+        .run_check(Actor::Human, "morning")
+        .await
+        .expect("回せない");
+
+    // **同じ接続のまま、測れない回**（許可リストから一時的に外れた）。
+    let allowed = std::fs::read_to_string(dir.path().join("readonly.toml")).expect("読めない");
+    std::fs::write(dir.path().join("readonly.toml"), "version = 1\n").expect("書けない");
+    let blind = engine
+        .run_check(Actor::Human, "morning")
+        .await
+        .expect("回せない");
+    assert_eq!(blind.unknown, 1);
+
+    // 戻して回す。**前回は、測れた 42% のまま。**
+    std::fs::write(dir.path().join("readonly.toml"), allowed).expect("書けない");
+    let again = engine
+        .run_check(Actor::Human, "morning")
+        .await
+        .expect("回せない");
+    let earlier = again.steps[0].previous.as_ref().expect("前回の値が消えた");
+    assert_eq!(earlier.value, "42%");
+}

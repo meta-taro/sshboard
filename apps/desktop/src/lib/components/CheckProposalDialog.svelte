@@ -39,8 +39,6 @@
 	}
 </script>
 
-<svelte:window onkeydown={(event) => event.key === 'Escape' && onDismiss()} />
-
 <div
 	class="backdrop"
 	role="presentation"
@@ -48,7 +46,18 @@
 		if (event.target === event.currentTarget) onDismiss();
 	}}
 >
-	<div class="dialog" role="dialog" aria-modal="true" aria-label={i18n.t('checkProposal.title')}>
+	<!--
+		**Esc は、案に目を移しているときだけ**（セキュリティレビュー LOW-2）。
+		窓全体で拾うと、端末で vim を打っている人の Esc で案が消えます。
+	-->
+	<div
+		class="dialog"
+		role="dialog"
+		aria-modal="true"
+		tabindex="-1"
+		aria-label={i18n.t('checkProposal.title')}
+		onkeydown={(event) => event.key === 'Escape' && onDismiss()}
+	>
 		<h2>{i18n.t('checkProposal.title')}</h2>
 		<p class="note">{i18n.t('checkProposal.what')}</p>
 

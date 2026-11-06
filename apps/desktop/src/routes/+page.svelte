@@ -479,7 +479,8 @@
 	async function saveCheckProposal() {
 		failure = null;
 		try {
-			await invoke('check_proposal_save');
+			// **見せていた案を渡す。**見せたあとで差し替わっていたら、実行体が断ります。
+			await invoke('check_proposal_save', { shown: checkProposal });
 			checkProposal = null;
 		} catch (error: unknown) {
 			// **握り潰さない。**押したのに入っていない、を作らない。

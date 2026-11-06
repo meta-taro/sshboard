@@ -43,8 +43,6 @@
 	} = $props();
 </script>
 
-<svelte:window onkeydown={(event) => event.key === 'Escape' && ondismiss()} />
-
 <!-- svelte-ignore a11y_click_events_have_key_events -->
 <div class="veil" role="presentation" onclick={ondismiss}>
 	<!-- svelte-ignore a11y_click_events_have_key_events -->
@@ -56,6 +54,7 @@
 		tabindex="-1"
 		aria-label={i18n.t('propose.title')}
 		onclick={(event) => event.stopPropagation()}
+		onkeydown={(event) => event.key === 'Escape' && ondismiss()}
 	>
 		<header>
 			<h2><Icon name="warning" size={14} /> {i18n.t('propose.title')}</h2>
