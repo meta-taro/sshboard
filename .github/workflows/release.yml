@@ -154,6 +154,31 @@ jobs:
           rm -f apps/desktop/signing-smoke.txt apps/desktop/signing-smoke.txt.sig
           echo "署名できました"
 
+      # **WiX（MSI を作る道具）は NuGet から入れる**（2026-11-09）。
+      #
+      # Tauri は WiX を GitHub の wixtoolset/wix3 のリリースから取りに行きますが、
+      # その配り口が 504 を返し続け、**0.1.40 は Windows の 2 台とも束ねる所で落ちました**
+      # （GitHub の状態は正常・ほかの配布物は取れる・手元から取っても 504）。
+      # 同じ 3.14.1 が NuGet に在るので、Tauri が探す場所（%LOCALAPPDATA%\tauri\WixTools314）へ
+      # 先に置きます。在れば Tauri は取りに行きません。
+      - name: WiX を NuGet から用意する
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $dest = Join-Path $env:LOCALAPPDATA 'tauri\WixTools314'
+          if (Test-Path (Join-Path $dest 'candle.exe')) { Write-Host "WiX はもう在ります"; exit 0 }
+          $pkg = Join-Path $env:RUNNER_TEMP 'wix.3.14.1.zip'
+          Invoke-WebRequest -Uri 'https://www.nuget.org/api/v2/package/wix/3.14.1' -OutFile $pkg
+          $tmp = Join-Path $env:RUNNER_TEMP 'wix-nupkg'
+          Expand-Archive -Path $pkg -DestinationPath $tmp -Force
+          New-Item -ItemType Directory -Force -Path $dest | Out-Null
+          Copy-Item -Path (Join-Path $tmp 'tools\*') -Destination $dest -Recurse -Force
+          # Tauri が要る 10 個（tauri-bundler の WIX_REQUIRED_FILES）。1 つでも欠けると消して GitHub へ取りに行きます。
+          foreach ($need in 'candle.exe','candle.exe.config','darice.cub','light.exe','light.exe.config','wconsole.dll','winterop.dll','wix.dll','WixUIExtension.dll','WixUtilExtension.dll') {
+            if (-not (Test-Path (Join-Path $dest $need))) { Write-Error "$need がありません"; exit 1 }
+          }
+          Write-Host "WiX 3.14.1 を $dest に置きました"
+
       # `tauri build` が `beforeBuildCommand`（`pnpm build`）を先に走らせます。
       # **`createUpdaterArtifacts` が true なので、`.sig` も一緒に出ます。**
       - name: 束ねる
