@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Get the agent's help without letting it roam the server — sshboard</title>
+    <meta name="description" content="Letting an AI agent edit a site on a server while keeping it inside one directory you chose: the write fence, what it blocks, and what you still control." />
+    <link rel="canonical" href="https://meta-taro.github.io/sshboard/cases/fence.html" />
+    <link rel="icon" href="../icon.png" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; img-src 'self'; style-src 'self'; base-uri 'none'; form-action 'none'" />
+    <link rel="stylesheet" href="../sub.css" />
+    <!-- 架空の案件だけで再現しています（紹介ページの構成 4・8）。名前もパスも作り物です。 -->
+    <script type="application/ld+json">
+[
+  {
+    "@context": "https://schema.org",
+    "@type": "TechArticle",
+    "headline": "Get the agent's help without letting it roam the server",
+    "description": "Letting an AI agent edit a site on a server while keeping it inside one directory you chose: the write fence, what it blocks, and what you still control.",
+    "about": {
+      "@type": "SoftwareApplication",
+      "name": "sshboard"
+    },
+    "url": "https://meta-taro.github.io/sshboard/cases/fence.html"
+  },
+  {
+    "@context": "https://schema.org",
+    "@type": "HowTo",
+    "name": "Get the agent's help without letting it roam the server",
+    "step": [
+      {
+        "@type": "HowToStep",
+        "position": 1,
+        "name": "Draw the fence",
+        "text": "In the connection settings for web-01 (made up), list one directory the agent may write to, for example /var/www/example. The list starts empty: until you add one, the agent writes nothing."
+      },
+      {
+        "@type": "HowToStep",
+        "position": 2,
+        "name": "Let it work inside",
+        "text": "Ask the agent to fix the page. It reads, then writes inside that directory. Each write appears in the band and in the file pane beside you."
+      },
+      {
+        "@type": "HowToStep",
+        "position": 3,
+        "name": "Watch it hit the edge",
+        "text": "If it tries to write anywhere else, it is refused and the refusal is on screen. Deleting, renaming, changing permissions, restarting services and installing packages do not exist for it at all."
+      },
+      {
+        "@type": "HowToStep",
+        "position": 4,
+        "name": "You are not fenced",
+        "text": "You, the person, can still do anything in the file panes or your own terminal. The fence is for the agent only."
+      }
+    ]
+  },
+  {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    "itemListElement": [
+      {
+        "@type": "ListItem",
+        "position": 1,
+        "name": "sshboard",
+        "item": "https://meta-taro.github.io/sshboard/"
+      },
+      {
+        "@type": "ListItem",
+        "position": 2,
+        "name": "Get the agent's help without letting it roam the server",
+        "item": "https://meta-taro.github.io/sshboard/cases/fence.html"
+      }
+    ]
+  }
+]
+    </script>
+  </head>
+  <body>
+    <main>
+      <div class="top">
+        <a class="home" href="../">sshboard</a>
+        <div class="langs"><button type="button" value="en">English</button> <button type="button" value="ja">日本語</button></div>
+      </div>
+
+      <div data-lang="en">
+        <h1>Get the agent's help without letting it roam the server</h1>
+        <div class="summary">
+          <dl>
+            <dt>Uses</dt><dd>The write fence (write_roots) · write_file · upload_file · the file panes</dd>
+            <dt>Finds</dt><dd>The agent can change the files you pointed it at — and nothing outside them</dd>
+            <dt>How it ends</dt><dd>The site is updated; every write is on the band, and nothing outside the fence was touched</dd>
+          </dl>
+        </div>
+        <h2>Steps</h2>
+        <ol>
+          <li><b>Draw the fence.</b> In the connection settings for <code>web-01</code> (made up), list one directory the agent may write to, for example <code>/var/www/example</code>. The list starts empty: until you add one, the agent writes nothing.</li>
+          <li><b>Let it work inside.</b> Ask the agent to fix the page. It reads, then writes inside that directory. Each write appears in the band and in the file pane beside you.</li>
+          <li><b>Watch it hit the edge.</b> If it tries to write anywhere else, it is refused and the refusal is on screen. Deleting, renaming, changing permissions, restarting services and installing packages do not exist for it at all.</li>
+          <li><b>You are not fenced.</b> You, the person, can still do anything in the file panes or your own terminal. The fence is for the agent only.</li>
+        </ol>
+        <p><img src="../shots/en/files.png" alt="Two file panes, with where the agent may write shown at the top" width="1100" height="700" /></p>
+        <h2>Why this matters</h2>
+        <p>Help without a free hand: you choose exactly where the agent may write, and you can see every byte it writes.</p>
+      </div>
+
+      <div data-lang="ja" hidden>
+        <h1>手伝ってほしい。でもサーバーに放し飼いにはしたくない</h1>
+        <div class="summary">
+          <dl>
+            <dt>使うもの</dt><dd>書き込みの囲い（write_roots）· write_file · upload_file · ファイルの画面</dd>
+            <dt>見つかるもの</dt><dd>AI は指したファイルを変えられる —— その外は何も変えられない</dd>
+            <dt>どう終わるか</dt><dd>サイトは直り、書いたものは全部帯に残り、囲いの外は 1 つも触られていない</dd>
+          </dl>
+        </div>
+        <h2>手順</h2>
+        <ol>
+          <li><b>囲いを引く。</b> <code>web-01</code>（架空）の接続の設定で、AI が書いてよいディレクトリを 1 つ挙げます。例えば <code>/var/www/example</code>。一覧は空から始まり、挙げるまで AI は何も書けません。</li>
+          <li><b>中で働かせる。</b> ページを直すよう AI に頼みます。AI は読み、そのディレクトリの中に書きます。書くたびに、帯と横のファイルの画面に出ます。</li>
+          <li><b>端に当たるところを見る。</b> ほかの場所へ書こうとすると断られ、断ったことが画面に出ます。削除・名前の変更・権限の変更・サービスの再起動・パッケージの操作は、AI にはそもそもありません。</li>
+          <li><b>あなたは囲われない。</b> あなた自身は、ファイルの画面でも自分の端末でも何でもできます。囲いは AI のためだけのものです。</li>
+        </ol>
+        <p><img src="../shots/ja/files.png" alt="2 ペインのファイル画面。上に AI が書ける場所が出ています" width="1100" height="700" /></p>
+        <h2>なぜこれがよいか</h2>
+        <p>放し飼いにせずに手伝わせる：AI が書いてよい場所はあなたが決め、AI が書いた 1 バイトずつを、あなたが見られます。</p>
+      </div>
+
+      <footer>
+        <a href="../">sshboard</a> · <a href="./certificates.html">Certificates</a> ·
+        <a href="./mail.html">Mail</a> · <a href="./fence.html">The fence</a> · <a href="../roadmap.html">Roadmap</a>
+      </footer>
+    </main>
+    <script src="../sub.js"></script>
+  </body>
+</html>

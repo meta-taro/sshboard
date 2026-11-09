@@ -8,6 +8,33 @@
  * **版・落とす先・道具の本数は、どれも手で書きません。**
  * 書くと、変えるたびにページを直す作業が増え、**忘れた分だけ嘘を配ります。**
  */
+/**
+ * **見ている PC に合う 1 枚に「この PC」の印を付ける**（紹介ページの構成 1）。
+ * 分からなければ付けない —— 当てずっぽうの印は、違う物を落とさせます。
+ */
+async function markThisPc() {
+  const ua = navigator.userAgent || '';
+  let id = null;
+  if (/Mac OS X|Macintosh/.test(ua)) id = 'dl-mac';
+  if (/Windows/.test(ua)) {
+    id = 'dl-win';
+    try {
+      const hints = await navigator.userAgentData?.getHighEntropyValues?.(['architecture']);
+      if (hints && hints.architecture === 'arm') id = 'dl-win-arm';
+    } catch {
+      // 読めなければ x64 のまま（多い方）。
+    }
+  }
+  const card = id && document.getElementById(id)?.closest('.card');
+  if (!card || card.querySelector('.this-pc')) return;
+  const mark = document.createElement('span');
+  mark.className = 'this-pc';
+  mark.setAttribute('data-t', 'dl.this');
+  mark.textContent = document.getElementById('this-pc-label')?.textContent || 'This PC';
+  card.prepend(mark);
+  card.classList.add('mine');
+}
+
 // **版・落とす先・道具の一覧は、どれも手で書かない。**
 // 書くと、変えるたびにページを直す作業が増え、**忘れた分だけ嘘を配る。**
 (async () => {
@@ -148,43 +175,20 @@
     ).padStart(2, '0')}`;
     put('when', `${rel.tag_name} · ${ymd}`);
 
-    const find = (fn) => (rel.assets || []).find(fn);
+    // **どの資産がどの OS・CPU 向けかは `releases.js` が 1 か所で決める**（過去の版のページと共有）。
+    const sorted = window.SSHBOARD_RELEASES.sortAssets(rel.assets);
     const wire = (linkId, sizeId, asset) => {
       if (!asset) return;
       const a = document.getElementById(linkId);
       if (a) a.href = asset.browser_download_url;
       put(sizeId, `${asset.name} · ${(asset.size / 1048576).toFixed(1)} MB`);
     };
-    // **`.dmg` を先に。**`.app.tar.gz` は自動更新が食べる形で、
-    // **人が受け取る形ではありません** —— 実際に「変な zip」と踏まれました。
-    // 古い版には `.dmg` が無いので、無ければ従来のものへ落とします。
-    wire(
-      'dl-mac',
-      'size-mac',
-      find((x) => x.name.endsWith('.dmg')) ?? find((x) => x.name.endsWith('.app.tar.gz'))
-    );
-    // **形ごとに名前で分ける**（2026-10-06）。
-    //
-    // `endsWith('-setup.exe')` は、**x64 と ARM64 が並んだ日に
-    // 先に見つかった方**を採ります。git-qa は同じ形で
-    // **x64 と ARM64 を取り違えました。**
-    const arch = (name, want) => name.toLowerCase().includes(want);
-    wire(
-      'dl-win',
-      'size-win',
-      find((x) => x.name.endsWith('-setup.exe') && arch(x.name, 'x64'))
-    );
-    wire(
-      'dl-win-arm',
-      'size-win-arm',
-      find((x) => x.name.endsWith('-setup.exe') && arch(x.name, 'arm64'))
-    );
-    wire('dl-msi', 'size-msi', find((x) => x.name.endsWith('.msi') && arch(x.name, 'x64')));
-    wire(
-      'dl-msi-arm',
-      'size-msi-arm',
-      find((x) => x.name.endsWith('.msi') && arch(x.name, 'arm64'))
-    );
+    wire('dl-mac', 'size-mac', sorted.mac);
+    wire('dl-win', 'size-win', sorted.winX64);
+    wire('dl-win-arm', 'size-win-arm', sorted.winArm);
+    wire('dl-msi', 'size-msi', sorted.msiX64);
+    wire('dl-msi-arm', 'size-msi-arm', sorted.msiArm);
+    markThisPc();
   } catch {
     // **黙って古い物を配らない。**読めなかったことを出す
     put('ver', 'see Releases');

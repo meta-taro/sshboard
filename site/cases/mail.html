@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Mail stopped arriving and nobody knows where to look — sshboard</title>
+    <meta name="description" content="Tracking down why mail stopped on a server with an AI agent: config, service state and logs read over your own SSH session, one step at a time on your screen, with no shell handed over." />
+    <link rel="canonical" href="https://meta-taro.github.io/sshboard/cases/mail.html" />
+    <link rel="icon" href="../icon.png" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; img-src 'self'; style-src 'self'; base-uri 'none'; form-action 'none'" />
+    <link rel="stylesheet" href="../sub.css" />
+    <!-- 架空の案件だけで再現しています（紹介ページの構成 4・8）。名前もパスも作り物です。 -->
+    <script type="application/ld+json">
+[
+  {
+    "@context": "https://schema.org",
+    "@type": "TechArticle",
+    "headline": "Mail stopped arriving and nobody knows where to look",
+    "description": "Tracking down why mail stopped on a server with an AI agent: config, service state and logs read over your own SSH session, one step at a time on your screen, with no shell handed over.",
+    "about": {
+      "@type": "SoftwareApplication",
+      "name": "sshboard"
+    },
+    "url": "https://meta-taro.github.io/sshboard/cases/mail.html"
+  },
+  {
+    "@context": "https://schema.org",
+    "@type": "HowTo",
+    "name": "Mail stopped arriving and nobody knows where to look",
+    "step": [
+      {
+        "@type": "HowToStep",
+        "position": 1,
+        "name": "Ask the agent",
+        "text": "Connect to mail-01 (made up) and tell the agent mail stopped arriving. It has no command line to type into — only tools for looking."
+      },
+      {
+        "@type": "HowToStep",
+        "position": 2,
+        "name": "It reads, on your screen",
+        "text": "It reads the mail server config, checks the service is running and tails the mail log. Every one of those lines appears in the band beside your terminal before it runs."
+      },
+      {
+        "@type": "HowToStep",
+        "position": 3,
+        "name": "The cause shows up",
+        "text": "The log says the queue cannot be written; disk_usage shows the partition at 100%."
+      },
+      {
+        "@type": "HowToStep",
+        "position": 4,
+        "name": "You make the change",
+        "text": "Clearing space is a change to the server, so it is yours to make (or an operation you listed in advance, which asks you first). The agent then confirms the queue is draining."
+      }
+    ]
+  },
+  {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    "itemListElement": [
+      {
+        "@type": "ListItem",
+        "position": 1,
+        "name": "sshboard",
+        "item": "https://meta-taro.github.io/sshboard/"
+      },
+      {
+        "@type": "ListItem",
+        "position": 2,
+        "name": "Mail stopped arriving and nobody knows where to look",
+        "item": "https://meta-taro.github.io/sshboard/cases/mail.html"
+      }
+    ]
+  }
+]
+    </script>
+  </head>
+  <body>
+    <main>
+      <div class="top">
+        <a class="home" href="../">sshboard</a>
+        <div class="langs"><button type="button" value="en">English</button> <button type="button" value="ja">日本語</button></div>
+      </div>
+
+      <div data-lang="en">
+        <h1>Mail stopped arriving and nobody knows where to look</h1>
+        <div class="summary">
+          <dl>
+            <dt>Uses</dt><dd>read_file · service_status · read_log · disk_usage</dd>
+            <dt>Finds</dt><dd>The mail server is up, but the disk holding its queue is full</dd>
+            <dt>How it ends</dt><dd>You free the space; the agent watches the log until mail starts moving again</dd>
+          </dl>
+        </div>
+        <h2>Steps</h2>
+        <ol>
+          <li><b>Ask the agent.</b> Connect to <code>mail-01</code> (made up) and tell the agent mail stopped arriving. It has no command line to type into — only tools for looking.</li>
+          <li><b>It reads, on your screen.</b> It reads the mail server config, checks the service is running and tails the mail log. Every one of those lines appears in the band beside your terminal before it runs.</li>
+          <li><b>The cause shows up.</b> The log says the queue cannot be written; <code>disk_usage</code> shows the partition at 100%.</li>
+          <li><b>You make the change.</b> Clearing space is a change to the server, so it is yours to make (or an operation you listed in advance, which asks you first). The agent then confirms the queue is draining.</li>
+        </ol>
+        <p><img src="../shots/en/band.png" alt="The band: every step the agent takes, listed before it runs" width="1100" height="700" /></p>
+        <h2>Why this matters</h2>
+        <p>Nothing the agent did was invisible, and nothing it did changed the server. Finding the cause and making the change stayed two different steps.</p>
+      </div>
+
+      <div data-lang="ja" hidden>
+        <h1>メールが届かなくなった。どこを見ればいいか分からない</h1>
+        <div class="summary">
+          <dl>
+            <dt>使うもの</dt><dd>read_file · service_status · read_log · disk_usage</dd>
+            <dt>見つかるもの</dt><dd>メールのサーバーは動いているが、キューを置くディスクが満杯</dd>
+            <dt>どう終わるか</dt><dd>あなたが空きを作り、メールが流れ出すまで AI がログを見届ける</dd>
+          </dl>
+        </div>
+        <h2>手順</h2>
+        <ol>
+          <li><b>AI に聞く。</b> <code>mail-01</code>（架空）に繋ぎ、メールが届かないと AI に伝えます。AI に打てるコマンド行はありません —— あるのは見るための道具だけです。</li>
+          <li><b>あなたの画面で読む。</b> AI はメールのサーバーの設定を読み、サービスが動いているかを見て、メールのログを追います。そのどれもが、走る前に端末の横の帯に出ます。</li>
+          <li><b>原因が見える。</b> ログに「キューに書けない」とあり、<code>disk_usage</code> でその区画が 100% だと分かります。</li>
+          <li><b>変えるのはあなた。</b> 空きを作るのはサーバーを変える操作なので、あなたが行います（または前もって挙げておいた操作として、あなたに尋ねてから）。そのあと、キューが減っていくのを AI が確かめます。</li>
+        </ol>
+        <p><img src="../shots/ja/band.png" alt="帯：AI の 1 手ずつが、走る前に並びます" width="1100" height="700" /></p>
+        <h2>なぜこれがよいか</h2>
+        <p>AI のしたことは 1 つも見えない所で起きておらず、どれもサーバーを変えていません。原因を探すことと、変えることが、別の手順のまま残りました。</p>
+      </div>
+
+      <footer>
+        <a href="../">sshboard</a> · <a href="./certificates.html">Certificates</a> ·
+        <a href="./mail.html">Mail</a> · <a href="./fence.html">The fence</a> · <a href="../roadmap.html">Roadmap</a>
+      </footer>
+    </main>
+    <script src="../sub.js"></script>
+  </body>
+</html>

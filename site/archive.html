@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>All versions — sshboard</title>
+    <meta name="description" content="Every published version of sshboard, with installers for macOS (Apple Silicon and Intel) and Windows (x64 and ARM64). Read from the GitHub releases, so it is never out of date." />
+    <link rel="canonical" href="https://meta-taro.github.io/sshboard/archive.html" />
+    <link rel="icon" href="./icon.png" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; connect-src https://api.github.com; img-src 'self'; style-src 'self'; base-uri 'none'; form-action 'none'" />
+    <link rel="stylesheet" href="./sub.css" />
+    <script type="application/ld+json">
+      {"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"sshboard","item":"https://meta-taro.github.io/sshboard/"},{"@type":"ListItem","position":2,"name":"All versions","item":"https://meta-taro.github.io/sshboard/archive.html"}]}
+    </script>
+  </head>
+  <body>
+    <main>
+      <div class="top">
+        <a class="home" href="./">sshboard</a>
+        <div class="langs"><button type="button" value="en">English</button> <button type="button" value="ja">日本語</button></div>
+      </div>
+
+      <div data-lang="en">
+        <h1>All versions</h1>
+        <p>Every published version, newest first. The list is read from the GitHub releases when this page opens, so it is never behind.</p>
+        <p class="note">macOS builds marked <b>universal</b> run on both Apple Silicon and Intel Macs. Older ones run on Apple Silicon only. None of them is code-signed yet — see the front page for how to open them the first time.</p>
+      </div>
+      <div data-lang="ja" hidden>
+        <h1>過去の版</h1>
+        <p>公開したすべての版です（新しい順）。このページを開いたときに GitHub のリリースから読むので、古くなりません。</p>
+        <p class="note">macOS の配布物のうち <b>universal</b> と付いたものは、Apple シリコンと Intel のどちらの Mac でも動きます。それより古いものは Apple シリコン専用です。どれもまだ署名していません —— 初めて開く手順は表紙にあります。</p>
+      </div>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Version</th>
+            <th>macOS</th>
+            <th>Windows x64</th>
+            <th>Windows ARM64</th>
+          </tr>
+        </thead>
+        <tbody id="archive">
+          <tr><td colspan="4" class="note">Loading… If nothing appears, see the <a href="https://github.com/meta-taro/sshboard/releases">Releases page</a>.</td></tr>
+        </tbody>
+      </table>
+
+      <footer>
+        <a href="./">sshboard</a> · <a href="./roadmap.html">Roadmap</a> ·
+        <a href="https://github.com/meta-taro/sshboard/releases">GitHub Releases</a>
+      </footer>
+    </main>
+    <script src="./sub.js"></script>
+    <script src="./releases.js"></script>
+    <script src="./archive.js"></script>
+  </body>
+</html>

@@ -63,6 +63,15 @@ jobs:
       - name: 道具の一覧をコードから作る
         run: python3 tools/make-site-tools.py
 
+      # **紹介ページの構成（2026-11-09）を検める。**過去の版・事例・ロードマップ・よくある質問の
+      # どれか 1 枚だけが古くなる、sitemap に載せ忘れる、本文に版の数字や個人の手がかりを書く —— を出す前に落とす。
+      - name: ページの検め
+        run: python3 tools/check-site.py
+
+      # **どの配布物がどの OS・CPU 向けかの見分け**（表紙と過去の版で共有）。x64 と ARM64 を取り違えない。
+      - name: 配布物の見分けの試験
+        run: node --test tools/site-releases.test.mjs
+
       # **置く物を確かめる。**参照だけ足して壊れている状態を作らない（baseline §23）
       - name: 中身があるか
         run: |
@@ -71,6 +80,10 @@ jobs:
           test -f site/icon.png
           test -f site/i18n.js
           test -f site/app.js
+          test -f site/releases.js
+          test -f site/sub.js
+          test -f site/sub.css
+          test -f site/archive.js
           test -f site/tools.json
           test -f site/llms.txt
           test -f site/robots.txt

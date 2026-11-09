@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Roadmap — sshboard</title>
+    <meta name="description" content="What sshboard already does, what is being worked on, what comes next, the one success criterion, when to stop, and what it will never become." />
+    <link rel="canonical" href="https://meta-taro.github.io/sshboard/roadmap.html" />
+    <link rel="icon" href="./icon.png" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; img-src 'self'; style-src 'self'; base-uri 'none'; form-action 'none'" />
+    <link rel="stylesheet" href="./sub.css" />
+    <script type="application/ld+json">
+      {"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"sshboard","item":"https://meta-taro.github.io/sshboard/"},{"@type":"ListItem","position":2,"name":"Roadmap","item":"https://meta-taro.github.io/sshboard/roadmap.html"}]}
+    </script>
+  </head>
+  <body>
+    <main>
+      <div class="top">
+        <a class="home" href="./">sshboard</a>
+        <div class="langs"><button type="button" value="en">English</button> <button type="button" value="ja">日本語</button></div>
+      </div>
+
+      <div data-lang="en">
+        <h1>Roadmap</h1>
+        <p>sshboard lets a person and an AI agent look at the same server, on the same screen, over one SSH connection. This page says where that stands.</p>
+
+        <h2>Done</h2>
+        <ul>
+          <li>One SSH session shared by the window and the agent, for several servers at once</li>
+          <li>Read-only tools for the agent: files, search, disk, processes, services, logs, listening ports</li>
+          <li>Commands a person allow-listed, by id only; state-changing operations that ask on screen every time</li>
+          <li>A shared terminal with a lock and a stop button; files in two panes with a write fence per connection</li>
+          <li>Health checks a person writes and either side runs, with the previous value beside the new one</li>
+          <li>The agent is woken when the person answers a question on screen (Claude Code channels)</li>
+          <li>Auto-update; macOS for Apple Silicon and Intel; Windows x64 and ARM64; eleven languages</li>
+        </ul>
+
+        <h2>Now</h2>
+        <ul>
+          <li>Using it on real servers and fixing what that use turns up — that is where almost every issue has come from</li>
+          <li>A design pass on the interface, decided by a person, not by the agent</li>
+        </ul>
+
+        <h2>Next</h2>
+        <ul>
+          <li>Linux builds</li>
+          <li>Confirming ssh-agent on Windows (named pipe / Pageant)</li>
+          <li>Code signing, once its absence actually hurts someone — say so in an issue</li>
+          <li>Deleting and renaming files inside the write fence (asked for; held for the next phase on purpose)</li>
+        </ul>
+
+        <h2>How we know it works, and when to stop</h2>
+        <p><b>The one success criterion:</b> the agent stops saying "please show me the state of the server". Not downloads, not stars — whether the back-and-forth disappears during real maintenance.</p>
+        <p>If people keep handing the agent a raw shell instead, because the fence costs more than it protects, that is the signal to rethink the design rather than add features.</p>
+
+        <h2>What it will not become</h2>
+        <ul>
+          <li>A tool that runs any command line the agent writes (<code>run_command</code>)</li>
+          <li>A way to run an agent against a server while nobody is watching</li>
+          <li>A place your keys or passphrases get stored</li>
+          <li>A second SSH session you cannot see</li>
+          <li>A way to move you off the server you already have</li>
+        </ul>
+      </div>
+
+      <div data-lang="ja" hidden>
+        <h1>ロードマップ</h1>
+        <p>sshboard は、人と AI エージェントが同じサーバーを、同じ画面で、1 本の SSH の上で見るための道具です。このページは、それがいまどこまで来ているかを書いています。</p>
+
+        <h2>済んだこと</h2>
+        <ul>
+          <li>窓とエージェントが 1 本の SSH を共有する（何台でも同時に）</li>
+          <li>エージェント向けの読み取りの道具：ファイル・検索・空き容量・プロセス・サービス・ログ・待ち受け</li>
+          <li>人が許したコマンドを id だけで走らせる。状態を変える操作は、毎回画面で尋ねる</li>
+          <li>錠と停止ボタン付きの共有端末。接続ごとに書き込みの囲いを持つ 2 ペインのファイル画面</li>
+          <li>人が書く点検表を、人も AI も回せる（前回の値を隣に並べる）</li>
+          <li>人が画面で答えたら、待っている AI を起こす（Claude Code の channels）</li>
+          <li>自動更新。macOS は Apple シリコンと Intel、Windows は x64 と ARM64。11 言語</li>
+        </ul>
+
+        <h2>いま</h2>
+        <ul>
+          <li>実際のサーバーで使い、出てきたものを直す —— ほとんどの Issue はここから来ています</li>
+          <li>画面の見た目を整える（決めるのは人で、エージェントではありません）</li>
+        </ul>
+
+        <h2>次</h2>
+        <ul>
+          <li>Linux 版</li>
+          <li>Windows の ssh-agent（名前付きパイプ・Pageant）の確認</li>
+          <li>コード署名 —— 無いことで実際に困った人が出たら。Issue で言ってください</li>
+          <li>書き込みの囲いの中での削除・名前変更（要望あり。次の段に、意図して置いています）</li>
+        </ul>
+
+        <h2>うまくいっているかの物差しと、止めどころ</h2>
+        <p><b>成功条件は 1 つだけです：</b>エージェントが「サーバーの状態を見せてください」と言わなくなること。ダウンロード数でも星の数でもなく、実際の保守作業で往復が消えたかどうかです。</p>
+        <p>囲いが守るものより手間の方が大きく、結局エージェントに素のシェルを渡す人が続くなら、それは機能を足す合図ではなく、作りを考え直す合図です。</p>
+
+        <h2>作らないもの</h2>
+        <ul>
+          <li>エージェントが書いた任意のコマンド行を走らせる口（<code>run_command</code>）</li>
+          <li>誰も見ていない所でエージェントにサーバーを触らせる道</li>
+          <li>鍵やパスフレーズをしまう場所</li>
+          <li>あなたから見えない 2 本目の SSH</li>
+          <li>いまのサーバーから別の基盤へ移させる道具</li>
+        </ul>
+      </div>
+
+      <footer>
+        <a href="./">sshboard</a> · <a href="./archive.html">All versions</a> ·
+        <a href="https://github.com/meta-taro/sshboard/issues">Issues</a>
+      </footer>
+    </main>
+    <script src="./sub.js"></script>
+  </body>
+</html>

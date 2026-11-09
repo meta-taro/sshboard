@@ -64,6 +64,19 @@ The terminal is **shared**. While you hold it the human's input is locked out
 and a Stop button is showing on their screen — they can take it back at any
 time, and every keystroke you send is visible to them as you send it.
 
+## More pages
+
+- All versions, with installers for macOS (Apple Silicon and Intel) and Windows (x64 and ARM64):
+  https://meta-taro.github.io/sshboard/archive.html
+- Roadmap — done, now, next, the success criterion, and what it will not become:
+  https://meta-taro.github.io/sshboard/roadmap.html
+- Example: renewing certificates on three servers with the agent reading your terminals:
+  https://meta-taro.github.io/sshboard/cases/certificates.html
+- Example: finding why mail stopped, read-only, one step at a time on screen:
+  https://meta-taro.github.io/sshboard/cases/mail.html
+- Example: letting the agent edit inside one directory you chose (the write fence):
+  https://meta-taro.github.io/sshboard/cases/fence.html
+
 ## Sibling projects
 
 - **dbboard** — the same idea for databases: a desktop client plus an MCP

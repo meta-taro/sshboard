@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Renew the certificates on three servers today — sshboard</title>
+    <meta name="description" content="Renewing TLS certificates on three servers with an AI agent watching the same terminals: which one failed, why, and the retry — all on screen, nothing out of sight." />
+    <link rel="canonical" href="https://meta-taro.github.io/sshboard/cases/certificates.html" />
+    <link rel="icon" href="../icon.png" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; img-src 'self'; style-src 'self'; base-uri 'none'; form-action 'none'" />
+    <link rel="stylesheet" href="../sub.css" />
+    <!-- 架空の案件だけで再現しています（紹介ページの構成 4・8）。名前もパスも作り物です。 -->
+    <script type="application/ld+json">
+[
+  {
+    "@context": "https://schema.org",
+    "@type": "TechArticle",
+    "headline": "Renew the certificates on three servers today",
+    "description": "Renewing TLS certificates on three servers with an AI agent watching the same terminals: which one failed, why, and the retry — all on screen, nothing out of sight.",
+    "about": {
+      "@type": "SoftwareApplication",
+      "name": "sshboard"
+    },
+    "url": "https://meta-taro.github.io/sshboard/cases/certificates.html"
+  },
+  {
+    "@context": "https://schema.org",
+    "@type": "HowTo",
+    "name": "Renew the certificates on three servers today",
+    "step": [
+      {
+        "@type": "HowToStep",
+        "position": 1,
+        "name": "Open the three connections",
+        "text": "Connect to web-01, web-02 and web-03 (made-up names). Each gets its own terminal tab; put two side by side if you like."
+      },
+      {
+        "@type": "HowToStep",
+        "position": 2,
+        "name": "Run the renewal yourself",
+        "text": "Paste the same renewal command into each terminal. You are typing — the agent is not."
+      },
+      {
+        "@type": "HowToStep",
+        "position": 3,
+        "name": "Ask which one fell over",
+        "text": "The agent reads every terminal with list_consoles and read_console and tells you that web-02 failed the HTTP challenge, quoting the line."
+      },
+      {
+        "@type": "HowToStep",
+        "position": 4,
+        "name": "Fix and check",
+        "text": "You fix the web server config on web-02 and rerun. The agent reads the certificate dates on all three and reports them side by side."
+      }
+    ]
+  },
+  {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    "itemListElement": [
+      {
+        "@type": "ListItem",
+        "position": 1,
+        "name": "sshboard",
+        "item": "https://meta-taro.github.io/sshboard/"
+      },
+      {
+        "@type": "ListItem",
+        "position": 2,
+        "name": "Renew the certificates on three servers today",
+        "item": "https://meta-taro.github.io/sshboard/cases/certificates.html"
+      }
+    ]
+  }
+]
+    </script>
+  </head>
+  <body>
+    <main>
+      <div class="top">
+        <a class="home" href="../">sshboard</a>
+        <div class="langs"><button type="button" value="en">English</button> <button type="button" value="ja">日本語</button></div>
+      </div>
+
+      <div data-lang="en">
+        <h1>Renew the certificates on three servers today</h1>
+        <div class="summary">
+          <dl>
+            <dt>Uses</dt><dd>One terminal per server · the shared console · read_console</dd>
+            <dt>Finds</dt><dd>Which of the three renewals failed, and the line in its log that says why</dd>
+            <dt>How it ends</dt><dd>You rerun the one that failed; the agent confirms the new expiry date on all three</dd>
+          </dl>
+        </div>
+        <h2>Steps</h2>
+        <ol>
+          <li><b>Open the three connections.</b> Connect to <code>web-01</code>, <code>web-02</code> and <code>web-03</code> (made-up names). Each gets its own terminal tab; put two side by side if you like.</li>
+          <li><b>Run the renewal yourself.</b> Paste the same renewal command into each terminal. You are typing — the agent is not.</li>
+          <li><b>Ask which one fell over.</b> The agent reads every terminal with <code>list_consoles</code> and <code>read_console</code> and tells you that <code>web-02</code> failed the HTTP challenge, quoting the line.</li>
+          <li><b>Fix and check.</b> You fix the web server config on <code>web-02</code> and rerun. The agent reads the certificate dates on all three and reports them side by side.</li>
+        </ol>
+        <p><img src="../shots/en/console.png" alt="Terminals shared by you and the agent, one tab per connection" width="1100" height="700" /></p>
+        <h2>Why this matters</h2>
+        <p>The agent never had a shell of its own. It read what you were already looking at, so the person deciding what to run was you, the whole time.</p>
+      </div>
+
+      <div data-lang="ja" hidden>
+        <h1>3 台の証明書を、今日中に更新する</h1>
+        <div class="summary">
+          <dl>
+            <dt>使うもの</dt><dd>接続ごとの端末 · 共有の端末 · read_console</dd>
+            <dt>見つかるもの</dt><dd>3 台のうちどれの更新が落ちたか、その理由が書いてあるログの行</dd>
+            <dt>どう終わるか</dt><dd>落ちた 1 台だけを打ち直し、3 台とも新しい期限になったことを AI が並べて確かめる</dd>
+          </dl>
+        </div>
+        <h2>手順</h2>
+        <ol>
+          <li><b>3 つの接続を開く。</b> <code>web-01</code>・<code>web-02</code>・<code>web-03</code>（架空の名前）に繋ぎます。接続ごとに端末のタブができます。2 枚を左右に並べても構いません。</li>
+          <li><b>更新は自分で打つ。</b> 同じ更新のコマンドを、それぞれの端末に貼ります。打っているのはあなたで、AI ではありません。</li>
+          <li><b>どれが転んだかを聞く。</b> AI は <code>list_consoles</code> と <code>read_console</code> で全部の端末を読み、<code>web-02</code> が HTTP の確認で落ちたことを、その行を添えて言います。</li>
+          <li><b>直して確かめる。</b> <code>web-02</code> の Web サーバーの設定を直して打ち直します。AI が 3 台の証明書の期限を読み、並べて報告します。</li>
+        </ol>
+        <p><img src="../shots/ja/console.png" alt="人と AI で共有している端末。接続ごとにタブがあります" width="1100" height="700" /></p>
+        <h2>なぜこれがよいか</h2>
+        <p>AI は自分のシェルを一度も持っていません。あなたが見ていたものを読んだだけで、何を走らせるかを決めていたのは、ずっとあなたです。</p>
+      </div>
+
+      <footer>
+        <a href="../">sshboard</a> · <a href="./certificates.html">Certificates</a> ·
+        <a href="./mail.html">Mail</a> · <a href="./fence.html">The fence</a> · <a href="../roadmap.html">Roadmap</a>
+      </footer>
+    </main>
+    <script src="../sub.js"></script>
+  </body>
+</html>

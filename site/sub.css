@@ -1,0 +1,155 @@
+/*
+ * 表紙以外のページ（過去の版・ロードマップ・使いどころ）の見た目。
+ * **色は表紙と同じ**（アプリの tokens.css から採ったもの）。ライトが既定、OS がダークならダーク。
+ */
+:root {
+  color-scheme: light;
+  --ground: #eef0f3;
+  --surface: #ffffff;
+  --surface-2: #f7f8fa;
+  --fg: #14181d;
+  --fg-muted: #545c67;
+  --hairline: rgba(16, 22, 30, 0.09);
+  --lift-2: 0 1px 2px rgba(16, 22, 30, 0.05), 0 10px 28px -12px rgba(16, 22, 30, 0.22);
+  --accent: #1f6b58;
+  --accent-soft: rgba(31, 107, 88, 0.1);
+  --r-shell: 14px;
+  --r-core: 10px;
+  --font-ui: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, 'Cascadia Mono', monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --ground: #0b0e11;
+    --surface: #171c22;
+    --surface-2: #1c222a;
+    --fg: #e8ecf1;
+    --fg-muted: #a3adb9;
+    --hairline: rgba(255, 255, 255, 0.08);
+    --lift-2: 0 1px 2px rgba(0, 0, 0, 0.4), 0 12px 30px -12px rgba(0, 0, 0, 0.7);
+    --accent: #4fd6ae;
+    --accent-soft: rgba(79, 214, 174, 0.14);
+  }
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  padding: 0 20px 72px;
+  background: var(--ground);
+  color: var(--fg);
+  font-family: var(--font-ui);
+  font-size: 15px;
+  line-height: 1.7;
+}
+main {
+  max-width: 760px;
+  margin: 0 auto;
+}
+a {
+  color: var(--accent);
+}
+code,
+pre {
+  font-family: var(--font-mono);
+  font-size: 13px;
+}
+pre {
+  background: var(--surface-2);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-core);
+  padding: 12px 14px;
+  overflow-x: auto;
+}
+.top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 18px 0 8px;
+}
+.top a.home {
+  font-weight: 600;
+  text-decoration: none;
+}
+.langs button {
+  min-height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--hairline);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--fg);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.langs button[aria-pressed='true'] {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+h1 {
+  font-size: 26px;
+  line-height: 1.35;
+  margin: 18px 0 6px;
+}
+h2 {
+  font-size: 18px;
+  margin: 32px 0 6px;
+}
+.summary {
+  margin: 18px 0;
+  padding: 14px 16px;
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-shell);
+  box-shadow: var(--lift-2);
+}
+.summary dl {
+  margin: 0;
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 4px 14px;
+}
+.summary dt {
+  font-weight: 600;
+}
+.summary dd {
+  margin: 0;
+  color: var(--fg-muted);
+}
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+th,
+td {
+  text-align: left;
+  padding: 6px 8px;
+  border-top: 1px solid var(--hairline);
+  vertical-align: top;
+}
+th {
+  color: var(--fg-muted);
+  font-weight: 500;
+}
+.note {
+  color: var(--fg-muted);
+  font-size: 14px;
+}
+footer {
+  margin-top: 48px;
+  color: var(--fg-muted);
+  font-size: 14px;
+}
+[hidden] {
+  display: none !important;
+}
+main img {
+  width: 100%;
+  height: auto;
+  border-radius: var(--r-core);
+  border: 1px solid var(--hairline);
+}

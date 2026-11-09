@@ -49,6 +49,74 @@
       http-equiv="Content-Security-Policy"
       content="default-src 'none'; script-src 'self'; connect-src 'self' https://api.github.com; img-src 'self'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'"
     />
+    <!-- **何の道具かを検索と AI に言い切る**（紹介ページの構成 7）。よくある質問は画面の FAQ と同じ文。 -->
+    <script type="application/ld+json">
+[
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "sshboard",
+    "applicationCategory": "DeveloperApplication",
+    "operatingSystem": "macOS, Windows",
+    "description": "A desktop SSH client with an MCP server built in. You and your AI agent share one SSH session on the same screen; the agent has no run_command tool and writes only inside directories you listed.",
+    "url": "https://meta-taro.github.io/sshboard/",
+    "downloadUrl": "https://github.com/meta-taro/sshboard/releases/latest",
+    "license": "https://opensource.org/licenses/MIT",
+    "isAccessibleForFree": true,
+    "offers": {
+      "@type": "Offer",
+      "price": "0",
+      "priceCurrency": "USD"
+    }
+  },
+  {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": [
+      {
+        "@type": "Question",
+        "name": "What is sshboard?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "A desktop SSH client with an MCP server built in. You and your AI agent look at the same server, on the same screen, over one SSH connection, and everything the agent does appears in your window as it happens."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Can the agent run any command it likes?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "No. There is no tool that takes a command line. The agent can use read-only tools, run commands a person listed in readonly.toml by id, and ask to run operations a person listed in operations.toml — each of those asks you on screen first."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Where can the agent write files?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Only inside the directories you list for each connection. The list is empty by default, so it writes nothing until you add one. It cannot delete, rename or download files to your machine."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Does sshboard store my keys or passwords?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "No. Keys stay in your OS keychain and ssh-agent. A sudo password you type for one approved operation is passed to that one run and never stored."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Which agents and systems does it work with?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Any MCP client; Claude Code is the one it is tested with. The app runs on macOS (Apple Silicon and Intel) and Windows (x64 and ARM64)."
+        }
+      }
+    ]
+  }
+]
+    </script>
     <style>
       /*
        * 色は `apps/desktop/src/lib/styles/tokens.css` から採る。
@@ -212,6 +280,29 @@
         margin: 0 0 2px;
         font-size: 15px;
       }
+      /* **見ている PC に合う 1 枚**（app.js が付ける）。色だけでなく文字でも言う。 */
+      .faq dt {
+        margin-top: 14px;
+        font-weight: 600;
+      }
+      .faq dd {
+        margin: 2px 0 0;
+        color: var(--fg-muted);
+      }
+      .card.mine {
+        border-color: var(--accent);
+        box-shadow: 0 0 0 1px var(--accent), var(--lift-2);
+      }
+      .this-pc {
+        display: inline-block;
+        margin-bottom: 6px;
+        padding: 1px 8px;
+        border-radius: 999px;
+        background: var(--accent-soft);
+        color: var(--accent);
+        font-size: 12px;
+        font-weight: 600;
+      }
 
       /*
        * カードに付く印。**題字の上に置きます。**
@@ -352,7 +443,7 @@
       <div class="tags">
         <span class="tag alpha" data-t="tag.alpha">Alpha</span>
         <span class="tag" id="ver">…</span>
-        <span class="tag" data-t="tag.mac">macOS (Apple Silicon)</span>
+        <span class="tag" data-t="tag.mac">macOS (Apple Silicon · Intel)</span>
         <span class="tag" data-t="tag.win">Windows x64 / ARM64</span>
         <span class="tag" data-t="tag.langs">11 languages</span>
         <span class="tag">MIT</span>
@@ -370,7 +461,7 @@
       <div class="files">
         <div class="card">
           <h3>macOS</h3>
-          <p class="sub" data-t="dl.mac.sub">Apple Silicon</p>
+          <p class="sub" data-t="dl.mac.sub">Apple Silicon · Intel (universal)</p>
           <a class="get" id="dl-mac" data-t="dl.button" href="https://github.com/meta-taro/sshboard/releases">Download</a>
           <span class="size" id="size-mac"></span>
         </div>
@@ -416,6 +507,11 @@
           <span class="size">pnpm install &amp;&amp; pnpm --filter desktop tauri dev</span>
         </div>
       </div>
+
+      <!-- 「この PC」の印の字（app.js が写す）。訳は data-t で当たる。 -->
+      <span id="this-pc-label" data-t="dl.this" hidden>This PC</span>
+      <!-- **過去の版も落とせる**（紹介ページの構成 2）。一覧はリリースから読むので、版を出すたびに直さない。 -->
+      <p class="note" data-t="dl.archive">Older versions are on the <a href="./archive.html">archive page</a>.</p>
 
       <div class="note warn" data-t="unsigned">
         <b>It is not code-signed.</b> Windows SmartScreen and macOS Gatekeeper will both stop you the
@@ -581,19 +677,20 @@
         <tr>
           <td data-t="state.working.list">
             One shared SSH session (GUI + agent)<br />
-            35 MCP tools<br />
+            The MCP tools listed above<br />
             Read-only commands from an allow-list<br />
+            Health checks a person writes, run by either side<br />
             Approved state-changing operations<br />
             <code>sudo</code> with a password nobody stores<br />
             Terminal shared with a stop button<br />
-            Auto-update
+            The agent woken when you answer (Claude Code channels)<br />
+            Auto-update · Apple Silicon and Intel Macs
           </td>
           <td data-t="state.notyet.list">
             A design pass on the UI<br />
             Code signing<br />
             ssh-agent on Windows (named pipe / Pageant) — unverified<br />
-            Intel macOS / Linux builds<br />
-            Tests that render the screen itself
+            Linux builds
           </td>
         </tr>
       </table>
@@ -704,6 +801,30 @@ claude mcp add --scope user sshboard -- "%LOCALAPPDATA%\\sshboard\\sshboard.exe"
         with no central account. It is not part of the deploy story.
       </p>
 
+      <p data-t="state.roadmap">What is done, what is next, and what it will not do: <a href="./roadmap.html">the roadmap</a>.</p>
+
+      <h2 data-t="h.cases">Examples</h2>
+      <p data-t="cases.intro">Three afternoons, each on made-up servers. Every page starts with what you use, what you find and how it ends.</p>
+      <ul class="cases">
+        <li><a href="./cases/certificates.html" data-t="cases.cert">Renew the certificates on three servers today</a></li>
+        <li><a href="./cases/mail.html" data-t="cases.mail">Mail stopped arriving and nobody knows where to look</a></li>
+        <li><a href="./cases/fence.html" data-t="cases.fence">Get the agent's help without letting it roam the server</a></li>
+      </ul>
+
+      <h2 data-t="h.faq">Frequently asked questions</h2>
+      <dl class="faq">
+        <dt data-t="faq.q1">What is sshboard?</dt>
+        <dd data-t="faq.a1">A desktop SSH client with an MCP server built in. You and your AI agent look at the same server, on the same screen, over one SSH connection, and everything the agent does appears in your window as it happens.</dd>
+        <dt data-t="faq.q2">Can the agent run any command it likes?</dt>
+        <dd data-t="faq.a2">No. There is no tool that takes a command line. The agent can use read-only tools, run commands a person listed in readonly.toml by id, and ask to run operations a person listed in operations.toml — each of those asks you on screen first.</dd>
+        <dt data-t="faq.q3">Where can the agent write files?</dt>
+        <dd data-t="faq.a3">Only inside the directories you list for each connection. The list is empty by default, so it writes nothing until you add one. It cannot delete, rename or download files to your machine.</dd>
+        <dt data-t="faq.q4">Does sshboard store my keys or passwords?</dt>
+        <dd data-t="faq.a4">No. Keys stay in your OS keychain and ssh-agent. A sudo password you type for one approved operation is passed to that one run and never stored.</dd>
+        <dt data-t="faq.q5">Which agents and systems does it work with?</dt>
+        <dd data-t="faq.a5">Any MCP client; Claude Code is the one it is tested with. The app runs on macOS (Apple Silicon and Intel) and Windows (x64 and ARM64).</dd>
+      </dl>
+
       <h2 data-t="h.never">What it will not become</h2>
       <ul>
         <li data-t="never.1">A way to run an agent against a server while nobody is watching.</li>
@@ -722,6 +843,7 @@ claude mcp add --scope user sshboard -- "%LOCALAPPDATA%\\sshboard\\sshboard.exe"
     </main>
 
     <script src="./i18n.js"></script>
+    <script src="./releases.js"></script>
     <script src="./app.js"></script>
   </body>
 </html>
