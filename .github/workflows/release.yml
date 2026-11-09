@@ -42,6 +42,19 @@ jobs:
         # ARM の Windows（Snapdragon など）の席で入れられず、
         # **作業が止まった**実例が出ています。
         os: [macos-latest, windows-latest, windows-11-arm]
+        # **mac は Apple シリコンと Intel の両方で動く 1 本（universal）**（2026-11-09・PdM の依頼）。
+        # Apple シリコンの機械で、両方の CPU 向けに建てて 1 つに束ねます。
+        # 出る場所が `target/universal-apple-darwin/release/bundle` に変わるので、ここで持ち分けます。
+        include:
+          - os: macos-latest
+            build_args: --target universal-apple-darwin
+            bundle_dir: target/universal-apple-darwin/release/bundle
+          - os: windows-latest
+            build_args: ''
+            bundle_dir: target/release/bundle
+          - os: windows-11-arm
+            build_args: ''
+            bundle_dir: target/release/bundle
     steps:
       - uses: actions/checkout@v7
 
@@ -58,6 +71,11 @@ jobs:
 
       - name: Rust をツールチェイン指定で用意
         run: rustup show
+
+      # universal は 2 つの CPU 向けに建てるので、**両方の部品**が要ります。
+      - name: mac の 2 つの CPU 向けの部品を足す
+        if: runner.os == 'macOS'
+        run: rustup target add aarch64-apple-darwin x86_64-apple-darwin
 
       - uses: Swatinem/rust-cache@v2
 
@@ -142,14 +160,14 @@ jobs:
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-        run: pnpm --filter desktop tauri build
+        run: pnpm --filter desktop tauri build ${{ matrix.build_args }}
 
       # **`.app` はディレクトリなので、そのままでは Release へ添付できません。**
       # `createUpdaterArtifacts` が `.app.tar.gz` を作るので、**それをそのまま配ります**
       # （更新機構が要求する形と、人が落とす形を 1 つにする。D34）。
       - name: 束ねたものを見る
         shell: bash
-        run: ls -R target/release/bundle
+        run: ls -R ${{ matrix.bundle_dir }}
 
       - name: 成果物を残す
         uses: actions/upload-artifact@v4
@@ -157,7 +175,7 @@ jobs:
           name: sshboard-${{ matrix.os }}
           # **ワークスペース直下**に出ます（`apps/desktop/src-tauri/target` ではない）。
           # 手元で 1 回束ねるまで、ここを間違えていました。
-          path: target/release/bundle/**
+          path: ${{ matrix.bundle_dir }}/**
           # **黙って空を残さない。**無いなら落とす。
           if-no-files-found: error
           retention-days: 14
@@ -259,6 +277,9 @@ jobs:
           [ -n "$win_x64" ] && [ -f "upload/$win_x64.sig" ] && add "windows-x86_64" "$win_x64"
           [ -n "$win_arm" ] && [ -f "upload/$win_arm.sig" ] && add "windows-aarch64" "$win_arm"
           [ -n "$mac_tar" ] && [ -f "upload/$mac_tar.sig" ] && add "darwin-aarch64" "$mac_tar"
+          # **universal なので Intel の Mac にも同じ 1 本を配る**（2026-11-09）。
+          # 載せないと、Intel の Mac に入れた人へ更新が届きません。
+          [ -n "$mac_tar" ] && [ -f "upload/$mac_tar.sig" ] && add "darwin-x86_64" "$mac_tar"
 
           # **1 つも組めなければ止める。**空の目録を配ると、更新が静かに死にます。
           [ -n "$platforms" ] || { echo "::error::latest.json に載せるものがありません"; exit 1; }

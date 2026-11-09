@@ -84,7 +84,7 @@ claude mcp add --scope user --transport http sshboard http://127.0.0.1:22022/mcp
 
 Prebuilt installers are on the
 [releases page](https://github.com/meta-taro/sshboard/releases/latest)
-(Windows x64 / ARM64, macOS Apple Silicon). **They are not code-signed**, so SmartScreen
+(Windows x64 / ARM64, and one macOS build for both Apple Silicon and Intel). **They are not code-signed**, so SmartScreen
 and Gatekeeper will both stop you the first time.
 
 ---

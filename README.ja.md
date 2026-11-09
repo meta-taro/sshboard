@@ -80,7 +80,7 @@ claude mcp add --scope user --transport http sshboard http://127.0.0.1:22022/mcp
 
 束ねたインストーラは
 [リリースのページ](https://github.com/meta-taro/sshboard/releases/latest)
-にあります（Windows x64 / ARM64・macOS Apple Silicon）。**署名していない**ので、
+にあります（Windows x64 / ARM64・macOS は Apple Silicon と Intel の両方で動く 1 本）。**署名していない**ので、
 SmartScreen と Gatekeeper が初回に必ず止めます。
 
 ---
