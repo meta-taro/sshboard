@@ -8,23 +8,37 @@
     <link rel="canonical" href="https://meta-taro.github.io/sshboard/roadmap.html" />
     <link rel="icon" href="./icon.png" />
     <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; img-src 'self'; style-src 'self'; base-uri 'none'; form-action 'none'" />
-    <link rel="stylesheet" href="./sub.css" />
+    <link rel="stylesheet" href="./site.css" />
     <script type="application/ld+json">
       {"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"sshboard","item":"https://meta-taro.github.io/sshboard/"},{"@type":"ListItem","position":2,"name":"Roadmap","item":"https://meta-taro.github.io/sshboard/roadmap.html"}]}
     </script>
   </head>
   <body>
-    <main>
-      <div class="top">
-        <a class="home" href="./">sshboard</a>
-        <div class="langs"><button type="button" value="en">English</button> <button type="button" value="ja">日本語</button></div>
+    <a class="skip" href="#main">Skip to content</a>
+    <header class="site-head">
+      <div class="wrap">
+        <a class="brand" href="././"><img src="./icon.png" alt="" width="28" height="28" />sshboard</a>
+        <nav class="site-nav" aria-label="Site">
+          <a href="././#features">Features</a>
+          <a href="././#cases">Examples</a>
+          <a href="././#download">Download</a>
+          <a href="./roadmap.html">Roadmap</a>
+          <a class="gh" href="https://github.com/meta-taro/sshboard">GitHub</a>
+        </nav>
+        <div class="langs"><button type="button" value="en">English</button><button type="button" value="ja">日本語</button></div>
       </div>
+    </header>
+    <main id="main">
+      <section>
+        <div class="wrap article">
+        <p class="crumbs"><a href="./">sshboard</a></p>
 
       <div data-lang="en">
         <h1>Roadmap</h1>
         <p>sshboard lets a person and an AI agent look at the same server, on the same screen, over one SSH connection. This page says where that stands.</p>
 
-        <h2>Done</h2>
+        <div class="road-item stage">
+          <h3>Done</h3>
         <ul>
           <li>One SSH session shared by the window and the agent, for several servers at once</li>
           <li>Read-only tools for the agent: files, search, disk, processes, services, logs, listening ports</li>
@@ -34,26 +48,32 @@
           <li>The agent is woken when the person answers a question on screen (Claude Code channels)</li>
           <li>Auto-update; macOS for Apple Silicon and Intel; Windows x64 and ARM64; eleven languages</li>
         </ul>
+        </div>
 
-        <h2>Now</h2>
+        <div class="road-item stage now">
+          <h3>Now</h3>
         <ul>
           <li>Using it on real servers and fixing what that use turns up — that is where almost every issue has come from</li>
           <li>A design pass on the interface, decided by a person, not by the agent</li>
         </ul>
+        </div>
 
-        <h2>Next</h2>
+        <div class="road-item stage">
+          <h3>Next</h3>
         <ul>
           <li>Linux builds</li>
           <li>Confirming ssh-agent on Windows (named pipe / Pageant)</li>
           <li>Code signing, once its absence actually hurts someone — say so in an issue</li>
           <li>Deleting and renaming files inside the write fence (asked for; held for the next phase on purpose)</li>
         </ul>
+        </div>
 
         <h2>How we know it works, and when to stop</h2>
         <p><b>The one success criterion:</b> the agent stops saying "please show me the state of the server". Not downloads, not stars — whether the back-and-forth disappears during real maintenance.</p>
         <p>If people keep handing the agent a raw shell instead, because the fence costs more than it protects, that is the signal to rethink the design rather than add features.</p>
 
-        <h2>What it will not become</h2>
+        <div class="road-item stage">
+          <h3>What it will not become</h3>
         <ul>
           <li>A tool that runs any command line the agent writes (<code>run_command</code>)</li>
           <li>A way to run an agent against a server while nobody is watching</li>
@@ -61,13 +81,15 @@
           <li>A second SSH session you cannot see</li>
           <li>A way to move you off the server you already have</li>
         </ul>
+        </div>
       </div>
 
       <div data-lang="ja" hidden>
         <h1>ロードマップ</h1>
         <p>sshboard は、人と AI エージェントが同じサーバーを、同じ画面で、1 本の SSH の上で見るための道具です。このページは、それがいまどこまで来ているかを書いています。</p>
 
-        <h2>済んだこと</h2>
+        <div class="road-item stage">
+          <h3>済んだこと</h3>
         <ul>
           <li>窓とエージェントが 1 本の SSH を共有する（何台でも同時に）</li>
           <li>エージェント向けの読み取りの道具：ファイル・検索・空き容量・プロセス・サービス・ログ・待ち受け</li>
@@ -77,26 +99,32 @@
           <li>人が画面で答えたら、待っている AI を起こす（Claude Code の channels）</li>
           <li>自動更新。macOS は Apple シリコンと Intel、Windows は x64 と ARM64。11 言語</li>
         </ul>
+        </div>
 
-        <h2>いま</h2>
+        <div class="road-item stage now">
+          <h3>いま</h3>
         <ul>
           <li>実際のサーバーで使い、出てきたものを直す —— ほとんどの Issue はここから来ています</li>
           <li>画面の見た目を整える（決めるのは人で、エージェントではありません）</li>
         </ul>
+        </div>
 
-        <h2>次</h2>
+        <div class="road-item stage">
+          <h3>次</h3>
         <ul>
           <li>Linux 版</li>
           <li>Windows の ssh-agent（名前付きパイプ・Pageant）の確認</li>
           <li>コード署名 —— 無いことで実際に困った人が出たら。Issue で言ってください</li>
           <li>書き込みの囲いの中での削除・名前変更（要望あり。次の段に、意図して置いています）</li>
         </ul>
+        </div>
 
         <h2>うまくいっているかの物差しと、止めどころ</h2>
         <p><b>成功条件は 1 つだけです：</b>エージェントが「サーバーの状態を見せてください」と言わなくなること。ダウンロード数でも星の数でもなく、実際の保守作業で往復が消えたかどうかです。</p>
         <p>囲いが守るものより手間の方が大きく、結局エージェントに素のシェルを渡す人が続くなら、それは機能を足す合図ではなく、作りを考え直す合図です。</p>
 
-        <h2>作らないもの</h2>
+        <div class="road-item stage">
+          <h3>作らないもの</h3>
         <ul>
           <li>エージェントが書いた任意のコマンド行を走らせる口（<code>run_command</code>）</li>
           <li>誰も見ていない所でエージェントにサーバーを触らせる道</li>
@@ -104,13 +132,24 @@
           <li>あなたから見えない 2 本目の SSH</li>
           <li>いまのサーバーから別の基盤へ移させる道具</li>
         </ul>
+        </div>
       </div>
 
-      <footer>
-        <a href="./">sshboard</a> · <a href="./archive.html">All versions</a> ·
-        <a href="https://github.com/meta-taro/sshboard/issues">Issues</a>
-      </footer>
+        </div>
+      </section>
     </main>
+    <footer class="site-foot">
+      <div class="wrap">
+        <div><a class="brand" href="././"><img src="./icon.png" alt="" width="22" height="22" />sshboard</a></div>
+        <nav aria-label="Footer">
+          <a href="././#cases">Examples</a>
+          <a href="./archive.html">All versions</a>
+          <a href="./roadmap.html">Roadmap</a>
+          <a href="https://github.com/meta-taro/sshboard">GitHub</a>
+          <a href="./llms.txt">llms.txt</a>
+        </nav>
+      </div>
+    </footer>
     <script src="./sub.js"></script>
   </body>
 </html>

@@ -36,20 +36,16 @@
       content="sshboard with three servers open as tabs, a local pane and a remote pane side by side."
     />
     <meta name="twitter:card" content="summary_large_image" />
-
     <!--
-      **外から何も読み込みません。**
-      外向きは GitHub の API（版と資産名を読む所）だけ。
-      **`'self'` も要ります** —— ページ自身が `tools.json` を読むためで、
-      これを落とすと**道具の一覧が丸ごと出なくなります**（実際に一度そうなりました）。
-      script も style も自分のものだけ —— **鍵を扱う道具の入口なので、
-      ここから何かを差し込ませない。**
+      **外から何も読み込みません。**外向きは GitHub の API（版と資産名を読む所）だけ。
+      `'self'` は `tools.json` と `site.css` のため。**鍵を扱う道具の入口なので、ここから何かを差し込ませない。**
+      見た目は tadori の紹介ページの質に寄せ、色はアプリの緑のまま（2026-11-09・PdM 経由の田中さんの指示）。
     -->
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'none'; script-src 'self'; connect-src 'self' https://api.github.com; img-src 'self'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'"
+      content="default-src 'none'; script-src 'self'; connect-src 'self' https://api.github.com; img-src 'self'; style-src 'self'; base-uri 'none'; form-action 'none'"
     />
-    <!-- **何の道具かを検索と AI に言い切る**（紹介ページの構成 7）。よくある質問は画面の FAQ と同じ文。 -->
+    <link rel="stylesheet" href="./site.css" />
     <script type="application/ld+json">
 [
   {
@@ -117,566 +113,311 @@
   }
 ]
     </script>
-    <style>
-      /*
-       * 色は `apps/desktop/src/lib/styles/tokens.css` から採る。
-       * **アプリの見た目と食い違わせない** —— 入れた人が「別の物？」と思わないように。
-       */
-      :root {
-        color-scheme: light;
-        --ground: #eef0f3;
-        --shell: #e4e7ec;
-        --surface: #ffffff;
-        --surface-2: #f7f8fa;
-        --fg: #14181d;
-        --fg-muted: #545c67;
-        --fg-faint: #858d99;
-        --hairline: rgba(16, 22, 30, 0.09);
-        --hairline-strong: rgba(16, 22, 30, 0.16);
-        --lift-2: 0 1px 2px rgba(16, 22, 30, 0.05), 0 10px 28px -12px rgba(16, 22, 30, 0.22);
-        --accent: #1f6b58;
-        --accent-fg: #ffffff;
-        --accent-soft: rgba(31, 107, 88, 0.1);
-        --warning: #8a5a12;
-        --warning-soft: rgba(138, 90, 18, 0.1);
-        --danger: #b0332f;
-        --r-shell: 14px;
-        --r-core: 10px;
-        --font-ui: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
-        --font-mono: ui-monospace, SFMono-Regular, Menlo, 'Cascadia Mono', monospace;
-      }
-      @media (prefers-color-scheme: dark) {
-        :root {
-          color-scheme: dark;
-          --ground: #0b0e11;
-          --shell: #12161b;
-          --surface: #171c22;
-          --surface-2: #1c222a;
-          --fg: #e8ecf1;
-          --fg-muted: #a3adb9;
-          --fg-faint: #737d89;
-          --hairline: rgba(255, 255, 255, 0.08);
-          --hairline-strong: rgba(255, 255, 255, 0.15);
-          --lift-2: 0 1px 2px rgba(0, 0, 0, 0.4), 0 12px 30px -12px rgba(0, 0, 0, 0.7);
-          --accent: #4fd6ae;
-          --accent-fg: #06251c;
-          --accent-soft: rgba(79, 214, 174, 0.14);
-          --warning: #e5bb6b;
-          --warning-soft: rgba(229, 187, 107, 0.12);
-          --danger: #ff8b86;
-        }
-      }
-
-      * {
-        box-sizing: border-box;
-      }
-      body {
-        margin: 0;
-        padding: 0 20px 72px;
-        background: var(--ground);
-        color: var(--fg);
-        font-family: var(--font-ui);
-        font-size: 15px;
-        line-height: 1.7;
-      }
-      main {
-        max-width: 760px;
-        margin: 0 auto;
-      }
-      a {
-        color: var(--accent);
-      }
-      code,
-      pre {
-        font-family: var(--font-mono);
-        font-size: 13px;
-      }
-      pre {
-        background: var(--surface-2);
-        border: 1px solid var(--hairline);
-        border-radius: var(--r-core);
-        padding: 12px 14px;
-        overflow-x: auto;
-        line-height: 1.6;
-      }
-      p code {
-        background: var(--surface-2);
-        border: 1px solid var(--hairline);
-        border-radius: 5px;
-        padding: 1px 5px;
-      }
-      h2 {
-        font-size: 19px;
-        margin: 44px 0 12px;
-        letter-spacing: -0.01em;
-      }
-      h3 {
-        font-size: 15px;
-        margin: 26px 0 8px;
-      }
-
-      /* 頭 */
-      header {
-        display: flex;
-        gap: 18px;
-        align-items: center;
-        padding: 52px 0 8px;
-      }
-      header img {
-        width: 68px;
-        height: 68px;
-        border-radius: 15px;
-        box-shadow: var(--lift-2);
-      }
-      h1 {
-        font-size: 34px;
-        margin: 0;
-        letter-spacing: -0.02em;
-      }
-      .lede {
-        font-size: 17px;
-        color: var(--fg-muted);
-        margin: 4px 0 0;
-      }
-      .tags {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 7px;
-        margin-top: 14px;
-      }
-      .tag {
-        font-size: 12px;
-        border: 1px solid var(--hairline-strong);
-        border-radius: 999px;
-        padding: 2px 11px;
-        color: var(--fg-muted);
-        background: var(--surface);
-      }
-      .tag.alpha {
-        color: var(--warning);
-        background: var(--warning-soft);
-        border-color: transparent;
-      }
-
-      /* 落とす */
-      .files {
-        display: grid;
-        gap: 12px;
-        grid-template-columns: 1fr 1fr;
-      }
-      @media (max-width: 620px) {
-        .files {
-          grid-template-columns: 1fr;
-        }
-      }
-      .card {
-        background: var(--surface);
-        border: 1px solid var(--hairline);
-        border-radius: var(--r-shell);
-        padding: 16px;
-        box-shadow: var(--lift-2);
-      }
-      .card h3 {
-        margin: 0 0 2px;
-        font-size: 15px;
-      }
-      /* **見ている PC に合う 1 枚**（app.js が付ける）。色だけでなく文字でも言う。 */
-      .faq dt {
-        margin-top: 14px;
-        font-weight: 600;
-      }
-      .faq dd {
-        margin: 2px 0 0;
-        color: var(--fg-muted);
-      }
-      .card.mine {
-        border-color: var(--accent);
-        box-shadow: 0 0 0 1px var(--accent), var(--lift-2);
-      }
-      .this-pc {
-        display: inline-block;
-        margin-bottom: 6px;
-        padding: 1px 8px;
-        border-radius: 999px;
-        background: var(--accent-soft);
-        color: var(--accent);
-        font-size: 12px;
-        font-weight: 600;
-      }
-
-      /*
-       * カードに付く印。**題字の上に置きます。**
-       *
-       * 横に並べません —— 題字は言語によって 2 行になり、
-       * **並べると行が増えたぶんだけ揃わなくなります。**上に置けば、
-       * 何行になっても崩れようがありません。
-       */
-      .card img.mark {
-        display: block;
-        margin: 0 0 8px;
-        border-radius: 6px;
-      }
-      .card .sub {
-        color: var(--fg-faint);
-        font-size: 12.5px;
-        margin: 0 0 12px;
-      }
-      .get {
-        display: inline-block;
-        background: var(--accent);
-        color: var(--accent-fg);
-        text-decoration: none;
-        font-weight: 600;
-        font-size: 14px;
-        border-radius: 8px;
-        padding: 8px 16px;
-      }
-      .get.thin {
-        background: transparent;
-        color: var(--accent);
-        border: 1px solid var(--hairline-strong);
-        font-weight: 500;
-      }
-      .size {
-        display: block;
-        margin-top: 9px;
-        font-size: 11.5px;
-        color: var(--fg-faint);
-        font-family: var(--font-mono);
-        word-break: break-all;
-      }
-
-      /*
-       * 画面写真。**架空の設定の上で撮ったもの**（D26 / 禁止事項 4）。
-       *
-       * **`loading="lazy"` は付けません。**実際の閲覧者には効くはずですが、
-       * **こちらで確かめられませんでした** —— 自動操作の中では発火せず、
-       * 5 枚とも読み込まれないままでした。
-       * **確かめられないものを、外へ出す 1 枚に使わない。**
-       * 5 枚で 650KB ほどです。
-       */
-      figure.shot {
-        margin: 18px 0 26px;
-      }
-      figure.shot img {
-        display: block;
-        width: 100%;
-        height: auto;
-        border: 1px solid var(--hairline);
-        border-radius: var(--r-shell);
-        box-shadow: var(--lift-2);
-        background: var(--surface);
-      }
-      figure.shot figcaption {
-        margin-top: 7px;
-        font-size: 12.5px;
-        color: var(--fg-faint);
-      }
-
-      /* 兄弟プロダクトの 1 段落。落とす先のカードより文が長いので、行間を持たせる */
-      .card p.fam {
-        margin: 0 0 12px;
-        font-size: 13px;
-        line-height: 1.65;
-        color: var(--fg-muted);
-      }
-
-      .note {
-        border-left: 3px solid var(--hairline-strong);
-        padding: 2px 0 2px 14px;
-        color: var(--fg-muted);
-        margin: 16px 0;
-      }
-      .note.warn {
-        border-left-color: var(--warning);
-      }
-
-      table {
-        width: 100%;
-        border-collapse: collapse;
-        margin: 14px 0;
-        font-size: 14px;
-      }
-      th,
-      td {
-        text-align: left;
-        padding: 8px 10px;
-        border-bottom: 1px solid var(--hairline);
-        vertical-align: top;
-      }
-      th {
-        color: var(--fg-faint);
-        font-weight: 600;
-        font-size: 12.5px;
-      }
-
-      ul {
-        padding-left: 20px;
-      }
-      li {
-        margin: 6px 0;
-      }
-
-      footer {
-        margin-top: 56px;
-        padding-top: 20px;
-        border-top: 1px solid var(--hairline);
-        color: var(--fg-faint);
-        font-size: 13px;
-      }
-    </style>
   </head>
   <body>
-    <main>
-      <div class="lang">
+    <a class="skip" href="#main">Skip to content</a>
+    <header class="site-head">
+      <div class="wrap">
+        <a class="brand" href="./"><img src="./icon.png" alt="" width="28" height="28" />sshboard</a>
+        <nav class="site-nav" aria-label="Site">
+          <a href="#features" data-t="nav.features">Features</a>
+          <a href="#cases" data-t="nav.cases">Examples</a>
+          <a href="#download" data-t="nav.download">Download</a>
+          <a href="./roadmap.html" data-t="nav.roadmap">Roadmap</a>
+          <a class="gh" href="https://github.com/meta-taro/sshboard">GitHub</a>
+        </nav>
         <select id="lang" aria-label="Language"></select>
       </div>
+    </header>
 
-      <header>
-        <img src="./icon.png" alt="" />
-        <div>
-          <h1>sshboard</h1>
-          <p class="lede" data-t="lede">You and your AI agent, on one SSH session.</p>
-        </div>
-      </header>
-
-      <div class="tags">
-        <span class="tag alpha" data-t="tag.alpha">Alpha</span>
-        <span class="tag" id="ver">…</span>
-        <span class="tag" data-t="tag.mac">macOS (Apple Silicon · Intel)</span>
-        <span class="tag" data-t="tag.win">Windows x64 / ARM64</span>
-        <span class="tag" data-t="tag.langs">11 languages</span>
-        <span class="tag">MIT</span>
-      </div>
-
-      <p style="margin-top: 22px" data-t="intro">
-        Most agent tooling gives a model a <code>run_command(cmd)</code> hole and lets it work
+    <main id="main">
+      <section class="hero">
+        <div class="wrap">
+          <span class="eyebrow"><span data-t="tag.alpha">Alpha</span> · MIT · <span id="ver">…</span></span>
+          <h1 data-t="lede">You and your AI agent, on one SSH session.</h1>
+          <p class="lede" data-t="intro">Most agent tooling gives a model a <code>run_command(cmd)</code> hole and lets it work
         somewhere you aren't looking. sshboard does the opposite: the agent and you hold
         <b>the same SSH connection</b>, and everything it does lands on a screen you are sitting in
-        front of. There is no second, invisible session.
-      </p>
-
-      <h2 data-t="h.download">Download</h2>
-
-      <div class="files">
-        <div class="card">
-          <h3>macOS</h3>
-          <p class="sub" data-t="dl.mac.sub">Apple Silicon · Intel (universal)</p>
-          <a class="get" id="dl-mac" data-t="dl.button" href="https://github.com/meta-taro/sshboard/releases">Download</a>
-          <span class="size" id="size-mac"></span>
+        front of. There is no second, invisible session.</p>
+          <div class="cta">
+            <a class="btn btn-primary" href="#download">
+              <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M10 3v10m0 0l-4-4m4 4l4-4M4 16h12" /></svg>
+              <span data-t="dl.button">Download</span>
+            </a>
+            <a class="btn btn-ghost" href="#cases" data-t="cta.cases">See the examples</a>
+          </div>
+          <p class="cta-note">
+            <span data-t="tag.mac">macOS (Apple Silicon · Intel)</span> ·
+            <span data-t="tag.win">Windows x64 / ARM64</span> ·
+            <span data-t="tag.langs">11 languages</span>
+          </p>
+          <figure class="shot">
+            <img id="shot-hero" src="./shots/en/console.png" width="1100" height="700" fetchpriority="high" alt="sshboard — a terminal shared by you and the agent, with every operation listed beside it" />
+          </figure>
         </div>
+      </section>
 
-        <div class="card">
-          <h3>Windows</h3>
-          <p class="sub" data-t="dl.win.sub">x64 · installer (NSIS)</p>
-          <a class="get" id="dl-win" data-t="dl.button" href="https://github.com/meta-taro/sshboard/releases">Download</a>
-          <span class="size" id="size-win"></span>
+      <section>
+        <div class="wrap">
+          <div class="section-head">
+            <h2 data-t="h.fence">The fence</h2>
+            <p data-t="fence.intro">These are constraints on the code, not advice in a prompt. They hold whether or not the
+        model cooperates.</p>
+          </div>
+          <ul class="facts">
+          <li data-t="fence.1"><b>There is no <code>run_command(cmd)</code> tool.</b> Not a filtered one, not a clever one. An agent cannot hand an arbitrary string to a shell.</li>
+          <li data-t="fence.2"><b>Read-only commands come from a list you wrote.</b> <code>readonly.toml</code> starts empty, so out of the box the agent cannot run a single command.</li>
+          <li data-t="fence.3"><b>Writes are fenced to directories you listed,</b> per connection. That list also starts empty. Upload and mkdir only — no delete, rename, move, chmod, service restart or package install.</li>
+          <li data-t="fence.4"><b>There is no download-to-my-machine tool.</b> The fence does not protect your laptop, so the agent doesn't get a door onto it.</li>
+          <li data-t="fence.5"><b>State-changing operations need a human press,</b> and the first attempt is always refused so the screen can show you exactly what would run. Approvals expire in 5 minutes and cover one run.</li>
+          <li data-t="fence.6"><b>Keys stay in the OS credential store and ssh-agent.</b> sshboard does not implement a key store, and the tool that lists connections returns identifiers, never credentials.</li>
+          </ul>
         </div>
+      </section>
 
-        <!--
-          **ARM64 を分けて出す**（2026-10-06・人の決定）。
-          ARM の Windows（Snapdragon など）の席で入れられず、作業が止まった実例が出ています。
-          **「Windows」1 つに見せて中身が x64 だけ**だと、ARM の人は
-          落として入れて初めて分かります。
-        -->
-        <div class="card">
-          <h3>Windows (ARM64)</h3>
-          <p class="sub">arm64 · installer (NSIS)</p>
-          <a class="get" id="dl-win-arm" data-t="dl.button" href="https://github.com/meta-taro/sshboard/releases">Download</a>
-          <span class="size" id="size-win-arm"></span>
+      <section class="soft" id="features">
+        <div class="wrap">
+          <div class="section-head">
+            <h2 data-t="h.ui">What you are looking at</h2>
+            <p data-t="ui.intro">One window, five tabs. These were taken against a <b>made-up configuration</b> — every
+        screenshot of this product would otherwise carry somebody's hostname, username and paths.
+        The three servers below do not exist; they point at a throwaway container on the machine
+        that took the shots.</p>
+          </div>
+        <div class="feature">
+          <div class="feature-text">
+            <h3 data-t="tab.connections">Connections</h3>
+            <p data-t="ui.t.connections">The servers you registered, and the button that opens one. Credentials live in the OS credential store and ssh-agent, never here.</p>
+          </div>
+          <figure class="shot"><img id="shot-connections" src="./shots/en/connections.png" width="1100" height="700" loading="lazy" alt="sshboard — Connections" /></figure>
         </div>
-
-        <div class="card">
-          <h3 data-t="dl.msi.title">Windows (MSI)</h3>
-          <p class="sub" data-t="dl.msi.sub">If your organisation deploys by MSI</p>
-          <a class="get thin" id="dl-msi" data-t="dl.button" href="https://github.com/meta-taro/sshboard/releases">Download</a>
-          <span class="size" id="size-msi"></span>
+        <div class="feature flip">
+          <div class="feature-text">
+            <h3 data-t="tab.files">Files</h3>
+            <p data-t="ui.t.files">Two panes: the server on one side, your machine on the other. Upload, download, make a directory. The agent is fenced to directories you listed; you are not.</p>
+          </div>
+          <figure class="shot"><img id="shot-files" src="./shots/en/files.png" width="1100" height="700" loading="lazy" alt="sshboard — Files" /></figure>
         </div>
-
-        <div class="card">
-          <h3>Windows (MSI · ARM64)</h3>
-          <p class="sub" data-t="dl.msi.sub">If your organisation deploys by MSI</p>
-          <a class="get thin" id="dl-msi-arm" data-t="dl.button" href="https://github.com/meta-taro/sshboard/releases">Download</a>
-          <span class="size" id="size-msi-arm"></span>
+        <div class="feature">
+          <div class="feature-text">
+            <h3 data-t="tab.console">Console</h3>
+            <p data-t="ui.t.console">A real terminal on the same SSH connection — <b>shared with the agent.</b> While the agent holds it your input is locked out and a Stop button is showing. It never opens a second session you can't see.</p>
+          </div>
+          <figure class="shot"><img id="shot-console" src="./shots/en/console.png" width="1100" height="700" loading="lazy" alt="sshboard — Console" /></figure>
         </div>
-
-        <div class="card">
-          <h3 data-t="dl.src.title">Source</h3>
-          <p class="sub">Tauri 2 · SvelteKit · Rust</p>
-          <a class="get thin" href="https://github.com/meta-taro/sshboard">GitHub</a>
-          <span class="size">pnpm install &amp;&amp; pnpm --filter desktop tauri dev</span>
+        <div class="feature flip">
+          <div class="feature-text">
+            <h3 data-t="tab.band">Activity</h3>
+            <p data-t="ui.t.band"><b>Who did what.</b> One line per operation, tagged <code>[Human]</code> or <code>[AI]</code>, in the order it happened. This is the tab you read to answer "what has the agent been doing?"</p>
+          </div>
+          <figure class="shot"><img id="shot-band" src="./shots/en/band.png" width="1100" height="700" loading="lazy" alt="sshboard — Activity" /></figure>
         </div>
-      </div>
+        <div class="feature">
+          <div class="feature-text">
+            <h3 data-t="tab.diag">Log</h3>
+            <p data-t="ui.t.diag"><b>Why something failed.</b> Connection stages, errors, and what to do about them. This is the tab you read when something did not work — and the one to copy from when you file an issue.</p>
+          </div>
+          <figure class="shot"><img id="shot-diag" src="./shots/en/diag.png" width="1100" height="700" loading="lazy" alt="sshboard — Log" /></figure>
+        </div>
+          <div class="note" data-t="ui.confusable"><b>Activity and Log are not the same thing,</b> and the names do not make that obvious
+        enough yet. <b>Activity is a record of actions</b> — it answers <i>who did what</i>.
+        <b>Log is a record of diagnosis</b> — it answers <i>why it failed</i>. If you are trying to
+        find out what the agent ran, you want Activity. If you are trying to find out why a
+        connection would not open, you want Log.</div>
+        </div>
+      </section>
 
-      <!-- 「この PC」の印の字（app.js が写す）。訳は data-t で当たる。 -->
-      <span id="this-pc-label" data-t="dl.this" hidden>This PC</span>
-      <!-- **過去の版も落とせる**（紹介ページの構成 2）。一覧はリリースから読むので、版を出すたびに直さない。 -->
-      <p class="note" data-t="dl.archive">Older versions are on the <a href="./archive.html">archive page</a>.</p>
+      <section>
+        <div class="wrap">
+          <div class="section-head"><h2 data-t="h.howto">How you use it</h2></div>
+          <ol class="steps">
+          <li data-t="howto.1"><b>Register a server.</b> Connections tab → add one. You give it an id, a name, a host and a user. The passphrase or password is never stored by sshboard — it goes to the OS credential store, or you leave it to ssh-agent.</li>
+          <li data-t="howto.2"><b>Open it.</b> It becomes a tab. Several can be open at once, and every one of them is visible. If a key needs a passphrase, the question appears on your screen — the agent cannot answer it.</li>
+          <li data-t="howto.3"><b>Work in Files or Console.</b> Both run over that same connection. Nothing the agent does happens on a different one.</li>
+          <li data-t="howto.4"><b>Point your agent at it</b> (below). Ask it to look at something. What it runs appears in Activity as it happens, and its output appears in the same Console you are watching.</li>
+          <li data-t="howto.5"><b>Approve what changes things.</b> Reading is fenced by an allow-list you wrote. Anything that changes state is refused the first time and shown to you in full before it can run — and the approval is good for one run, for five minutes.</li>
+          </ol>
+          <div class="note" data-t="howto.empty"><b>Out of the box the agent can do nothing at all.</b> The read-only allow-list starts
+        empty, the write directories start empty, and the list of state-changing operations starts
+        empty. That is not a missing setup step — it is the design. You widen it as far as you
+        actually need, one line at a time.</div>
+        </div>
+      </section>
 
-      <div class="note warn" data-t="unsigned">
-        <b>It is not code-signed.</b> Windows SmartScreen and macOS Gatekeeper will both stop you the
+      <section class="soft" id="cases">
+        <div class="wrap">
+          <div class="section-head">
+            <h2 data-t="h.cases">Examples</h2>
+            <p data-t="cases.intro">Three afternoons, each on made-up servers. Every page starts with what you use, what you find and how it ends.</p>
+          </div>
+          <div class="cards">
+          <a class="card" href="./cases/certificates.html">
+            <img src="./shots/en/console.png" width="1100" height="700" loading="lazy" alt="" />
+            <div class="card-body"><h3 data-t="cases.cert">Renew the certificates on three servers today</h3><span class="more" data-t="cases.more">Read the example →</span></div>
+          </a>
+          <a class="card" href="./cases/mail.html">
+            <img src="./shots/en/band.png" width="1100" height="700" loading="lazy" alt="" />
+            <div class="card-body"><h3 data-t="cases.mail">Mail stopped arriving and nobody knows where to look</h3><span class="more" data-t="cases.more">Read the example →</span></div>
+          </a>
+          <a class="card" href="./cases/fence.html">
+            <img src="./shots/en/files.png" width="1100" height="700" loading="lazy" alt="" />
+            <div class="card-body"><h3 data-t="cases.fence">Get the agent's help without letting it roam the server</h3><span class="more" data-t="cases.more">Read the example →</span></div>
+          </a>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <div class="wrap">
+          <div class="section-head">
+            <h2 data-t="h.tools">What the agent can do</h2>
+            <p data-t="tools.intro"><span id="tool-count"></span> tools over MCP. These are the exact descriptions the agent
+        reads, so they are shown in English as it sees them. Note what is <b>not</b> here: there is
+        no tool that takes an arbitrary command string, and no tool that downloads to your machine.</p>
+          </div>
+          <details class="tools-all">
+            <summary data-t="tools.show">Show every tool, with the exact description the agent reads</summary>
+            <div id="tools"></div>
+          </details>
+        </div>
+      </section>
+
+      <section class="soft" id="download">
+        <div class="wrap">
+          <div class="section-head"><h2 data-t="h.download">Download</h2></div>
+          <div class="dl-grid">
+          <div class="dl">
+            <h3>macOS</h3>
+            <p class="cpu" data-t="dl.mac.sub">Apple Silicon · Intel (universal)</p>
+            <a class="btn btn-primary" id="dl-mac" data-t="dl.button" href="https://github.com/meta-taro/sshboard/releases">Download</a>
+            <span class="size" id="size-mac"></span>
+          </div>
+          <div class="dl">
+            <h3>Windows</h3>
+            <p class="cpu" data-t="dl.win.sub">x64 · installer (NSIS)</p>
+            <a class="btn btn-primary" id="dl-win" data-t="dl.button" href="https://github.com/meta-taro/sshboard/releases">Download</a>
+            <span class="size" id="size-win"></span>
+          </div>
+          <div class="dl">
+            <h3>Windows (ARM64)</h3>
+            <p class="cpu">arm64 · installer (NSIS)</p>
+            <a class="btn btn-primary" id="dl-win-arm" data-t="dl.button" href="https://github.com/meta-taro/sshboard/releases">Download</a>
+            <span class="size" id="size-win-arm"></span>
+          </div>
+          <!-- **MSI は 1 枚に 2 つ**（x64 と ARM64）。配る形の違いで、別の製品ではないため。 -->
+          <div class="dl">
+            <h3 data-t="dl.msi.title">Windows (MSI)</h3>
+            <p class="cpu" data-t="dl.msi.sub">If your organisation deploys by MSI</p>
+            <div class="files">
+              <a class="btn btn-ghost" id="dl-msi" href="https://github.com/meta-taro/sshboard/releases">x64</a>
+              <span class="size" id="size-msi"></span>
+              <a class="btn btn-ghost" id="dl-msi-arm" href="https://github.com/meta-taro/sshboard/releases">ARM64</a>
+              <span class="size" id="size-msi-arm"></span>
+            </div>
+          </div>
+          </div>
+          <!-- 「この PC」の印の字（app.js が写す）。訳は data-t で当たる。 -->
+          <span id="this-pc-label" data-t="dl.this" hidden>This PC</span>
+          <p data-t="dl.archive">Older versions are on the <a href="./archive.html">archive page</a>.</p>
+          <div class="note" data-t="unsigned"><b>It is not code-signed.</b> Windows SmartScreen and macOS Gatekeeper will both stop you the
         first time. On Windows: <i>More info → Run anyway</i>. On macOS: right-click the app →
         <i>Open</i>. This is a tool that handles keys, and we know the first thing it teaches you is
         to dismiss a warning — signing goes in once someone is actually hurt by its absence, and
         <a href="https://github.com/meta-taro/sshboard/issues">saying so in an issue</a> is what
-        decides that.
-      </div>
-
-      <h3 data-t="h.install.mac">Installing on macOS</h3>
-      <p data-t="install.mac">
-        Open the <code>.dmg</code> and drag sshboard into Applications. The
+        decides that.</div>
+          <div class="install">
+            <div>
+              <h3 data-t="h.install.mac">Installing on macOS</h3>
+              <p data-t="install.mac">Open the <code>.dmg</code> and drag sshboard into Applications. The
         <code>.app.tar.gz</code> sitting next to it in the release is what the auto-updater
-        consumes — you don't need it.
-      </p>
-      <p data-t="install.mac.open">Then open it from Finder with right-click → <b>Open</b> the first time.</p>
-
-      <h3 data-t="h.install.win">Installing on Windows</h3>
-      <p data-t="install.win">
-        Run the <code>-setup.exe</code>. Windows needs <b>WebView2</b>; Windows 11 and recent 10
+        consumes — you don't need it.</p>
+              <p data-t="install.mac.open">Then open it from Finder with right-click → <b>Open</b> the first time.</p>
+            </div>
+            <div>
+              <h3 data-t="h.install.win">Installing on Windows</h3>
+              <p data-t="install.win">Run the <code>-setup.exe</code>. Windows needs <b>WebView2</b>; Windows 11 and recent 10
         already have it, and if not the installer fetches it — so the first install needs a network
-        connection.
-      </p>
+        connection.</p>
+            </div>
+          </div>
+          <p class="muted"><span data-t="dl.src.title">Source</span>: <a href="https://github.com/meta-taro/sshboard">GitHub</a> · Tauri 2 · SvelteKit · Rust</p>
+        </div>
+      </section>
 
-      <h2 data-t="h.ui">What you are looking at</h2>
+      <section>
+        <div class="wrap">
+          <div class="section-head">
+            <h2 data-t="h.agent">Connect your agent</h2>
+            <p data-t="agent.intro">Point your agent at the running app. This form starts sshboard as a relay with no window, so
+        <b>the token is never written to disk</b> — not into <code>~/.claude.json</code>, not into
+        your shell history.</p>
+          </div>
+          <pre># macOS
+claude mcp add --scope user sshboard -- /Applications/sshboard.app/Contents/MacOS/sshboard --mcp-stdio-proxy
+# Windows
+claude mcp add --scope user sshboard -- "%LOCALAPPDATA%\\sshboard\\sshboard.exe" --mcp-stdio-proxy</pre>
+          <p data-t="agent.note">The relay holds no engine and opens no connection of its own — only the app does, which is
+        the point. It is a one-time step: the port is fixed at <code>22022</code> and the token is
+        reused, so restarting does not make you register again. If the port is taken it says so on
+        screen rather than quietly moving. (There is a plain HTTP form too, but that one leaves the
+        token in a file — the window has a button that copies it if you want it.)</p>
+          <p data-t="agent.about">Ask it <code>about_sshboard</code> first — the tool exists so an agent can find out what this
+        is, what it may and may not do, and what changed in each version, without you pasting a
+        briefing.</p>
+        </div>
+      </section>
 
-      <p data-t="ui.intro">
-        One window, five tabs. These were taken against a <b>made-up configuration</b> — every
-        screenshot of this product would otherwise carry somebody's hostname, username and paths.
-        The three servers below do not exist; they point at a throwaway container on the machine
-        that took the shots.
-      </p>
+      <section class="soft">
+        <div class="wrap">
+          <div class="section-head">
+            <h2 data-t="h.pair">Pair it with dbboard and the deploy is yours</h2>
+            <p data-t="pair.lede">Plenty of systems are still released by hand: someone opens an SSH session, copies the
+        files up, then opens a database client and runs the migration. <b>There is no pipeline
+        to hand an agent, and building one is its own project</b> — a runner, a hosted service,
+        credentials sitting in someone else's vault.</p>
+          </div>
+          <p data-t="pair.claim"><b>Two desktop apps cover both halves.</b> sshboard puts the files where they go;
+        <a href="https://meta-taro.github.io/dbboard/">dbboard</a> runs what has to run against
+        the database. The agent does the steps and <b>you are in the room for all of them, on
+        both sides</b> — no CI service, no deploy platform, no secrets uploaded anywhere.</p>
+          <div class="pair">
+            <div class="dl">
+              <img class="mark" src="./icon.png" width="28" height="28" alt="" />
+              <h3 data-t="pair.here">sshboard — the server half</h3>
+              <p class="cpu" data-t="pair.here.body">Upload into directories you listed. Run commands from a list you wrote. Take the
+            terminal back at any time. <b>No <code>run_command</code> hole</b>, and no tool that
+            reaches back down to your own machine.</p>
+            </div>
+            <div class="dl">
+              <img class="mark" src="./dbboard-icon-256.png" width="28" height="28" alt="" />
+              <h3 data-t="pair.there">dbboard — the database half</h3>
+              <p class="cpu" data-t="pair.there.body">Nine engines, from MySQL and PostgreSQL to Turso, D1 and Firestore. <b>Read-only
+            until you opt a connection in</b>, and even then grants, role DDL,
+            <code>TRUNCATE</code> and <code>DROP</code> are refused whatever you set.</p>
+              <a class="btn btn-ghost" href="https://meta-taro.github.io/dbboard/" data-t="pair.get">Get dbboard</a>
+            </div>
+          </div>
+          <div class="note" data-t="pair.watch"><b>Neither is a way to leave an agent running unattended.</b> What gets automated is the
+        work, not the watching — that is the whole point of running it on your desk instead of in
+        someone's cloud.</div>
+          <p class="muted" data-t="pair.warifu">There is a third one, <a href="https://meta-taro.github.io/warifu/">warifu</a>, for a
+        different question: several people and several agents in one conversation, peer to peer,
+        with no central account. It is not part of the deploy story.</p>
+        </div>
+      </section>
 
-      <figure class="shot">
-        <img
-          id="shot-connections"
-          src="./shots/en/connections.png"
-          alt="sshboard — Connections"
-          width="1100"
-          height="700"
-        />
-        <figcaption data-t="tab.connections">Connections</figcaption>
-      </figure>
-      <figure class="shot">
-        <img
-          id="shot-files"
-          src="./shots/en/files.png"
-          alt="sshboard — Files"
-          width="1100"
-          height="700"
-        />
-        <figcaption data-t="tab.files">Files</figcaption>
-      </figure>
-      <figure class="shot">
-        <img
-          id="shot-console"
-          src="./shots/en/console.png"
-          alt="sshboard — Console"
-          width="1100"
-          height="700"
-        />
-        <figcaption data-t="tab.console">Console</figcaption>
-      </figure>
-      <figure class="shot">
-        <img
-          id="shot-band"
-          src="./shots/en/band.png"
-          alt="sshboard — Activity"
-          width="1100"
-          height="700"
-        />
-        <figcaption data-t="tab.band">Activity</figcaption>
-      </figure>
-      <figure class="shot">
-        <img
-          id="shot-diag"
-          src="./shots/en/diag.png"
-          alt="sshboard — Log"
-          width="1100"
-          height="700"
-        />
-        <figcaption data-t="tab.diag">Log</figcaption>
-      </figure>
-
-      <table>
-        <tr>
-          <th data-t="ui.th.tab">Tab</th>
-          <th data-t="ui.th.what">What it holds</th>
-        </tr>
-        <tr>
-          <td><b data-t="tab.connections">Connections</b></td>
-          <td data-t="ui.t.connections">The servers you registered, and the button that opens one. Credentials live in the OS credential store and ssh-agent, never here.</td>
-        </tr>
-        <tr>
-          <td><b data-t="tab.files">Files</b></td>
-          <td data-t="ui.t.files">Two panes: the server on one side, your machine on the other. Upload, download, make a directory. The agent is fenced to directories you listed; you are not.</td>
-        </tr>
-        <tr>
-          <td><b data-t="tab.console">Console</b></td>
-          <td data-t="ui.t.console">A real terminal on the same SSH connection — <b>shared with the agent.</b> While the agent holds it your input is locked out and a Stop button is showing. It never opens a second session you can't see.</td>
-        </tr>
-        <tr>
-          <td><b data-t="tab.band">Activity</b></td>
-          <td data-t="ui.t.band"><b>Who did what.</b> One line per operation, tagged <code>[Human]</code> or <code>[AI]</code>, in the order it happened. This is the tab you read to answer "what has the agent been doing?"</td>
-        </tr>
-        <tr>
-          <td><b data-t="tab.diag">Log</b></td>
-          <td data-t="ui.t.diag"><b>Why something failed.</b> Connection stages, errors, and what to do about them. This is the tab you read when something did not work — and the one to copy from when you file an issue.</td>
-        </tr>
-      </table>
-
-      <div class="note" data-t="ui.confusable">
-        <b>Activity and Log are not the same thing,</b> and the names do not make that obvious
-        enough yet. <b>Activity is a record of actions</b> — it answers <i>who did what</i>.
-        <b>Log is a record of diagnosis</b> — it answers <i>why it failed</i>. If you are trying to
-        find out what the agent ran, you want Activity. If you are trying to find out why a
-        connection would not open, you want Log.
-      </div>
-
-      <h2 data-t="h.howto">How you use it</h2>
-
-      <ol>
-        <li data-t="howto.1"><b>Register a server.</b> Connections tab → add one. You give it an id, a name, a host and a user. The passphrase or password is never stored by sshboard — it goes to the OS credential store, or you leave it to ssh-agent.</li>
-        <li data-t="howto.2"><b>Open it.</b> It becomes a tab. Several can be open at once, and every one of them is visible. If a key needs a passphrase, the question appears on your screen — the agent cannot answer it.</li>
-        <li data-t="howto.3"><b>Work in Files or Console.</b> Both run over that same connection. Nothing the agent does happens on a different one.</li>
-        <li data-t="howto.4"><b>Point your agent at it</b> (below). Ask it to look at something. What it runs appears in Activity as it happens, and its output appears in the same Console you are watching.</li>
-        <li data-t="howto.5"><b>Approve what changes things.</b> Reading is fenced by an allow-list you wrote. Anything that changes state is refused the first time and shown to you in full before it can run — and the approval is good for one run, for five minutes.</li>
-      </ol>
-
-      <div class="note" data-t="howto.empty">
-        <b>Out of the box the agent can do nothing at all.</b> The read-only allow-list starts
-        empty, the write directories start empty, and the list of state-changing operations starts
-        empty. That is not a missing setup step — it is the design. You widen it as far as you
-        actually need, one line at a time.
-      </div>
-
-      <h2 data-t="h.tools">What the agent can do</h2>
-
-      <p data-t="tools.intro">
-        <span id="tool-count"></span> tools over MCP. These are the exact descriptions the agent
-        reads, so they are shown in English as it sees them. Note what is <b>not</b> here: there is
-        no tool that takes an arbitrary command string, and no tool that downloads to your machine.
-      </p>
-
-      <div id="tools"></div>
-
-      <h2 data-t="h.state">Where it actually is right now</h2>
-
-      <p data-t="state.intro">
-        <b>The features are in. The interface is not finished.</b> sshboard is being used against a
+      <section>
+        <div class="wrap">
+          <div class="section-head">
+            <h2 data-t="h.state">Where it actually is right now</h2>
+            <p data-t="state.intro"><b>The features are in. The interface is not finished.</b> sshboard is being used against a
         real production server, and the whole visible issue list came out of that use — but it has
         not had a design pass yet, and it shows. If you are looking for something polished, this is
         not it yet. If you are looking for something whose safety model you can read end to end, it
-        is ready for you to argue with.
-      </p>
-
-      <table>
-        <tr>
-          <th data-t="state.working">Working</th>
-          <th data-t="state.notyet">Not yet</th>
-        </tr>
-        <tr>
-          <td data-t="state.working.list">
-            One shared SSH session (GUI + agent)<br />
+        is ready for you to argue with.</p>
+          </div>
+          <div class="state">
+            <div><h3 data-t="state.working">Working</h3><p data-t="state.working.list">One shared SSH session (GUI + agent)<br />
             The MCP tools listed above<br />
             Read-only commands from an allow-list<br />
             Health checks a person writes, run by either side<br />
@@ -684,163 +425,51 @@
             <code>sudo</code> with a password nobody stores<br />
             Terminal shared with a stop button<br />
             The agent woken when you answer (Claude Code channels)<br />
-            Auto-update · Apple Silicon and Intel Macs
-          </td>
-          <td data-t="state.notyet.list">
-            A design pass on the UI<br />
+            Auto-update · Apple Silicon and Intel Macs</p></div>
+            <div><h3 data-t="state.notyet">Not yet</h3><p data-t="state.notyet.list">A design pass on the UI<br />
             Code signing<br />
             ssh-agent on Windows (named pipe / Pageant) — unverified<br />
-            Linux builds
-          </td>
-        </tr>
-      </table>
-
-      <h2 data-t="h.fence">The fence</h2>
-
-      <p data-t="fence.intro">
-        These are constraints on the code, not advice in a prompt. They hold whether or not the
-        model cooperates.
-      </p>
-
-      <ul>
-        <li data-t="fence.1"><b>There is no <code>run_command(cmd)</code> tool.</b> Not a filtered one, not a clever one. An agent cannot hand an arbitrary string to a shell.</li>
-        <li data-t="fence.2"><b>Read-only commands come from a list you wrote.</b> <code>readonly.toml</code> starts empty, so out of the box the agent cannot run a single command.</li>
-        <li data-t="fence.3"><b>Writes are fenced to directories you listed,</b> per connection. That list also starts empty. Upload and mkdir only — no delete, rename, move, chmod, service restart or package install.</li>
-        <li data-t="fence.4"><b>There is no download-to-my-machine tool.</b> The fence does not protect your laptop, so the agent doesn't get a door onto it.</li>
-        <li data-t="fence.5"><b>State-changing operations need a human press,</b> and the first attempt is always refused so the screen can show you exactly what would run. Approvals expire in 5 minutes and cover one run.</li>
-        <li data-t="fence.6"><b>Keys stay in the OS credential store and ssh-agent.</b> sshboard does not implement a key store, and the tool that lists connections returns identifiers, never credentials.</li>
-      </ul>
-
-      <h2 data-t="h.agent">Connect your agent</h2>
-
-      <p data-t="agent.intro">
-        Point your agent at the running app. This form starts sshboard as a relay with no window, so
-        <b>the token is never written to disk</b> — not into <code>~/.claude.json</code>, not into
-        your shell history.
-      </p>
-
-      <pre># macOS
-claude mcp add --scope user sshboard -- /Applications/sshboard.app/Contents/MacOS/sshboard --mcp-stdio-proxy
-
-# Windows
-claude mcp add --scope user sshboard -- "%LOCALAPPDATA%\\sshboard\\sshboard.exe" --mcp-stdio-proxy</pre>
-
-      <p data-t="agent.note">
-        The relay holds no engine and opens no connection of its own — only the app does, which is
-        the point. It is a one-time step: the port is fixed at <code>22022</code> and the token is
-        reused, so restarting does not make you register again. If the port is taken it says so on
-        screen rather than quietly moving. (There is a plain HTTP form too, but that one leaves the
-        token in a file — the window has a button that copies it if you want it.)
-      </p>
-
-      <p data-t="agent.about">
-        Ask it <code>about_sshboard</code> first — the tool exists so an agent can find out what this
-        is, what it may and may not do, and what changed in each version, without you pasting a
-        briefing.
-      </p>
-
-      <h2 data-t="h.pair">Pair it with dbboard and the deploy is yours</h2>
-
-      <p data-t="pair.lede">
-        Plenty of systems are still released by hand: someone opens an SSH session, copies the
-        files up, then opens a database client and runs the migration. <b>There is no pipeline
-        to hand an agent, and building one is its own project</b> — a runner, a hosted service,
-        credentials sitting in someone else's vault.
-      </p>
-
-      <p data-t="pair.claim">
-        <b>Two desktop apps cover both halves.</b> sshboard puts the files where they go;
-        <a href="https://meta-taro.github.io/dbboard/">dbboard</a> runs what has to run against
-        the database. The agent does the steps and <b>you are in the room for all of them, on
-        both sides</b> — no CI service, no deploy platform, no secrets uploaded anywhere.
-      </p>
-
-      <!--
-        **アイコンはここに置いたものを使います。**
-        CSP が `img-src 'self'` なので、相手のサイトを指すと**何も描かれません**
-        （遅い画像に劣化するのではなく、無くなります）。
-        dbboard 側も同じ理由で sshboard のアイコンを自分の所に置いています。
-      -->
-      <div class="files">
-        <div class="card">
-          <!--
-            **印は題字の外に置きます。**
-            中に入れると、訳を当てるときに `innerHTML` ごと置き換わって**消えます**
-            （実際に消えました）。訳が持つのは文字だけにしておく。
-          -->
-          <img class="mark" src="./icon.png" width="28" height="28" alt="" />
-          <h3 data-t="pair.here">sshboard — the server half</h3>
-          <p class="fam" data-t="pair.here.body">
-            Upload into directories you listed. Run commands from a list you wrote. Take the
-            terminal back at any time. <b>No <code>run_command</code> hole</b>, and no tool that
-            reaches back down to your own machine.
-          </p>
+            Linux builds</p></div>
+          </div>
+          <p data-t="state.roadmap">What is done, what is next, and what it will not do: <a href="./roadmap.html">the roadmap</a>.</p>
+          <h3 data-t="h.never">What it will not become</h3>
+          <ul>
+          <li data-t="never.1">A way to run an agent against a server while nobody is watching.</li>
+          <li data-t="never.2">A place your keys or passphrases get stored.</li>
+          <li data-t="never.3">A tool that opens a second SSH session you cannot see.</li>
+          </ul>
         </div>
+      </section>
 
-        <div class="card">
-          <img class="mark" src="./dbboard-icon-256.png" width="28" height="28" alt="" />
-          <h3 data-t="pair.there">dbboard — the database half</h3>
-          <p class="fam" data-t="pair.there.body">
-            Nine engines, from MySQL and PostgreSQL to Turso, D1 and Firestore. <b>Read-only
-            until you opt a connection in</b>, and even then grants, role DDL,
-            <code>TRUNCATE</code> and <code>DROP</code> are refused whatever you set.
-          </p>
-          <a class="get" href="https://meta-taro.github.io/dbboard/" data-t="pair.get">Get dbboard</a>
+      <section class="soft faq" id="faq">
+        <div class="wrap">
+          <div class="section-head"><h2 data-t="h.faq">Frequently asked questions</h2></div>
+        <details><summary data-t="faq.q1">What is sshboard?</summary><p data-t="faq.a1">A desktop SSH client with an MCP server built in. You and your AI agent look at the same server, on the same screen, over one SSH connection, and everything the agent does appears in your window as it happens.</p></details>
+        <details><summary data-t="faq.q2">Can the agent run any command it likes?</summary><p data-t="faq.a2">No. There is no tool that takes a command line. The agent can use read-only tools, run commands a person listed in readonly.toml by id, and ask to run operations a person listed in operations.toml — each of those asks you on screen first.</p></details>
+        <details><summary data-t="faq.q3">Where can the agent write files?</summary><p data-t="faq.a3">Only inside the directories you list for each connection. The list is empty by default, so it writes nothing until you add one. It cannot delete, rename or download files to your machine.</p></details>
+        <details><summary data-t="faq.q4">Does sshboard store my keys or passwords?</summary><p data-t="faq.a4">No. Keys stay in your OS keychain and ssh-agent. A sudo password you type for one approved operation is passed to that one run and never stored.</p></details>
+        <details><summary data-t="faq.q5">Which agents and systems does it work with?</summary><p data-t="faq.a5">Any MCP client; Claude Code is the one it is tested with. The app runs on macOS (Apple Silicon and Intel) and Windows (x64 and ARM64).</p></details>
         </div>
-      </div>
-
-      <div class="note" data-t="pair.watch">
-        <b>Neither is a way to leave an agent running unattended.</b> What gets automated is the
-        work, not the watching — that is the whole point of running it on your desk instead of in
-        someone's cloud.
-      </div>
-
-      <p class="note" data-t="pair.warifu">
-        There is a third one, <a href="https://meta-taro.github.io/warifu/">warifu</a>, for a
-        different question: several people and several agents in one conversation, peer to peer,
-        with no central account. It is not part of the deploy story.
-      </p>
-
-      <p data-t="state.roadmap">What is done, what is next, and what it will not do: <a href="./roadmap.html">the roadmap</a>.</p>
-
-      <h2 data-t="h.cases">Examples</h2>
-      <p data-t="cases.intro">Three afternoons, each on made-up servers. Every page starts with what you use, what you find and how it ends.</p>
-      <ul class="cases">
-        <li><a href="./cases/certificates.html" data-t="cases.cert">Renew the certificates on three servers today</a></li>
-        <li><a href="./cases/mail.html" data-t="cases.mail">Mail stopped arriving and nobody knows where to look</a></li>
-        <li><a href="./cases/fence.html" data-t="cases.fence">Get the agent's help without letting it roam the server</a></li>
-      </ul>
-
-      <h2 data-t="h.faq">Frequently asked questions</h2>
-      <dl class="faq">
-        <dt data-t="faq.q1">What is sshboard?</dt>
-        <dd data-t="faq.a1">A desktop SSH client with an MCP server built in. You and your AI agent look at the same server, on the same screen, over one SSH connection, and everything the agent does appears in your window as it happens.</dd>
-        <dt data-t="faq.q2">Can the agent run any command it likes?</dt>
-        <dd data-t="faq.a2">No. There is no tool that takes a command line. The agent can use read-only tools, run commands a person listed in readonly.toml by id, and ask to run operations a person listed in operations.toml — each of those asks you on screen first.</dd>
-        <dt data-t="faq.q3">Where can the agent write files?</dt>
-        <dd data-t="faq.a3">Only inside the directories you list for each connection. The list is empty by default, so it writes nothing until you add one. It cannot delete, rename or download files to your machine.</dd>
-        <dt data-t="faq.q4">Does sshboard store my keys or passwords?</dt>
-        <dd data-t="faq.a4">No. Keys stay in your OS keychain and ssh-agent. A sudo password you type for one approved operation is passed to that one run and never stored.</dd>
-        <dt data-t="faq.q5">Which agents and systems does it work with?</dt>
-        <dd data-t="faq.a5">Any MCP client; Claude Code is the one it is tested with. The app runs on macOS (Apple Silicon and Intel) and Windows (x64 and ARM64).</dd>
-      </dl>
-
-      <h2 data-t="h.never">What it will not become</h2>
-      <ul>
-        <li data-t="never.1">A way to run an agent against a server while nobody is watching.</li>
-        <li data-t="never.2">A place your keys or passphrases get stored.</li>
-        <li data-t="never.3">A tool that opens a second SSH session you cannot see.</li>
-      </ul>
-
-      <footer>
-        <p id="when"></p>
-        <p>
-          <a href="https://github.com/meta-taro/sshboard" data-t="f.source">Source</a> ·
-          <a href="https://github.com/meta-taro/sshboard/releases" data-t="f.releases">Releases</a> ·
-          <a href="https://github.com/meta-taro/sshboard/issues" data-t="f.issues">Issues</a>
-        </p>
-      </footer>
+      </section>
     </main>
+
+    <footer class="site-foot">
+      <div class="wrap">
+        <div>
+          <a class="brand" href="./"><img src="./icon.png" alt="" width="22" height="22" />sshboard</a>
+          <p id="when"></p>
+        </div>
+        <nav aria-label="Footer">
+          <a href="#cases" data-t="nav.cases">Examples</a>
+          <a href="./archive.html" data-t="f.archive">All versions</a>
+          <a href="./roadmap.html" data-t="nav.roadmap">Roadmap</a>
+          <a href="https://github.com/meta-taro/sshboard" data-t="f.source">Source</a>
+          <a href="https://github.com/meta-taro/sshboard/releases" data-t="f.releases">Releases</a>
+          <a href="https://github.com/meta-taro/sshboard/issues" data-t="f.issues">Issues</a>
+          <a href="./llms.txt">llms.txt</a>
+        </nav>
+      </div>
+    </footer>
 
     <script src="./i18n.js"></script>
     <script src="./releases.js"></script>

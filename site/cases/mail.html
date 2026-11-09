@@ -8,7 +8,7 @@
     <link rel="canonical" href="https://meta-taro.github.io/sshboard/cases/mail.html" />
     <link rel="icon" href="../icon.png" />
     <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; img-src 'self'; style-src 'self'; base-uri 'none'; form-action 'none'" />
-    <link rel="stylesheet" href="../sub.css" />
+    <link rel="stylesheet" href="../site.css" />
     <!-- 架空の案件だけで再現しています（紹介ページの構成 4・8）。名前もパスも作り物です。 -->
     <script type="application/ld+json">
 [
@@ -76,15 +76,28 @@
     </script>
   </head>
   <body>
-    <main>
-      <div class="top">
-        <a class="home" href="../">sshboard</a>
-        <div class="langs"><button type="button" value="en">English</button> <button type="button" value="ja">日本語</button></div>
+    <a class="skip" href="#main">Skip to content</a>
+    <header class="site-head">
+      <div class="wrap">
+        <a class="brand" href=".././"><img src="../icon.png" alt="" width="28" height="28" />sshboard</a>
+        <nav class="site-nav" aria-label="Site">
+          <a href=".././#features">Features</a>
+          <a href=".././#cases">Examples</a>
+          <a href=".././#download">Download</a>
+          <a href="../roadmap.html">Roadmap</a>
+          <a class="gh" href="https://github.com/meta-taro/sshboard">GitHub</a>
+        </nav>
+        <div class="langs"><button type="button" value="en">English</button><button type="button" value="ja">日本語</button></div>
       </div>
+    </header>
+    <main id="main">
+      <section>
+        <div class="wrap article">
+        <p class="crumbs"><a href=".././">sshboard</a> › <a href=".././#cases">Examples</a></p>
 
       <div data-lang="en">
         <h1>Mail stopped arriving and nobody knows where to look</h1>
-        <div class="summary">
+        <div class="summary summary-box">
           <dl>
             <dt>Uses</dt><dd>read_file · service_status · read_log · disk_usage</dd>
             <dt>Finds</dt><dd>The mail server is up, but the disk holding its queue is full</dd>
@@ -105,7 +118,7 @@
 
       <div data-lang="ja" hidden>
         <h1>メールが届かなくなった。どこを見ればいいか分からない</h1>
-        <div class="summary">
+        <div class="summary summary-box">
           <dl>
             <dt>使うもの</dt><dd>read_file · service_status · read_log · disk_usage</dd>
             <dt>見つかるもの</dt><dd>メールのサーバーは動いているが、キューを置くディスクが満杯</dd>
@@ -124,11 +137,21 @@
         <p>AI のしたことは 1 つも見えない所で起きておらず、どれもサーバーを変えていません。原因を探すことと、変えることが、別の手順のまま残りました。</p>
       </div>
 
-      <footer>
-        <a href="../">sshboard</a> · <a href="./certificates.html">Certificates</a> ·
-        <a href="./mail.html">Mail</a> · <a href="./fence.html">The fence</a> · <a href="../roadmap.html">Roadmap</a>
-      </footer>
+        </div>
+      </section>
     </main>
+    <footer class="site-foot">
+      <div class="wrap">
+        <div><a class="brand" href=".././"><img src="../icon.png" alt="" width="22" height="22" />sshboard</a></div>
+        <nav aria-label="Footer">
+          <a href=".././#cases">Examples</a>
+          <a href="../archive.html">All versions</a>
+          <a href="../roadmap.html">Roadmap</a>
+          <a href="https://github.com/meta-taro/sshboard">GitHub</a>
+          <a href="../llms.txt">llms.txt</a>
+        </nav>
+      </div>
+    </footer>
     <script src="../sub.js"></script>
   </body>
 </html>

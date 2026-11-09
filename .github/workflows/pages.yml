@@ -82,7 +82,7 @@ jobs:
           test -f site/app.js
           test -f site/releases.js
           test -f site/sub.js
-          test -f site/sub.css
+          test -f site/site.css
           test -f site/archive.js
           test -f site/tools.json
           test -f site/llms.txt

@@ -25,7 +25,7 @@ async function markThisPc() {
       // 読めなければ x64 のまま（多い方）。
     }
   }
-  const card = id && document.getElementById(id)?.closest('.card');
+  const card = id && document.getElementById(id)?.closest('.dl');
   if (!card || card.querySelector('.this-pc')) return;
   const mark = document.createElement('span');
   mark.className = 'this-pc';
@@ -75,6 +75,9 @@ async function markThisPc() {
   const apply = (code) => {
     const words = code === 'en' ? null : table[code];
     for (const el of document.querySelectorAll('[data-t]')) {
+      // **あとから描いたもの（道具の束の見出し）も、最初の英語を控えてから訳す。**
+      // 控えが無いと、英語へ戻したときに `undefined` が出ていました。
+      if (!english.has(el)) english.set(el, el.innerHTML);
       const key = el.getAttribute('data-t');
       const said = words && words[key];
       el.innerHTML = said ?? english.get(el);
@@ -93,6 +96,9 @@ async function markThisPc() {
       const img = document.getElementById(`shot-${view}`);
       if (img) img.src = `./shots/${shots}/${view}.png`;
     }
+    // 表紙の大きな 1 枚（端末の画面）も合わせる。
+    const hero = document.getElementById('shot-hero');
+    if (hero) hero.src = `./shots/${shots}/console.png`;
     document.documentElement.lang = code;
     try {
       localStorage.setItem(STORED, code);
