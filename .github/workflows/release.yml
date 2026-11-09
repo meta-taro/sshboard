@@ -169,6 +169,23 @@ jobs:
         shell: bash
         run: ls -R ${{ matrix.bundle_dir }}
 
+      # **universal に両方の CPU が入っているかを、配る前に確かめる**（2026-11-09）。
+      # 建て方を間違えても .dmg はできます。Intel の Mac で開いて初めて分かる、を作らない。
+      - name: mac のアプリに 2 つの CPU が入っているか
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          set -eu
+          bin="$(ls -d ${{ matrix.bundle_dir }}/macos/*.app)/Contents/MacOS/sshboard"
+          archs="$(lipo -archs "$bin")"
+          echo "入っている CPU: ${archs}"
+          for want in x86_64 arm64; do
+            case " ${archs} " in
+              *" ${want} "*) ;;
+              *) echo "::error::${want} が入っていません（${archs}）"; exit 1 ;;
+            esac
+          done
+
       - name: 成果物を残す
         uses: actions/upload-artifact@v4
         with:
