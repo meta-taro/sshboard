@@ -169,6 +169,12 @@ jobs:
           if (Test-Path (Join-Path $dest 'candle.exe')) { Write-Host "WiX はもう在ります"; exit 0 }
           $pkg = Join-Path $env:RUNNER_TEMP 'wix.3.14.1.zip'
           Invoke-WebRequest -Uri 'https://www.nuget.org/api/v2/package/wix/3.14.1' -OutFile $pkg
+          # **包みを照合してから開く**（Tauri は GitHub から取るとき SHA256 を照合する。迂回した分の穴を塞ぐ）。
+          # 値は 2026-11-10 に取った包みのもの。その包みの SHA512 が NuGet の catalog の
+          # packageHash（UnChdB0h…9nn70A==）と一致することを確かめてある。
+          $expected = '15D50463C73DCE31FBEA5440AC33AF47E92D54D4188166D207E9E39577B8FE0F'
+          $actual = (Get-FileHash -Algorithm SHA256 -Path $pkg).Hash
+          if ($actual -ne $expected) { Write-Error "WiX の包みが想定と違います（SHA256 $actual）"; exit 1 }
           $tmp = Join-Path $env:RUNNER_TEMP 'wix-nupkg'
           Expand-Archive -Path $pkg -DestinationPath $tmp -Force
           New-Item -ItemType Directory -Force -Path $dest | Out-Null
