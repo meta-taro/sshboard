@@ -2784,6 +2784,14 @@
 		flex: 999 1 22rem;
 		min-width: 0;
 		min-height: 0;
+		/*
+		 * **中央にも上限を置く**（Windows 11・0.1.39・2026-11-10「２重スクロール」）。
+		 * `.three` は折り返す（`flex-wrap: wrap`）ので、行の高さは**いちばん背の高い列**で決まります。
+		 * 11-04 に帯だけ上限を付けたため、字を大きくした端末が中央の列を押し上げ、
+		 * 端末はその背高な入れ物に合わせて測り直し、**背高のまま居座りました**。
+		 */
+		max-height: 100%;
+		box-sizing: border-box;
 	}
 
 	/*
@@ -2796,6 +2804,10 @@
 		max-width: 16rem;
 		min-width: 0;
 		overflow-y: auto;
+		/* **左の列も同じ**（柵が長い・字が大きい日に、行ごと押し上げないように）。 */
+		max-height: 100%;
+		min-height: 0;
+		box-sizing: border-box;
 	}
 
 	.three > :global(section.band) {
