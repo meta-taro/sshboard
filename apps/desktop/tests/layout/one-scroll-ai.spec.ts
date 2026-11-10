@@ -70,15 +70,18 @@ async function fillBand(page: Page): Promise<void> {
  * 字を大きくした端末が中央の列を押し上げると、入れ物ごとスクロールが出た（中央に上限が無かった）。
  */
 const GROW = [
-	{ label: '既定の字', steps: 0 },
-	{ label: '開いてから字を 2 段大きく', steps: 2 }
+	{ label: '既定の字', steps: 0, from: null },
+	{ label: '開いてから字を 2 段大きく', steps: 2, from: null },
+	// **字は普通のまま、窓を縮めたとき**（2026-11-10「文字サイズ普通です」）。
+	// 最大化から戻す・ノートの画面へ移す、で起きる。端末は縮む前の行数で背高のまま残る。
+	{ label: '大きな窓で開いてから縮める', steps: 0, from: { width: 1920, height: 1080 } }
 ] as const;
 
 for (const size of SIZES)
 for (const grow of GROW) {
 	test(`端末（AI が握る）· ${size.width}×${size.height} · ${grow.label}: only the columns scroll`, async ({ page }) => {
 		await heldByAi(page);
-		await page.setViewportSize(size);
+		await page.setViewportSize(grow.from ?? size);
 		await page.goto('/');
 		await fillBand(page);
 		await page.getByRole('button', { name: '端末', exact: true }).click();
@@ -94,6 +97,7 @@ for (const grow of GROW) {
 		}
 		await page.waitForTimeout(300);
 		for (let n = 0; n < grow.steps; n += 1) await emitEvent(page, 'menu://text-size', 'larger');
+		if (grow.from) await page.setViewportSize(size);
 		await page.waitForTimeout(300);
 
 		const row = await page.locator('.three').evaluate((el) => {
