@@ -29,6 +29,28 @@ export interface EditKeyEvent {
 
 export type EditPlatform = 'mac' | 'other';
 
+/** 押された先の最小限。**本物の要素もこの形を満たします。** */
+export interface FieldCandidate {
+	readonly tagName: string;
+	closest(selector: string): unknown;
+}
+
+/** xterm が描く端末の外枠。**この中の textarea は、打鍵を受けるための見えない部品です。** */
+const TERMINAL_SELECTOR = '.xterm';
+
+/**
+ * 普通の入力欄か。**端末の中の textarea は数えません**（実機・mac・2026-11-11）。
+ *
+ * 数えると、端末の上の ⌘V を入力欄として横取りし、見えない textarea へ貼ります。
+ * **端末へは 1 文字も届きません**（`su -` のパスワードが貼れなかった）。
+ */
+export function isEditingField(target: FieldCandidate | null): boolean {
+	if (!target) return false;
+	const tag = target.tagName.toUpperCase();
+	if (tag !== 'INPUT' && tag !== 'TEXTAREA') return false;
+	return !target.closest(TERMINAL_SELECTOR);
+}
+
 /** キーと OS から、したいことを決める。 */
 export function editIntent(event: EditKeyEvent, platform: EditPlatform): EditIntent | null {
 	// **入力欄の外では何もしない。**端末は `terminal-clipboard.ts` の担当です。

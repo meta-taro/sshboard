@@ -19,7 +19,7 @@
  */
 import { describe, expect, test } from 'vitest';
 
-import { editIntent, type EditKeyEvent } from './edit-keys';
+import { editIntent, isEditingField, type EditKeyEvent, type FieldCandidate } from './edit-keys';
 
 function press(part: Partial<EditKeyEvent>): EditKeyEvent {
 	return { key: 'a', ctrlKey: false, metaKey: false, shiftKey: false, inField: true, ...part };
@@ -68,5 +68,38 @@ describe('editIntent', () => {
 		for (const key of ['+', '-', '0', '=', '_']) {
 			expect(editIntent(press({ key, ctrlKey: true }), 'other'), key).toBeNull();
 		}
+	});
+});
+
+/**
+ * **端末の上の ⌘V が、入力欄の貼り付けに横取りされていた**（実機・mac・2026-11-11）。
+ *
+ * > sshboard mac だとターミナルにペーストできない。
+ *
+ * xterm は打鍵を受けるために**見えない `<textarea>` を持っています。**
+ * 「`<textarea>` なら入力欄」と決めていたので、端末の上の ⌘V を入力欄として受け、
+ * 見えない textarea へ貼っていました。**端末へは 1 文字も届きません**
+ * （`su -` のパスワードが貼れず、root の作業が止まった）。
+ */
+function element(tagName: string, insideTerminal: boolean): FieldCandidate {
+	return {
+		tagName,
+		closest: (selector: string) => (insideTerminal && selector === '.xterm' ? {} : null)
+	};
+}
+
+describe('isEditingField', () => {
+	test('counts an ordinary input and textarea as a field', () => {
+		expect(isEditingField(element('INPUT', false))).toBe(true);
+		expect(isEditingField(element('TEXTAREA', false))).toBe(true);
+	});
+
+	test('does not count the hidden textarea xterm types through', () => {
+		expect(isEditingField(element('TEXTAREA', true))).toBe(false);
+	});
+
+	test('does not count anything that is not an input', () => {
+		expect(isEditingField(element('DIV', false))).toBe(false);
+		expect(isEditingField(null)).toBe(false);
 	});
 });

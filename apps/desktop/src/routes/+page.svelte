@@ -61,7 +61,7 @@
 		replayFor,
 		type Backlogs
 	} from '$lib/stream-backlog';
-	import { applyEdit, editIntent, type EditableField } from '$lib/edit-keys';
+	import { applyEdit, editIntent, isEditingField, type EditableField } from '$lib/edit-keys';
 	import { appIntent } from '$lib/app-keys';
 	import { redaction } from '$lib/redaction/redaction.svelte';
 	import { canFollow, isView, VIEWS, type View, viewAfterAnswered} from '$lib/view-request'
@@ -974,7 +974,8 @@
 	 */
 	function onKeydown(event: KeyboardEvent) {
 		const target = event.target;
-		const typing = target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement;
+		// **端末の中の見えない textarea は入力欄に数えない**（⌘V を横取りしていた・2026-11-11）。
+		const typing = target instanceof HTMLElement && isEditingField(target);
 
 		/*
 		 * **画面ぜんたいのキー操作**（UI 案・2026-10-21）。
