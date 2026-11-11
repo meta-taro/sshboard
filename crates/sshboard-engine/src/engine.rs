@@ -375,6 +375,22 @@ impl Engine {
             .map(|l| l.opened.clone())
     }
 
+    /// **名指しした接続で動かす**（2026-11-11）。AI の道具はこの中で動かします。
+    ///
+    /// 中では、宛先を引く所がすべて `id` を使います。**人がタブを押しても動きません。**
+    /// `id` が開いていなければ、中の操作が「開いていない」で断られます。
+    pub async fn on<F: std::future::Future>(&self, id: &str, fut: F) -> F::Output {
+        crate::named::scoped(id, fut).await
+    }
+
+    /// いま操作が向かう接続の識別子。**名指しがあればそれ、無ければ画面の宛先。**
+    pub(crate) async fn target_id(&self) -> Option<String> {
+        if let Some(id) = crate::named::current() {
+            return Some(id);
+        }
+        self.held.lock().await.active.clone()
+    }
+
     /// 宛先を変える。**開いていないものは指定できない。**
     ///
     /// **断り方を `NotConnected` と分けています**（Issue #8）。
@@ -630,7 +646,7 @@ impl Engine {
     ///
     /// まだ 1 本も繋がっていなければ、繋ぐ前の口を返します。
     pub async fn stream(&self) -> Arc<OutputStream> {
-        match self.active().await.map(|open| open.id) {
+        match self.target_id().await {
             Some(id) => self.stream_for(&id).await,
             None => Arc::clone(&self.stream),
         }
@@ -909,6 +925,10 @@ impl Engine {
     /// - **人へ効く手順を言う**（「接続を開いて」は、すでに開いている人に効きません）
     /// - **勝手に 1 本選ばない。**推測した相手へコマンドを流すのが一番危険です
     async fn session(&self) -> Result<Arc<SshSession>, EngineError> {
+        // **名指しがあれば、画面の宛先は見ません**（AI の道具・`Engine::on`）。
+        if let Some(id) = crate::named::current() {
+            return self.session_on(&id).await;
+        }
         let held = self.held.lock().await;
         if let Some(live) = held.active.as_ref().and_then(|id| held.live.get(id)) {
             return Ok(Arc::clone(&live.session));
@@ -2213,9 +2233,11 @@ impl Engine {
 
     /// いまの宛先での権限の上げ方（D48）。**繋がっていなければ「上げない」。**
     pub async fn elevation(&self) -> Elevation {
+        let named = crate::named::current();
         let held = self.held.lock().await;
-        held.active
+        named
             .as_ref()
+            .or(held.active.as_ref())
             .and_then(|id| held.live.get(id))
             .map(|live| live.elevation)
             .unwrap_or_default()
@@ -2227,7 +2249,7 @@ impl Engine {
     /// ここで言い立てると、本当の用事（操作を走らせる）が埋もれます。
     async fn say_if_elevation_drifted(&self) {
         let live = self.elevation().await;
-        let Some(id) = self.held.lock().await.active.clone() else {
+        let Some(id) = self.target_id().await else {
             return;
         };
         let Ok(on_file) = Connections::load_or_empty(&self.connections_path) else {
@@ -2400,7 +2422,7 @@ impl Engine {
         let how = self.elevation().await;
         let raised = elevated(&operation.run, how);
         // **どの接続で走るか。**問いにも診断にも載せます（2 本開いていると割れなかった）。
-        let on = self.held.lock().await.active.clone().unwrap_or_default();
+        let on = self.target_id().await.unwrap_or_default();
 
         // **書き換えたのに効いていない、を黙らない**（実機の報告・2026-10-23）。
         //

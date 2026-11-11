@@ -68,6 +68,7 @@ async fn an_unlisted_id_comes_back_as_something_the_ai_can_act_on() {
     let error = server
         .run_readonly(
             rmcp::handler::server::wrapper::Parameters(sshboard_mcp::ReadonlyCommandId {
+                connection_id: "local".to_string(),
                 command_id: "systemctl-restart-nginx".to_string(),
             }),
             // **取り消されていない札**（Issue #31 の③）。

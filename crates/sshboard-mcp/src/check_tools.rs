@@ -15,6 +15,11 @@ use crate::ssh_tools::{refuse, until_cancelled};
 #[derive(Debug, Deserialize, rmcp::schemars::JsonSchema)]
 #[schemars(crate = "rmcp::schemars")]
 pub struct CheckId {
+    /// どの接続で動かすか。`list_connections` / `session_status` の識別子。
+    ///
+    /// **必ず名指しします。**画面で人が押しているタブには頼りません
+    /// （押されたタブへ黙って届いた・2026-11-11）。
+    pub connection_id: String,
     /// `list_checks` が返す点検の id。
     pub check_id: String,
 }
@@ -137,12 +142,15 @@ impl SshboardMcp {
         ct: CancellationToken,
     ) -> Result<String, ErrorData> {
         let engine = self.engine()?;
-        let report = until_cancelled(&ct, async {
-            engine
-                .run_check(Actor::Ai, &request.check_id)
-                .await
-                .map_err(refuse)
-        })
+        let report = until_cancelled(
+            &ct,
+            engine.on(&request.connection_id, async {
+                engine
+                    .run_check(Actor::Ai, &request.check_id)
+                    .await
+                    .map_err(refuse)
+            }),
+        )
         .await?;
         json(&report)
     }

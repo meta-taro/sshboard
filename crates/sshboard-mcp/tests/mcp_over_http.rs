@@ -419,11 +419,11 @@ async fn no_tool_description_claims_only_one_connection_can_be_open() {
         "`connect` の説明に、複数持てることが書かれていない: {connect}"
     );
 
-    // **宛先を変える口へ繋がっていること。**繋げると分かっても、
-    // 切り替え方が書いていなければ 2 本目は使われません。
+    // **どの接続かは道具ごとに名指しする**（2026-11-11）。宛先の切り替えに頼らせない ——
+    // 画面で人がタブを押すと宛先が動き、AI の読み取りが別の機械へ黙って届いた。
     assert!(
-        connect.contains("focus_connection"),
-        "`connect` の説明に、宛先の変え方（focus_connection）が無い: {connect}"
+        connect.contains("connection_id"),
+        "`connect` の説明に、道具ごとに connection_id で名指しすることが無い: {connect}"
     );
 
     // **2 つの説明が食い違わないこと。**食い違いこそが Issue #9 の中身です。
@@ -431,6 +431,10 @@ async fn no_tool_description_claims_only_one_connection_can_be_open() {
     assert!(
         focus.contains("several") || focus.contains("multiple"),
         "`focus_connection` の説明から、複数持てることが消えている: {focus}"
+    );
+    assert!(
+        focus.contains("connection_id"),
+        "`focus_connection` の説明が、AI の道具は宛先に従わないと言っていない: {focus}"
     );
 
     endpoint.shutdown();

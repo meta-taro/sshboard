@@ -14,6 +14,7 @@ mod checks;
 mod console;
 mod engine;
 mod error;
+mod named;
 mod open;
 /// 端末を**番号で**持つ入れ物と、誰が握るかの規則（D29 / D42 / D60）。
 ///

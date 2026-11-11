@@ -35,6 +35,7 @@ below = 90
 
 fn id(check_id: &str) -> Parameters<CheckId> {
     Parameters(CheckId {
+        connection_id: "local".to_owned(),
         check_id: check_id.to_owned(),
     })
 }

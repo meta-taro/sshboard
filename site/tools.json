@@ -14,11 +14,11 @@
     },
     {
      "name": "focus_connection",
-     "line": "Point subsequent file and command operations at one of the already-open connections."
+     "line": "Move the person's focused tab to one of the already-open connections."
     },
     {
      "name": "session_status",
-     "line": "List every connection sshboard currently holds open, where the AI may write on each, and which one file and command operations currently go to."
+     "line": "List every connection sshboard currently holds open, where the AI may write on each, and which one the person's screen is focused on (operationsGoTo)."
     },
     {
      "name": "list_connections",

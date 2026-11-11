@@ -125,7 +125,8 @@ impl Engine {
             });
         };
 
-        let connection = self.active().await.map(|opened| opened.id);
+        // **名指しがあればその接続**（AI の道具・2026-11-11）。無ければ画面の宛先。
+        let connection = self.target_id().await;
         let on = connection.clone().unwrap_or_default();
 
         let mut steps = Vec::with_capacity(check.steps.len());
@@ -133,7 +134,7 @@ impl Engine {
         for (index, step) in check.steps.iter().enumerate() {
             // **途中で宛先が変わったら、残りは測らない**（コードレビュー M2）。
             if moved.is_none() {
-                let now = self.active().await.map(|opened| opened.id);
+                let now = self.target_id().await;
                 moved = moved_since(connection.as_deref(), now.as_deref());
             }
             let outcome = match &moved {

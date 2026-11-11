@@ -85,7 +85,7 @@ pub(crate) fn refuse(error: EngineError) -> ErrorData {
 impl SshboardMcp {
     /// 登録済みの接続を開く。**画面に出ます。**
     #[tool(
-        description = "Open the SSH connection registered under this id. sshboard can hold several connections open at once - opening one does not close the others, and every one of them appears on screen for the human. The connection just opened becomes the target of subsequent file and command operations; use focus_connection to point them at a different open one, and session_status to see every connection currently held open. Takes no password or passphrase - if the key needs one, this call refuses and **puts the question on the human's screen**; ask them to answer it, then call connect again. Do not call it in a loop - one question is already showing. Call diagnostics to see how far the attempt got."
+        description = "Open the SSH connection registered under this id. sshboard can hold several connections open at once - opening one does not close the others, and every one of them appears on screen for the human. Every tool that touches a server takes connection_id - name the connection on each call; nothing follows the tab the person has on screen. Use session_status to see every connection currently held open. Takes no password or passphrase - if the key needs one, this call refuses and **puts the question on the human's screen**; ask them to answer it, then call connect again. Do not call it in a loop - one question is already showing. Call diagnostics to see how far the attempt got."
     )]
     pub async fn connect(
         &self,
@@ -124,7 +124,7 @@ impl SshboardMcp {
 
     /// 操作の宛先を変える。**開いているものの中からしか選べません。**
     #[tool(
-        description = "Point subsequent file and command operations at one of the already-open connections. sshboard can hold several at once; this chooses which one they go to."
+        description = "Move the person's focused tab to one of the already-open connections. sshboard can hold several at once. This changes what their own screen operations go to - it does not steer your tools, which go wherever their connection_id says."
     )]
     pub async fn focus_connection(
         &self,
@@ -243,12 +243,15 @@ impl SshboardMcp {
         // **取り消されたら待つのをやめます**（Issue #31 の③）。
         // ここは**正しく何十分もかかることがある**ので、一律の締め切りではなく
         // 「人が止めたら止まる」でなければいけません。
-        let ran = until_cancelled(&ct, async {
-            engine
-                .run_operation(Actor::Ai, &request.operation_id)
-                .await
-                .map_err(refuse)
-        })
+        let ran = until_cancelled(
+            &ct,
+            engine.on(&request.connection_id, async {
+                engine
+                    .run_operation(Actor::Ai, &request.operation_id)
+                    .await
+                    .map_err(refuse)
+            }),
+        )
         .await?;
 
         // **「sudo が無い」を「パスワードが違う」に見せない**（2026-09-25）。
@@ -271,7 +274,11 @@ impl SshboardMcp {
                 .ok()
                 .and_then(|listed| listed.get(&request.operation_id).map(|op| op.run.clone()))
                 .unwrap_or_default();
-            sudo_note(&run, engine.elevation().await, &ran.err)
+            sudo_note(
+                &run,
+                engine.on(&request.connection_id, engine.elevation()).await,
+                &ran.err,
+            )
         };
         let (out, out_cut) = capped(ran.out);
         let (err, err_cut) = capped(ran.err);
@@ -532,7 +539,7 @@ impl SshboardMcp {
 
     /// いま何が開いているか。**サーバーへは触りません。**
     #[tool(
-        description = "List every connection sshboard currently holds open, where the AI may write on each, and which one file and command operations currently go to. Touches no remote server."
+        description = "List every connection sshboard currently holds open, where the AI may write on each, and which one the person's screen is focused on (operationsGoTo). Your tools do not follow that focus - they take connection_id. Touches no remote server."
     )]
     pub async fn session_status(&self) -> Result<String, ErrorData> {
         self.show("session_status").await?;
@@ -544,7 +551,7 @@ impl SshboardMcp {
         serde_json::to_string(&serde_json::json!({
             // **開いているものは 1 本残らずここに出ます**（D25）。
             "open": open,
-            // 操作がどれへ行くか。`focus_connection` で変えられる。
+            // **人の画面の**操作がどれへ行くか。AI の道具はこれに従わない（connection_id で名指し）。
             "operationsGoTo": active.map(|open| open.id),
         }))
         .map_err(|error| ErrorData::internal_error(error.to_string(), None))
@@ -586,12 +593,15 @@ impl SshboardMcp {
         ct: CancellationToken,
     ) -> Result<String, ErrorData> {
         let engine = self.engine()?;
-        let entries = until_cancelled(&ct, async {
-            engine
-                .list_dir(Actor::Ai, &request.path)
-                .await
-                .map_err(refuse)
-        })
+        let entries = until_cancelled(
+            &ct,
+            engine.on(&request.connection_id, async {
+                engine
+                    .list_dir(Actor::Ai, &request.path)
+                    .await
+                    .map_err(refuse)
+            }),
+        )
         .await?;
 
         let listed: Vec<_> = entries
@@ -621,9 +631,12 @@ impl SshboardMcp {
         ct: CancellationToken,
     ) -> Result<String, ErrorData> {
         let engine = self.engine()?;
-        let facts = until_cancelled(&ct, async {
-            engine.stat(Actor::Ai, &request.path).await.map_err(refuse)
-        })
+        let facts = until_cancelled(
+            &ct,
+            engine.on(&request.connection_id, async {
+                engine.stat(Actor::Ai, &request.path).await.map_err(refuse)
+            }),
+        )
         .await?;
 
         serde_json::to_string(&serde_json::json!({
@@ -653,12 +666,15 @@ impl SshboardMcp {
         ct: CancellationToken,
     ) -> Result<String, ErrorData> {
         let engine = self.engine()?;
-        let bytes = until_cancelled(&ct, async {
-            engine
-                .read_file(Actor::Ai, &request.path)
-                .await
-                .map_err(refuse)
-        })
+        let bytes = until_cancelled(
+            &ct,
+            engine.on(&request.connection_id, async {
+                engine
+                    .read_file(Actor::Ai, &request.path)
+                    .await
+                    .map_err(refuse)
+            }),
+        )
         .await?;
 
         if bytes.len() > MAX_BYTES {
@@ -692,12 +708,15 @@ impl SshboardMcp {
         ct: CancellationToken,
     ) -> Result<String, ErrorData> {
         let engine = self.engine()?;
-        until_cancelled(&ct, async {
-            engine
-                .ensure_dir(Actor::Ai, &request.path)
-                .await
-                .map_err(refuse)
-        })
+        until_cancelled(
+            &ct,
+            engine.on(&request.connection_id, async {
+                engine
+                    .ensure_dir(Actor::Ai, &request.path)
+                    .await
+                    .map_err(refuse)
+            }),
+        )
         .await?;
         Ok(format!("ready: {}", request.path))
     }
@@ -713,12 +732,15 @@ impl SshboardMcp {
     ) -> Result<String, ErrorData> {
         let local = std::path::PathBuf::from(&request.local_path);
         let engine = self.engine()?;
-        let written = until_cancelled(&ct, async {
-            engine
-                .upload_file(Actor::Ai, &local, &request.remote_path)
-                .await
-                .map_err(refuse)
-        })
+        let written = until_cancelled(
+            &ct,
+            engine.on(&request.connection_id, async {
+                engine
+                    .upload_file(Actor::Ai, &local, &request.remote_path)
+                    .await
+                    .map_err(refuse)
+            }),
+        )
         .await?;
         Ok(format!(
             "uploaded {written} bytes to {}",
@@ -748,12 +770,15 @@ impl SshboardMcp {
             ));
         }
         let engine = self.engine()?;
-        let written = until_cancelled(&ct, async {
-            engine
-                .upload_bytes(Actor::Ai, &request.remote_path, bytes)
-                .await
-                .map_err(refuse)
-        })
+        let written = until_cancelled(
+            &ct,
+            engine.on(&request.connection_id, async {
+                engine
+                    .upload_bytes(Actor::Ai, &request.remote_path, bytes)
+                    .await
+                    .map_err(refuse)
+            }),
+        )
         .await?;
         Ok(format!("wrote {written} bytes to {}", request.remote_path))
     }
@@ -799,12 +824,15 @@ impl SshboardMcp {
         ct: CancellationToken,
     ) -> Result<String, ErrorData> {
         let engine = self.engine()?;
-        let ran = until_cancelled(&ct, async {
-            engine
-                .run_readonly(Actor::Ai, &request.command_id)
-                .await
-                .map_err(refuse)
-        })
+        let ran = until_cancelled(
+            &ct,
+            engine.on(&request.connection_id, async {
+                engine
+                    .run_readonly(Actor::Ai, &request.command_id)
+                    .await
+                    .map_err(refuse)
+            }),
+        )
         .await?;
 
         let (out, out_cut) = capped(ran.out);
@@ -829,11 +857,18 @@ impl SshboardMcp {
         description = "Report free disk space on the connected server (df). Read-only: sshboard \
                        builds the command, you cannot alter it."
     )]
-    pub async fn disk_usage(&self, ct: CancellationToken) -> Result<String, ErrorData> {
+    pub async fn disk_usage(
+        &self,
+        Parameters(request): Parameters<ConnectionId>,
+        ct: CancellationToken,
+    ) -> Result<String, ErrorData> {
         let engine = self.engine()?;
-        let ran = until_cancelled(&ct, async {
-            engine.disk_usage(Actor::Ai).await.map_err(refuse)
-        })
+        let ran = until_cancelled(
+            &ct,
+            engine.on(&request.connection_id, async {
+                engine.disk_usage(Actor::Ai).await.map_err(refuse)
+            }),
+        )
         .await?;
         probe_json("disk_usage", ran)
     }
@@ -843,11 +878,18 @@ impl SshboardMcp {
         description = "List the processes running on the connected server (ps). Read-only: \
                        sshboard builds the command, you cannot alter it."
     )]
-    pub async fn process_list(&self, ct: CancellationToken) -> Result<String, ErrorData> {
+    pub async fn process_list(
+        &self,
+        Parameters(request): Parameters<ConnectionId>,
+        ct: CancellationToken,
+    ) -> Result<String, ErrorData> {
         let engine = self.engine()?;
-        let ran = until_cancelled(&ct, async {
-            engine.process_list(Actor::Ai).await.map_err(refuse)
-        })
+        let ran = until_cancelled(
+            &ct,
+            engine.on(&request.connection_id, async {
+                engine.process_list(Actor::Ai).await.map_err(refuse)
+            }),
+        )
         .await?;
         probe_json("process_list", ran)
     }
@@ -857,11 +899,18 @@ impl SshboardMcp {
         description = "List the TCP ports the connected server is listening on. Falls back to \
                        netstat where ss is missing. Read-only: sshboard builds the command."
     )]
-    pub async fn network_listen(&self, ct: CancellationToken) -> Result<String, ErrorData> {
+    pub async fn network_listen(
+        &self,
+        Parameters(request): Parameters<ConnectionId>,
+        ct: CancellationToken,
+    ) -> Result<String, ErrorData> {
         let engine = self.engine()?;
-        let ran = until_cancelled(&ct, async {
-            engine.network_listen(Actor::Ai).await.map_err(refuse)
-        })
+        let ran = until_cancelled(
+            &ct,
+            engine.on(&request.connection_id, async {
+                engine.network_listen(Actor::Ai).await.map_err(refuse)
+            }),
+        )
         .await?;
         probe_json("network_listen", ran)
     }
@@ -878,12 +927,15 @@ impl SshboardMcp {
         ct: CancellationToken,
     ) -> Result<String, ErrorData> {
         let engine = self.engine()?;
-        let ran = until_cancelled(&ct, async {
-            engine
-                .service_status(Actor::Ai, &request.service)
-                .await
-                .map_err(refuse)
-        })
+        let ran = until_cancelled(
+            &ct,
+            engine.on(&request.connection_id, async {
+                engine
+                    .service_status(Actor::Ai, &request.service)
+                    .await
+                    .map_err(refuse)
+            }),
+        )
         .await?;
         probe_json("service_status", ran)
     }
@@ -900,12 +952,15 @@ impl SshboardMcp {
         ct: CancellationToken,
     ) -> Result<String, ErrorData> {
         let engine = self.engine()?;
-        let ran = until_cancelled(&ct, async {
-            engine
-                .read_log(Actor::Ai, &request.path, request.lines.unwrap_or(200))
-                .await
-                .map_err(refuse)
-        })
+        let ran = until_cancelled(
+            &ct,
+            engine.on(&request.connection_id, async {
+                engine
+                    .read_log(Actor::Ai, &request.path, request.lines.unwrap_or(200))
+                    .await
+                    .map_err(refuse)
+            }),
+        )
         .await?;
         probe_json("read_log", ran)
     }
@@ -928,18 +983,21 @@ impl SshboardMcp {
         let engine = self.engine()?;
         let hits = request.hits.unwrap_or(100);
         // **大きな木を掘ると長くかかります。**取り消されたら待つのをやめます。
-        let ran = until_cancelled(&ct, async {
-            if request.in_contents.unwrap_or(false) {
-                engine
-                    .search_content(Actor::Ai, &request.path, &request.pattern, hits)
-                    .await
-            } else {
-                engine
-                    .search_names(Actor::Ai, &request.path, &request.pattern, hits)
-                    .await
-            }
-            .map_err(refuse)
-        })
+        let ran = until_cancelled(
+            &ct,
+            engine.on(&request.connection_id, async {
+                if request.in_contents.unwrap_or(false) {
+                    engine
+                        .search_content(Actor::Ai, &request.path, &request.pattern, hits)
+                        .await
+                } else {
+                    engine
+                        .search_names(Actor::Ai, &request.path, &request.pattern, hits)
+                        .await
+                }
+                .map_err(refuse)
+            }),
+        )
         .await?;
 
         probe_json("search", ran)
@@ -951,11 +1009,18 @@ impl SshboardMcp {
                        the language runtimes it has. A runtime that is absent is simply left out \
                        - that is not a failure, so do not go looking for a cause."
     )]
-    pub async fn runtime_versions(&self, ct: CancellationToken) -> Result<String, ErrorData> {
+    pub async fn runtime_versions(
+        &self,
+        Parameters(request): Parameters<ConnectionId>,
+        ct: CancellationToken,
+    ) -> Result<String, ErrorData> {
         let engine = self.engine()?;
-        let ran = until_cancelled(&ct, async {
-            engine.runtime_versions(Actor::Ai).await.map_err(refuse)
-        })
+        let ran = until_cancelled(
+            &ct,
+            engine.on(&request.connection_id, async {
+                engine.runtime_versions(Actor::Ai).await.map_err(refuse)
+            }),
+        )
         .await?;
         probe_json("runtime_versions", ran)
     }
@@ -964,6 +1029,11 @@ impl SshboardMcp {
 #[derive(Debug, Deserialize, rmcp::schemars::JsonSchema)]
 #[schemars(crate = "rmcp::schemars")]
 pub struct Search {
+    /// どの接続で動かすか。`list_connections` / `session_status` の識別子。
+    ///
+    /// **必ず名指しします。**画面で人が押しているタブには頼りません
+    /// （押されたタブへ黙って届いた・2026-11-11）。
+    pub connection_id: String,
     /// どこから探すか。サーバー上の絶対パス。
     pub path: String,
     /// 名前で探すときはワイルドカード（`*.conf`）、中身で探すときは語。
@@ -995,6 +1065,11 @@ fn probe_json(tool: &str, ran: sshboard_engine::Ran) -> Result<String, ErrorData
 #[derive(Debug, Deserialize, rmcp::schemars::JsonSchema)]
 #[schemars(crate = "rmcp::schemars")]
 pub struct ServiceName {
+    /// どの接続で動かすか。`list_connections` / `session_status` の識別子。
+    ///
+    /// **必ず名指しします。**画面で人が押しているタブには頼りません
+    /// （押されたタブへ黙って届いた・2026-11-11）。
+    pub connection_id: String,
     /// systemd のユニット名（`nginx` / `postfix.service`）。
     pub service: String,
 }
@@ -1002,6 +1077,11 @@ pub struct ServiceName {
 #[derive(Debug, Deserialize, rmcp::schemars::JsonSchema)]
 #[schemars(crate = "rmcp::schemars")]
 pub struct ReadLog {
+    /// どの接続で動かすか。`list_connections` / `session_status` の識別子。
+    ///
+    /// **必ず名指しします。**画面で人が押しているタブには頼りません
+    /// （押されたタブへ黙って届いた・2026-11-11）。
+    pub connection_id: String,
     /// サーバー上の絶対パス。
     pub path: String,
     /// 末尾から何行返すか。**省略すると 200 行。**
@@ -1030,6 +1110,11 @@ fn capped(text: String) -> (String, bool) {
 #[derive(Debug, Deserialize, rmcp::schemars::JsonSchema)]
 #[schemars(crate = "rmcp::schemars")]
 pub struct ReadonlyCommandId {
+    /// どの接続で動かすか。`list_connections` / `session_status` の識別子。
+    ///
+    /// **必ず名指しします。**画面で人が押しているタブには頼りません
+    /// （押されたタブへ黙って届いた・2026-11-11）。
+    pub connection_id: String,
     /// `list_readonly_commands` が返す識別子。**コマンドそのものではありません。**
     pub command_id: String,
 }
@@ -1166,6 +1251,11 @@ pub struct ConnectionId {
 #[derive(Debug, Deserialize, rmcp::schemars::JsonSchema)]
 #[schemars(crate = "rmcp::schemars")]
 pub struct RemotePath {
+    /// どの接続で動かすか。`list_connections` / `session_status` の識別子。
+    ///
+    /// **必ず名指しします。**画面で人が押しているタブには頼りません
+    /// （押されたタブへ黙って届いた・2026-11-11）。
+    pub connection_id: String,
     /// サーバー上の絶対パス。
     pub path: String,
 }
@@ -1173,6 +1263,11 @@ pub struct RemotePath {
 #[derive(Debug, Deserialize, rmcp::schemars::JsonSchema)]
 #[schemars(crate = "rmcp::schemars")]
 pub struct UploadFile {
+    /// どの接続で動かすか。`list_connections` / `session_status` の識別子。
+    ///
+    /// **必ず名指しします。**画面で人が押しているタブには頼りません
+    /// （押されたタブへ黙って届いた・2026-11-11）。
+    pub connection_id: String,
     /// 手元のファイルのパス。**sshboard が動いている機械の上。**
     pub local_path: String,
     /// 置き先の絶対パス。**書き込み許可ディレクトリの下だけ。**
@@ -1182,6 +1277,11 @@ pub struct UploadFile {
 #[derive(Debug, Deserialize, rmcp::schemars::JsonSchema)]
 #[schemars(crate = "rmcp::schemars")]
 pub struct WriteFile {
+    /// どの接続で動かすか。`list_connections` / `session_status` の識別子。
+    ///
+    /// **必ず名指しします。**画面で人が押しているタブには頼りません
+    /// （押されたタブへ黙って届いた・2026-11-11）。
+    pub connection_id: String,
     /// 置き先の絶対パス。**書き込み許可ディレクトリの下だけ。**
     pub remote_path: String,
     /// 書く中身。
@@ -1214,9 +1314,9 @@ logs in with WinSCP or Tera Term.";
 const HOW_IT_WORKS: &str = "\
 Every operation - yours and the person's - goes through one engine and one SSH \
 connection per server. There is no hidden session: if you do something, it appears on \
-their screen. Several connections can be open at once; file and command operations go \
-to whichever one the person (or focus_connection) has focused. Use session_status to \
-see which.";
+their screen. Several connections can be open at once. Every tool that touches a server \
+takes connection_id and goes to that connection only - never to whichever tab the person \
+happens to have focused. Use session_status to see what is open.";
 
 const WHAT_YOU_CAN_DO: &str = "\
 Read anywhere the login user can read (list_directory, read_file, stat, search, \
@@ -1243,6 +1343,11 @@ anything you write, quote, or screenshot.";
 #[derive(Debug, Deserialize, rmcp::schemars::JsonSchema)]
 #[schemars(crate = "rmcp::schemars")]
 pub struct OperationId {
+    /// どの接続で動かすか。`list_connections` / `session_status` の識別子。
+    ///
+    /// **必ず名指しします。**画面で人が押しているタブには頼りません
+    /// （押されたタブへ黙って届いた・2026-11-11）。
+    pub connection_id: String,
     /// `operations.toml` に人が書いた id。
     pub operation_id: String,
 }

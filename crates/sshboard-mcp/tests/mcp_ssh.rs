@@ -214,7 +214,7 @@ async fn an_agent_connects_lists_and_uploads_through_one_ssh_session() {
     let made = harness
         .call(
             "make_directory",
-            serde_json::json!({ "path": "/home/probe/upload/release" }),
+            serde_json::json!({ "connection_id": "local", "path": "/home/probe/upload/release" }),
         )
         .await;
     assert!(made.contains("ready"), "作れない: {made}");
@@ -224,6 +224,7 @@ async fn an_agent_connects_lists_and_uploads_through_one_ssh_session() {
         .call(
             "write_file",
             serde_json::json!({
+                "connection_id": "local",
                 "remote_path": "/home/probe/upload/release/via-mcp.txt",
                 "content": "sshboard"
             }),
@@ -235,7 +236,7 @@ async fn an_agent_connects_lists_and_uploads_through_one_ssh_session() {
     let listed = harness
         .call(
             "list_directory",
-            serde_json::json!({ "path": "/home/probe/upload/release" }),
+            serde_json::json!({ "connection_id": "local", "path": "/home/probe/upload/release" }),
         )
         .await;
     assert!(listed.contains("via-mcp.txt"), "サーバーに無い: {listed}");
@@ -243,7 +244,7 @@ async fn an_agent_connects_lists_and_uploads_through_one_ssh_session() {
     let read = harness
         .call(
             "read_file",
-            serde_json::json!({ "path": "/home/probe/upload/release/via-mcp.txt" }),
+            serde_json::json!({ "connection_id": "local", "path": "/home/probe/upload/release/via-mcp.txt" }),
         )
         .await;
     assert!(read.contains("sshboard"), "読み戻せない: {read}");
@@ -281,6 +282,7 @@ async fn an_agent_cannot_write_outside_the_directories_a_human_allowed() {
         .call(
             "write_file",
             serde_json::json!({
+                "connection_id": "local",
                 "remote_path": "/home/probe/outside-via-mcp.txt",
                 "content": "nope"
             }),
@@ -295,7 +297,7 @@ async fn an_agent_cannot_write_outside_the_directories_a_human_allowed() {
     let listed = harness
         .call(
             "list_directory",
-            serde_json::json!({ "path": "/home/probe" }),
+            serde_json::json!({ "connection_id": "local", "path": "/home/probe" }),
         )
         .await;
     assert!(
@@ -323,7 +325,10 @@ async fn an_agent_that_has_not_connected_is_told_to_ask_a_human() {
     let harness = harness(band, &[]).await;
 
     let answer = harness
-        .call("list_directory", serde_json::json!({ "path": "/" }))
+        .call(
+            "list_directory",
+            serde_json::json!({ "connection_id": "local", "path": "/" }),
+        )
         .await;
 
     assert!(
