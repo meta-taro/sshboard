@@ -95,7 +95,10 @@ fn taking_the_signal_is_not_enough_it_has_to_be_used() {
     let mut unused = Vec::new();
     for name in TOUCHES_THE_SERVER {
         let body = body_of(&text, name);
-        if body.contains("ct: CancellationToken") && !body.contains("until_cancelled(&ct") {
+        // **空白と改行を除いてから探します**（2026-11-12）。`cargo fmt` が
+        // `until_cancelled(\n            &ct,` と折り返しただけで、使っているのに落ちていました。
+        let squeezed: String = body.chars().filter(|c| !c.is_whitespace()).collect();
+        if body.contains("ct: CancellationToken") && !squeezed.contains("until_cancelled(&ct") {
             unused.push(*name);
         }
     }
