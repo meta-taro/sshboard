@@ -237,6 +237,33 @@ def ai_wearing_human(files: dict[str, str]) -> list[str]:
     return bad
 
 
+AGENT_CURSOR_TS = SRC / "lib" / "agent-cursor.ts"
+
+
+def redaction_targets(css: str) -> list[str]:
+    """`[data-redact='on'] X` の X の頭（属性か要素名）。擬似要素・子孫の `*` は外す。"""
+    found: list[str] = []
+    for match in re.finditer(r"\[data-redact='on'\]\s+([^,{]+)", strip_notes(css)):
+        target = match.group(1).strip()
+        head = re.match(r"\[[\w-]+\]|[a-z]+", target)
+        if head and head.group(0) not in found:
+            found.append(head.group(0))
+    return found
+
+
+def searched_though_redacted(css: str, cursor_ts: str) -> list[str]:
+    """**画面の写真で伏せるのに、エージェント専用カーソルが探してしまう所。**
+
+    伏せる規則を足して `NOT_SEARCHED` へ足し忘れると、その所の字は「見つかる／見つからない」で
+    AI に当てられます（CLAUDE.md 禁止事項 4・2026-11-12）。
+    """
+    wanted = re.search(r"NOT_SEARCHED\s*=\s*'([^']*)'", cursor_ts)
+    if not wanted:
+        return ["agent-cursor.ts に NOT_SEARCHED が見つかりません"]
+    listed = {part.strip() for part in wanted.group(1).split(",")}
+    return [t for t in redaction_targets(css) if t not in listed]
+
+
 def read_sources() -> dict[str, str]:
     out = {}
     for path in sorted(SRC.rglob("*")):
@@ -272,6 +299,15 @@ def self_check() -> int:
         ),
     ]
     bad = 0
+    leak = searched_though_redacted(
+        "[data-redact='on'] [data-secret] {} [data-redact='on'] [data-new-secret] {}",
+        "export const NOT_SEARCHED = '[data-secret], input';",
+    )
+    ok = leak == ["[data-new-secret]"]
+    print(f"  {'OK  ' if ok else 'NG  '}伏せるのにカーソルが探す所を見つける")
+    if not ok:
+        print(f"        欲しい ['[data-new-secret]']\n        出た   {leak}")
+        bad += 1
     for label, files, want in cases:
         got = missing(files)
         ok = got == want
@@ -380,9 +416,20 @@ def main() -> int:
               file=sys.stderr)
         return 1
 
+    leak = searched_though_redacted(
+        TOKENS_CSS.read_text(encoding="utf-8"), AGENT_CURSOR_TS.read_text(encoding="utf-8")
+    )
+    if leak:
+        print(f"NG **画面の写真で伏せるのに、エージェント専用カーソルが探す所があります**: {leak}",
+              file=sys.stderr)
+        print("   agent-cursor.ts の NOT_SEARCHED へ足してください（接続先を当てさせない）。",
+              file=sys.stderr)
+        return 1
+
     print(f"OK ファイル {len(files)} / 定義 {len(defined)} / 控え無しの使用 {len(used)} —— 未定義は 0 件")
     print("OK 配色の不整合なし（暗い側 2 か所が一致・案の色・AI は AI の色）")
     print("OK ドロップダウンは単独の括り（錠剤の規則に混ざっていない）")
+    print("OK 伏せる所はどれも、エージェント専用カーソルが探さない")
     return 0
 
 

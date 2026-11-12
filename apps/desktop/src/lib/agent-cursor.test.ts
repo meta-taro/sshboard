@@ -124,3 +124,4 @@ describe('showMs', () => {
 		expect(showMs('a'.repeat(1000))).toBe(20000);
 	});
 });
+
