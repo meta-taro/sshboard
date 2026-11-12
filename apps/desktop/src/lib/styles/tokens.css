@@ -78,6 +78,14 @@
 	 * 明るい地に合わせて濃さだけ取り直しました（白地で 5.6:1）。
 	 */
 	--accent: #1c62c4;
+	/*
+	 * **エージェント専用カーソル**（2026-11-12）。色はオーナーの仕様（tadori と全アプリで揃える）。
+	 * **明るい・暗いのどちらでも同じ色**にするので、ここ 1 か所だけに置きます（人のカーソルと見分けるため）。
+	 */
+	--agent-cursor: #5e6ad2;
+	--agent-cursor-fg: #ffffff;
+	--agent-bubble: #ffd166;
+	--agent-bubble-fg: #1f1f1f;
 	--accent-fg: #ffffff;
 	--check-mark: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2.5 6.2 5 8.6 9.6 3.6' fill='none' stroke='%23ffffff' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
 	--accent-soft: rgba(28, 98, 196, 0.1);
@@ -232,6 +240,11 @@
 		--lift-3: 0 2px 4px rgba(0, 0, 0, 0.45), 0 20px 48px -16px rgba(0, 0, 0, 0.8);
 
 		--accent: #8cc2ff;
+		/* エージェント専用カーソル。**明るい側と同じ値**（仕様・人のカーソルと見分けるため） */
+		--agent-cursor: #5e6ad2;
+		--agent-cursor-fg: #ffffff;
+		--agent-bubble: #ffd166;
+		--agent-bubble-fg: #1f1f1f;
 		--accent-fg: #0b0d10;
 		--check-mark: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2.5 6.2 5 8.6 9.6 3.6' fill='none' stroke='%230b0d10' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
 	--check-mark: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2.5 6.2 5 8.6 9.6 3.6' fill='none' stroke='%230b0d10' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
@@ -296,6 +309,11 @@
 	--lift-3: 0 2px 4px rgba(0, 0, 0, 0.45), 0 20px 48px -16px rgba(0, 0, 0, 0.8);
 
 	--accent: #8cc2ff;
+	/* エージェント専用カーソル。**明るい側と同じ値**（仕様・人のカーソルと見分けるため） */
+	--agent-cursor: #5e6ad2;
+	--agent-cursor-fg: #ffffff;
+	--agent-bubble: #ffd166;
+	--agent-bubble-fg: #1f1f1f;
 	--accent-fg: #0b0d10;
 	--check-mark: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2.5 6.2 5 8.6 9.6 3.6' fill='none' stroke='%230b0d10' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
 	--accent-soft: rgba(140, 194, 255, 0.12);

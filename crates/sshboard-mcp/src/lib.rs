@@ -3,6 +3,7 @@
 //! GUI には依存しない。ここが Tauri を知った瞬間、ヘッドレスでテストできなくなる。
 
 mod about;
+mod agent_screen;
 mod capture;
 mod channel;
 mod check_tools;
@@ -12,6 +13,7 @@ mod ssh_tools;
 mod view;
 
 pub use about::{changes_since, releases, Release, CHANGELOG};
+pub use agent_screen::{parse_act, ActOutcome, AgentAct, ScreenRequest};
 pub use capture::{WindowCapture, WindowShot};
 pub use channel::{answered, channel_notice, Waiting, CHANNEL_CAPABILITY, CHANNEL_METHOD};
 pub use check_tools::{CheckId, ProposedCheck, ProposedStep};

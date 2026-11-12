@@ -223,6 +223,7 @@ export const ko: Catalog = {
 
 	// --- ファイルの面と書き込みの囲い（D22）・MCP の合言葉（D23） ---
 	"tab.files": "파일",
+	"agent.label": "에이전트",
 	"files.choose": "연결 대상",
 	"files.connect": "연결",
 	"files.connecting": "연결 중…",
@@ -598,6 +599,7 @@ export const zhCN: Catalog = {
 
 	// --- ファイルの面と書き込みの囲い（D22）・MCP の合言葉（D23） ---
 	"tab.files": "文件",
+	"agent.label": "智能体",
 	"files.choose": "连接",
 	"files.connect": "连接",
 	"files.connecting": "连接中…",
@@ -973,6 +975,7 @@ export const zhTW: Catalog = {
 
 	// --- ファイルの面と書き込みの囲い（D22）・MCP の合言葉（D23） ---
 	"tab.files": "檔案",
+	"agent.label": "代理",
 	"files.choose": "連線",
 	"files.connect": "連線",
 	"files.connecting": "連線中…",

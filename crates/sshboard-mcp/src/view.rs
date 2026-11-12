@@ -41,4 +41,20 @@ pub trait ShowView: Send + Sync {
         &'a self,
         view: &'a str,
     ) -> Pin<Box<dyn Future<Output = Result<(), String>> + Send + 'a>>;
+
+    /// エージェント専用カーソルを動かす（`screen`・2026-11-12）。
+    ///
+    /// **既定は「この画面はカーソルを持っていない」と断ります。**画面を持っている側だけが実装します。
+    fn act<'a>(
+        &'a self,
+        _act: &'a crate::agent_screen::AgentAct,
+    ) -> Pin<Box<dyn Future<Output = Result<crate::agent_screen::ActOutcome, String>> + Send + 'a>>
+    {
+        Box::pin(async {
+            Err(
+                "this screen has no agent cursor - ask the person to open sshboard's window"
+                    .to_string(),
+            )
+        })
+    }
 }

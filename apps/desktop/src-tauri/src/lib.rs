@@ -3,6 +3,7 @@
 //! **GUI と MCP が同じプロセスに同居する**（decisions D8 / D15）。
 //! 裏で見えないセッションを 1 本も増やさないための前提（PRD §4-1）。
 
+mod agent_cursor;
 mod allowlist_cmd;
 mod attention;
 mod bridge;
@@ -78,6 +79,7 @@ pub fn run() {
         // **押しても何も起きない項目を残さない。**受け手はここ 1 か所。
         .on_menu_event(menu::handle_event)
         .invoke_handler(tauri::generate_handler![
+            agent_cursor::agent_act_done,
             commands::app_version,
             commands::report_facts,
             commands::band_export,
@@ -190,6 +192,8 @@ pub fn run() {
             }
 
             app.manage(PendingLines::new());
+            // **エージェント専用カーソル**（2026-11-12）。画面の答えを番号で待つ口。
+            app.manage(agent_cursor::AgentCursor::new(app.handle().clone()));
             app.manage(McpUrl::default());
             app.manage(band.clone());
 

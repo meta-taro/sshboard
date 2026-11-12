@@ -999,6 +999,24 @@ impl sshboard_mcp::ShowView for TauriShowView {
                 .map_err(|error| format!("画面へ渡せません: {error}"))
         })
     }
+
+    /// エージェント専用カーソル（2026-11-12）。**画面の中だけ**で動き、人のマウスは使いません。
+    fn act<'a>(
+        &'a self,
+        act: &'a sshboard_mcp::AgentAct,
+    ) -> std::pin::Pin<
+        Box<dyn std::future::Future<Output = Result<sshboard_mcp::ActOutcome, String>> + Send + 'a>,
+    > {
+        Box::pin(async move {
+            let Some(cursor) = tauri::Manager::try_state::<
+                std::sync::Arc<crate::agent_cursor::AgentCursor>,
+            >(&self.app) else {
+                return Err("the agent cursor is not ready yet - try again in a moment".to_string());
+            };
+            let cursor = std::sync::Arc::clone(&cursor);
+            cursor.act(act).await
+        })
+    }
 }
 
 // --- パスフレーズの頼み（Issue #13） --------------------------------------

@@ -30,6 +30,7 @@ SOURCES = [
     ROOT / "crates/sshboard-mcp/src/ssh_tools.rs",
     ROOT / "crates/sshboard-mcp/src/server.rs",
     ROOT / "crates/sshboard-mcp/src/check_tools.rs",
+    ROOT / "crates/sshboard-mcp/src/agent_screen.rs",
 ]
 
 # **束の名前と並びは人が決める。**コードの並び順は実装の都合で変わるため。
@@ -49,7 +50,7 @@ GROUPS = [
               "run_operation", "propose_operation"]),
     ("console", ["console_open", "console_type", "console_stop", "console_release", "read_stream",
                  "list_consoles", "read_console"]),
-    ("screen", ["show_view", "capture_window", "pending_status", "await_answer", "diagnostics"]),
+    ("screen", ["show_view", "screen", "capture_window", "pending_status", "await_answer", "diagnostics"]),
     ("itself", ["about_sshboard", "ping"]),
 ]
 

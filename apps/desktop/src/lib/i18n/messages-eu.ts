@@ -223,6 +223,7 @@ export const de: Catalog = {
 
 	// --- ファイルの面と書き込みの囲い（D22）・MCP の合言葉（D23） ---
 	"tab.files": "Dateien",
+	"agent.label": "Agent",
 	"files.choose": "Verbindung",
 	"files.connect": "Verbinden",
 	"files.connecting": "Verbinde…",
@@ -598,6 +599,7 @@ export const fr: Catalog = {
 
 	// --- ファイルの面と書き込みの囲い（D22）・MCP の合言葉（D23） ---
 	"tab.files": "Fichiers",
+	"agent.label": "Agent",
 	"files.choose": "Connexion",
 	"files.connect": "Connecter",
 	"files.connecting": "Connexion…",
@@ -973,6 +975,7 @@ export const es: Catalog = {
 
 	// --- ファイルの面と書き込みの囲い（D22）・MCP の合言葉（D23） ---
 	"tab.files": "Archivos",
+	"agent.label": "Agente",
 	"files.choose": "Conexión",
 	"files.connect": "Conectar",
 	"files.connecting": "Conectando…",

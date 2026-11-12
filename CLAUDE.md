@@ -75,7 +75,8 @@
 
 > **用途別の読み取りツールは書き終わりました**（`stat` / `search` / `disk_usage` /
 > `process_list` / `service_status` / `read_log` / `network_listen` / `runtime_versions`）。
-> MCP は **43 本**です（`grep -rho '#\[tool(' crates/sshboard-mcp/src/ | wc -l` で数えられます）。
+> MCP は **44 本**です（`grep -rho '#\[tool(' crates/sshboard-mcp/src/ | wc -l` で数えられます）。
+> 2026-11-12 に `screen` を足しました（エージェント専用カーソル。**画面の中だけで動き、押せるのはタブだけ**）。
 > 2026-11-05 に `list_checks` / `run_check` を、11-06 に `propose_check` を足しました（D72・点検表。**手順は許可リストの id だけ。案は出せるが保存は画面の人**）。
 > 2026-10-23 に `propose_operation` を足しました（**AI はファイルを書きません。書くのは画面**）。
 > 2026-10-02 に `list_consoles` / `read_console` を足しました（D60）。

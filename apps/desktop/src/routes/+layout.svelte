@@ -10,6 +10,7 @@
 	import '@fontsource/jetbrains-mono/400.css';
 	import '@fontsource/jetbrains-mono/500.css';
 	import '$lib/styles/tokens.css';
+	import '$lib/styles/agent-cursor.css';
 	import { i18n } from '$lib/i18n/i18n.svelte';
 	import { redaction } from '$lib/redaction/redaction.svelte';
 	import { session } from '$lib/session.svelte';

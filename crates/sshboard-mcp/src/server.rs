@@ -115,7 +115,9 @@ impl SshboardMcp {
                 // 用途別の読み取り（D3）。**任意コマンドを作らずに済ませる方の半分。**
                 + Self::probe_tool_router()
                 + Self::search_tool_router()
-                + Self::check_tool_router(),
+                + Self::check_tool_router()
+                // エージェント専用カーソル（2026-11-12）。**画面の中だけ。**人のマウスは使わない。
+                + Self::screen_tool_router(),
         }
     }
 

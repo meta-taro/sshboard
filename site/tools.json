@@ -1,5 +1,5 @@
 {
- "total": 43,
+ "total": 44,
  "groups": [
   {
    "key": "connect",
@@ -176,6 +176,10 @@
     {
      "name": "show_view",
      "line": "Ask the person at the screen to look at one of sshboard's tabs: connections, files, console, band or diag."
+    },
+    {
+     "name": "screen",
+     "line": "Show the person what you are doing, inside sshboard's own window, with an agent-only cursor."
     },
     {
      "name": "capture_window",

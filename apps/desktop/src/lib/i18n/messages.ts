@@ -259,6 +259,7 @@ const en = {
 
 	// --- ファイルの面と書き込みの囲い（D22）・MCP の合言葉（D23） ---
 	"tab.files": "Files",
+	"agent.label": "Agent",
 	"files.choose": "Connection",
 	"files.connect": "Connect",
 	"files.connecting": "Connecting…",
@@ -674,6 +675,7 @@ const ja: Catalog = {
 
 	// --- ファイルの面と書き込みの囲い（D22）・MCP の合言葉（D23） ---
 	"tab.files": "ファイル",
+	"agent.label": "エージェント",
 	"files.choose": "接続先",
 	"files.connect": "接続",
 	"files.connecting": "接続中…",

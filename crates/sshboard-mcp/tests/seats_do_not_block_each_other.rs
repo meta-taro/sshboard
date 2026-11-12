@@ -147,3 +147,60 @@ async fn a_slow_call_on_one_seat_does_not_hold_up_another_seat() {
 
     endpoint.shutdown();
 }
+
+/// **同じ席の中でも、遅い呼びが後ろの呼びを止めない**（2026-11-12）。
+///
+/// 2026-11-12、ある席の `session_status` が返らなくなった。別の席の呼びは返っていた。
+/// 前の日も、長い `search` を流していた同じ席の `list_connections` が返らなかった。
+/// 席をまたぐ試験（上）は通るので、**同じ会期の中で並べて流せているか**を見る。
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn a_slow_call_does_not_hold_up_the_next_call_on_the_same_seat() {
+    // Arrange
+    let band = Band::new();
+    let _screen = screen_that_ignores_ping(&band);
+    let endpoint = Arc::new(
+        serve(ServeParts {
+            band,
+            stream: Arc::new(OutputStream::new()),
+            connections_watch: Arc::new(ConnectionsWatch::new()),
+            engine: None,
+            capture: None,
+            view: None,
+            token: None,
+            port: 0,
+            ack_timeout: SLOW_CALL_WAITS,
+        })
+        .await
+        .expect("MCP が立ち上がらない"),
+    );
+    let client = reqwest::Client::new();
+    let seat = open_seat(&client, &endpoint).await;
+
+    let slow = {
+        let client = client.clone();
+        let endpoint = Arc::clone(&endpoint);
+        let seat = seat.clone();
+        tokio::spawn(async move {
+            let _ = post(&client, &endpoint, Some(&seat), SLOW_BODY)
+                .await
+                .text()
+                .await;
+        })
+    };
+    tokio::time::sleep(SLOW_CALL_HEAD_START).await;
+
+    // Act —— **同じ席**から軽い呼び。
+    let quick = tokio::time::timeout(
+        QUICK_CALL_LIMIT,
+        post(&client, &endpoint, Some(&seat), QUICK_BODY),
+    )
+    .await;
+
+    // Assert
+    assert!(
+        quick.is_ok(),
+        "同じ席の list_connections が {QUICK_CALL_LIMIT:?} 以内に返らない（前の遅い呼びに止められた）"
+    );
+    let _ = slow.await;
+    endpoint.shutdown();
+}

@@ -65,6 +65,7 @@
 	import { appIntent } from '$lib/app-keys';
 	import { redaction } from '$lib/redaction/redaction.svelte';
 	import { canFollow, isView, VIEWS, type View, viewAfterAnswered} from '$lib/view-request'
+	import { AgentCursor, type AgentAct } from '$lib/agent-cursor';
 	import { asConnectFailure, readableFailure } from '$lib/connect-failure';
 	import { attachClipboard, browserClipboard, detectPlatform } from '$lib/terminal-clipboard';
 	import { isFindShortcut, type TerminalSearch } from '$lib/terminal-search';
@@ -129,6 +130,22 @@
 	function humanShows(next: typeof view) {
 		humanSwitchedAt = Date.now();
 		view = next;
+	}
+
+	/**
+	 * **AI が画面を動かしてよいか**（D44）。`show_view` もエージェント専用カーソルもここを通る。
+	 * 問いが出ている・欄に打っている・人が直前に自分で切り替えた、の間は動かさない。
+	 */
+	function aiMayTakeScreen(): boolean {
+		const askOpen =
+			passphraseFor !== null ||
+			consoleAsk === 'ai' ||
+			operationAsk !== null ||
+			aboutOpen ||
+			showUpdate;
+		const active = document.activeElement;
+		const focusInField = active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement;
+		return canFollow({ askOpen, focusInField, sinceHumanSwitchMs: Date.now() - humanSwitchedAt });
 	}
 
 	/**
@@ -1378,19 +1395,35 @@
 		listen<string>('view://show', (event) => {
 			const wanted = event.payload;
 			if (!isView(wanted)) return;
-			// **問いが出ている間は動かさない。**動かすと、人は何に答えたのか分からなくなります。
-			const askOpen =
-				passphraseFor !== null ||
-				consoleAsk === 'ai' ||
-				operationAsk !== null ||
-				aboutOpen ||
-				showUpdate;
-			const active = document.activeElement;
-			const focusInField =
-				active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement;
-			if (!canFollow({ askOpen, focusInField, sinceHumanSwitchMs: Date.now() - humanSwitchedAt }))
-				return;
+			if (!aiMayTakeScreen()) return;
 			view = wanted as View;
+		})
+			.then((stop) => stops.push(stop))
+			.catch(() => {
+				/* 購読できないだけ。**画面は出す。** */
+			});
+
+		// **エージェント専用カーソル**（2026-11-12）。画面の中だけで動き、人のマウスは使いません。
+		// 押せるのは `data-agent-view` の印が付いたタブだけ。人の作業中は画面を動かしません。
+		const agentCursor = new AgentCursor(
+			document,
+			{
+				mayTakeScreen: aiMayTakeScreen,
+				showView: (wanted) => {
+					if (isView(wanted)) view = wanted as View;
+				}
+			},
+			i18n.t('agent.label')
+		);
+		listen<{ id: number; act: AgentAct }>('agent://act', (event) => {
+			const { id, act } = event.payload;
+			agentCursor
+				.run(act)
+				.then((outcome) => invoke('agent_act_done', { id, outcome }))
+				.catch((error: unknown) => {
+					// **黙らない。**答えが返らないと、呼んだ席は時間切れまで待ちます。
+					failure = String(error);
+				});
 		})
 			.then((stop) => stops.push(stop))
 			.catch(() => {
@@ -1776,25 +1809,46 @@
 			-->
 			<button
 				type="button"
+				data-agent-view="connections"
 				class:active={view === 'connections'}
 				onclick={() => humanShows('connections')}
 			>
 				<Icon name="server" />
 				{i18n.t('tab.connections')}
 			</button>
-			<button type="button" class:active={view === 'files'} onclick={() => humanShows('files')}>
+			<button
+				type="button"
+				data-agent-view="files"
+				class:active={view === 'files'}
+				onclick={() => humanShows('files')}
+			>
 				<Icon name="folder" />
 				{i18n.t('tab.files')}
 			</button>
-			<button type="button" class:active={view === 'console'} onclick={() => humanShows('console')}>
+			<button
+				type="button"
+				data-agent-view="console"
+				class:active={view === 'console'}
+				onclick={() => humanShows('console')}
+			>
 				<Icon name="terminal" />
 				{i18n.t('tab.console')}
 			</button>
-			<button type="button" class:active={view === 'band'} onclick={() => humanShows('band')}>
+			<button
+				type="button"
+				data-agent-view="band"
+				class:active={view === 'band'}
+				onclick={() => humanShows('band')}
+			>
 				<Icon name="activity" />
 				{i18n.t('tab.band')}
 			</button>
-			<button type="button" class:active={view === 'diag'} onclick={() => humanShows('diag')}>
+			<button
+				type="button"
+				data-agent-view="diag"
+				class:active={view === 'diag'}
+				onclick={() => humanShows('diag')}
+			>
 				<Icon name="warning" />
 				{i18n.t('tab.diag')}
 			</button>

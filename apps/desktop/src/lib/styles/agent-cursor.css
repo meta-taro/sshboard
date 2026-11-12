@@ -1,0 +1,145 @@
+/* ---------------------------------------------------------------------------
+   エージェント専用カーソル（2026-11-12・`src/lib/agent-cursor.ts`）
+
+   人のマウスは使わず、画面の中に描くだけ。**人のクリックを邪魔しない**（pointer-events: none）。
+   **ダイアログやトーストより上**に出す（いちばん上は伏せている印の 9999）。
+   --------------------------------------------------------------------------- */
+
+.agent-cursor {
+	position: fixed;
+	left: 0;
+	top: 0;
+	z-index: 1000;
+	pointer-events: none;
+	color: var(--agent-cursor);
+	/* 0.65 秒でなめらかに動く（agent-cursor.ts の MOVE_MS と合わせる） */
+	transition: transform 0.65s cubic-bezier(0.22, 1, 0.36, 1);
+	filter: drop-shadow(0 1px 2px rgb(0 0 0 / 0.35));
+}
+
+.agent-cursor svg {
+	display: block;
+	width: 22px;
+	height: 22px;
+}
+
+.agent-cursor svg path {
+	fill: currentColor;
+}
+
+/* 名前の札（「エージェント」・一言に差し替わる） */
+.agent-cursor .tag {
+	position: absolute;
+	left: 18px;
+	top: 18px;
+	max-width: 280px;
+	padding: 2px 8px;
+	border-radius: 999px;
+	background: var(--agent-cursor);
+	color: var(--agent-cursor-fg);
+	font-size: 12px;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+/* 押した所に輪が広がる */
+.agent-cursor.click::after {
+	content: '';
+	position: absolute;
+	left: -10px;
+	top: -10px;
+	width: 20px;
+	height: 20px;
+	border-radius: 50%;
+	border: 2px solid var(--agent-cursor);
+	animation: agent-ring 0.6s ease-out forwards;
+}
+
+@keyframes agent-ring {
+	from {
+		transform: scale(0.4);
+		opacity: 1;
+	}
+	to {
+		transform: scale(2.2);
+		opacity: 0;
+	}
+}
+
+/* 指した物を囲む枠 */
+.agent-box {
+	position: fixed;
+	z-index: 999;
+	pointer-events: none;
+	border: 2px solid var(--agent-cursor);
+	border-radius: 6px;
+	box-shadow: 0 0 0 4px color-mix(in srgb, var(--agent-cursor) 25%, transparent);
+}
+
+/* 吹き出し。**窓の端から 8px 内側に収める**のは agent-cursor.ts の bubblePlacement */
+.agent-bubble {
+	position: fixed;
+	z-index: 1001;
+	max-width: 280px;
+	padding: 8px 28px 8px 10px;
+	border-radius: 8px;
+	background: var(--agent-bubble);
+	color: var(--agent-bubble-fg);
+	font-size: 13px;
+	line-height: 1.5;
+	overflow-wrap: anywhere;
+	box-shadow: 0 4px 14px rgb(0 0 0 / 0.25);
+}
+
+/* しっぽ。**指した所を向く**（--tail は吹き出しの端からの位置） */
+.agent-bubble::after {
+	content: '';
+	position: absolute;
+	width: 10px;
+	height: 10px;
+	background: var(--agent-bubble);
+	transform: rotate(45deg);
+}
+.agent-bubble[data-side='above']::after {
+	bottom: -5px;
+	left: calc(var(--tail, 14px) - 5px);
+}
+.agent-bubble[data-side='below']::after {
+	top: -5px;
+	left: calc(var(--tail, 14px) - 5px);
+}
+.agent-bubble[data-side='right']::after {
+	left: -5px;
+	top: calc(var(--tail, 14px) - 5px);
+}
+.agent-bubble[data-side='left']::after {
+	right: -5px;
+	top: calc(var(--tail, 14px) - 5px);
+}
+
+.agent-bubble-close {
+	position: absolute;
+	right: 4px;
+	top: 2px;
+	border: 0;
+	background: transparent;
+	color: inherit;
+	font-size: 14px;
+	cursor: pointer;
+}
+
+.agent-cursor[hidden],
+.agent-box[hidden],
+.agent-bubble[hidden] {
+	display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.agent-cursor {
+		transition: none;
+	}
+	.agent-cursor.click::after {
+		animation: none;
+	}
+}
