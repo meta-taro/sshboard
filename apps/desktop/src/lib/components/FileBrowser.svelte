@@ -564,10 +564,14 @@
 								type="button"
 								class="ghost close"
 								onclick={() => disconnect(held.id)}
-								aria-label={i18n.t('files.disconnect')}
 								title={i18n.t('files.disconnect')}
 							>
+								<!--
+									**字で出す**（2026-11-12・オーナー「画面に［切断］ボタンがありません」）。
+									絵だけでは、人から見て切る手段が見つかりませんでした。
+								-->
 								<Icon name="unplug" size={11} />
+								<span class="close-label">{i18n.t('files.disconnect')}</span>
 							</button>
 						</div>
 					{/each}
@@ -1093,8 +1097,19 @@
 	}
 
 	.conn-tab .close {
-		padding: 0.18rem 0.3rem 0.18rem 0.1rem;
-		color: var(--fg-faint);
+		display: inline-flex;
+		align-items: center;
+		gap: 0.2rem;
+		/* 字が付いて「押す釦」になったので、押せる大きさ（WCAG 2.2 の 24px）を持たせる */
+		min-height: 24px;
+		padding: 0.18rem 0.4rem 0.18rem 0.1rem;
+		/* 字で出すので、薄すぎない色に（見つけられることが目的） */
+		color: var(--fg-muted);
+		white-space: nowrap;
+	}
+
+	.conn-tab .close-label {
+		font-size: var(--text-xs);
 	}
 
 	.conn-tab .close:hover {

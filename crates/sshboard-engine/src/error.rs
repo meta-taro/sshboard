@@ -178,8 +178,8 @@ impl fmt::Display for EngineError {
             ),
             EngineError::AlreadyConnected { id, name } => write!(
                 f,
-                "すでに {name}（{id}）へ繋がっています。\
-                 先に切ってから繋ぎ直してください（同時に 2 本は張りません）"
+                "すでに {name}（{id}）へ繋がっています。繋ぎ直すなら、［ファイル］画面の\
+                 接続の札にある［切断］を押してから繋いでください（同じ相手へ 2 本は張りません）"
             ),
             EngineError::UnknownConnection(id) => {
                 write!(f, "{id} という接続は登録されていません")
