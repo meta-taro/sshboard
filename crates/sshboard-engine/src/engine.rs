@@ -362,12 +362,14 @@ impl Engine {
 
     /// 開いているもの全部。**タブに出すのはこれ**（D25）。
     pub async fn open_connections(&self) -> Vec<Opened> {
+        self.drop_dead().await;
         let held = self.held.lock().await;
         held.live.values().map(|l| l.opened.clone()).collect()
     }
 
     /// いま操作の宛先になっているもの。
     pub async fn active(&self) -> Option<Opened> {
+        self.drop_dead().await;
         let held = self.held.lock().await;
         held.active
             .as_ref()
@@ -704,6 +706,8 @@ impl Engine {
         self.clear_questions_for(id);
 
         // **同じ相手を二重に開かない。**別の相手は開ける（D25）。
+        // ただし**SSH が切れている物は先に外す** —— 外さないと「すでに繋がっています」で行き止まり。
+        self.drop_dead().await;
         {
             let held = self.held.lock().await;
             if let Some(open) = held.live.get(id) {
@@ -844,15 +848,51 @@ impl Engine {
     ///
     /// `id` を省略すると、いまの宛先を切ります。
     pub async fn disconnect(&self, actor: Actor, id: Option<&str>) -> Option<Opened> {
-        let mut held = self.held.lock().await;
-        let target = match id {
-            Some(id) => id.to_owned(),
-            None => held.active.clone()?,
+        let target = {
+            let held = self.held.lock().await;
+            match id {
+                Some(id) => id.to_owned(),
+                None => held.active.clone()?,
+            }
         };
+        self.remove_live(&target, Some(actor)).await
+    }
+
+    /// **下の SSH が切れた接続を、表から外す**（2026-11-12・実機）。
+    ///
+    /// 切れているのに「開いている」と残すと、端末は `Channel send error`、繋ぎ直しは
+    /// 「すでに繋がっています」で断られ、**画面から抜ける道がありませんでした。**
+    /// 表を読む所・繋ぐ所・操作の前で呼びます。
+    async fn drop_dead(&self) {
+        let dead: Vec<String> = {
+            let held = self.held.lock().await;
+            held.live
+                .iter()
+                .filter(|(_, live)| live.session.is_closed())
+                .map(|(id, _)| id.clone())
+                .collect()
+        };
+        for id in dead {
+            if self.remove_live(&id, None).await.is_some() {
+                self.diag.error(
+                    Stage::Reach,
+                    Some(&id),
+                    "SSH が切れていたので、開いている一覧から外しました",
+                    "繋ぎ直してください（相手か網が切りました。sshboard は切っていません）",
+                );
+            }
+        }
+    }
+
+    /// 表から 1 本外し、その出力と端末を片付けて画面へ知らせる。
+    /// `by` が `None` なのは、**誰も切っていない**（SSH が勝手に切れた）とき。
+    async fn remove_live(&self, target: &str, by: Option<Actor>) -> Option<Opened> {
+        let target = target.to_owned();
+        let mut held = self.held.lock().await;
         let closed = held.live.remove(&target).map(|l| l.opened);
         // **誰が切ったかを残す**（Issue #8）。
         // 切った直後は誰でも分かりますが、**踏まれるのは 30 分後**です。
-        if closed.is_some() {
+        if let (true, Some(actor)) = (closed.is_some(), by) {
             held.last_closed = Some((target.clone(), actor));
         }
 
@@ -880,7 +920,7 @@ impl Engine {
             self.publish_consoles().await;
         }
 
-        if let Some(open) = closed.as_ref() {
+        if let (Some(open), Some(actor)) = (closed.as_ref(), by) {
             // 切断は取り消せないので、**受け取りが返らなくても切る**。
             // ここで失敗にすると「切れないまま繋がっている」という悪い方へ倒れる。
             let _ = self.show(actor, &format!("disconnect {}", open.id)).await;
@@ -925,6 +965,7 @@ impl Engine {
     /// - **人へ効く手順を言う**（「接続を開いて」は、すでに開いている人に効きません）
     /// - **勝手に 1 本選ばない。**推測した相手へコマンドを流すのが一番危険です
     async fn session(&self) -> Result<Arc<SshSession>, EngineError> {
+        self.drop_dead().await;
         // **名指しがあれば、画面の宛先は見ません**（AI の道具・`Engine::on`）。
         if let Some(id) = crate::named::current() {
             return self.session_on(&id).await;
@@ -986,6 +1027,7 @@ impl Engine {
     /// 端末が接続ごとに持てるようになったので、**宛先でない接続の端末も
     /// 立てられなければなりません**（人は 3 台同時に作業します）。
     async fn session_on(&self, id: &str) -> Result<Arc<SshSession>, EngineError> {
+        self.drop_dead().await;
         let held = self.held.lock().await;
         if let Some(live) = held.live.get(id) {
             return Ok(Arc::clone(&live.session));

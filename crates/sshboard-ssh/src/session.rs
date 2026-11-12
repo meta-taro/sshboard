@@ -178,6 +178,14 @@ pub struct SshSession {
 }
 
 impl SshSession {
+    /// **下の SSH が切れているか**（2026-11-12）。相手か網が切ると真になります。
+    ///
+    /// 切れているのに「開いている」と表に残すと、端末は `Channel send error`、
+    /// 繋ぎ直しは「すでに繋がっています」で行き止まりになりました。
+    pub fn is_closed(&self) -> bool {
+        self.handle.is_closed()
+    }
+
     /// 繋いで、ホスト鍵を確かめる。
     ///
     /// **信用できないホストとは、繋いだあとでもセッションを捨てます。**
