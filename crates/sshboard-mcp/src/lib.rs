@@ -8,6 +8,7 @@ mod capture;
 mod channel;
 mod check_tools;
 mod http;
+mod open_files;
 mod server;
 mod ssh_tools;
 mod view;

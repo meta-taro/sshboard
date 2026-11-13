@@ -79,6 +79,10 @@ pub enum SshError {
     NotShown(String),
     /// **AI の書き込みを囲いが断った**（D22）。サーバーへは届いていない。
     WriteRefused(Refusal),
+    /// そのパスがサーバーに無い（2026-11-13）。**「読めない」とは別に返す**——人へ頼むことが違うため。
+    NoSuchPath(String),
+    /// そのパスを読む権限が無い（2026-11-13）。**「無い」とは別に返す。**
+    PermissionDenied(String),
 }
 
 impl std::fmt::Display for SshError {
@@ -101,11 +105,28 @@ impl std::fmt::Display for SshError {
             SshError::Command(detail) => write!(f, "コマンドが通りません: {detail}"),
             SshError::NotShown(detail) => write!(f, "画面へ出せませんでした: {detail}"),
             SshError::WriteRefused(why) => write!(f, "書き込みを断りました: {why}"),
+            SshError::NoSuchPath(path) => write!(f, "{path} はありません"),
+            SshError::PermissionDenied(path) => write!(f, "{path} を読む権限がありません"),
         }
     }
 }
 
 impl std::error::Error for SshError {}
+
+/// SFTP の断りを、**「無い」「読めない」「それ以外」に分ける**（2026-11-13）。
+///
+/// 文字で見分けず、サーバーが返した番号で見分けます（文言はサーバーごとに違う）。
+fn sftp_failure(path: &str, error: russh_sftp::client::error::Error) -> SshError {
+    use russh_sftp::protocol::StatusCode;
+    match &error {
+        russh_sftp::client::error::Error::Status(status) => match status.status_code {
+            StatusCode::NoSuchFile => SshError::NoSuchPath(path.to_owned()),
+            StatusCode::PermissionDenied => SshError::PermissionDenied(path.to_owned()),
+            _ => SshError::Command(error.to_string()),
+        },
+        _ => SshError::Command(error.to_string()),
+    }
+}
 
 /// 認証のやり方。**パスワード認証を用意しません**（履歴と記憶に残る経路を作らない）。
 pub enum Auth {
@@ -839,7 +860,7 @@ impl SshSession {
         let entries = sftp
             .read_dir(path)
             .await
-            .map_err(|error| SshError::Command(error.to_string()))?;
+            .map_err(|error| sftp_failure(path, error))?;
 
         Ok(entries
             .map(|entry| DirEntry {

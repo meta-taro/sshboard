@@ -39,7 +39,7 @@ pub use error::EngineError;
 pub use open::{Opened, WriteAccess};
 pub use transfers::{Direction, Outcome, Transfer, Transfers};
 
-pub use sshboard_ssh::{DirEntry, FileFacts, Ran};
+pub use sshboard_ssh::{DirEntry, FileFacts, Ran, SshError};
 
 /// **AI が呼べるコマンドの許可リスト**（D3）。
 ///

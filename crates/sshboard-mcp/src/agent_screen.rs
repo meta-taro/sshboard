@@ -62,6 +62,17 @@ pub enum AgentAct {
         #[serde(skip_serializing_if = "Option::is_none")]
         seconds: Option<u32>,
     },
+    /// ファイルのタブを、その接続・そのフォルダで開く（`show_view` から・2026-11-13）。
+    ///
+    /// **`screen` からは作れません**（`parse_act` が作らない）。フォルダが在るかを
+    /// 本体が先に確かめてから、`show_view` だけがこれを画面へ渡します。
+    Open {
+        connection_id: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        path: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        select: Option<String>,
+    },
     /// 一言だけ言う。
     Say {
         message: String,
@@ -192,6 +203,7 @@ fn reply(act: &AgentAct, outcome: ActOutcome) -> Result<String, ErrorData> {
             AgentAct::Click { .. } => "pressed it on the person's screen".to_string(),
             AgentAct::Go { view, .. } => format!("asked the person's screen to show {view}"),
             AgentAct::Say { .. } => "said it on the person's screen".to_string(),
+            AgentAct::Open { .. } => "done: opened the files tab".to_string(),
         }),
         ActOutcome::NotFound => Err(ErrorData::invalid_params(
             "not found on the screen - nothing was pressed. Name something the person can see \

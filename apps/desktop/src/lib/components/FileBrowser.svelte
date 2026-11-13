@@ -42,6 +42,11 @@
 		session,
 		type Listed
 	} from '$lib/session.svelte';
+	import {
+		filesRequest,
+		takeFilesRequest,
+		type FilesRequest
+	} from '$lib/files-request.svelte';
 
 	/** 印の色をタブへ出すためだけに持ちます。**繋ぐのは `ConnectPanel` の仕事。** */
 	let registered = $state<Connection[]>([]);
@@ -494,6 +499,46 @@
 	 * **人がタブを押したときも、AI が宛先を動かしたときも**追いつきます。
 	 */
 	let lastRead: string | null = null;
+
+	/**
+	 * **AI が「この接続のこのフォルダを開いて」と頼んだ**（`show_view files`・2026-11-13）。
+	 *
+	 * 下の「宛先が変わったら読み直す」より**先に**置きます。先に `lastRead` を埋めておかないと、
+	 * 宛先が変わった所で `remotePath` が `.` へ戻され、頼まれたフォルダが上書きされます。
+	 */
+	$effect(() => {
+		if (!filesRequest.pending) return;
+		const asked = takeFilesRequest();
+		if (asked) void openAsked(asked);
+	});
+
+	async function openAsked(asked: FilesRequest) {
+		lastRead = asked.connectionId;
+		try {
+			if (asked.connectionId !== session.activeId) await session.focus(asked.connectionId);
+			if (asked.path) remotePath = asked.path;
+			await refresh();
+			// **選ぶだけ。**落とすのは人が［ダウンロード］を押したとき。
+			const name = asked.select;
+			if (!name) return;
+			const found = entries.find((entry) => entry.name === name);
+			if (found && !found.isDir) pickedRemote = [name];
+			scrollToEntry(name);
+		} catch (error: unknown) {
+			failure = String(error);
+		}
+	}
+
+	/** 選んだ物が見える所まで動かす。**人が探さずに済むように。** */
+	function scrollToEntry(name: string) {
+		requestAnimationFrame(() => {
+			const row = document.querySelector<HTMLElement>(
+				`[data-remote-entry="${CSS.escape(name)}"]`
+			);
+			row?.scrollIntoView({ block: 'nearest' });
+		});
+	}
+
 	$effect(() => {
 		const target = session.activeId;
 		if (!target || target === lastRead) return;
@@ -854,7 +899,11 @@
 				{:else}
 					<ul class="list">
 						{#each entries as entry (entry.name)}
-							<li class:picked={!entry.isDir && pickedRemote.includes(entry.name)} data-secret>
+							<li
+								class:picked={!entry.isDir && pickedRemote.includes(entry.name)}
+								data-remote-entry={entry.name}
+								data-secret
+							>
 								<Icon name={entry.isDir ? 'folder' : 'file'} size={12} />
 								{#if entry.isDir}
 									<button type="button" class="link" onclick={() => enter(entry.name)}>

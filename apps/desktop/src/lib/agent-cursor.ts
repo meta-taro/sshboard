@@ -14,11 +14,14 @@
  * - 画面を切り替えるときは、人が何かしている最中なら動かない（`canFollow` と同じ判定）
  */
 
+import type { OpenAct } from './files-request.svelte';
+
 /** 画面へ届く指示（本体で検査済み）。 */
 export type AgentAct =
 	| { action: 'point' | 'click'; target: string; message?: string; seconds?: number }
 	| { action: 'go'; view: string; message?: string; seconds?: number }
-	| { action: 'say'; message: string; seconds?: number };
+	| { action: 'say'; message: string; seconds?: number }
+	| OpenAct;
 
 /** 本体へ返す答え。`crates/sshboard-mcp` の `ActOutcome` と同じ名前。 */
 export type ActOutcome = 'done' | 'not_found' | 'not_allowed' | 'busy';
@@ -29,6 +32,8 @@ export interface AgentPage {
 	mayTakeScreen(): boolean;
 	/** 画面（タブ）を切り替える。**人が押した扱いにはしない。** */
 	showView(view: string): void;
+	/** ［ファイル］をその接続・そのフォルダで開く（`show_view files` から・2026-11-13）。 */
+	openFiles(act: OpenAct): void;
 }
 
 /** カーソルが動く時間（`agent-cursor.css` の transition と合わせる）。 */
@@ -191,6 +196,12 @@ export class AgentCursor {
 	private async runOne(act: AgentAct): Promise<ActOutcome> {
 		if (act.action === 'say') {
 			this.say(act.message, act.seconds);
+			return 'done';
+		}
+		if (act.action === 'open') {
+			// **人の作業中は動かない。**フォルダの有無は本体が確かめ済み。
+			if (!this.page.mayTakeScreen()) return 'busy';
+			this.page.openFiles(act);
 			return 'done';
 		}
 		if (act.action === 'go') {

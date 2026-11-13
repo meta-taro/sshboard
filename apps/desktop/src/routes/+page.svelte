@@ -21,6 +21,7 @@
 	import ConnectPanel from '$lib/components/ConnectPanel.svelte';
 	import ConsolePaneView from '$lib/components/ConsolePane.svelte';
 	import FileBrowser from '$lib/components/FileBrowser.svelte';
+	import { askFiles } from '$lib/files-request.svelte';
 	import Icon from '$lib/components/Icon.svelte';
 	import { i18n } from '$lib/i18n/i18n.svelte';
 	import { session } from '$lib/session.svelte';
@@ -1411,6 +1412,10 @@
 				mayTakeScreen: aiMayTakeScreen,
 				showView: (wanted) => {
 					if (isView(wanted)) view = wanted as View;
+				},
+				openFiles: (act) => {
+					askFiles(act);
+					view = 'files';
 				}
 			},
 			i18n.t('agent.label')

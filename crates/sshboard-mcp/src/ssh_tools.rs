@@ -146,11 +146,19 @@ impl SshboardMcp {
                        while they are answering a question, typing in a field, or have just \
                        switched tabs themselves - that is them working, not a fault. \
                        Use it after opening the console so they can watch what you type, \
-                       instead of writing 'please open the terminal tab' in chat."
+                       instead of writing 'please open the terminal tab' in chat. \
+                       For `files` you may also pass connection_id, path (a folder on that \
+                       server) and select (one file name inside it): the folder is checked \
+                       first, then the tab opens there with that file selected - nothing is \
+                       opened, moved or deleted. The reply names what happened: done, \
+                       not_found (no such folder), denied (no permission to read it), \
+                       file_not_found (the folder exists, the file does not), busy (the person \
+                       is typing or answering - try later) or no_screen (no window is open)."
     )]
     pub async fn show_view(
         &self,
         Parameters(request): Parameters<ShowViewRequest>,
+        ct: CancellationToken,
     ) -> Result<String, ErrorData> {
         let wanted = request.view.trim().to_lowercase();
         if !crate::view::VIEWS.contains(&wanted.as_str()) {
@@ -161,6 +169,10 @@ impl SshboardMcp {
                 ),
                 None,
             ));
+        }
+
+        if let Some(open) = crate::open_files::OpenFiles::from_request(&wanted, &request)? {
+            return self.open_files(open, ct).await;
         }
 
         let Some(viewer) = self.viewer() else {
@@ -1369,12 +1381,21 @@ pub struct ProposeOperation {
     pub max_per_hour: u32,
 }
 
-/// `show_view` の引数。**画面のタブ名だけ**（接続先も何も通りません）。
+/// `show_view` の引数。
 #[derive(Debug, Deserialize, rmcp::schemars::JsonSchema)]
 #[schemars(crate = "rmcp::schemars")]
 pub struct ShowViewRequest {
     /// `connections` / `files` / `console` / `band` / `diag` のどれか。
     pub view: String,
+    /// `files` だけ：どの接続のファイルを出すか。`path` か `select` を渡すときは必須。
+    #[serde(default)]
+    pub connection_id: Option<String>,
+    /// `files` だけ：開くフォルダ（サーバー側の絶対パス）。
+    #[serde(default)]
+    pub path: Option<String>,
+    /// `files` だけ：開いたフォルダの中で選んでおくファイルの名前（1 つ・パスではなく名前）。
+    #[serde(default)]
+    pub select: Option<String>,
 }
 
 /// `console_open` の引数。
