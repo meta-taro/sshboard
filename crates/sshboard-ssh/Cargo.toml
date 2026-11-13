@@ -12,7 +12,7 @@ sshboard-diag = { path = "../sshboard-diag" }
 sshboard-stream = { path = "../sshboard-stream" }
 # 既定は aws-lc-rs を引く。dbboard の ADR-0034 に合わせて ring へ寄せる。
 # **採用したら cargo tree で毎回確かめること**（D6）。
-russh = { version = "0.63", default-features = false, features = ["ring", "flate2", "rsa"] }
+russh = { version = "0.65", default-features = false, features = ["ring", "flate2", "rsa"] }
 russh-sftp = "2"
 tokio = { workspace = true, features = ["net", "io-util"] }
 base64 = "0.22"
