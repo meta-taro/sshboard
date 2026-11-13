@@ -15,7 +15,7 @@ use rmcp::handler::server::wrapper::Parameters;
 use rmcp::model::{
     CallToolResult, ContentBlock, CustomNotification, JsonObject, ListResourcesResult,
     PaginatedRequestParams, ReadResourceRequestParams, ReadResourceResponse, ReadResourceResult,
-    Resource, ResourceContents, ResourceUpdatedNotificationParam, ServerCapabilities, ServerInfo,
+    Resource, ResourceContents, ResourceUpdatedNotificationParam, ServerCapabilities, ServerConfig,
     ServerNotification, SubscribeRequestParams,
 };
 use rmcp::service::{NotificationContext, RequestContext, RoleServer};
@@ -778,7 +778,7 @@ impl ServerHandler for SshboardMcp {
         Ok(())
     }
 
-    fn get_info(&self) -> ServerInfo {
+    fn get_info(&self) -> ServerConfig {
         // **呼ばなくても届く唯一の場所**（D49）。
         //
         // `about_sshboard` を作っても、**呼ばれなければ届きません。**
@@ -802,7 +802,7 @@ impl ServerHandler for SshboardMcp {
             crate::channel::CHANNEL_CAPABILITY.to_owned(),
             JsonObject::new(),
         );
-        let mut info = ServerInfo::new(
+        let mut info = ServerConfig::new(
             ServerCapabilities::builder()
                 .enable_experimental_with(channel)
                 .enable_tools()
