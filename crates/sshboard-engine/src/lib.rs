@@ -12,6 +12,7 @@
 
 mod checks;
 mod console;
+mod console_grant;
 mod engine;
 mod error;
 mod named;
@@ -31,6 +32,7 @@ pub mod probes;
 
 pub use checks::{moved_since, CheckReport, StepReport};
 pub use console::{ConsoleFacts, PER_CONNECTION_LIMIT};
+pub use console_grant::{GrantFacts, GrantScope, MAX_CONSOLE_GRANT};
 pub use engine::{
     Answered, ConsoleOpened, Engine, HostKeyAsk, OnConflict, OnScreen, OperationAsk,
     OperationProposal, StandingAllowance,

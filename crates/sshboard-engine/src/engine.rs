@@ -23,6 +23,7 @@ use tokio::sync::{mpsc, watch, Mutex};
 use tokio::time::{Duration, Instant};
 
 use crate::console::{Ambiguous, ConsoleFacts, ConsoleRequest, Consoles};
+use crate::console_grant::{ConsoleGrant, GrantFacts, GrantScope, MAX_CONSOLE_GRANT};
 use crate::error::EngineError;
 use crate::open::{Opened, WriteAccess};
 use crate::transfers::{Direction, Outcome, Transfer, Transfers};
@@ -285,6 +286,10 @@ pub struct Engine {
     operation_approvals: Mutex<Vec<Approval>>,
     /// **今後も許可**している操作（保存しない・D47 改）。
     standing: Mutex<Vec<StandingAllowance>>,
+    /// **期限付きの端末の許可**（保存しない・2026-11-16）。同時に 1 件だけ。
+    console_grant: Mutex<Option<ConsoleGrant>>,
+    /// 許可が出た・外れたことを配る。**出ている許可を、人が忘れないように**画面へ出し続けます。
+    console_grant_changed: watch::Sender<Option<GrantFacts>>,
     /// **実際に走った記録。**`max_per_hour` を数えるのはこちら。
     ///
     /// **走ったものだけ**が入ります。許可しただけでは増えません
@@ -327,6 +332,7 @@ impl Engine {
         let (operation_request, _) = watch::channel(None);
         let (operation_proposal, _) = watch::channel(None);
         let (transfer_feed, _) = watch::channel(None);
+        let (console_grant_changed, _) = watch::channel(None);
         Self {
             band,
             diag,
@@ -349,6 +355,8 @@ impl Engine {
             transfer_feed,
             operation_approvals: Mutex::new(Vec::new()),
             standing: Mutex::new(Vec::new()),
+            console_grant: Mutex::new(None),
+            console_grant_changed,
             operation_runs: Mutex::new(Vec::new()),
             checks: crate::checks::CheckMemory::default(),
             changed,
@@ -1808,6 +1816,19 @@ impl Engine {
         if mine {
             return Ok(());
         }
+        // **人が先に出した期限付きの許可**（2026-11-16）。
+        // ただし**人が握っている端末へは効かせません** —— 許可は「尋ねない」で、
+        // 「人が打っている所へ割り込む」ではありません。そのときは元どおり尋ねます。
+        let human_is_holding = slot.on(on).iter().any(|open| open.holder == Actor::Human);
+        if !human_is_holding && self.console_granted_on(on).await {
+            drop(slot);
+            self.diag.info(
+                Stage::Exec,
+                Some(on),
+                format!("人が先に出した期限付きの許可で、{}へ通しました", who(actor)),
+            );
+            return Ok(());
+        }
         // **催促を積み上げない。**何度呼ばれても、人に出る問いは 1 つ。
         // ただし**宛先が変わったら別の頼み**です（同じ問いにすると、人は
         // どの接続を許したのか分からないまま押します）。
@@ -2391,6 +2412,90 @@ impl Engine {
             ),
         );
         Ok(())
+    }
+
+    /// **期限付きの端末の許可を出す**（2026-11-16）。**出せるのは人だけ。**
+    ///
+    /// 出し直すと前の許可は置き換わります（同時に持つのは 1 件）。
+    /// 上限（[`MAX_CONSOLE_GRANT`]）を超える期限は**縮めずに断ります。**
+    ///
+    /// 「新しい接続」の許可では、**いま一覧に在る接続を控えて、そこには効かせません。**
+    /// 一覧が読めなければ、どれが新しいか決められないので断ります。
+    pub async fn console_grant(
+        &self,
+        actor: Actor,
+        scope: GrantScope,
+        for_how_long: Duration,
+    ) -> Result<(), EngineError> {
+        if actor != Actor::Human {
+            return Err(EngineError::HumanOnly);
+        }
+        if for_how_long > MAX_CONSOLE_GRANT {
+            return Err(EngineError::GrantTooLong {
+                max_hours: MAX_CONSOLE_GRANT.as_secs() / 3600,
+            });
+        }
+        let existing = Connections::load_or_empty(&self.connections_path)
+            .map_err(|error| EngineError::Connections(error.to_string()))?
+            .connections
+            .into_iter()
+            .map(|entry| entry.id)
+            .collect();
+        let grant = ConsoleGrant::new(scope, existing, for_how_long, Instant::now());
+        let facts = grant.facts(Instant::now());
+        *self.console_grant.lock().await = Some(grant);
+        let on = match &facts.scope {
+            GrantScope::Connection(id) => Some(id.as_str()),
+            GrantScope::NewConnections => None,
+        };
+        self.diag.info(
+            Stage::Exec,
+            on,
+            format!(
+                "人が端末の期限付きの許可を出しました（{}・{} 分）",
+                facts.scope.describe(),
+                facts.remaining.as_secs() / 60
+            ),
+        );
+        let _ = self.console_grant_changed.send_replace(Some(facts));
+        Ok(())
+    }
+
+    /// **期限付きの許可を外す。**外せるのは人だけ（AI が外しても何も起きません）。
+    pub async fn console_grant_revoke(&self, actor: Actor) {
+        if actor != Actor::Human {
+            return;
+        }
+        let removed = self.console_grant.lock().await.take().is_some();
+        if removed {
+            self.diag
+                .info(Stage::Exec, None, "人が端末の期限付きの許可を外しました");
+        }
+        let _ = self.console_grant_changed.send_replace(None);
+    }
+
+    /// いま効いている許可。**期限を過ぎたものは無いのと同じ**に返します。
+    pub async fn console_grant_facts(&self) -> Option<GrantFacts> {
+        let now = Instant::now();
+        let mut slot = self.console_grant.lock().await;
+        if slot.as_ref().is_some_and(|grant| !grant.is_live(now)) {
+            // 期限切れを片付ける。残しておくと、画面が「出ている」と言い続けます。
+            *slot = None;
+        }
+        slot.as_ref().map(|grant| grant.facts(now))
+    }
+
+    /// 許可の変化を受け取る口。
+    pub fn subscribe_console_grant(&self) -> watch::Receiver<Option<GrantFacts>> {
+        self.console_grant_changed.subscribe()
+    }
+
+    async fn console_granted_on(&self, on: &str) -> bool {
+        self.console_grant
+            .lock()
+            .await
+            .as_ref()
+            .is_some_and(|grant| grant.covers(on, Instant::now()))
     }
 
     /// 今後も許可している操作の一覧。**画面の設定の枠が出します。**

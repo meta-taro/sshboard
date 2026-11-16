@@ -10,6 +10,10 @@
 	import HostKeyDialog from '$lib/components/HostKeyDialog.svelte';
 	import OperationRequestDialog from '$lib/components/OperationRequestDialog.svelte';
 	import StandingDialog, { type Standing } from '$lib/components/StandingDialog.svelte';
+	import ConsoleGrantDialog, {
+		type ConsoleGrant,
+		type GrantScopeChoice
+	} from '$lib/components/ConsoleGrantDialog.svelte';
 	import CheckDialog, {
 		type CheckReport,
 		type ChecksOverview
@@ -105,6 +109,14 @@
 	/** **許可を続けている操作**の枠（D47 改）。開くたびに実行体から読み直す。 */
 	let standingOpen = $state(false);
 	let standingList = $state<Standing[]>([]);
+	/**
+	 * **端末の期限付きの許可**（2026-11-16）。出ている間は見出しの帯に出し続けます ——
+	 * **出したことを人が忘れない**ように。
+	 */
+	let grantOpen = $state(false);
+	let consoleGrant = $state<ConsoleGrant | null>(null);
+	/** 残りの時間を読み直す間隔。分の単位で出すので 1 分ごとで足ります。 */
+	const GRANT_REFRESH_MS = 60_000;
 	/** **点検**（D72）。開いている間だけ一覧を持つ。 */
 	let checksOverview = $state<ChecksOverview | null>(null);
 	let checkRunning = $state<string | null>(null);
@@ -243,6 +255,8 @@
 			//
 			// **「外すまで許可」も全部外す**（D47 改）。止めたのに許可だけ残る、を作らない。
 			await invoke('standing_revoke_all');
+			// 端末の期限付きの許可も、同じ口で外れています（実行体側）。画面の帯も消す。
+			consoleGrant = null;
 			await invoke('mcp_stop');
 			mcp = null;
 		} catch (error: unknown) {
@@ -514,6 +528,48 @@
 		}
 		checkProposal = null;
 	}
+
+	async function refreshGrant() {
+		try {
+			consoleGrant = await invoke<ConsoleGrant | null>('console_grant_state');
+		} catch (error: unknown) {
+			failure = String(error);
+		}
+	}
+
+	async function openGrant() {
+		await refreshGrant();
+		grantOpen = true;
+	}
+
+	async function giveGrant(scope: GrantScopeChoice, connection: string | null, hours: number) {
+		try {
+			consoleGrant = await invoke<ConsoleGrant | null>('console_grant', {
+				scope,
+				connection,
+				hours
+			});
+			grantOpen = false;
+		} catch (error: unknown) {
+			failure = String(error);
+		}
+	}
+
+	async function revokeGrant() {
+		try {
+			await invoke('console_grant_revoke');
+			consoleGrant = null;
+		} catch (error: unknown) {
+			failure = String(error);
+		}
+	}
+
+	// **出ている間だけ**、残りの時間を読み直す。期限が来れば実行体が `null` を返し、帯が消えます。
+	$effect(() => {
+		if (consoleGrant === null) return;
+		const timer = setInterval(() => void refreshGrant(), GRANT_REFRESH_MS);
+		return () => clearInterval(timer);
+	});
 
 	async function revokeStanding(held: Standing) {
 		try {
@@ -1792,6 +1848,9 @@
 							<button type="button" onclick={() => { viewMenuOpen = false; void openStanding(); }}>
 								{i18n.t('standing.title')}
 							</button>
+							<button type="button" onclick={() => { viewMenuOpen = false; void openGrant(); }}>
+								{i18n.t('grant.title')}
+							</button>
 							<button type="button" onclick={() => { viewMenuOpen = false; void openChecks(); }}>
 								{i18n.t('check.title')}
 							</button>
@@ -1885,6 +1944,18 @@
 			<span class="label-long">{redaction.on ? i18n.t('mask.on') : i18n.t('mask.hide')}</span>
 			<span class="label-short">{redaction.on ? i18n.t('mask.on.short') : i18n.t('mask.hide.short')}</span>
 		</button>
+
+		<!--
+			**出ている期限付きの許可**（2026-11-16）。出ている間だけ出します。
+			押すと枠が開き、そこで外せます。
+		-->
+		{#if consoleGrant}
+			<button type="button" class="grant-chip" onclick={() => void openGrant()}>
+				{i18n.t('grant.title')} · {i18n.t('grant.left', {
+					minutes: Math.ceil(consoleGrant.remainingSecs / 60)
+				})}
+			</button>
+		{/if}
 
 		<!--
 			**AI を止める**（UI 案・2026-10-21）。
@@ -2224,6 +2295,16 @@
 			allowances={standingList}
 			onRevoke={revokeStanding}
 			onClose={() => (standingOpen = false)}
+		/>
+	{/if}
+
+	{#if grantOpen}
+		<ConsoleGrantDialog
+			current={session.open ? { id: session.open.id, name: session.open.name } : null}
+			grant={consoleGrant}
+			onGrant={giveGrant}
+			onRevoke={revokeGrant}
+			onClose={() => (grantOpen = false)}
 		/>
 	{/if}
 
@@ -3020,6 +3101,24 @@
 	.stop-ai:focus-visible {
 		outline: 2px solid var(--accent);
 		outline-offset: 1px;
+	}
+
+	/* **出ている期限付きの許可。**止めるボタンと並ぶので、注意の色ではなく強調の色で。 */
+	.grant-chip {
+		display: inline-flex;
+		align-items: center;
+		flex: none;
+		height: var(--control-h);
+		padding: 0 10px;
+		border: 0;
+		border-radius: var(--r-pill);
+		font: inherit;
+		font-size: var(--text-control);
+		color: var(--accent);
+		background: var(--accent-soft);
+		box-shadow: inset 0 0 0 1px var(--accent);
+		white-space: nowrap;
+		cursor: pointer;
 	}
 
 	/*

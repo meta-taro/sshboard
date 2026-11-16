@@ -962,9 +962,12 @@ pub async fn standing_revoke(
 }
 
 /// 全部外す。**［AI を止める］が呼びます。**
+///
+/// **端末の期限付きの許可も外します**（2026-11-16）。止めたのに許可だけ残る、を作らない。
 #[tauri::command]
 pub async fn standing_revoke_all(engine: State<'_, Arc<Engine>>) -> Result<(), String> {
     engine.revoke_all_standing(Actor::Human).await;
+    engine.console_grant_revoke(Actor::Human).await;
     Ok(())
 }
 

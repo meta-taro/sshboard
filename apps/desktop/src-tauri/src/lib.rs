@@ -12,6 +12,7 @@ mod capture;
 mod check_cmd;
 mod commands;
 mod connections_cmd;
+mod console_grant_cmd;
 mod mcp_host;
 mod menu;
 mod pending;
@@ -143,6 +144,9 @@ pub fn run() {
             session_cmd::standing_list,
             session_cmd::standing_revoke,
             session_cmd::standing_revoke_all,
+            console_grant_cmd::console_grant,
+            console_grant_cmd::console_grant_revoke,
+            console_grant_cmd::console_grant_state,
             session_cmd::passphrase_request,
             session_cmd::passphrase_dismiss,
             // **ホスト鍵の問いに、人が答える口**（Issue #26）。

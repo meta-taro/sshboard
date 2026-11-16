@@ -70,6 +70,10 @@ pub enum EngineError {
     /// ホスト鍵の承認を AI に渡すと、**初めて見るホストを AI が自分で通せます。**
     /// この製品が「人が見ていること」を安全の根拠にしている以上、そこは渡しません。
     HumanOnly,
+    /// **期限付きの許可が長すぎる**（2026-11-16）。
+    ///
+    /// **縮めずに断ります。**黙って縮めると、人は自分が出した期限を誤って覚えます。
+    GrantTooLong { max_hours: u64 },
     /// **その接続についての問いが立っていない。**
     ///
     /// 承認や拒否が、**立っていない問いへ飛んできた**ということです。
@@ -156,6 +160,10 @@ impl fmt::Display for EngineError {
             EngineError::HumanOnly => write!(
                 f,
                 "これは人だけが答えられます。sshboard の画面で答えてください"
+            ),
+            EngineError::GrantTooLong { max_hours } => write!(
+                f,
+                "期限付きの許可は {max_hours} 時間までです。それより短い期限で出し直してください"
             ),
             EngineError::NoHostKeyAsk(id) => write!(
                 f,
