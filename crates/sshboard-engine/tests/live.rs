@@ -266,6 +266,94 @@ async fn a_write_root_removed_while_connected_stops_ai_writes_at_once() {
     );
 }
 
+/// 毎回違う名前。**前の回の残りに当たって、通ったことにしない。**
+fn fresh_name(prefix: &str) -> String {
+    let nanos = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_nanos())
+        .unwrap_or_default();
+    format!("{prefix}-{}-{nanos}", std::process::id())
+}
+
+/// **まだ無い場所を足しても、繋いだまま作れる。**
+///
+/// 「足した書き込み先が繋ぎ直すまで効かない。足したのは、まだ実際には無い
+/// フォルダだった」という報告があった。無いパスのときだけ起きる穴が無いかを見る。
+#[tokio::test]
+async fn a_write_root_that_does_not_exist_yet_can_be_made_without_reconnecting() {
+    if !server_is_up().await {
+        println!("テスト用サーバーが建っていません（想定内・飛ばします）");
+        return;
+    }
+
+    let dir = tempfile::tempdir().expect("一時ディレクトリ");
+    let engine = engine_at(registry(&dir, &["/home/probe/upload"]).await);
+    engine
+        .connect(Actor::Human, "local", None)
+        .await
+        .expect("繋がらない");
+
+    let fresh = format!("/home/probe/{}", fresh_name("not-yet"));
+    registry(&dir, &["/home/probe/upload", &fresh]).await;
+
+    let inner = format!("{fresh}/shop/1");
+    engine
+        .ensure_dir(Actor::Ai, &inner)
+        .await
+        .expect("まだ無い書き込み先の下を、繋いだまま作れない");
+    engine
+        .upload_bytes(Actor::Ai, &format!("{inner}/a.txt"), b"ok")
+        .await
+        .expect("作った所へ、繋いだまま上げられない");
+}
+
+/// **OS の権限で断られたら、sshboard の設定のせいではないと言う。**
+///
+/// 「Permission denied」だけだと、人は sshboard の許可が足りないと受け取り、
+/// 書き込み先を広げる・版を上げる・繋ぎ直す、を繰り返した（報告より）。
+/// 直す所はサーバー上の持ち主と権限なので、**親の持ち主と権限を添える。**
+#[tokio::test]
+async fn a_permission_denied_by_the_server_says_it_is_not_sshboards_setting() {
+    if !server_is_up().await {
+        println!("テスト用サーバーが建っていません（想定内・飛ばします）");
+        return;
+    }
+
+    let dir = tempfile::tempdir().expect("一時ディレクトリ");
+    // 囲いは `/` まで広げる。**断るのは sshboard ではなく OS** にするため。
+    let engine = engine_at(registry(&dir, &["/"]).await);
+    engine
+        .connect(Actor::Human, "local", None)
+        .await
+        .expect("繋がらない");
+
+    let made = engine
+        .ensure_dir(Actor::Ai, &format!("/{}", fresh_name("no-permission")))
+        .await;
+    let uploaded = engine
+        .upload_bytes(
+            Actor::Ai,
+            &format!("/{}.txt", fresh_name("no-permission")),
+            b"x",
+        )
+        .await;
+
+    for (what, result) in [("フォルダ", made.map(|_| 0)), ("ファイル", uploaded)] {
+        let said = match result {
+            Err(error) => error.to_string(),
+            Ok(_) => panic!("{what}: 一般のユーザーが / の直下に書けてしまった"),
+        };
+        assert!(
+            said.contains("sshboard の設定を変えても通りません"),
+            "{what}: sshboard の設定のせいではないと言っていない: {said}"
+        );
+        assert!(
+            said.contains("親 / ") && said.contains("権限 0"),
+            "{what}: 親の持ち主と権限を添えていない: {said}"
+        );
+    }
+}
+
 #[tokio::test]
 async fn what_the_engine_publishes_carries_no_host_and_no_user() {
     // **AI へホストと利用者名を渡さない**（CLAUDE.md 禁止事項 5）。

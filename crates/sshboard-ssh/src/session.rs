@@ -83,6 +83,17 @@ pub enum SshError {
     NoSuchPath(String),
     /// そのパスを読む権限が無い（2026-11-13）。**「無い」とは別に返す。**
     PermissionDenied(String),
+    /// **サーバーの OS が書き込みを断った**（2026-11-16）。sshboard の囲いではない。
+    ///
+    /// 「Permission denied」だけだと、人は sshboard の許可が足りないと受け取り、
+    /// 書き込み先を広げる・版を上げる・繋ぎ直す、を繰り返しました（実運用の報告）。
+    /// 直す所はサーバー上の持ち主と権限なので、**親の持ち主と権限を添えます。**
+    ServerRefusedWrite {
+        path: String,
+        parent: String,
+        /// 親の持ち主と権限（`uid 48・gid 48・権限 0755`）。読めなければ `None`。
+        parent_facts: Option<String>,
+    },
 }
 
 impl std::fmt::Display for SshError {
@@ -107,6 +118,25 @@ impl std::fmt::Display for SshError {
             SshError::WriteRefused(why) => write!(f, "書き込みを断りました: {why}"),
             SshError::NoSuchPath(path) => write!(f, "{path} はありません"),
             SshError::PermissionDenied(path) => write!(f, "{path} を読む権限がありません"),
+            SshError::ServerRefusedWrite {
+                path,
+                parent,
+                parent_facts,
+            } => {
+                write!(
+                    f,
+                    "{path}: Permission denied。sshboard の書き込み先の問題ではなく、\
+                     サーバー上のファイル権限で断られました。sshboard の設定を変えても通りません。"
+                )?;
+                match parent_facts {
+                    Some(facts) => write!(f, "親 {parent} は {facts} です。")?,
+                    None => write!(f, "親 {parent} の持ち主と権限は読めませんでした。")?,
+                }
+                write!(
+                    f,
+                    "繋いでいるユーザーに、そこへ書く権限があるかをサーバー側で確かめてください"
+                )
+            }
         }
     }
 }
@@ -125,6 +155,42 @@ fn sftp_failure(path: &str, error: russh_sftp::client::error::Error) -> SshError
             _ => SshError::Command(error.to_string()),
         },
         _ => SshError::Command(error.to_string()),
+    }
+}
+
+/// 書けなかった理由を、**OS の拒否かそれ以外か**で分ける（2026-11-16）。
+///
+/// OS の拒否なら、親の持ち主と権限を読みに行って添えます（読めなくても断り方は変えない）。
+async fn write_failure(
+    sftp: &russh_sftp::client::SftpSession,
+    path: &str,
+    error: russh_sftp::client::error::Error,
+) -> SshError {
+    use russh_sftp::protocol::StatusCode;
+    let denied = matches!(
+        &error,
+        russh_sftp::client::error::Error::Status(status)
+            if status.status_code == StatusCode::PermissionDenied
+    );
+    if !denied {
+        return SshError::Command(format!("{path}: {error}"));
+    }
+    let parent = parent_of(path);
+    let parent_facts = sftp.metadata(&parent).await.ok().map(|meta| {
+        let id = |value: Option<u32>| value.map_or_else(|| "?".to_string(), |v| v.to_string());
+        let mode = meta
+            .permissions
+            .map_or_else(|| "?".to_string(), |bits| format!("{:04o}", bits & 0o7777));
+        format!(
+            "持ち主 uid {}・グループ gid {}・権限 {mode}",
+            id(meta.uid),
+            id(meta.gid)
+        )
+    });
+    SshError::ServerRefusedWrite {
+        path: path.to_owned(),
+        parent,
+        parent_facts,
     }
 }
 
@@ -980,10 +1046,11 @@ impl SshSession {
                         "{dir} は既にファイルとして在ります"
                     )))
                 }
-                Err(_) => sftp
-                    .create_dir(&dir)
-                    .await
-                    .map_err(|error| SshError::Command(format!("{dir}: {error}")))?,
+                Err(_) => {
+                    if let Err(error) = sftp.create_dir(&dir).await {
+                        return Err(write_failure(&sftp, &dir, error).await);
+                    }
+                }
             }
         }
         Ok(())
@@ -1001,10 +1068,10 @@ impl SshSession {
             .await?;
 
         let sftp = self.sftp().await?;
-        let mut file = sftp
-            .create(path)
-            .await
-            .map_err(|error| SshError::Command(format!("{path}: {error}")))?;
+        let mut file = match sftp.create(path).await {
+            Ok(file) => file,
+            Err(error) => return Err(write_failure(&sftp, path, error).await),
+        };
         file.write_all(bytes)
             .await
             .map_err(|error| SshError::Command(format!("{path}: {error}")))?;
@@ -1135,6 +1202,15 @@ fn shell_quote(value: &str) -> String {
 }
 
 /// `/a/b/c` を `["/", "/a", "/a/b", "/a/b/c"]` へ。**浅い順。**
+/// 1 つ上の階層。**`/` の親は `/`。**
+fn parent_of(path: &str) -> String {
+    let trimmed = path.trim_end_matches('/');
+    match trimmed.rfind('/') {
+        Some(0) | None => "/".to_string(),
+        Some(at) => trimmed[..at].to_string(),
+    }
+}
+
 fn ancestors(path: &str) -> Vec<String> {
     let mut out = vec!["/".to_string()];
     let mut current = String::new();
@@ -1148,7 +1224,15 @@ fn ancestors(path: &str) -> Vec<String> {
 
 #[cfg(test)]
 mod tests {
-    use super::ancestors;
+    use super::{ancestors, parent_of};
+
+    #[test]
+    fn the_parent_is_one_level_up_and_the_root_is_its_own_parent() {
+        assert_eq!(parent_of("/opt/app/img"), "/opt/app");
+        assert_eq!(parent_of("/opt/app/img/"), "/opt/app");
+        assert_eq!(parent_of("/opt"), "/");
+        assert_eq!(parent_of("/"), "/");
+    }
 
     #[test]
     fn ancestors_are_listed_from_the_root_downwards() {
