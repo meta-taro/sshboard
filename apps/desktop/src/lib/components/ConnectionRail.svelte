@@ -4,6 +4,8 @@
 		id: string;
 		name: string;
 		tag?: string | null;
+		/** **人が付けた印の色**（`red` などの名前）。無ければ印を出しません。 */
+		color?: string | null;
 	};
 </script>
 
@@ -70,10 +72,16 @@
 				class="pick"
 				class:active={item.id === activeId}
 				aria-selected={item.id === activeId}
+				style:--mark={item.color ? `var(--mark-${item.color})` : null}
 				onclick={() => onpick(item.id)}
 			>
+				<!--
+					**印の色**（2026-11-16）。接続を選ぶ枠・ファイルの面と同じ出し方です。
+					色だけに頼らないよう、札（タグ）も並べて出します。
+				-->
+				{#if item.color}<span class="mark-bar" aria-hidden="true"></span>{/if}
 				<!-- **接続先は伏せられる所**（D26 / 禁止事項 4）。 -->
-				<span data-secret>{item.name}</span>
+				<span class="who" data-secret>{item.name}</span>
 				{#if item.tag}<span class="tag" data-secret>{item.tag}</span>{/if}
 			</button>
 		{/each}
@@ -189,6 +197,22 @@
 		color: var(--selected-fg);
 		background: var(--selected);
 		font-weight: 700;
+	}
+
+	/* 印の色。**`.bar` と名付けない**（接続を選ぶ枠と同じ理由・上の接続バーと衝突する）。 */
+	.mark-bar {
+		flex: none;
+		width: 3px;
+		height: 0.95rem;
+		border-radius: 2px;
+		background: var(--mark);
+	}
+
+	.rail.vertical .who {
+		flex: 1 1 auto;
+		min-width: 0;
+		overflow: hidden;
+		text-overflow: ellipsis;
 	}
 
 	.pick:focus-visible,

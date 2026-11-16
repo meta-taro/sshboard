@@ -152,3 +152,33 @@ describe('横でも縦でも', () => {
 		expect(container.querySelector('.rail')?.classList.contains('vertical')).toBe(false);
 	});
 });
+
+describe('印の色（2026-11-16）', () => {
+	/**
+	 * 端末の面の左の並びにも、人が付けた**印の色**を出します。
+	 * 接続を選ぶ枠・ファイルの面・端末の枠には出ていて、ここだけ無かった。
+	 * 色だけに頼らないよう、**札（タグ）はこれまでどおり並べて出します。**
+	 */
+	const COLORED: RailItem[] = [
+		{ id: 'web-01', name: 'Web', tag: 'prod', color: 'red' },
+		{ id: 'db-01', name: 'Database', tag: null, color: null }
+	];
+
+	test('paints each connection with the colour the person chose', () => {
+		const { container } = mount({ items: COLORED });
+		const picks = container.querySelectorAll<HTMLElement>('.pick');
+		expect(picks[0].style.getPropertyValue('--mark')).toBe('var(--mark-red)');
+		expect(picks[0].querySelector('.mark-bar')).not.toBeNull();
+	});
+
+	test('leaves an uncoloured connection without a mark', () => {
+		const { container } = mount({ items: COLORED });
+		const picks = container.querySelectorAll<HTMLElement>('.pick');
+		expect(picks[1].querySelector('.mark-bar')).toBeNull();
+	});
+
+	test('keeps the tag next to the colour', () => {
+		mount({ items: COLORED });
+		expect(screen.getByText('prod')).toBeTruthy();
+	});
+});
