@@ -24,6 +24,8 @@ interface FakeTerm {
 	onData: Array<(data: string) => void>;
 	options: { fontSize: number };
 	element: HTMLElement;
+	/** 打てる状態にした回数。**開いたのに打てない、を捕まえるため。** */
+	focused: number;
 }
 
 const made: FakeTerm[] = [];
@@ -32,7 +34,7 @@ vi.mock('$lib/terminal.svelte', () => ({
 	createTerminal: (host: HTMLElement, fontSize: number) => {
 		const element = document.createElement('div');
 		host.appendChild(element);
-		const term: FakeTerm = { written: [], onData: [], options: { fontSize }, element };
+		const term: FakeTerm = { written: [], onData: [], options: { fontSize }, element, focused: 0 };
 		made.push(term);
 		return {
 			element,
@@ -40,6 +42,9 @@ vi.mock('$lib/terminal.svelte', () => ({
 			onData: (fn: (data: string) => void) => term.onData.push(fn),
 			onResize: () => {},
 			dispose: () => {},
+			focus: () => {
+				term.focused += 1;
+			},
 			// **どの端末へ書いたかを覚えます。**作ったのに書かない、を捕まえるため。
 			__write: (payload: number[]) => term.written.push([...payload])
 		};
@@ -248,6 +253,37 @@ describe('端末 1 枚の面', () => {
 
 		expect(pane.style.getPropertyValue('--mark')).toBe('transparent');
 		expect(container.querySelector('.mark-bar')).toBeTruthy();
+	});
+
+	test('puts the keyboard in the terminal when asked to after opening it', () => {
+		// **繋いだあとにやることは 1 つ —— 打つこと**（実機の指摘・2026-11-16）。
+		// ［端末を開く］を押したのに、打つ前にもう 1 回面を押させていました。
+		const done: number[] = [];
+		mount({ active: true, wantFocus: true, onfocused: (id: number) => done.push(id) });
+
+		expect(made[0].focused).toBe(1);
+		// **入れたら親へ返す。**親が合図を下ろさないと、あとで作り直した面がまた奪います。
+		expect(done).toEqual([2]);
+	});
+
+	test('leaves the keyboard where it is when nobody asked', () => {
+		// **AI が開いた面や、タブを戻しただけの面で焦点を奪わない。**
+		// 検索欄で打っている途中に端末へ飛ぶと、打った字が端末へ流れます。
+		mount({ active: true });
+
+		expect(made[0].focused).toBe(0);
+	});
+
+	test('takes the keyboard once per request, not on every redraw', async () => {
+		// **同じ合図で 2 回奪わない。**親が下ろす前に描き直しが挟まっても 1 回。
+		const view = mount({ active: true, wantFocus: true });
+		await view.rerender({ active: true, wantFocus: true, fontPx: 14 });
+		expect(made[0].focused).toBe(1);
+
+		// 下ろして、また頼む（もう 1 枚開いた）。
+		await view.rerender({ active: true, wantFocus: false });
+		await view.rerender({ active: true, wantFocus: true });
+		expect(made[0].focused).toBe(2);
 	});
 
 	test('marks the pane the keystrokes go to', () => {

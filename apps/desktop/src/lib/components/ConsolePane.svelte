@@ -77,7 +77,19 @@
 		 * **`attachClipboard` の `handledElsewhere` と同じ形**にします ——
 		 * 型を合わせずに包むと、押しても何も起きない日が来ます。
 		 */
-		findIsOpen = () => false
+		findIsOpen = () => false,
+		/**
+		 * **打てる状態にしてほしい合図**（実機の指摘・2026-11-16）。
+		 *
+		 * > 端末を開くを押したあと、端末内にフォーカスがないのがかなりストレスです。
+		 * > 繋いだ後はやることが一つだからです
+		 *
+		 * 人が［端末を開く］を押したときだけ、親が立てます。入れたら `onfocused` で返し、
+		 * **親がすぐ下ろします** —— 立てたままだと、AI が開いた面やタブを戻しただけの面で
+		 * 焦点を奪い、検索欄で打っていた字が端末へ流れます。
+		 */
+		wantFocus = false,
+		onfocused = () => {}
 	}: {
 		pane: ConsolePane;
 		backlog?: number[];
@@ -93,6 +105,8 @@
 		onpick?: (id: number) => void;
 		onfailure?: (message: string) => void;
 		findIsOpen?: ClipboardOptions['handledElsewhere'];
+		wantFocus?: boolean;
+		onfocused?: (id: number) => void;
 	} = $props();
 
 	let host: HTMLDivElement | undefined = $state();
@@ -158,6 +172,19 @@
 			term.dispose();
 			term = undefined;
 		}
+	});
+
+	/** 立っている合図に応えたか。**同じ合図で 2 回奪わない**（描き直しが挟まっても）。 */
+	let answered = false;
+	$effect(() => {
+		if (!wantFocus) {
+			answered = false;
+			return;
+		}
+		if (!term || answered) return;
+		answered = true;
+		term.focus();
+		onfocused(pane.id);
 	});
 
 	// **字の大きさを揃える。**xterm.js は自前で描くので `rem` が効きません。

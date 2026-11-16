@@ -1143,12 +1143,20 @@
 	 * **打鍵は帯へ載せません。**1 キーずつ載せると帯が溢れ、
 	 * 受け取り待ちを挟むと端末が使い物になりません。開始と終了は載ります。
 	 */
+	/**
+	 * **人が開いた端末へ焦点を入れる合図**（2026-11-16）。開くたびに立て、
+	 * いま打鍵が行く面が入れたら下ろします（`ConsolePane` の `wantFocus`）。
+	 */
+	let focusWanted = $state(false);
+
 	async function openConsole() {
 		try {
 			// **大きさは部品が窓に追従して直します**（`attachFit`）。目安だけ渡します。
 			await invoke('console_open', { cols: 80, rows: 24 });
 			holder = 'human';
 			await refreshConsoles();
+			// **開いたら、そのまま打てる**（2026-11-16）。繋いだあとにやることは 1 つ。
+			focusWanted = true;
 		} catch (error: unknown) {
 			failure = String(error);
 		}
@@ -1174,6 +1182,7 @@
 			// **開いた面を、そのまま見せる。**開いたのに見えないのは、押せない釦と同じ。
 			chosenConsole = id;
 			await refreshConsoles();
+			focusWanted = true;
 		} catch (error: unknown) {
 			failure = String(error);
 		}
@@ -2628,6 +2637,8 @@
 									mark={session.all.find((held) => held.id === pane.connection)?.color ?? null}
 									fontPx={textSize.terminalPx}
 									active={layout.focused === pane.id}
+									wantFocus={focusWanted && layout.focused === pane.id}
+									onfocused={() => (focusWanted = false)}
 									iHold={pane.holder === 'human'}
 									findIsOpen={findFrom('console')}
 									onpick={(id) => (chosenConsole = id)}
