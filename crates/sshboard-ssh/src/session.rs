@@ -3,7 +3,7 @@
 //! **2 本目を張りません**（PRD §4-1「裏で見えないセッションを張らない」）。
 //! **すべての操作が帯に出ます**（PRD §4-2）。
 
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, RwLock};
 use std::time::Duration;
 
 use russh::client::{self, Handle};
@@ -195,7 +195,10 @@ pub struct SshSession {
     handle: Handle<Watcher>,
     band: Band,
     host_key: SeenHostKey,
-    write_scope: WriteScope,
+    /// **AI が書いてよい範囲**（D22）。繋いだあとでも差し替えられます ——
+    /// `connections.toml` で足した・外した場所が、繋ぎ直さずに効くように。
+    /// 写しのままにすると、**外したはずの場所に AI が書けたまま**になります。
+    write_scope: RwLock<WriteScope>,
 }
 
 impl SshSession {
@@ -332,7 +335,7 @@ impl SshSession {
             handle,
             band,
             host_key,
-            write_scope: target.write_scope.clone(),
+            write_scope: RwLock::new(target.write_scope.clone()),
         })
     }
 
@@ -341,9 +344,26 @@ impl SshSession {
         &self.host_key
     }
 
-    /// この接続で AI が書いてよい範囲。**人へ見せるため。**
-    pub fn write_scope(&self) -> &WriteScope {
-        &self.write_scope
+    /// この接続で AI が書いてよい範囲（いまの値の写し）。**人へ見せるため。**
+    ///
+    /// 錠が壊れていたら**書けない側**を返します（囲いを広げる側に倒さない）。
+    pub fn write_scope(&self) -> WriteScope {
+        self.write_scope
+            .read()
+            .map(|scope| scope.clone())
+            .unwrap_or_default()
+    }
+
+    /// AI が書いてよい範囲を差し替える。**繋ぎ直さずに効きます。**
+    pub fn set_write_scope(&self, scope: WriteScope) {
+        match self.write_scope.write() {
+            Ok(mut held) => *held = scope,
+            // 壊れた錠の中身は信用しない。新しい値で上書きして戻す。
+            Err(poisoned) => {
+                *poisoned.into_inner() = scope;
+                self.write_scope.clear_poison();
+            }
+        }
     }
 
     /// コマンドを実行し、**出た物すべてと終了コード**を返す。**先に帯へ出す**（D16）。
@@ -930,10 +950,11 @@ impl SshSession {
         if actor == Actor::Human {
             return Ok(());
         }
+        let scope = self.write_scope();
         let verdict = if as_dir {
-            self.write_scope.permits_dir(path)
+            scope.permits_dir(path)
         } else {
-            self.write_scope.permits(path)
+            scope.permits(path)
         };
         verdict.map_err(SshError::WriteRefused)
     }

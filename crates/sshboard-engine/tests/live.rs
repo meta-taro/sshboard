@@ -196,6 +196,76 @@ async fn opening_a_connection_publishes_it_and_carries_the_write_scope() {
     assert_eq!(engine.active().await.map(|o| o.id), Some("local".into()));
 }
 
+/// **書き込み先を足したら、繋いだままの接続にもすぐ効く。**
+///
+/// 一覧には足した場所が出ているのに、AI が書くと「許可の外」で断られ続け、
+/// 繋ぎ直すまで効かない、という報告があった。一覧が効いて見えるので、
+/// 人も AI も「まだ効いていない」とは気づけない。
+#[tokio::test]
+async fn a_write_root_added_while_connected_takes_effect_without_reconnecting() {
+    if !server_is_up().await {
+        println!("テスト用サーバーが建っていません（想定内・飛ばします）");
+        return;
+    }
+
+    let dir = tempfile::tempdir().expect("一時ディレクトリ");
+    let engine = engine_at(registry(&dir, &["/home/probe/upload"]).await);
+    engine
+        .connect(Actor::Human, "local", None)
+        .await
+        .expect("繋がらない");
+    assert!(!engine.ai_may_write("/home/probe/added/x.txt", false).await);
+
+    // 繋いだまま、外から一覧を書き換える。
+    registry(&dir, &["/home/probe/upload", "/home/probe/added"]).await;
+
+    assert!(
+        engine.ai_may_write("/home/probe/added/x.txt", false).await,
+        "足した場所が、繋いだままの接続に効いていない"
+    );
+    assert_eq!(
+        engine.active().await.map(|o| o.write.ai_roots),
+        Some(vec![
+            "/home/probe/upload".to_string(),
+            "/home/probe/added".to_string()
+        ]),
+        "人へ見せる許可の一覧が、判定と食い違っている"
+    );
+}
+
+/// **削った書き込み先には、繋いだままでも書けなくなる。**
+///
+/// 足した側より危ない —— 写しのままだと、人が外したはずの場所に AI が書けてしまう。
+#[tokio::test]
+async fn a_write_root_removed_while_connected_stops_ai_writes_at_once() {
+    if !server_is_up().await {
+        println!("テスト用サーバーが建っていません（想定内・飛ばします）");
+        return;
+    }
+
+    let dir = tempfile::tempdir().expect("一時ディレクトリ");
+    let engine = engine_at(registry(&dir, &["/home/probe/upload"]).await);
+    engine
+        .connect(Actor::Human, "local", None)
+        .await
+        .expect("繋がらない");
+    assert!(engine.ai_may_write("/home/probe/upload/x.txt", false).await);
+
+    registry(&dir, &[]).await;
+
+    assert!(
+        !engine.ai_may_write("/home/probe/upload/x.txt", false).await,
+        "外した場所に、繋いだままの AI がまだ書ける"
+    );
+    let refused = engine
+        .upload_bytes(Actor::Ai, "/home/probe/upload/removed.txt", b"x")
+        .await;
+    assert!(
+        matches!(refused, Err(EngineError::Ssh(SshError::WriteRefused(_)))),
+        "外した場所への AI の書き込みが断られていない: {refused:?}"
+    );
+}
+
 #[tokio::test]
 async fn what_the_engine_publishes_carries_no_host_and_no_user() {
     // **AI へホストと利用者名を渡さない**（CLAUDE.md 禁止事項 5）。

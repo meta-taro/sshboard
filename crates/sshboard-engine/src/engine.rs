@@ -371,6 +371,7 @@ impl Engine {
     /// 開いているもの全部。**タブに出すのはこれ**（D25）。
     pub async fn open_connections(&self) -> Vec<Opened> {
         self.drop_dead().await;
+        self.sync_write_scopes().await;
         let held = self.held.lock().await;
         held.live.values().map(|l| l.opened.clone()).collect()
     }
@@ -378,6 +379,7 @@ impl Engine {
     /// いま操作の宛先になっているもの。
     pub async fn active(&self) -> Option<Opened> {
         self.drop_dead().await;
+        self.sync_write_scopes().await;
         let held = self.held.lock().await;
         held.active
             .as_ref()
@@ -1982,6 +1984,7 @@ impl Engine {
     ///
     /// 繋がっていなければ `false`（**書けない側に倒す**）。
     pub async fn ai_may_write(&self, path: &str, as_dir: bool) -> bool {
+        self.sync_write_scopes().await;
         let Ok(session) = self.session().await else {
             return false;
         };
@@ -3027,6 +3030,7 @@ impl Engine {
     // --- 書き込み（D22） ----------------------------------------------------
 
     pub async fn ensure_dir(&self, actor: Actor, path: &str) -> Result<(), EngineError> {
+        self.sync_write_scopes().await;
         Ok(self.session().await?.ensure_dir(actor, path).await?)
     }
 
@@ -3036,6 +3040,7 @@ impl Engine {
         path: &str,
         bytes: &[u8],
     ) -> Result<u64, EngineError> {
+        self.sync_write_scopes().await;
         let session = self.session().await?;
         match session.upload(actor, path, bytes).await {
             Ok(written) => {
@@ -3137,6 +3142,47 @@ impl Engine {
     }
 
     // --- 接続一覧 -----------------------------------------------------------
+
+    /// **繋いだままの接続の書き込み範囲を、いまの `connections.toml` に合わせる。**
+    ///
+    /// 範囲を繋いだときの写しで持つと、一覧では足した場所が見えているのに
+    /// AI の書き込みは断られ続け、**外した場所には書けたまま**になります。
+    /// 判定の直前と、人へ許可の一覧を見せる直前に呼びます。
+    ///
+    /// 一覧が読めない・接続が消えた・指定が不正なときは**書けない側**に倒し、
+    /// **範囲が変わったときだけ**記録に残します（呼ぶたびに同じ行を積まない）。
+    async fn sync_write_scopes(&self) {
+        let loaded = Connections::load_or_empty(&self.connections_path)
+            .map_err(|error| format!("接続一覧を読めません: {error}"));
+        let mut held = self.held.lock().await;
+        let mut changed = false;
+        for (id, live) in held.live.iter_mut() {
+            let (scope, why_denied) = match current_write_scope(id, loaded.as_ref()) {
+                Ok(scope) => (scope, None),
+                Err(why) => (WriteScope::Denied, Some(why)),
+            };
+            if live.session.write_scope() == scope {
+                continue;
+            }
+            if let Some(why) = why_denied {
+                self.diag.error(
+                    Stage::Registry,
+                    Some(id),
+                    format!("{why}。AI の書き込みを止めました"),
+                    "connections.toml を直すと、繋ぎ直さずに戻ります",
+                );
+            }
+            live.opened.write.ai_roots = scope.roots().to_vec();
+            live.session.set_write_scope(scope);
+            changed = true;
+        }
+        if !changed {
+            return;
+        }
+        let all = held.live.values().map(|l| l.opened.clone()).collect();
+        drop(held);
+        let _ = self.changed.send_replace(all);
+    }
 
     fn entry(&self, id: &str) -> Result<ConnectionEntry, EngineError> {
         let connections = Connections::load_or_empty(&self.connections_path)
@@ -3370,4 +3416,19 @@ fn inspect_key_at(path: &str) -> KeyFacts {
             needs_passphrase: false,
         },
     }
+}
+
+/// 1 本分の、いま効かせる書き込み範囲。**書けない理由があれば `Err` で返す。**
+///
+/// 一覧から接続が消えたときは、理由なしで書けない側（人が外した結果なので異常ではない）。
+fn current_write_scope(
+    id: &str,
+    loaded: Result<&Connections, &String>,
+) -> Result<WriteScope, String> {
+    let connections = loaded.map_err(Clone::clone)?;
+    let Some(entry) = connections.get(id) else {
+        return Ok(WriteScope::Denied);
+    };
+    WriteScope::under(&entry.write_roots)
+        .map_err(|why| format!("書き込み許可の指定が不正です: {why}"))
 }
