@@ -2910,7 +2910,7 @@ async fn allowing_from_now_on_stays_with_that_connection_and_still_has_a_ceiling
 
     let _ = engine.run_operation(Actor::Ai, "whoami-root").await;
     engine
-        .answer_operation_standing(Actor::Human)
+        .answer_operation_standing(Actor::Human, None)
         .await
         .expect("今後も許可できない");
 
@@ -2927,13 +2927,13 @@ async fn allowing_from_now_on_stays_with_that_connection_and_still_has_a_ceiling
         ),
         "**plain の今後も許可が with-ask に付いてきた**: {elsewhere:?}"
     );
-    // **パスワードの要る問いには、今後も許可を付けられない。**
+    // **パスワードを入れずに、パスワードの要る問いへ今後も許可は付けられない。**
     assert!(
         engine
-            .answer_operation_standing(Actor::Human)
+            .answer_operation_standing(Actor::Human, None)
             .await
             .is_err(),
-        "**パスワードの要る操作を今後も許可できてしまう**"
+        "**パスワード無しで、パスワードの要る操作を今後も許可できてしまう**"
     );
     assert_eq!(
         engine.standing_allowances().await.len(),
@@ -3100,4 +3100,125 @@ async fn a_run_that_could_not_measure_keeps_the_last_measured_value() {
         .expect("回せない");
     let earlier = again.steps[0].previous.as_ref().expect("前回の値が消えた");
     assert_eq!(earlier.value, "42%");
+}
+
+// --- sudo のパスワードを毎回入れさせない（オーナーの指摘・2026-11-16）-----------
+//
+// 「1 回だけ許可」と毎回のパスワードでは、人が AI に任せる意味がありません。
+// **1 回入れて「今後も許可」を押せば、あとは人なしで回る**ことを測ります。
+
+#[tokio::test]
+async fn a_sudo_operation_allowed_for_good_runs_again_without_asking() {
+    if !server_is_up().await {
+        println!("テスト用サーバーが建っていません（想定内・飛ばします）");
+        return;
+    }
+    let dir = tempfile::tempdir().expect("一時ディレクトリ");
+    let engine = engine_at(registry_ask(&dir).await);
+    engine
+        .connect(Actor::Human, "pw", Some("sshboard-test-password".into()))
+        .await
+        .expect("パスワードで繋がらない");
+
+    let _ = engine.run_operation(Actor::Ai, "whoami-root").await;
+    engine
+        .answer_operation_standing(Actor::Human, Some("sshboard-test-password".into()))
+        .await
+        .expect("パスワードの要る操作を今後も許可できない");
+
+    for round in 0..3 {
+        let ran = engine
+            .run_operation(Actor::Ai, "whoami-root")
+            .await
+            .unwrap_or_else(|error| panic!("{round} 回目で止まった（人を待たせた）: {error:?}"));
+        assert_eq!(ran.out.trim(), "0", "{round} 回目: stderr={:?}", ran.err);
+        assert!(
+            engine.operation_request().is_none(),
+            "{round} 回目で人に聞いている"
+        );
+    }
+}
+
+#[tokio::test]
+async fn a_password_typed_once_is_not_asked_for_again_on_the_next_approval() {
+    if !server_is_up().await {
+        println!("テスト用サーバーが建っていません（想定内・飛ばします）");
+        return;
+    }
+    let dir = tempfile::tempdir().expect("一時ディレクトリ");
+    let engine = engine_at(registry_ask(&dir).await);
+    engine
+        .connect(Actor::Human, "pw", Some("sshboard-test-password".into()))
+        .await
+        .expect("パスワードで繋がらない");
+
+    let _ = engine.run_operation(Actor::Ai, "whoami-root").await;
+    engine
+        .answer_operation(Actor::Human, true, Some("sshboard-test-password".into()))
+        .await
+        .expect("人が許せない");
+    engine
+        .run_operation(Actor::Ai, "whoami-root")
+        .await
+        .expect("1 回目が走らない");
+
+    // 2 回目の問いには、**パスワードの欄を出さない**（覚えている）。
+    let again = engine.run_operation(Actor::Ai, "whoami-root").await;
+    assert!(
+        matches!(
+            again,
+            Err(EngineError::OperationApprovalNeeded {
+                needs_secret: false,
+                ..
+            })
+        ),
+        "**2 回目もパスワードを聞いている**: {again:?}"
+    );
+    engine
+        .answer_operation(Actor::Human, true, None)
+        .await
+        .expect("人が許せない");
+    let ran = engine
+        .run_operation(Actor::Ai, "whoami-root")
+        .await
+        .expect("2 回目が走らない");
+    assert_eq!(ran.out.trim(), "0", "stderr={:?}", ran.err);
+}
+
+#[tokio::test]
+async fn a_remembered_password_that_sudo_refuses_is_dropped_and_asked_again() {
+    if !server_is_up().await {
+        println!("テスト用サーバーが建っていません（想定内・飛ばします）");
+        return;
+    }
+    let dir = tempfile::tempdir().expect("一時ディレクトリ");
+    let engine = engine_at(registry_ask(&dir).await);
+    engine
+        .connect(Actor::Human, "pw", Some("sshboard-test-password".into()))
+        .await
+        .expect("パスワードで繋がらない");
+
+    let _ = engine.run_operation(Actor::Ai, "whoami-root").await;
+    engine
+        .answer_operation_standing(Actor::Human, Some("not-the-password".into()))
+        .await
+        .expect("今後も許可できない");
+    let ran = engine
+        .run_operation(Actor::Ai, "whoami-root")
+        .await
+        .expect("コマンド自体は返るはず（失敗で）");
+    assert!(!ran.succeeded(), "違うパスワードで通った");
+
+    // **違うものを食わせ続けない。**次は欄を出して聞き直す。
+    let next = engine.run_operation(Actor::Ai, "whoami-root").await;
+    assert!(
+        matches!(
+            next,
+            Err(EngineError::OperationApprovalNeeded {
+                needs_secret: true,
+                ..
+            })
+        ),
+        "**断られたパスワードを使い続けている**: {next:?}"
+    );
 }

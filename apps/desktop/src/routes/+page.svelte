@@ -464,10 +464,10 @@
 	 * 画面側に持つと、**次の問いまで居座ります。**
 	 */
 	/** **外すまで許可する**（D47 改・2026-10-26）。その接続で、外すまで尋ねない。 */
-	async function answerOperationStanding() {
+	async function answerOperationStanding(secret?: string) {
 		operationAsk = null;
 		try {
-			await invoke('operation_answer_standing');
+			await invoke('operation_answer_standing', { secret: secret ?? null });
 		} catch (error: unknown) {
 			failure = String(error);
 		}

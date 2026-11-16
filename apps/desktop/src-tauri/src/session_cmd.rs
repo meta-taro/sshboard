@@ -925,11 +925,14 @@ pub struct Standing {
 }
 
 /// **外すまで許可する。**いま出ている問いの操作を、その接続で。
-/// パスワードの要る問いは実行体が断ります（パスワードは保存しない・D48）。
+/// パスワードの要る問いは、入れたものを**アプリを閉じるまで覚えます**（ディスクには書かない）。
 #[tauri::command]
-pub async fn operation_answer_standing(engine: State<'_, Arc<Engine>>) -> Result<(), String> {
+pub async fn operation_answer_standing(
+    engine: State<'_, Arc<Engine>>,
+    secret: Option<String>,
+) -> Result<(), String> {
     engine
-        .answer_operation_standing(Actor::Human)
+        .answer_operation_standing(Actor::Human, secret)
         .await
         .map_err(|error| error.to_string())
 }

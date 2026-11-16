@@ -6,8 +6,8 @@ use std::sync::Arc;
 
 use sshboard_band::{Actor, Band};
 use sshboard_connections::{
-    drift_note, drifted, elevated, sudo_is_unavailable, sudo_needs_become, ConnectionEntry,
-    Connections, Elevation,
+    drift_note, drifted, elevated, sudo_is_unavailable, sudo_needs_become, sudo_refused_password,
+    ConnectionEntry, Connections, Elevation,
 };
 use sshboard_credentials::SecretStore;
 use sshboard_diag::{Diagnostics, Stage};
@@ -286,6 +286,12 @@ pub struct Engine {
     operation_approvals: Mutex<Vec<Approval>>,
     /// **今後も許可**している操作（保存しない・D47 改）。
     standing: Mutex<Vec<StandingAllowance>>,
+    /// **人が 1 回入れた sudo のパスワード**（接続ごと・2026-11-16）。
+    ///
+    /// 毎回入れさせると、人が AI に任せる意味がありません（オーナーの指摘）。
+    /// **ディスクには書きません。**アプリを終える・［AI を止める］・
+    /// sudo に断られた、のどれかで消えます。
+    sudo_secrets: Mutex<std::collections::HashMap<String, String>>,
     /// **期限付きの端末の許可**（保存しない・2026-11-16）。同時に 1 件だけ。
     console_grant: Mutex<Option<ConsoleGrant>>,
     /// 許可が出た・外れたことを配る。**出ている許可を、人が忘れないように**画面へ出し続けます。
@@ -355,6 +361,7 @@ impl Engine {
             transfer_feed,
             operation_approvals: Mutex::new(Vec::new()),
             standing: Mutex::new(Vec::new()),
+            sudo_secrets: Mutex::new(std::collections::HashMap::new()),
             console_grant: Mutex::new(None),
             console_grant_changed,
             operation_runs: Mutex::new(Vec::new()),
@@ -2359,6 +2366,13 @@ impl Engine {
         let on = asked.connection;
         self.operation_request.send_replace(None);
         if allow {
+            // **入れたパスワードは、この接続のあいだ覚えます**（毎回入れさせない）。
+            if let Some(typed) = secret.as_deref().filter(|typed| !typed.is_empty()) {
+                self.sudo_secrets
+                    .lock()
+                    .await
+                    .insert(on.clone(), typed.to_owned());
+            }
             let mut approvals = self.operation_approvals.lock().await;
             approvals.push(Approval {
                 id: id.clone(),
@@ -2380,7 +2394,11 @@ impl Engine {
 
     /// **今後も許可する**（D47 改・2026-10-26）。いま出ている問いの操作を、その接続で、
     /// 外すまで尋ねずに走らせます。**パスワードの要る問いには付けません**（D48）。
-    pub async fn answer_operation_standing(&self, actor: Actor) -> Result<(), EngineError> {
+    pub async fn answer_operation_standing(
+        &self,
+        actor: Actor,
+        secret: Option<String>,
+    ) -> Result<(), EngineError> {
         if actor != Actor::Human {
             // **AI が自分へ権限を渡せたら、承認の意味がありません。**
             return Err(EngineError::ConsoleApprovalNeeded);
@@ -2388,9 +2406,15 @@ impl Engine {
         let Some(asked) = self.operation_request.borrow().clone() else {
             return Ok(());
         };
-        if asked.needs_secret {
+        let typed = secret.filter(|typed| !typed.is_empty());
+        // **パスワードの要る操作も「今後も許可」できます**（2026-11-16・オーナーの指摘）。
+        // 1 回入れれば、この接続のあいだ覚えます（ディスクには書きません）。
+        if asked.needs_secret
+            && typed.is_none()
+            && self.sudo_secret(&asked.connection).await.is_none()
+        {
             return Err(EngineError::BadArgument(
-                "パスワードの要る操作は「今後も許可」できません。パスワードは保存しないので、毎回入れてください"
+                "sudo のパスワードを入れてから押してください（1 回入れれば、この接続のあいだ覚えます）"
                     .to_string(),
             ));
         }
@@ -2405,7 +2429,7 @@ impl Engine {
             }
         }
         // 出ている 1 回分も、そのまま通す（1 回の許可と同じ札を置く）。
-        self.answer_operation(Actor::Human, true, None).await?;
+        self.answer_operation(Actor::Human, true, typed).await?;
         self.diag.info(
             Stage::Exec,
             Some(&asked.connection),
@@ -2535,6 +2559,8 @@ impl Engine {
         drop(standing);
         // **まだ使われていない許可も全部引き取る**（止めたのに 1 回走る、を作らない）。
         self.operation_approvals.lock().await.clear();
+        // 覚えた sudo のパスワードも捨てます（止めたのに上がれる、を作らない）。
+        self.sudo_secrets.lock().await.clear();
         if count > 0 {
             self.diag.info(
                 Stage::Exec,
@@ -2616,13 +2642,21 @@ impl Engine {
 
         // **札を取るのは、承認が要るときか、秘密が要るとき。**
         // 人が自分で走らせるだけなら、承認も秘密も間に挟みません。
-        let mut approval = if actor != Actor::Human || raised.needs_secret {
+        // **覚えている sudo のパスワード**（この接続で、人が前に入れたもの）。
+        let remembered = if raised.needs_secret {
+            self.sudo_secret(&on).await
+        } else {
+            None
+        };
+        let secret_missing = raised.needs_secret && remembered.is_none();
+        let mut approval = if actor != Actor::Human || secret_missing {
             self.take_operation_approval(id, &on).await
         } else {
             None
         };
-        // **今後も許可**（D47 改）。パスワードの要らない操作で、その接続の分だけ。
-        if approval.is_none() && actor != Actor::Human && !raised.needs_secret {
+        // **今後も許可**（D47 改）。その接続の分だけ。パスワードの要る操作は、
+        // 覚えているときだけ（覚えていなければ欄を出して 1 回入れてもらう）。
+        if approval.is_none() && actor != Actor::Human && !secret_missing {
             let standing = self.standing.lock().await.contains(&StandingAllowance {
                 operation: id.to_owned(),
                 connection: on.clone(),
@@ -2649,12 +2683,13 @@ impl Engine {
         //    人が自分で走らせるときも同じです。**製品はパスワードを作れません。**
         //    ここで通すと、`sudo -S` に空を渡して落ちるだけで、
         //    **人には打ち込む場所が 1 つも出ません。**
-        if approval.is_none() && (actor != Actor::Human || raised.needs_secret) {
+        if approval.is_none() && (actor != Actor::Human || secret_missing) {
             // 画面へ出すのは、**上げ方を当てはめたあとの、実際に打つ文字列**です。
+            // 覚えているなら、欄は出しません（毎回入れさせない）。
             self.operation_request.send_replace(Some(OperationAsk {
                 id: operation.id.clone(),
                 runs: raised.command.clone(),
-                needs_secret: raised.needs_secret,
+                needs_secret: secret_missing,
                 connection: on.clone(),
             }));
             self.diag.info(
@@ -2665,7 +2700,7 @@ impl Engine {
             return Err(EngineError::OperationApprovalNeeded {
                 id: id.to_owned(),
                 connection: on,
-                needs_secret: raised.needs_secret,
+                needs_secret: secret_missing,
             });
         }
 
@@ -2677,6 +2712,7 @@ impl Engine {
         let fed = raised.needs_secret.then(|| {
             approval
                 .and_then(|held| held.secret)
+                .or(remembered)
                 .unwrap_or_default()
                 // sudo は 1 行として読みます。**改行が無いと待ち続けます。**
                 + "\n"
@@ -2727,6 +2763,22 @@ impl Engine {
         // `su -` で運用しているサーバーでは `operations.toml` は届かないのに、
         // 返ってくる字は「パスワードが与えられませんでした」です。
         // **人も AI も入れ直しにかかり、永久に通りません。**
+        // **sudo に断られたら、覚えたパスワードを捨てます。**違うものを
+        // 毎回食わせ続けると、サーバー側で締め出されます。次は欄を出して聞き直します。
+        if raised.needs_secret
+            && !ran.succeeded()
+            && sudo_refused_password(&ran.err)
+            && self.sudo_secrets.lock().await.remove(&on).is_some()
+        {
+            self.diag.warn(
+                Stage::Exec,
+                Some(&on),
+                format!(
+                    "{id}: sudo がパスワードを受け付けませんでした。覚えていたものを捨てたので、次は入れ直してもらいます"
+                ),
+            );
+        }
+
         if !ran.succeeded() && sudo_is_unavailable(&ran.err) {
             self.diag.warn(
                 Stage::Exec,
@@ -2772,6 +2824,11 @@ impl Engine {
             .iter()
             .position(|held| held.id == id && held.connection == connection)?;
         Some(approvals.remove(at))
+    }
+
+    /// この接続で覚えている sudo のパスワード（無ければ None）。
+    async fn sudo_secret(&self, connection: &str) -> Option<String> {
+        self.sudo_secrets.lock().await.get(connection).cloned()
     }
 
     /// **走ったことを記録する。**`max_per_hour` はこれを数えます。

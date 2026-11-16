@@ -450,7 +450,7 @@ describe('立ち上げ直したあとの繋ぎ直し（UI 案・5 枚目）', ()
 
 describe('今後も許可の配線（D47 改・2026-10-26）', () => {
 	test('the request dialog can allow from now on', () => {
-		expect(source).toContain("invoke('operation_answer_standing')");
+		expect(source).toContain("invoke('operation_answer_standing', { secret: secret ?? null })");
 		expect(source).toMatch(/onAllowStanding=\{/);
 	});
 

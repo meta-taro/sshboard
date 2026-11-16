@@ -184,10 +184,26 @@ describe('今後も許可（D47 改・2026-10-26）', () => {
 		expect(screen.getByText(i18n.t('operation.request.standing.note'))).toBeTruthy();
 	});
 
-	test('does not offer it when a password is needed, since the password is never kept', () => {
-		mountWith(true);
-		expect(
-			screen.queryByRole('button', { name: i18n.t('operation.request.standing') })
-		).toBeNull();
+	test('offers it even when a password is needed, so the person types it only once', async () => {
+		// **毎回パスワードを入れさせない**（オーナーの指摘・2026-11-16）。
+		const { onAllowStanding } = mountWith(true);
+		const field = secretField() as HTMLInputElement;
+		await fireEvent.input(field, { target: { value: 'typed-once' } });
+		await fireEvent.click(screen.getByRole('button', { name: i18n.t('operation.request.standing') }));
+		expect(onAllowStanding).toHaveBeenCalledWith('typed-once');
+		expect(field.value).toBe('');
+	});
+
+	test('does not keep allowing with an empty password box', async () => {
+		const { onAllowStanding } = mountWith(true);
+		await fireEvent.click(screen.getByRole('button', { name: i18n.t('operation.request.standing') }));
+		expect(onAllowStanding).not.toHaveBeenCalled();
+		expect(document.activeElement).toBe(secretField());
+	});
+
+	test('makes keeping it allowed the main button, since that is what saves the person work', () => {
+		mountWith(false);
+		const standing = screen.getByRole('button', { name: i18n.t('operation.request.standing') });
+		expect(standing.classList.contains('cta')).toBe(true);
 	});
 });

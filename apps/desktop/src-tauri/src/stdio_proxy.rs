@@ -43,7 +43,96 @@ pub const FLAG: &str = "--mcp-stdio-proxy";
 
 /// 本体が動いていないときに返す文面。**人が次に何をすればいいかを書く。**
 const NOT_RUNNING: &str =
-    "sshboard が動いていません。アプリを起動してから、もう一度お試しください。";
+    "sshboard を起動しようとしましたが、30 秒待っても繋がりませんでした。アプリが開いているか確かめてください。";
+
+/// **本体が居なければ、こちらで起こす**（2026-11-16・複数の席から）。
+///
+/// 「アプリを起動してから」と返すと、**人がアプリを開いて MCP を繋ぎ直す**手間が
+/// 毎回 1 つ増えました。人の手を減らすための製品なので、起こせるものは起こします。
+/// 起こしたあと、口が開くまでこれだけ待ちます（初回起動の鍵束の問いなどを見込む）。
+const LAUNCH_WAIT: std::time::Duration = std::time::Duration::from_secs(30);
+
+/// 起こしたあと、口が開いたかを見に行く間隔。
+const LAUNCH_POLL: std::time::Duration = std::time::Duration::from_millis(500);
+
+/// 起こすのは**中継 1 本につき 1 回だけ。**同時に来た呼びは、その 1 回の結果を待ちます。
+static LAUNCHED: tokio::sync::OnceCell<()> = tokio::sync::OnceCell::const_new();
+
+/// GUI として起こす道。macOS の `.app` の中なら、その束を `open -g` で開きます
+/// （束の外から実行体を直に叩くと、Dock や権限の扱いが違ってしまうため）。
+pub fn launch_command(exe: &std::path::Path) -> std::process::Command {
+    if let Some(bundle) = app_bundle_of(exe) {
+        let mut command = std::process::Command::new("open");
+        // `-g`: 前へ出さない（作業中の人の手元を奪わない）。
+        command.arg("-g").arg(bundle);
+        return command;
+    }
+    std::process::Command::new(exe)
+}
+
+/// `…/Foo.app/Contents/MacOS/foo` → `…/Foo.app`。束の中でなければ None。
+pub fn app_bundle_of(exe: &std::path::Path) -> Option<PathBuf> {
+    let macos = exe.parent()?;
+    let contents = macos.parent()?;
+    let bundle = contents.parent()?;
+    let is_bundle = macos.file_name()? == "MacOS"
+        && contents.file_name()? == "Contents"
+        && bundle.extension()? == "app";
+    is_bundle.then(|| bundle.to_path_buf())
+}
+
+/// 本体を GUI として起こす。**起こせたかだけ**を返します（口が開くのは別に待つ）。
+fn launch_app() -> bool {
+    // **試験の中では起こしません。**実行体が試験そのものなので、起こすと試験が試験を呼びます。
+    if cfg!(test) {
+        return false;
+    }
+    let Ok(exe) = std::env::current_exe() else {
+        return false;
+    };
+    let spawned = launch_command(&exe)
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .spawn();
+    match spawned {
+        Ok(_) => {
+            eprintln!("[sshboard] アプリが動いていなかったので、起動しました");
+            true
+        }
+        Err(error) => {
+            eprintln!("[sshboard] アプリを起動できません: {error}");
+            false
+        }
+    }
+}
+
+/// 起こしてから、`reachable` が真になるまで待つ（最長 `wait`）。
+pub async fn launch_then_wait<L, R, Fut>(
+    launch: L,
+    mut reachable: R,
+    wait: std::time::Duration,
+    every: std::time::Duration,
+) -> bool
+where
+    L: FnOnce() -> bool,
+    R: FnMut() -> Fut,
+    Fut: std::future::Future<Output = bool>,
+{
+    if !launch() {
+        return false;
+    }
+    let deadline = tokio::time::Instant::now() + wait;
+    loop {
+        if reachable().await {
+            return true;
+        }
+        if tokio::time::Instant::now() >= deadline {
+            return false;
+        }
+        tokio::time::sleep(every).await;
+    }
+}
 
 /// 合言葉が見つからないときの文面。
 const NO_TOKEN: &str = "sshboard の合言葉が見つかりません。アプリを一度起動すると作られます。";
@@ -157,7 +246,21 @@ fn read_token() -> Option<String> {
 
 /// 中継として走る。**戻ってきたら、そのまま終わります。**
 pub fn run() {
-    let Some(token) = read_token() else {
+    // **合言葉が無い＝一度も起動していない。**起こして、作られるのを待ちます。
+    let token = read_token().or_else(|| {
+        if !launch_app() {
+            return None;
+        }
+        let deadline = std::time::Instant::now() + LAUNCH_WAIT;
+        while std::time::Instant::now() < deadline {
+            std::thread::sleep(LAUNCH_POLL);
+            if let Some(token) = read_token() {
+                return Some(token);
+            }
+        }
+        None
+    });
+    let Some(token) = token else {
         // stderr は MCP クライアントのログに出ます。**stdout へ書かないこと**
         // — あそこは JSON-RPC の通り道で、混ぜると相手が構文誤りで落ちます。
         eprintln!("[sshboard] {NO_TOKEN}");
@@ -305,10 +408,26 @@ async fn exchange(
         let response = match send(client, url, token, held.clone(), line.clone()).await {
             Ok(response) => response,
             Err(error) => {
-                // **繋がらない理由を、人の言葉で返す。**
-                // ここが一番出やすい失敗（本体を起動していない）です。
-                eprintln!("[sshboard] {NOT_RUNNING}（{error}）");
-                return error_response(id, NOT_RUNNING).map(|line| vec![line]);
+                // **本体が居ない。**人に起動させず、こちらで起こして送り直します。
+                LAUNCHED
+                    .get_or_init(|| async {
+                        launch_then_wait(
+                            launch_app,
+                            || async { client.get(url).send().await.is_ok() },
+                            LAUNCH_WAIT,
+                            LAUNCH_POLL,
+                        )
+                        .await;
+                    })
+                    .await;
+                match send(client, url, token, held.clone(), line.clone()).await {
+                    Ok(response) => response,
+                    Err(_) => {
+                        // 起こしても繋がらない。**理由を人の言葉で返す。**
+                        eprintln!("[sshboard] {NOT_RUNNING}（{error}）");
+                        return error_response(id, NOT_RUNNING).map(|line| vec![line]);
+                    }
+                }
             }
         };
 
@@ -997,5 +1116,86 @@ mod session_tests {
             parsed.get("error").is_some(),
             "失敗を失敗として返していない: {answered:?}"
         );
+    }
+}
+
+#[cfg(test)]
+mod launching {
+    //! **本体が居なければ起こす**（2026-11-16）。人にアプリを開かせない。
+    use super::*;
+    use std::path::Path;
+    use std::sync::atomic::{AtomicU32, Ordering};
+    use std::time::Duration;
+
+    #[test]
+    fn the_app_bundle_is_found_from_the_executable_inside_it() {
+        let exe = Path::new("/Applications/sshboard.app/Contents/MacOS/sshboard");
+        assert_eq!(
+            app_bundle_of(exe),
+            Some(PathBuf::from("/Applications/sshboard.app"))
+        );
+    }
+
+    #[test]
+    fn an_executable_outside_a_bundle_is_started_directly() {
+        let exe = Path::new("/usr/local/bin/sshboard");
+        assert_eq!(app_bundle_of(exe), None);
+        assert_eq!(launch_command(exe).get_program(), exe.as_os_str());
+    }
+
+    #[test]
+    fn a_bundle_is_opened_in_the_background_without_taking_the_screen() {
+        let command = launch_command(Path::new(
+            "/Applications/sshboard.app/Contents/MacOS/sshboard",
+        ));
+        assert_eq!(command.get_program(), "open");
+        let args: Vec<_> = command.get_args().collect();
+        assert_eq!(args, ["-g", "/Applications/sshboard.app"]);
+    }
+
+    #[tokio::test]
+    async fn after_launching_it_waits_until_the_app_answers() {
+        let polls = AtomicU32::new(0);
+        let reached = launch_then_wait(
+            || true,
+            || {
+                let seen = polls.fetch_add(1, Ordering::SeqCst);
+                async move { seen >= 2 }
+            },
+            Duration::from_secs(5),
+            Duration::from_millis(1),
+        )
+        .await;
+        assert!(reached, "答えるようになったのに諦めた");
+        assert_eq!(polls.load(Ordering::SeqCst), 3);
+    }
+
+    #[tokio::test]
+    async fn it_gives_up_when_the_app_never_answers() {
+        let reached = launch_then_wait(
+            || true,
+            || async { false },
+            Duration::from_millis(20),
+            Duration::from_millis(5),
+        )
+        .await;
+        assert!(!reached);
+    }
+
+    #[tokio::test]
+    async fn it_does_not_wait_when_the_app_could_not_be_started() {
+        let polls = AtomicU32::new(0);
+        let reached = launch_then_wait(
+            || false,
+            || {
+                polls.fetch_add(1, Ordering::SeqCst);
+                async { true }
+            },
+            Duration::from_secs(5),
+            Duration::from_millis(1),
+        )
+        .await;
+        assert!(!reached);
+        assert_eq!(polls.load(Ordering::SeqCst), 0, "起こせなかったのに待った");
     }
 }

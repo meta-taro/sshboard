@@ -138,6 +138,19 @@ pub fn sudo_note(run: &str, how: Elevation, stderr: &str) -> Option<&'static str
     None
 }
 
+/// **sudo がパスワードを受け付けなかったか**（2026-11-16）。
+///
+/// 覚えたパスワードを捨てる合図に使います。違うものを食わせ続けると、
+/// サーバー側で締め出されます。`sudo` が無い形（[`sudo_is_unavailable`]）は
+/// パスワードの問題ではないので、ここでは拾いません。
+pub fn sudo_refused_password(stderr: &str) -> bool {
+    if sudo_is_unavailable(stderr) {
+        return false;
+    }
+    let said = stderr.to_ascii_lowercase();
+    said.contains("sudo") && (said.contains("password") || said.contains("パスワード"))
+}
+
 /// **サーバーが `sudo` を持っていない形跡か**（2026-09-25）。
 ///
 /// 実運用で 3 時間溶けました。**この製品は `sudo` しか組み立てません。**

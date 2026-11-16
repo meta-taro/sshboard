@@ -953,7 +953,7 @@ async fn allowing_from_now_on_lets_later_runs_through_without_asking() {
         &engine.run_operation(Actor::Ai, "reload-httpd").await
     ));
     engine
-        .answer_operation_standing(Actor::Human)
+        .answer_operation_standing(Actor::Human, None)
         .await
         .expect("人が今後も許可できない");
 
@@ -974,7 +974,7 @@ async fn the_standing_allowances_can_be_listed_and_taken_away() {
     let engine = engine_in(&dir);
     let _ = engine.run_operation(Actor::Ai, "reload-httpd").await;
     engine
-        .answer_operation_standing(Actor::Human)
+        .answer_operation_standing(Actor::Human, None)
         .await
         .expect("許可");
 
@@ -1002,7 +1002,7 @@ async fn stopping_the_ai_takes_every_standing_allowance_away() {
     let engine = engine_in(&dir);
     let _ = engine.run_operation(Actor::Ai, "reload-httpd").await;
     engine
-        .answer_operation_standing(Actor::Human)
+        .answer_operation_standing(Actor::Human, None)
         .await
         .expect("許可");
 
@@ -1020,7 +1020,10 @@ async fn only_a_person_can_allow_from_now_on() {
     let engine = engine_in(&dir);
     let _ = engine.run_operation(Actor::Ai, "reload-httpd").await;
     assert!(
-        engine.answer_operation_standing(Actor::Ai).await.is_err(),
+        engine
+            .answer_operation_standing(Actor::Ai, None)
+            .await
+            .is_err(),
         "**AI が自分に恒久許可を出せる**"
     );
     assert!(engine.standing_allowances().await.is_empty());

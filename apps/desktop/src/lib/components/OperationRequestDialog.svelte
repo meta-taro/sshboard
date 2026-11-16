@@ -54,9 +54,10 @@
 		onDeny: () => void;
 		/**
 		 * **外すまで許可する**（D47 改・2026-10-26）。渡されたときだけ釦を出します。
-		 * **パスワードの要る問いには出しません**（パスワードは保存しない・D48）。
+		 * **パスワードの要る問いにも出します**（2026-11-16）。入れたものは
+		 * アプリを閉じるまで実行体が覚え、ディスクには書きません。
 		 */
-		onAllowStanding?: () => void;
+		onAllowStanding?: (secret?: string) => void;
 	}
 	let { id, runs, needsSecret = false, connection, onAllow, onDeny, onAllowStanding }: Props =
 		$props();
@@ -73,17 +74,36 @@
 		denyButton?.focus();
 	});
 
-	function allow() {
-		// **空欄で許可させない。**空のまま渡すと、サーバー側で
-		// 「パスワードがありません」に落ちるだけで、**人には何が起きたか分かりません。**
+	/**
+	 * 入れたものを取り出して欄を空にする。**空欄なら欄へ戻して null。**
+	 * 空のまま渡すと、サーバー側で「パスワードがありません」に落ちるだけで、
+	 * **人には何が起きたか分かりません。**
+	 */
+	function takeSecret(): { typed: string | undefined } | null {
 		if (needsSecret && secret.length === 0) {
 			secretField?.focus();
-			return;
+			return null;
 		}
 		const typed = needsSecret ? secret : undefined;
 		// **画面からも消す。**渡したあとに残しておく理由がありません。
 		secret = '';
-		onAllow(typed);
+		return { typed };
+	}
+
+	function allow() {
+		const taken = takeSecret();
+		if (taken) onAllow(taken.typed);
+	}
+
+	function allowStanding() {
+		const taken = takeSecret();
+		if (taken) onAllowStanding?.(taken.typed);
+	}
+
+	/** Enter で進む先。**手間を減らす側（外すまで許可）**が在ればそちら。 */
+	function primary() {
+		if (onAllowStanding) allowStanding();
+		else allow();
 	}
 
 	function onKeydown(event: KeyboardEvent) {
@@ -144,7 +164,7 @@
 						// **Enter で許可します。**打ち終えた指がそのまま進めるように。
 						if (event.key === 'Enter') {
 							event.preventDefault();
-							allow();
+							primary();
 						}
 					}}
 				/>
@@ -152,7 +172,7 @@
 			<p class="note">{i18n.t('operation.request.secret.note')}</p>
 		{/if}
 
-		{#if onAllowStanding && !needsSecret}
+		{#if onAllowStanding}
 			<!-- **押す前に、どこまで効くかを言う。**別の接続には付いてこない。 -->
 			<p class="note">{i18n.t('operation.request.standing.note')}</p>
 		{/if}
@@ -161,14 +181,15 @@
 			<button type="button" bind:this={denyButton} onclick={onDeny}>
 				{i18n.t('operation.request.deny')}
 			</button>
-			{#if onAllowStanding && !needsSecret}
-				<button type="button" onclick={onAllowStanding}>
+			<button type="button" class:cta={!onAllowStanding} onclick={allow}>
+				{i18n.t('operation.request.allow')}
+			</button>
+			{#if onAllowStanding}
+				<!-- **主の釦。**人の手間を減らすのがこの製品の目的なので（2026-11-16）。 -->
+				<button type="button" class="cta" onclick={allowStanding}>
 					{i18n.t('operation.request.standing')}
 				</button>
 			{/if}
-			<button type="button" class="cta" onclick={allow}>
-				{i18n.t('operation.request.allow')}
-			</button>
 		</div>
 	</div>
 </div>
