@@ -3222,3 +3222,149 @@ async fn a_remembered_password_that_sudo_refuses_is_dropped_and_asked_again() {
         "**断られたパスワードを使い続けている**: {next:?}"
     );
 }
+
+// --- `{file}`：AI が置いたバッチを、AI が試しに回す（2026-11-16）-----------------
+//
+// 「AI が置いたバッチを試しに回して、cron に載せる」を、バッチごとに人が
+// 操作を書き足さずに済ませる。**渡せるのは書き込み先の下のパスだけ。**
+
+async fn registry_with_batch_runner(dir: &tempfile::TempDir) -> PathBuf {
+    let path = registry(dir, &["/home/probe/upload"]).await;
+    std::fs::write(
+        dir.path().join("operations.toml"),
+        "version = 1\n\n[[operation]]\nid = \"try-batch\"\n\
+         run = \"sh {file} --dry-run\"\ndescription = \"置いたバッチを試しに回す\"\nmax_per_hour = 20\n",
+    )
+    .expect("操作の一覧を書けない");
+    path
+}
+
+#[tokio::test]
+async fn the_ai_can_try_a_batch_it_placed_without_the_person_writing_a_new_operation() {
+    if !server_is_up().await {
+        println!("テスト用サーバーが建っていません（想定内・飛ばします）");
+        return;
+    }
+    let dir = tempfile::tempdir().expect("一時ディレクトリ");
+    let engine = engine_at(registry_with_batch_runner(&dir).await);
+    engine
+        .connect(Actor::Human, "local", None)
+        .await
+        .expect("繋がらない");
+
+    let batch = format!("/home/probe/upload/{}.sh", fresh_name("batch"));
+    engine
+        .upload_bytes(Actor::Ai, &batch, b"echo \"ran with $1\"\n")
+        .await
+        .expect("バッチを置けない");
+
+    // 1 回目は人に聞く。**見せるのは、パスを埋めたあとの文字列。**
+    let asked = engine
+        .run_operation_with(Actor::Ai, "try-batch", Some(&batch))
+        .await;
+    assert!(
+        matches!(asked, Err(EngineError::OperationApprovalNeeded { .. })),
+        "聞かずに走った: {asked:?}"
+    );
+    let shown = engine.operation_request().expect("問いが立っていない");
+    assert_eq!(shown.runs, format!("sh '{batch}' --dry-run"));
+
+    // 外すまで許可 → 以後は人なしで回る。
+    engine
+        .answer_operation_standing(Actor::Human, None)
+        .await
+        .expect("今後も許可できない");
+    let ran = engine
+        .run_operation_with(Actor::Ai, "try-batch", Some(&batch))
+        .await
+        .expect("許したのに走らない");
+    assert_eq!(ran.out.trim(), "ran with --dry-run", "stderr={:?}", ran.err);
+
+    // **別のバッチも、そのまま回る**（バッチごとに人が書き足さない）。
+    let another = format!("/home/probe/upload/{}.sh", fresh_name("batch"));
+    engine
+        .upload_bytes(Actor::Ai, &another, b"echo second\n")
+        .await
+        .expect("2 本目を置けない");
+    let ran = engine
+        .run_operation_with(Actor::Ai, "try-batch", Some(&another))
+        .await
+        .expect("2 本目で人を待たせた");
+    assert_eq!(ran.out.trim(), "second");
+}
+
+#[tokio::test]
+async fn a_file_outside_the_write_roots_is_refused_before_anything_runs() {
+    if !server_is_up().await {
+        println!("テスト用サーバーが建っていません（想定内・飛ばします）");
+        return;
+    }
+    let dir = tempfile::tempdir().expect("一時ディレクトリ");
+    let engine = engine_at(registry_with_batch_runner(&dir).await);
+    engine
+        .connect(Actor::Human, "local", None)
+        .await
+        .expect("繋がらない");
+
+    for outside in [
+        "/etc/passwd",
+        "/home/probe/upload/../.bashrc",
+        "relative.sh",
+    ] {
+        let refused = engine
+            .run_operation_with(Actor::Ai, "try-batch", Some(outside))
+            .await;
+        assert!(
+            matches!(refused, Err(EngineError::BadArgument(_))),
+            "{outside} を渡せてしまう: {refused:?}"
+        );
+    }
+    assert!(
+        engine.operation_request().is_none(),
+        "断るべきものを人に聞いている"
+    );
+    // file の要る操作に、file 無しでは呼べない。
+    assert!(matches!(
+        engine.run_operation(Actor::Ai, "try-batch").await,
+        Err(EngineError::BadArgument(_))
+    ));
+}
+
+#[tokio::test]
+async fn a_one_time_approval_runs_only_the_file_the_person_saw() {
+    if !server_is_up().await {
+        println!("テスト用サーバーが建っていません（想定内・飛ばします）");
+        return;
+    }
+    let dir = tempfile::tempdir().expect("一時ディレクトリ");
+    let engine = engine_at(registry_with_batch_runner(&dir).await);
+    engine
+        .connect(Actor::Human, "local", None)
+        .await
+        .expect("繋がらない");
+    let seen = format!("/home/probe/upload/{}.sh", fresh_name("seen"));
+    let swapped = format!("/home/probe/upload/{}.sh", fresh_name("swapped"));
+    for path in [&seen, &swapped] {
+        engine
+            .upload_bytes(Actor::Ai, path, b"echo hi\n")
+            .await
+            .expect("置けない");
+    }
+
+    let _ = engine
+        .run_operation_with(Actor::Ai, "try-batch", Some(&seen))
+        .await;
+    engine
+        .answer_operation(Actor::Human, true, None)
+        .await
+        .expect("人が許せない");
+
+    // **見せたものと違うパスでは、その札は使えない。**
+    let other = engine
+        .run_operation_with(Actor::Ai, "try-batch", Some(&swapped))
+        .await;
+    assert!(
+        matches!(other, Err(EngineError::OperationApprovalNeeded { .. })),
+        "人が見ていないパスで走った: {other:?}"
+    );
+}

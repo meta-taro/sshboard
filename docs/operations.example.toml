@@ -126,3 +126,30 @@ id = "nginx-reload"
 run = "sudo systemctl reload nginx"
 description = "nginx に設定を読み直させる（無停止・-t を先に通すこと）"
 max_per_hour = 6
+
+
+# --- AI が置いたバッチを試しに回して、cron に載せる（{file}・0.1.52）-----------
+#
+# run に {file} と書くと、AI は run_operation に file を 1 つ渡せます。
+# 渡せるのは **この接続の書き込み先（write_roots）の下のパスだけ** で、
+# 引用符で包んで埋めます（別のコマンドにはなりません）。
+# バッチを 1 本足すたびに、ここへ書き足す必要はありません。
+# 「外すまで許可する」を 1 回押せば、以後は人なしで回ります。
+
+[[operation]]
+id = "try-php-batch"
+run = "php {file} --dry-run"
+description = "AI が書き込み先に置いた PHP のバッチを、試しに（--dry-run で）回す"
+max_per_hour = 30
+
+[[operation]]
+id = "install-cron"
+run = "sudo install -m 0644 -o root -g root {file} /etc/cron.d/"
+description = "AI が書き込み先に置いた cron の定義を /etc/cron.d へ入れる（ファイル名はそのまま）"
+max_per_hour = 10
+
+[[operation]]
+id = "make-dir-as-apache"
+run = "sudo install -d -o apache -g apache {file}"
+description = "apache の持ち物の下に、apache の持ち物としてフォルダを作る"
+max_per_hour = 10

@@ -226,3 +226,44 @@ fn the_examples_contain_nothing_that_is_never_allowed() {
         }
     }
 }
+
+// --- `{file}`：AI が書き込み先のパスを 1 つ渡せる（2026-11-16）-----------------
+
+fn one(run: &str) -> sshboard_readonly::Operation {
+    let text = format!(
+        "version = 1\n\n[[operation]]\nid = \"x\"\nrun = \"{run}\"\ndescription = \"d\"\nmax_per_hour = 5\n"
+    );
+    sshboard_readonly::Operations::parse(&text)
+        .expect("読めない")
+        .get("x")
+        .expect("無い")
+        .clone()
+}
+
+#[test]
+fn an_operation_with_a_file_slot_says_it_takes_a_file() {
+    assert!(one("php {file} --dry-run").takes_file());
+    assert!(!one("pm2 list").takes_file());
+}
+
+#[test]
+fn the_path_is_quoted_so_it_cannot_become_another_command() {
+    let op = one("php {file} --dry-run");
+    assert_eq!(
+        op.with_file("/srv/app/batch/a b;rm x.php"),
+        "php '/srv/app/batch/a b;rm x.php' --dry-run"
+    );
+    assert_eq!(
+        op.with_file("/srv/it's.php"),
+        "php '/srv/it'\\''s.php' --dry-run"
+    );
+}
+
+#[test]
+fn a_cron_install_template_fills_in_the_file() {
+    let op = one("sudo install -m 0644 {file} /etc/cron.d/");
+    assert_eq!(
+        op.with_file("/srv/app/cron/collect-likes"),
+        "sudo install -m 0644 '/srv/app/cron/collect-likes' /etc/cron.d/"
+    );
+}

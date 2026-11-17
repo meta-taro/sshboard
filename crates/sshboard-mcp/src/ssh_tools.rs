@@ -234,14 +234,21 @@ impl SshboardMcp {
                        screen for them to allow or refuse; call it again once they have \
                        allowed it. **One approval runs it once** - unless the person chose \
                        \"allow until I take it away\" for that operation on that connection, \
-                       in which case it runs without asking until they take it away (never for \
-                       operations that need a password). There is also an hourly \
+                       in which case it runs without asking until they take it away (also for \
+                       sudo operations: the password typed once is remembered in memory for that \
+                       connection until the app quits or Stop AI). If the command contains \
+                       `{file}` (list_operations shows `takesFile`), pass `file`: a path under \
+                       this connection's write roots - typically a batch or cron file you \
+                       uploaded. It is single-quoted into the command; anything outside the \
+                       write roots is refused. This is how you try out a batch you placed and \
+                       install it into cron without the person writing a new operation for each \
+                       one. There is also an hourly \
                        ceiling per operation. Use list_operations to see what exists. \
                        This is also how you reach anything only root can read: if the \
                        human set `become = \"ask\"` on the connection, an operation whose \
                        command starts with `sudo` gets a password box on their screen, \
-                       and sshboard feeds what they type to sudo over stdin for that one \
-                       run. **You never see it and it is never stored.** If reading a \
+                       and sshboard feeds what they type to sudo over stdin. \
+                       **You never see it and it is never written to disk.** If reading a \
                        file fails with a permission error, say which path you could not \
                        read and suggest they add an operation for it - do not ask them to \
                        paste the contents to you."
@@ -259,7 +266,7 @@ impl SshboardMcp {
             &ct,
             engine.on(&request.connection_id, async {
                 engine
-                    .run_operation(Actor::Ai, &request.operation_id)
+                    .run_operation_with(Actor::Ai, &request.operation_id, request.file.as_deref())
                     .await
                     .map_err(refuse)
             }),
@@ -311,7 +318,9 @@ impl SshboardMcp {
         description = "List the state-changing operations the human has listed in \
                        operations.toml: their ids, what each one actually runs, the \
                        description the human wrote, and the hourly ceiling. **Empty until \
-                       a person writes that file** - sshboard ships with none."
+                       a person writes that file** - sshboard ships with none. \
+                       `takesFile: true` means the command contains `{file}`: pass a path \
+                       under this connection's write roots as `file` to run_operation."
     )]
     pub async fn list_operations(&self) -> Result<String, ErrorData> {
         self.show("list_operations").await?;
@@ -326,6 +335,8 @@ impl SshboardMcp {
                     "runs": held.run,
                     "description": held.description,
                     "maxPerHour": held.max_per_hour,
+                    // `{file}` が在る操作は、run_operation に file を 1 つ渡します。
+                    "takesFile": held.takes_file(),
                 })
             })
             .collect();
@@ -1362,6 +1373,11 @@ pub struct OperationId {
     pub connection_id: String,
     /// `operations.toml` に人が書いた id。
     pub operation_id: String,
+    /// **`run` に `{file}` が在る操作だけ。**書き込み先の下のパスを 1 つ（2026-11-16）。
+    ///
+    /// 引用符で包んで埋めます。書き込み先の外は断ります。
+    #[serde(default)]
+    pub file: Option<String>,
 }
 
 /// `propose_operation` の引数。

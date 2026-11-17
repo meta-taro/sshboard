@@ -10,7 +10,13 @@
 //! ## 崩していないもの
 //!
 //! **AI が渡せるのは id だけ**（D3）。`run` の文字列は**人が書いたもの**で、
-//! AI が組み立てる余地はありません。**引数のスロットを作りません。**
+//! AI が組み立てる余地はありません。
+//!
+//! **例外は 1 つだけ: `{file}`**（2026-11-16）。人が `run` に `{file}` と書いた操作には、
+//! AI が**書き込み先（AI が書ける所）の下のパス**を 1 つ渡せます。
+//! 「AI が置いたバッチを試しに回して、cron に載せる」を、バッチごとに人が
+//! 操作を書き足さずに済ませるためです。渡せるのはパスだけで、**引用符で包んで**
+//! 埋めるので、別のコマンドにはなりません。書き込み先の外は実行体が断ります。
 //!
 //! ## 製品が保証できないこと
 //!
@@ -64,7 +70,10 @@ const NEVER: [&str; 21] = [
     "rm -rf",
 ];
 
-/// 1 件。**`run` は人が書いた文字列**で、AI は触れません。
+/// `run` の中で、AI が渡すパスに置き換わる印。
+pub const FILE_SLOT: &str = "{file}";
+
+/// 1 件。**`run` は人が書いた文字列**で、AI は触れません（`{file}` を除く）。
 #[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
 pub struct Operation {
     /// AI が渡す識別子。**渡せるのはこれだけ。**
@@ -75,6 +84,25 @@ pub struct Operation {
     pub description: String,
     /// 1 時間あたりの上限。**暴走しても、ここで止まります。**
     pub max_per_hour: u32,
+}
+
+impl Operation {
+    /// AI がパスを 1 つ渡す操作か（`run` に `{file}` が在る）。
+    pub fn takes_file(&self) -> bool {
+        self.run.contains(FILE_SLOT)
+    }
+
+    /// `{file}` を、**引用符で包んだ**パスに置き換えた文字列。
+    ///
+    /// 包むので、パスに空白や `;` が在っても**別のコマンドにはなりません。**
+    pub fn with_file(&self, path: &str) -> String {
+        self.run.replace(FILE_SLOT, &shell_quoted(path))
+    }
+}
+
+/// sh の単一引用符で包む。中の `'` は `'\''` に直します。
+pub fn shell_quoted(text: &str) -> String {
+    format!("'{}'", text.replace('\'', "'\\''"))
 }
 
 /// 読めなかった理由。**空として扱わないため、種類を分けます。**
@@ -188,7 +216,9 @@ impl Operations {
 }
 
 /// **書いても弾くもの**に当たっていれば、当たった語を返す。
-fn never_allowed(run: &str) -> Option<&'static str> {
+///
+/// `{file}` に渡されたパスにも使います（`.ssh` の下などを渡させない）。
+pub fn never_allowed(run: &str) -> Option<&'static str> {
     let lowered = run.to_lowercase();
     NEVER.iter().copied().find(|word| lowered.contains(word))
 }

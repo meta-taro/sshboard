@@ -208,6 +208,9 @@ struct Approval {
     id: String,
     /// **人が許した接続。**許したあとで宛先が移っても、移った先では使いません。
     connection: String,
+    /// **人が見て許した、実際に打つ文字列。**`{file}` の操作では渡すパスで変わるので、
+    /// 見せたものと違うものを、この札で走らせません。
+    runs: String,
     /// いつ押されたか。**古い札を捨てるため**（[`APPROVAL_LIVES_FOR`]）。
     at: Instant,
     /// 人がその場で入れたもの（D48）。**保存しません。**
@@ -2364,6 +2367,7 @@ impl Engine {
         };
         let id = asked.id;
         let on = asked.connection;
+        let runs = asked.runs;
         self.operation_request.send_replace(None);
         if allow {
             // **入れたパスワードは、この接続のあいだ覚えます**（毎回入れさせない）。
@@ -2377,6 +2381,7 @@ impl Engine {
             approvals.push(Approval {
                 id: id.clone(),
                 connection: on.clone(),
+                runs,
                 at: Instant::now(),
                 secret,
             });
@@ -2581,10 +2586,25 @@ impl Engine {
     /// **人が許可するまで走りません。**1 回目は問いを立てて断り、
     /// 人が答えたあとにもう一度呼ばれると走ります（D42 と同じ形）。
     pub async fn run_operation(&self, actor: Actor, id: &str) -> Result<Ran, EngineError> {
+        self.run_operation_with(actor, id, None).await
+    }
+
+    /// [`Self::run_operation`] に、`{file}` へ入れるパスを添える（2026-11-16）。
+    ///
+    /// 渡せるのは**書き込み先（AI が書ける所）の下のパスだけ**で、引用符で包んで埋めます。
+    /// 「AI が置いたバッチを試しに回して、cron に載せる」を、バッチごとに
+    /// 人が操作を書き足さずに済ませるためです。
+    pub async fn run_operation_with(
+        &self,
+        actor: Actor,
+        id: &str,
+        file: Option<&str>,
+    ) -> Result<Ran, EngineError> {
         let listed = self.operations()?;
         let Some(operation) = listed.get(id) else {
             return Err(self.refuse_operation(actor, id, &listed).await);
         };
+        let run = self.operation_command(operation, file).await?;
 
         // **どうやって権限を得るか**（D48 / Issue #19）。
         //
@@ -2596,7 +2616,7 @@ impl Engine {
         // 上げ方は**接続ごとに人が書きます**。`sudo` で始まらないものは
         // 何も変わりません（`Elevation::None` なら、そもそも 1 文字も変わりません）。
         let how = self.elevation().await;
-        let raised = elevated(&operation.run, how);
+        let raised = elevated(&run, how);
         // **どの接続で走るか。**問いにも診断にも載せます（2 本開いていると割れなかった）。
         let on = self.target_id().await.unwrap_or_default();
 
@@ -2650,7 +2670,7 @@ impl Engine {
         };
         let secret_missing = raised.needs_secret && remembered.is_none();
         let mut approval = if actor != Actor::Human || secret_missing {
-            self.take_operation_approval(id, &on).await
+            self.take_operation_approval(id, &on, &raised.command).await
         } else {
             None
         };
@@ -2670,6 +2690,7 @@ impl Engine {
                 approval = Some(Approval {
                     id: id.to_owned(),
                     connection: on.clone(),
+                    runs: raised.command.clone(),
                     at: Instant::now(),
                     secret: None,
                 });
@@ -2814,7 +2835,12 @@ impl Engine {
     ///
     /// **秘密も札と一緒に出ていきます。**残すと、人が見ていない間に
     /// 何度でも権限を上げられます。
-    async fn take_operation_approval(&self, id: &str, connection: &str) -> Option<Approval> {
+    async fn take_operation_approval(
+        &self,
+        id: &str,
+        connection: &str,
+        runs: &str,
+    ) -> Option<Approval> {
         let mut approvals = self.operation_approvals.lock().await;
         // **古い札は、取る前に捨てます。**抱えている秘密ごと落とすため、
         // 「取れなかった」より先に**必ずここを通します。**
@@ -2822,8 +2848,51 @@ impl Engine {
         // **許した接続でだけ使う。**許したあとで宛先が移ったら、移った先では問い直す。
         let at = approvals
             .iter()
-            .position(|held| held.id == id && held.connection == connection)?;
+            .position(|held| held.id == id && held.connection == connection && held.runs == runs)?;
         Some(approvals.remove(at))
+    }
+
+    /// 実際に打つ文字列を決める。`{file}` の操作なら、渡されたパスを確かめて埋めます。
+    async fn operation_command(
+        &self,
+        operation: &sshboard_readonly::Operation,
+        file: Option<&str>,
+    ) -> Result<String, EngineError> {
+        let id = &operation.id;
+        match (operation.takes_file(), file) {
+            (false, None) => Ok(operation.run.clone()),
+            (false, Some(_)) => Err(EngineError::BadArgument(format!(
+                "{id} はファイルを取りません（run に {{file}} がありません）。file を付けずに呼んでください"
+            ))),
+            (true, None) => Err(EngineError::BadArgument(format!(
+                "{id} は file が要ります（書き込み先の下のパスを 1 つ）"
+            ))),
+            (true, Some(path)) => {
+                self.check_operation_file(path).await?;
+                Ok(operation.with_file(path))
+            }
+        }
+    }
+
+    /// `{file}` に渡されたパスが、**いまの書き込み先の下か**。外なら断ります。
+    async fn check_operation_file(&self, path: &str) -> Result<(), EngineError> {
+        if let Some(word) = sshboard_readonly::never_allowed(path) {
+            return Err(EngineError::BadArgument(format!(
+                "{path} は渡せません（{word} を含みます）"
+            )));
+        }
+        // 書き込み先は繋いだままでも足し引きされる（0.1.48）。**いまの値で見ます。**
+        self.sync_write_scopes().await;
+        self.session()
+            .await?
+            .write_scope()
+            .permits_dir(path)
+            .map_err(|refusal| {
+                EngineError::BadArgument(format!(
+                    "{path} は書き込み先の下ではありません。file に渡せるのは、\
+                     AI が書ける所（この接続の書き込み先）のパスだけです（{refusal}）"
+                ))
+            })
     }
 
     /// この接続で覚えている sudo のパスワード（無ければ None）。

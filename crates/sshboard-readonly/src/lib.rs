@@ -31,5 +31,7 @@ pub use allowlist::{Allowlist, AllowlistError, CURRENT_VERSION};
 pub use checks::{Check, Checks, ChecksError, Step, CHECKS_VERSION};
 pub use command::ReadonlyCommand;
 pub use judge::{Expect, Judged, StepOutcome, Verdict};
-pub use operations::{Operation, Operations, OperationsError};
+pub use operations::{
+    never_allowed, shell_quoted, Operation, Operations, OperationsError, FILE_SLOT,
+};
 pub use refusals::{Refusals, MAX_ID_CHARS};
