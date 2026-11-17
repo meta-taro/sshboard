@@ -591,17 +591,7 @@ impl Engine {
             .filter(|asked| asked.id == id)
             .ok_or_else(|| EngineError::NoHostKeyAsk(id.to_owned()))?;
 
-        let mut connections = Connections::load_or_empty(&self.connections_path)
-            .map_err(|error| EngineError::Connections(error.to_string()))?;
-        let entry = connections
-            .connections
-            .iter_mut()
-            .find(|one| one.id == id)
-            .ok_or_else(|| EngineError::UnknownConnection(id.to_owned()))?;
-        entry.fingerprint = Some(asked.fingerprint.clone());
-        connections
-            .save(&self.connections_path)
-            .map_err(|error| EngineError::Connections(error.to_string()))?;
+        self.save_fingerprint(id, &asked.fingerprint)?;
 
         self.host_key_request.send_replace(None);
         self.diag.info(
@@ -611,6 +601,30 @@ impl Engine {
         );
         let _ = self.show(actor, &format!("trust_host_key {id}")).await;
         Ok(())
+    }
+
+    /// 指紋を `connections.toml` のその接続へ書く。
+    fn save_fingerprint(&self, id: &str, fingerprint: &str) -> Result<(), EngineError> {
+        let mut connections = Connections::load_or_empty(&self.connections_path)
+            .map_err(|error| EngineError::Connections(error.to_string()))?;
+        let entry = connections
+            .connections
+            .iter_mut()
+            .find(|one| one.id == id)
+            .ok_or_else(|| EngineError::UnknownConnection(id.to_owned()))?;
+        entry.fingerprint = Some(fingerprint.to_owned());
+        connections
+            .save(&self.connections_path)
+            .map_err(|error| EngineError::Connections(error.to_string()))
+    }
+
+    /// 人が出した「これから増える接続」の許可が、この接続に効いているか。
+    async fn first_key_is_vouched_for(&self, id: &str) -> bool {
+        self.console_grant
+            .lock()
+            .await
+            .as_ref()
+            .is_some_and(|grant| grant.covers_new(id, Instant::now()))
     }
 
     /// **聞かれたホスト鍵を、人が断る**（Issue #26）。
@@ -796,8 +810,33 @@ impl Engine {
         // 誰がいつ開いたかが残らないなら、同じ 1 本を共有している意味がない。
         self.show(actor, &format!("connect {}", entry.id)).await?;
 
-        let session = SshSession::connect(&target, &auth, self.band.clone(), &self.diag)
-            .await
+        let first = SshSession::connect(&target, &auth, self.band.clone(), &self.diag).await;
+        // **使い捨ての機械の、初めてのホスト鍵**（2026-11-16・測定の席から）。
+        //
+        // VM は毎回新しく作るので、毎回「初めての相手」になり、そのたびに人が
+        // 画面で鍵を確かめるまで、課金中の機械が止まっていました。
+        // **人が先に「これから増える接続」の許可を出しているときだけ**、
+        // 初めての鍵をそのまま登録して繋ぎます。食い違い（すり替えの疑い）は受けません。
+        let first = match first {
+            Err(sshboard_ssh::SshError::UntrustedHost {
+                seen,
+                trust: sshboard_ssh::Trust::Unknown,
+            }) if self.first_key_is_vouched_for(&entry.id).await => {
+                self.save_fingerprint(&entry.id, &seen.fingerprint)?;
+                self.diag.info(
+                    Stage::HostKey,
+                    Some(&entry.id),
+                    "「これから増える接続」の許可があるので、初めてのホスト鍵を登録しました",
+                );
+                let pinned = Target {
+                    pinned_fingerprint: Some(seen.fingerprint.clone()),
+                    ..target
+                };
+                SshSession::connect(&pinned, &auth, self.band.clone(), &self.diag).await
+            }
+            other => other,
+        };
+        let session = first
             // **ホスト鍵の不一致だけは、構造のまま上へ返す。**
             // 文字列に潰すと、画面が「この指紋で登録しますか」を出せず、
             // 人がそこで行き止まりになる（**実際になった**）。

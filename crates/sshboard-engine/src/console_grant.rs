@@ -100,6 +100,15 @@ impl ConsoleGrant {
         }
     }
 
+    /// **「これから増える接続」の許可**が、その接続に効くか（2026-11-16）。
+    ///
+    /// 使い捨ての機械の**初めてのホスト鍵**を、人に聞かずに受けるかの判断に使います。
+    /// 1 台ずつの許可（`Connection`）では受けません —— 人が知っている接続の鍵が
+    /// 変わったなら、それは確かめるべきことだからです。
+    pub(crate) fn covers_new(&self, on: &str, now: Instant) -> bool {
+        matches!(self.scope, GrantScope::NewConnections) && self.covers(on, now)
+    }
+
     pub(crate) fn facts(&self, now: Instant) -> GrantFacts {
         GrantFacts {
             scope: self.scope.clone(),
@@ -116,6 +125,25 @@ mod tests {
 
     fn existing(ids: &[&str]) -> BTreeSet<String> {
         ids.iter().map(|id| (*id).to_owned()).collect()
+    }
+
+    #[test]
+    fn only_a_new_connections_grant_vouches_for_a_first_host_key() {
+        let now = Instant::now();
+        let fresh = ConsoleGrant::new(GrantScope::NewConnections, existing(&["prod"]), HOUR, now);
+        assert!(fresh.covers_new("vm-1", now));
+        assert!(
+            !fresh.covers_new("prod", now),
+            "前から在る接続の鍵まで受けた"
+        );
+        assert!(!fresh.covers_new("vm-1", now + HOUR), "期限後も受けた");
+        let one = ConsoleGrant::new(
+            GrantScope::Connection("vm-1".into()),
+            existing(&[]),
+            HOUR,
+            now,
+        );
+        assert!(!one.covers_new("vm-1", now), "1 台の許可で鍵を受けた");
     }
 
     #[test]

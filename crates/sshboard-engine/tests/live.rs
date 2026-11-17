@@ -3368,3 +3368,106 @@ async fn a_one_time_approval_runs_only_the_file_the_person_saw() {
         "人が見ていないパスで走った: {other:?}"
     );
 }
+
+// --- 使い捨ての VM：初めてのホスト鍵を、毎回人に聞かない（2026-11-16）-------------
+
+fn unpinned_entry(id: &str, key: &Path) -> String {
+    format!(
+        "[[connections]]\nid = \"{id}\"\nname = \"{id}\"\n\
+         host = \"{HOST}\"\nport = {PORT}\nuser = \"{USER}\"\n\
+         key_path = \"{}\"\n\n",
+        key.display()
+    )
+}
+
+#[tokio::test]
+async fn a_vm_added_under_a_new_connections_grant_connects_without_a_host_key_question() {
+    if !server_is_up().await {
+        println!("テスト用サーバーが建っていません（想定内・飛ばします）");
+        return;
+    }
+    let key = PathBuf::from(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../tools/test-server/.key"
+    ));
+    if !key.exists() {
+        println!("使い捨ての鍵がありません（想定内・飛ばします）");
+        return;
+    }
+    let dir = tempfile::tempdir().expect("一時ディレクトリ");
+    let path = dir.path().join("connections.toml");
+    // 許可を出す前から在る接続（人がふだん使う側）。
+    std::fs::write(
+        &path,
+        format!("version = 1\n\n{}", unpinned_entry("prod", &key)),
+    )
+    .expect("一覧を書けない");
+    let engine = engine_at(path.clone());
+
+    engine
+        .console_grant(
+            Actor::Human,
+            sshboard_engine::GrantScope::NewConnections,
+            std::time::Duration::from_secs(3600),
+        )
+        .await
+        .expect("許可を出せない");
+
+    // 許可のあとに、測定の VM が増える。
+    std::fs::write(
+        &path,
+        format!(
+            "version = 1\n\n{}{}",
+            unpinned_entry("prod", &key),
+            unpinned_entry("vm-1", &key)
+        ),
+    )
+    .expect("一覧を書けない");
+
+    engine
+        .connect(Actor::Ai, "vm-1", None)
+        .await
+        .expect("**新しい VM で、また鍵を聞いている**");
+    assert!(engine.host_key_request().is_none(), "問いが残っている");
+    let saved = std::fs::read_to_string(&path).expect("読めない");
+    assert!(
+        saved.contains("fingerprint"),
+        "受けた鍵を登録していない（次に食い違いを見分けられない）"
+    );
+
+    // **許可の前から在った接続は、元どおり人に聞く。**
+    let prod = engine.connect(Actor::Ai, "prod", None).await;
+    assert!(
+        matches!(prod, Err(EngineError::UntrustedHost { .. })),
+        "前から在る接続の鍵まで黙って受けた: {prod:?}"
+    );
+}
+
+#[tokio::test]
+async fn without_a_grant_a_new_vm_still_asks_about_its_host_key() {
+    if !server_is_up().await {
+        println!("テスト用サーバーが建っていません（想定内・飛ばします）");
+        return;
+    }
+    let key = PathBuf::from(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../tools/test-server/.key"
+    ));
+    if !key.exists() {
+        println!("使い捨ての鍵がありません（想定内・飛ばします）");
+        return;
+    }
+    let dir = tempfile::tempdir().expect("一時ディレクトリ");
+    let path = dir.path().join("connections.toml");
+    std::fs::write(
+        &path,
+        format!("version = 1\n\n{}", unpinned_entry("vm-1", &key)),
+    )
+    .expect("一覧を書けない");
+    let engine = engine_at(path);
+    let refused = engine.connect(Actor::Ai, "vm-1", None).await;
+    assert!(
+        matches!(refused, Err(EngineError::UntrustedHost { .. })),
+        "許可なしで初見の鍵を受けた: {refused:?}"
+    );
+}
