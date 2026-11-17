@@ -135,6 +135,19 @@ pub fn sudo_note(run: &str, how: Elevation, stderr: &str) -> Option<&'static str
              reconnect (or `become = \"sudoers\"` if the server allows it without a password).",
         );
     }
+    // **パスワードが違っていたのに「届いていない」と読まれた**（実機・2026-11-17）。
+    // 1 回渡して入力を閉じるので、sudo は「残念、また試してください」の次に読みに行って
+    // 何も無く、「与えられませんでした」と書きます。違うパスワードの言い方です。
+    if how == Elevation::Ask && sudo_refused_password(stderr) {
+        return Some(
+            "sudo did not accept the password the person typed. sshboard sends it exactly once \
+             and then closes input, so a wrong password shows up as \"no password was provided\" \
+             and \"1 incorrect password attempt\" - this is how sudo reports a WRONG password \
+             here, not a sign that it never arrived. Ask the person to check the password by \
+             running sudo in the terminal once, then try again. Do not retry in a loop: \
+             repeated failures can lock the account.",
+        );
+    }
     None
 }
 

@@ -2027,7 +2027,7 @@ async fn an_approval_only_opens_the_console_it_was_asked_for() {
 
 #[tokio::test]
 async fn the_agent_holds_one_console_while_the_person_holds_many() {
-    // **人は何本でも、AI は 1 本だけ**（D60）。
+    // **人は何本でも、AI は接続ごとに 1 本**（D60 を 2026-11-17 に改めた）。
     //
     // 本数を縛る理由は本数そのものではなく、
     // **人が「AI がいまどこで打っているか」を 1 つに決められる**ようにするため。
@@ -2058,23 +2058,13 @@ async fn the_agent_holds_one_console_while_the_person_holds_many() {
         .expect("人が 2 本目を開けない");
     assert_eq!(engine.console_list().await.len(), 2);
 
-    // **AI は 2 本目を握れない。**
-    //
-    // **しかも、人に問う前に断ります。**許可を取ってから断ると、
-    // 人は押しても通らない問いを押させられます。
+    // **人が握っている接続は、AI には渡らない**（頼めば人に聞く・奪わない）。
     let second = engine.console_open(Actor::Ai, None, 80, 24).await;
     assert!(
-        matches!(
-            second,
-            Err(EngineError::ConsoleOnOtherConnection { ref id }) if id == "first"
-        ),
-        "AI が 2 本目を握れてしまった: {second:?}"
+        matches!(second, Err(EngineError::ConsoleApprovalNeeded)),
+        "人が握っている端末を、聞かずに AI が取った: {second:?}"
     );
-    assert_eq!(
-        engine.console_request().await,
-        None,
-        "通らない頼みで人に問いを出した"
-    );
+    let _ = engine.console_answer(Actor::Human, false).await;
 
     // **一覧には、人が開いた分も含めて全部出る**（AI がここを読みます）。
     let open = engine.console_list().await;
@@ -3470,4 +3460,44 @@ async fn without_a_grant_a_new_vm_still_asks_about_its_host_key() {
         matches!(refused, Err(EngineError::UntrustedHost { .. })),
         "許可なしで初見の鍵を受けた: {refused:?}"
     );
+}
+
+// --- AI は接続ごとに 1 本（2026-11-17・測定の席から）-----------------------------
+//
+// AWS と GCP を並べて測るには、AI が 2 台で同時に端末を握れる必要がありました。
+// **1 つの接続で AI が握れるのは 1 本のまま**です（どこで打っているかは接続で決まる）。
+
+#[tokio::test]
+async fn the_agent_can_hold_consoles_on_two_connections_at_once() {
+    if !server_is_up().await {
+        println!("テスト用サーバーが建っていません（想定内・飛ばします）");
+        return;
+    }
+    let dir = tempfile::tempdir().expect("一時ディレクトリ");
+    let engine = engine_at(registry_pair(&dir).await);
+    for id in ["first", "second"] {
+        engine
+            .connect(Actor::Human, id, None)
+            .await
+            .expect("繋がらない");
+    }
+    engine.focus("first").await.expect("向けられない");
+    ai_console_open(&engine).await;
+    engine.focus("second").await.expect("向けられない");
+    ai_console_open(&engine).await;
+
+    let held: Vec<_> = engine
+        .console_list()
+        .await
+        .into_iter()
+        .filter(|one| one.holder == Actor::Ai)
+        .map(|one| one.connection)
+        .collect();
+    assert_eq!(held.len(), 2, "AI が 2 台で握れていない: {held:?}");
+
+    // **同じ接続で 2 本目は握らない。**
+    let more = engine.console_open_new(Actor::Ai, "second", 80, 24).await;
+    assert!(more.is_err(), "同じ接続で AI が 2 本握れた: {more:?}");
+
+    let _ = engine.console_stop(Actor::Human, None).await;
 }

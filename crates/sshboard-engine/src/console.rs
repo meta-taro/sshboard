@@ -210,16 +210,6 @@ impl Consoles {
         before - self.items.len()
     }
 
-    /// **その相手が握っている、立っている端末。**AI は全体で 1 本だけ（D60）。
-    ///
-    /// **数えるのは立っている端末だけ**です。許可だけ出ている段を数えると、
-    /// **人が許した直後に「既に握っています」と断る**ことになります。
-    pub(crate) fn up_held_by(&self, actor: Actor) -> Option<&OpenConsole> {
-        self.items
-            .iter()
-            .find(|open| open.holder == actor && open.is_up())
-    }
-
     /// **許可は出ているが、まだ端末を立てていないもの**（Issue #29）。
     pub(crate) fn may_open(&self, actor: Actor) -> Option<&OpenConsole> {
         self.items
@@ -404,7 +394,7 @@ mod tests {
         consoles.hold("a", Actor::Ai);
 
         assert!(consoles.facts().is_empty(), "立っていない端末が一覧に出た");
-        assert!(consoles.up_held_by(Actor::Ai).is_none());
+        assert!(consoles.held_by_on("a", Actor::Ai).is_none());
         assert!(consoles.may_open(Actor::Ai).is_some());
         assert!(consoles.room_on("a"), "許可だけで席が埋まった");
     }

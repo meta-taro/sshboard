@@ -245,9 +245,19 @@ fn the_ai_is_told_how_to_read_a_failed_sudo() {
         "{missing}"
     );
 
-    // ask で打ち間違えた。**入れ直せば通る**ので、何も添えない。
-    assert_eq!(
-        sudo_note("sudo pm2 list", Elevation::Ask, no_password),
-        None
-    );
+    // ask で打ち間違えた。**違うパスワードだと言う**（2026-11-17・「届いていない」と読まれた）。
+    let wrong = sudo_note("sudo pm2 list", Elevation::Ask, no_password)
+        .expect("違うパスワードだと言っていない");
+    assert!(wrong.contains("WRONG password"), "{wrong}");
+}
+
+#[test]
+fn a_refused_password_is_explained_as_a_wrong_password_not_a_lost_one() {
+    // 実機（2026-11-17）: パスワードが違っていたのに「届いていない」と読まれた。
+    let said = "sudo: パスワードが与えられませんでした\nsudo: 1 回パスワード試行を間違えました\n";
+    let note =
+        sshboard_connections::sudo_note("sudo cat /x", sshboard_connections::Elevation::Ask, said)
+            .expect("説明が付いていない");
+    assert!(note.contains("WRONG password"), "{note}");
+    assert!(note.contains("terminal"), "{note}");
 }

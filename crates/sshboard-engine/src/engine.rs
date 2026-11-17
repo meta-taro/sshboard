@@ -1297,30 +1297,11 @@ impl Engine {
     ) -> Result<ConsoleOpened, EngineError> {
         let target = self.console_target(on).await?;
 
-        // **AI が握れるのは、全体で 1 本だけ**（D60）。
+        // **AI が握れるのは、接続ごとに 1 本**（D60 を 2026-11-17 に改めた）。
         //
-        // 人は何本でも開けます。AI の本数を縛るのは、
-        // **人が「AI がいまどこで打っているか」を 1 つに決められる**ようにするため。
-        //
-        // **これは問う前に見ます。**許可を取ってから断ると、
-        // **人は押しても通らない問いを押させられます**（D42 は人を疲れさせない方針）。
-        if actor != Actor::Human {
-            let slot = self.console.lock().await;
-            if let Some(elsewhere) = slot.up_held_by(actor) {
-                if elsewhere.connection != target {
-                    let elsewhere = elsewhere.connection.clone();
-                    drop(slot);
-                    self.diag.error(
-                        Stage::Exec,
-                        Some(&target),
-                        format!("端末を開けません（{elsewhere} で既に握っています）"),
-                        "AI が握れるのは 1 本だけです（D60）。先に止めてください",
-                    );
-                    return Err(EngineError::ConsoleOnOtherConnection { id: elsewhere });
-                }
-            }
-        }
-
+        // 以前は全体で 1 本でした。測定の席から、AWS と GCP を並べて測れないと
+        // 報告があり、改めました。**どこで打っているかは接続で決まる**ので、
+        // 接続ごとに 1 本なら人は読み違えません。同じ接続の 2 本目は下で断ります。
         // **AI が握るには、人の許可が要る**（D42）。**サーバーへ行く前に**尋ねます。
         self.ask_first(actor, &target).await?;
 
@@ -1461,17 +1442,17 @@ impl Engine {
         cols: u32,
         rows: u32,
     ) -> Result<u64, EngineError> {
-        // **AI が握れるのは、全体で 1 本だけ**（D60）。問う前に見ます。
+        // **AI が握れるのは、接続ごとに 1 本**（D60 改）。問う前に見ます。
         if actor != Actor::Human {
-            if let Some(elsewhere) = self.console.lock().await.up_held_by(actor) {
-                let elsewhere = elsewhere.connection.clone();
+            let already = self.console.lock().await.held_by_on(on, actor);
+            if already.is_some() {
                 self.diag.error(
                     Stage::Exec,
                     Some(on),
-                    format!("端末を開けません（{elsewhere} で既に握っています）"),
-                    "AI が握れるのは 1 本だけです（D60）。先に止めてください",
+                    format!("端末を開けません（{on} では既に握っています）"),
+                    "AI が握れるのは接続ごとに 1 本です。いま握っている端末を使ってください",
                 );
-                return Err(EngineError::ConsoleOnOtherConnection { id: elsewhere });
+                return Err(EngineError::ConsoleOnOtherConnection { id: on.to_owned() });
             }
         }
         self.ask_first(actor, on).await?;

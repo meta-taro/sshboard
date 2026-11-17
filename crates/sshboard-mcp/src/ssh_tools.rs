@@ -1615,9 +1615,15 @@ impl SshboardMcp {
 
         serde_json::to_string(&serde_json::json!({
             "open": rows,
-            // **あなたが握っているのは 1 本だけ**（D60）。
+            // **最初の 1 本**（前からの形のまま残す）。接続ごとに 1 本握れるので、
+            // 全部は `youHoldAll` に並べます（D60 改・2026-11-17）。
             "youHold": mine,
             "youHoldConsole": mine_id,
+            "youHoldAll": open
+                .iter()
+                .filter(|held| held.holder == Actor::Ai)
+                .map(|held| serde_json::json!({ "id": held.id, "connection": held.connection }))
+                .collect::<Vec<_>>(),
             // **人の画面が向いている接続**（端末の面に限らない話）。
             "personIsLookingAt": focused,
             // **いま画面に並んでいる端末の番号。**`null` は画面がまだ言っていない。
