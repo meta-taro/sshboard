@@ -25,12 +25,12 @@ tool** — the fence does not protect the human's laptop, so no door is opened
 onto it.
 
 **Anything that changes state needs a human press.** The first attempt is
-always refused so the screen can show exactly what would run. Approvals expire
-in five minutes and cover one run.
+always refused so the screen can show exactly what would run. A person chooses
+to allow it until they take it away, or once (for five minutes).
 
 ## Connect sshboard as an MCP server
 
-The app must be running. This form starts sshboard as a relay with no window,
+If the app is not running, the relay starts it. This form starts sshboard as a relay with no window,
 so the token is never written to disk — not into `~/.claude.json`, not into
 shell history:
 

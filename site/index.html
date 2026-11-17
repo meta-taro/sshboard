@@ -98,7 +98,7 @@
         "name": "Does sshboard store my keys or passwords?",
         "acceptedAnswer": {
           "@type": "Answer",
-          "text": "No. Keys stay in your OS keychain and ssh-agent. A sudo password you type for one approved operation is passed to that one run and never stored."
+          "text": "No. Keys stay in your OS keychain and ssh-agent. A sudo password is typed once and kept only in memory for that connection, until you quit the app or press Stop AI. It is never written to disk."
         }
       },
       {
@@ -169,7 +169,7 @@
           <li data-t="fence.2"><b>Read-only commands come from a list you wrote.</b> <code>readonly.toml</code> starts empty, so out of the box the agent cannot run a single command.</li>
           <li data-t="fence.3"><b>Writes are fenced to directories you listed,</b> per connection. That list also starts empty. Upload and mkdir only — no delete, rename, move, chmod, service restart or package install.</li>
           <li data-t="fence.4"><b>There is no download-to-my-machine tool.</b> The fence does not protect your laptop, so the agent doesn't get a door onto it.</li>
-          <li data-t="fence.5"><b>State-changing operations need a human press,</b> and the first attempt is always refused so the screen can show you exactly what would run. Approvals expire in 5 minutes and cover one run.</li>
+          <li data-t="fence.5"><b>State-changing operations need a human press,</b> and the first attempt is always refused so the screen can show you exactly what would run. You choose: <b>allow until you take it away</b>, or <b>once</b> (for five minutes).</li>
           <li data-t="fence.6"><b>Keys stay in the OS credential store and ssh-agent.</b> sshboard does not implement a key store, and the tool that lists connections returns identifiers, never credentials.</li>
           </ul>
         </div>
@@ -235,7 +235,7 @@
           <li data-t="howto.2"><b>Open it.</b> It becomes a tab. Several can be open at once, and every one of them is visible. If a key needs a passphrase, the question appears on your screen — the agent cannot answer it.</li>
           <li data-t="howto.3"><b>Work in Files or Console.</b> Both run over that same connection. Nothing the agent does happens on a different one.</li>
           <li data-t="howto.4"><b>Point your agent at it</b> (below). Ask it to look at something. What it runs appears in Activity as it happens, and its output appears in the same Console you are watching.</li>
-          <li data-t="howto.5"><b>Approve what changes things.</b> Reading is fenced by an allow-list you wrote. Anything that changes state is refused the first time and shown to you in full before it can run — and the approval is good for one run, for five minutes.</li>
+          <li data-t="howto.5"><b>Approve what changes things.</b> Reading is fenced by an allow-list you wrote. Anything that changes state is refused the first time and shown to you in full before it can run — and the approval lasts <b>until you take it away</b> or <b>for one run</b>, your choice.</li>
           </ol>
           <div class="note" data-t="howto.empty"><b>Out of the box the agent can do nothing at all.</b> The read-only allow-list starts
         empty, the write directories start empty, and the list of state-changing operations starts
@@ -348,7 +348,7 @@
         <div class="wrap">
           <div class="section-head">
             <h2 data-t="h.agent">Connect your agent</h2>
-            <p data-t="agent.intro">Point your agent at the running app. This form starts sshboard as a relay with no window, so
+            <p data-t="agent.intro">Point your agent at the app — if it is not running, it is started for you. This form starts sshboard as a relay with no window, so
         <b>the token is never written to disk</b> — not into <code>~/.claude.json</code>, not into
         your shell history.</p>
           </div>
@@ -422,7 +422,7 @@ claude mcp add --scope user sshboard -- "%LOCALAPPDATA%\\sshboard\\sshboard.exe"
             Read-only commands from an allow-list<br />
             Health checks a person writes, run by either side<br />
             Approved state-changing operations<br />
-            <code>sudo</code> with a password nobody stores<br />
+            <code>sudo</code> with a password never written to disk<br />
             Terminal shared with a stop button<br />
             The agent woken when you answer (Claude Code channels)<br />
             Auto-update · Apple Silicon and Intel Macs</p></div>
@@ -447,7 +447,7 @@ claude mcp add --scope user sshboard -- "%LOCALAPPDATA%\\sshboard\\sshboard.exe"
         <details><summary data-t="faq.q1">What is sshboard?</summary><p data-t="faq.a1">A desktop SSH client with an MCP server built in. You and your AI agent look at the same server, on the same screen, over one SSH connection, and everything the agent does appears in your window as it happens.</p></details>
         <details><summary data-t="faq.q2">Can the agent run any command it likes?</summary><p data-t="faq.a2">No. There is no tool that takes a command line. The agent can use read-only tools, run commands a person listed in readonly.toml by id, and ask to run operations a person listed in operations.toml — each of those asks you on screen first.</p></details>
         <details><summary data-t="faq.q3">Where can the agent write files?</summary><p data-t="faq.a3">Only inside the directories you list for each connection. The list is empty by default, so it writes nothing until you add one. It cannot delete, rename or download files to your machine.</p></details>
-        <details><summary data-t="faq.q4">Does sshboard store my keys or passwords?</summary><p data-t="faq.a4">No. Keys stay in your OS keychain and ssh-agent. A sudo password you type for one approved operation is passed to that one run and never stored.</p></details>
+        <details><summary data-t="faq.q4">Does sshboard store my keys or passwords?</summary><p data-t="faq.a4">No. Keys stay in your OS keychain and ssh-agent. A sudo password is typed once and kept only in memory for that connection, until you quit the app or press Stop AI. It is never written to disk.</p></details>
         <details><summary data-t="faq.q5">Which agents and systems does it work with?</summary><p data-t="faq.a5">Any MCP client; Claude Code is the one it is tested with. The app runs on macOS (Apple Silicon and Intel) and Windows (x64 and ARM64).</p></details>
         </div>
       </section>

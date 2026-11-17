@@ -285,16 +285,34 @@ max_per_hour = 3
 | `description` | **shown on the approval dialog.** Words you will understand in six months |
 | `max_per_hour` | hourly ceiling. **`0` is rejected** (there has to be a place it stops) |
 
+### Passing a file (`{file}`)
+
+Write `{file}` in `run` and the agent may pass **one path** with the id. It is accepted
+only **under that connection's write directories** and is single-quoted before it is
+typed, so it cannot add a second command. This is how the agent tries a batch it
+uploaded and then installs it into cron **without anyone adding a new operation each time**:
+
+```toml
+[[operation]]
+id = "try-php-batch"
+run = "php {file} --dry-run"
+description = "dry-run a batch the agent uploaded"
+max_per_hour = 10
+```
+
+More in [`docs/operations.example.toml`](docs/operations.example.toml).
+
 ### Gates it passes through before running
 
 1. **It is in the list a person wrote.** Unknown ids are refused, and the refusal is recorded
 2. **It is under the hourly ceiling**
 3. **A person approves it on screen.** The agent's first call is always refused, and the
    window shows **what would actually run**
-4. **An approval is spent once.** One approval, one run
-5. **An approval expires after five minutes.** People press allow and the agent never
-   calls back (the conversation moves on). **We do not leave approvals lying around** —
-   with `become = "ask"`, **the password is dropped here too**
+4. **You choose how long it lasts.** **[Allow until I take it away]** (the default
+   button) stops asking for that operation on that connection — take it back from the
+   menu, and **[Stop AI] takes every one of them back.** **[Allow once]** is one run
+5. **A one-time approval expires after five minutes.** People press allow and the agent
+   never calls back (the conversation moves on). **We do not leave those lying around**
 
 **A person at the screen does not pass 3–5.** They are looking at it.
 **The one exception is the `become = "ask"` password** — that is not approval, it is a
@@ -367,10 +385,13 @@ route **was never open.** That is what `ask` is for.
 
 A password field appears on the approval dialog and **a person types it there.**
 
-- **Never stored.** Not on disk, not in the OS credential store
+- **Typed once, kept in memory** for that connection until you quit the app or press
+  [Stop AI] — so an operation you allowed until revoked does not ask again.
+  **Never written to disk**, not even to the OS credential store
 - **Never on the command line.** It goes in over stdin, so it does not show up in `ps`
 - **Never on screen and never in the log.** What appears is `$ sudo -S -p '' …` and no more
-- **One approval, one run.** Dropped the instant it is used
+- **If sudo rejects it, it is dropped** and the field appears again — a wrong password is
+  never fed to sudo twice, and the agent is told it was a wrong password
 - **Refuse, and it is dropped there and then**
 
 **Reading a log only root can read** works the same way:
@@ -407,7 +428,7 @@ answer. With nobody there, the operation does not run.
 |---|---|
 | Let the agent write outside the fence | The person sets where it may write, per connection. Empty by default = not one byte |
 | Give the agent arbitrary commands | An allowlist prevents it structurally |
-| Give the agent sudo | Raising privileges happens only inside operations the person wrote in `operations.toml`; the password is typed by the person for that one run and never stored |
+| Give the agent sudo | Raising privileges happens only inside operations the person wrote in `operations.toml`; the password is typed by the person, kept in memory only until the app quits or [Stop AI], and never written to disk |
 | Build our own key store | Delegate to the OS credential store and ssh-agent. What you do not hold, you need not guard |
 | Embed an AI chat UI | The agent lives outside the app |
 | Generate reports | If it can read, the agent writes the proposal. Nothing to add |
@@ -477,8 +498,8 @@ the running app.
 
 - **The token appears neither in `~/.claude.json` nor in your shell history**
 - Move the port (`SSHBOARD_MCP_PORT`) and **you do not have to re-register**
-- If the app is not running you get: "**sshboard is not running. Start the app and try
-  again.**"
+- **If the app is not running, the relay starts it** (in the background) and waits for it
+  to come up. You do not have to open sshboard before your agent
 
 **Only the app opens SSH connections.** The relay holds no engine and no band.
 **It adds not one invisible SSH session** (prohibition 3).
@@ -562,7 +583,8 @@ guaranteed here is that the update came from us.
 - **The `run_readonly` allowlist is empty by default** too. Nothing runs until a person
   writes `readonly.toml`. The purpose-built tools (`disk_usage` and friends) work without it
 - **The terminal is shared between you and the agent.** While the agent holds it your
-  input is locked out, and **[Stop] always works**
+  input is locked out, and **[Stop] always works**. The agent can hold one console per
+  connection, so it can work on two servers side by side — each in its own tab
 - **Installers are attached to each Release** (D32).
   Windows gets `.msi` and an NSIS `-setup.exe`, macOS gets a `.dmg`.
   **They are unsigned, so Windows shows SmartScreen and macOS shows Gatekeeper.**
