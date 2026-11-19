@@ -3501,3 +3501,164 @@ async fn the_agent_can_hold_consoles_on_two_connections_at_once() {
 
     let _ = engine.console_stop(Actor::Human, None).await;
 }
+
+// --- 書き込み先の中での改名・削除（Issue #27・2026-11-19） --------------------
+//
+// `write_file` で中身を潰せるのに、ファイルを消す・名前を変えることはできなかった。
+// `.bak` へ退避するだけで端末を開き、人の許可を待つことになっていた。
+// **囲いは動かさない。**移動元と移動先の両方を書き込み先で検査し、ファイル 1 つだけ。
+
+async fn connected_with_upload_root() -> (tempfile::TempDir, Engine, String) {
+    let dir = tempfile::tempdir().expect("一時ディレクトリ");
+    let engine = engine_at(registry(&dir, &["/home/probe/upload"]).await);
+    engine
+        .connect(Actor::Human, "local", None)
+        .await
+        .expect("繋がらない");
+    let base = format!("/home/probe/upload/{}", fresh_name("tidy"));
+    engine
+        .ensure_dir(Actor::Ai, &base)
+        .await
+        .expect("囲いの中なのに作れない");
+    (dir, engine, base)
+}
+
+#[tokio::test]
+async fn the_agent_can_move_a_file_aside_inside_the_write_roots() {
+    if !server_is_up().await {
+        println!("テスト用サーバーが建っていません（想定内・飛ばします）");
+        return;
+    }
+    let (_dir, engine, base) = connected_with_upload_root().await;
+    let from = format!("{base}/tenant.json");
+    let to = format!("{base}/tenant.json.bak");
+    engine
+        .upload_bytes(Actor::Ai, &from, b"{\"keep\":true}")
+        .await
+        .expect("上げられない");
+
+    engine
+        .rename_file(Actor::Ai, &from, &to)
+        .await
+        .expect("囲いの中なのに名前を変えられない");
+
+    let back = engine
+        .read_file(Actor::Human, &to)
+        .await
+        .expect("新しい名前で読めない");
+    assert_eq!(back, b"{\"keep\":true}", "中身が変わった");
+    assert!(
+        engine.read_file(Actor::Human, &from).await.is_err(),
+        "元の名前のファイルが残っている"
+    );
+}
+
+#[tokio::test]
+async fn a_rename_that_leaves_or_enters_from_outside_the_write_roots_is_refused() {
+    if !server_is_up().await {
+        println!("テスト用サーバーが建っていません（想定内・飛ばします）");
+        return;
+    }
+    let (_dir, engine, base) = connected_with_upload_root().await;
+    let inside = format!("{base}/stay.txt");
+    engine
+        .upload_bytes(Actor::Ai, &inside, b"stay")
+        .await
+        .expect("上げられない");
+
+    // **囲いの外へ運び出せない。**
+    let out = engine
+        .rename_file(Actor::Ai, &inside, "/home/probe/carried-out.txt")
+        .await;
+    assert!(
+        matches!(out, Err(EngineError::Ssh(SshError::WriteRefused(_)))),
+        "囲いの外へ運び出せている: {out:?}"
+    );
+    // **囲いの外から持ち込めない**（外のファイルを動かすのも書き込み）。
+    let into = engine
+        .rename_file(Actor::Ai, "/home/probe/.bashrc", &format!("{base}/bashrc"))
+        .await;
+    assert!(
+        matches!(into, Err(EngineError::Ssh(SshError::WriteRefused(_)))),
+        "囲いの外のファイルを動かせている: {into:?}"
+    );
+    assert_eq!(
+        engine
+            .read_file(Actor::Human, &inside)
+            .await
+            .expect("消えた"),
+        b"stay"
+    );
+}
+
+#[tokio::test]
+async fn a_rename_never_overwrites_a_file_that_is_already_there() {
+    if !server_is_up().await {
+        println!("テスト用サーバーが建っていません（想定内・飛ばします）");
+        return;
+    }
+    let (_dir, engine, base) = connected_with_upload_root().await;
+    let from = format!("{base}/new.conf");
+    let to = format!("{base}/live.conf");
+    engine
+        .upload_bytes(Actor::Ai, &from, b"new")
+        .await
+        .expect("上げられない");
+    engine
+        .upload_bytes(Actor::Ai, &to, b"live")
+        .await
+        .expect("上げられない");
+
+    let refused = engine.rename_file(Actor::Ai, &from, &to).await;
+    assert!(refused.is_err(), "既にあるファイルを潰して名前を変えた");
+    assert_eq!(
+        engine.read_file(Actor::Human, &to).await.expect("読めない"),
+        b"live"
+    );
+    assert_eq!(
+        engine
+            .read_file(Actor::Human, &from)
+            .await
+            .expect("読めない"),
+        b"new"
+    );
+}
+
+#[tokio::test]
+async fn the_agent_can_remove_one_file_but_not_a_directory_or_anything_outside() {
+    if !server_is_up().await {
+        println!("テスト用サーバーが建っていません（想定内・飛ばします）");
+        return;
+    }
+    let (_dir, engine, base) = connected_with_upload_root().await;
+    let gone = format!("{base}/old.json");
+    engine
+        .upload_bytes(Actor::Ai, &gone, b"old")
+        .await
+        .expect("上げられない");
+
+    engine
+        .remove_file(Actor::Ai, &gone)
+        .await
+        .expect("囲いの中のファイルを消せない");
+    assert!(
+        engine.read_file(Actor::Human, &gone).await.is_err(),
+        "消したはずのファイルが残っている"
+    );
+
+    // **ディレクトリは消さない。**間違えたときの幅が違う。
+    let sub = format!("{base}/keep-dir");
+    engine.ensure_dir(Actor::Ai, &sub).await.expect("作れない");
+    let dir_refused = engine.remove_file(Actor::Ai, &sub).await;
+    assert!(dir_refused.is_err(), "ディレクトリを消せている");
+    engine
+        .list_dir(Actor::Human, &sub)
+        .await
+        .expect("ディレクトリが消えている");
+
+    let outside = engine.remove_file(Actor::Ai, "/home/probe/.bashrc").await;
+    assert!(
+        matches!(outside, Err(EngineError::Ssh(SshError::WriteRefused(_)))),
+        "囲いの外を消せている: {outside:?}"
+    );
+}

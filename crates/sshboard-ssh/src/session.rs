@@ -158,6 +158,23 @@ fn sftp_failure(path: &str, error: russh_sftp::client::error::Error) -> SshError
     }
 }
 
+/// **ディレクトリなら断る。**リンクは辿らずにそれ自身を見ます（リンクを消すのはリンクだけ）。
+async fn refuse_directory(
+    sftp: &russh_sftp::client::SftpSession,
+    path: &str,
+) -> Result<(), SshError> {
+    let meta = sftp
+        .symlink_metadata(path)
+        .await
+        .map_err(|error| sftp_failure(path, error))?;
+    if meta.is_dir() {
+        return Err(SshError::Command(format!(
+            "{path} はディレクトリです。sshboard が AI に許すのはファイル 1 つずつです"
+        )));
+    }
+    Ok(())
+}
+
 /// 書けなかった理由を、**OS の拒否かそれ以外か**で分ける（2026-11-16）。
 ///
 /// OS の拒否なら、親の持ち主と権限を読みに行って添えます（読めなくても断り方は変えない）。
@@ -1079,6 +1096,43 @@ impl SshSession {
             .await
             .map_err(|error| SshError::Command(format!("{path}: {error}")))?;
         Ok(bytes.len() as u64)
+    }
+
+    /// ファイルを 1 つ、別の名前へ移す（Issue #27）。**移動元も移動先も囲いの中だけ。**
+    ///
+    /// 片方だけを見ると、囲いの外へ運び出す道（あるいは外から持ち込む道）になります。
+    /// **既にある宛先は潰しません** —— 退避のつもりで本物を消す形を作らない。
+    pub async fn rename_file(&self, actor: Actor, from: &str, to: &str) -> Result<(), SshError> {
+        self.allow_write(actor, from, false)?;
+        self.allow_write(actor, to, false)?;
+        self.show(actor, &format!("mv {from} {to}")).await?;
+
+        let sftp = self.sftp().await?;
+        refuse_directory(&sftp, from).await?;
+        if sftp.symlink_metadata(to).await.is_ok() {
+            return Err(SshError::Command(format!(
+                "{to} は既に在ります。上書きしません（先に別の名前へ退避してください）"
+            )));
+        }
+        match sftp.rename(from, to).await {
+            Ok(()) => Ok(()),
+            Err(error) => Err(write_failure(&sftp, to, error).await),
+        }
+    }
+
+    /// ファイルを 1 つ消す（Issue #27）。**囲いの中だけ・ディレクトリは消さない。**
+    ///
+    /// 再帰削除は、間違えたときに失うものの幅が違います。
+    pub async fn remove_file(&self, actor: Actor, path: &str) -> Result<(), SshError> {
+        self.allow_write(actor, path, false)?;
+        self.show(actor, &format!("rm {path}")).await?;
+
+        let sftp = self.sftp().await?;
+        refuse_directory(&sftp, path).await?;
+        match sftp.remove_file(path).await {
+            Ok(()) => Ok(()),
+            Err(error) => Err(write_failure(&sftp, path, error).await),
+        }
     }
 
     /// 対話コンソールを 1 本開く（D29）。**PTY を要求し、シェルを起こします。**

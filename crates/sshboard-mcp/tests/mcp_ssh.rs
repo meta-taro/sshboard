@@ -716,3 +716,78 @@ async fn what_the_person_can_see_is_what_the_agent_is_told() {
 
     harness.endpoint.shutdown();
 }
+
+/// **書き込み先の中なら、端末なしで退避と片付けができる**（Issue #27）。
+///
+/// それまでは `.bak` にするだけで端末を開き、人の許可を待っていました。
+#[tokio::test]
+async fn an_agent_moves_a_file_aside_and_removes_it_inside_the_write_roots() {
+    if !server_is_up().await {
+        println!("テスト用サーバーが建っていません（想定内・飛ばします）");
+        return;
+    }
+
+    let band = Band::new();
+    let screen = fake_screen(&band);
+    let harness = harness(band, &["/home/probe/upload"]).await;
+    harness
+        .call("connect", serde_json::json!({ "connection_id": "local" }))
+        .await;
+
+    let nanos = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_nanos())
+        .unwrap_or_default();
+    let from = format!("/home/probe/upload/tidy-{nanos}.json");
+    let to = format!("{from}.bak");
+    harness
+        .call(
+            "write_file",
+            serde_json::json!({ "connection_id": "local", "remote_path": from, "content": "{}" }),
+        )
+        .await;
+
+    let moved = harness
+        .call(
+            "rename_file",
+            serde_json::json!({ "connection_id": "local", "from": from, "to": to }),
+        )
+        .await;
+    assert!(moved.contains("renamed"), "退避できない: {moved}");
+
+    let removed = harness
+        .call(
+            "remove_file",
+            serde_json::json!({ "connection_id": "local", "path": to }),
+        )
+        .await;
+    assert!(removed.contains("removed"), "消せない: {removed}");
+
+    // **囲いの外は断る。**
+    let refused = harness
+        .call(
+            "remove_file",
+            serde_json::json!({ "connection_id": "local", "path": "/home/probe/.bashrc" }),
+        )
+        .await;
+    assert!(
+        refused.contains("書き込み") || refused.contains("error"),
+        "囲いの外を消せている: {refused}"
+    );
+
+    // **どちらも帯に出ている**（人の見ていない所で終わらせない）。
+    harness.endpoint.shutdown();
+    let lines = screen.lock().expect("画面役の記録を読めない").clone();
+    assert!(
+        lines
+            .iter()
+            .any(|line| line.contains("mv ") && line.contains(".bak")),
+        "改名が帯に出ていない: {lines:?}"
+    );
+    assert!(
+        lines
+            .iter()
+            .any(|line| line.starts_with("[AI]") && line.contains("rm ")),
+        "削除が帯に出ていない: {lines:?}"
+    );
+}

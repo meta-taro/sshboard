@@ -32,6 +32,8 @@ const TOUCHES_THE_SERVER: &[&str] = &[
     "make_directory",
     "upload_file",
     "write_file",
+    "rename_file",
+    "remove_file",
     "run_readonly",
     "run_operation",
     "disk_usage",

@@ -3212,6 +3212,18 @@ impl Engine {
         }
     }
 
+    /// ファイルを 1 つ別の名前へ（Issue #27）。**移動元・移動先とも囲いの中だけ。**
+    pub async fn rename_file(&self, actor: Actor, from: &str, to: &str) -> Result<(), EngineError> {
+        self.sync_write_scopes().await;
+        Ok(self.session().await?.rename_file(actor, from, to).await?)
+    }
+
+    /// ファイルを 1 つ消す（Issue #27）。**囲いの中だけ・ディレクトリは消さない。**
+    pub async fn remove_file(&self, actor: Actor, path: &str) -> Result<(), EngineError> {
+        self.sync_write_scopes().await;
+        Ok(self.session().await?.remove_file(actor, path).await?)
+    }
+
     /// 1 件控える。**中身も秘密も持ちません**（名前と大きさだけ）。
     async fn note_transfer(
         &self,

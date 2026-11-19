@@ -210,6 +210,10 @@ async fn the_server_advertises_only_the_phase_zero_tools() {
         "about_sshboard",
         // **エージェント専用カーソル**（2026-11-12）。画面の中だけ。押せるのはタブだけ。
         "screen",
+        // **書き込み先の中でファイル 1 つを退避・片付ける**（Issue #27・2026-11-19）。
+        // 移動元も移動先も囲いの中だけ。ディレクトリは対象外。
+        "rename_file",
+        "remove_file",
     ] {
         assert!(
             listed.contains(expected),
@@ -221,7 +225,7 @@ async fn the_server_advertises_only_the_phase_zero_tools() {
     //
     // 上の一覧は「在ること」しか見ないので、**足しても誰も気づきません。**
     // 記録の表（手元の記録 / `CLAUDE.md`）と実物は、
-    // **これまで 5 回ずれました**（16→15・29→30・30→34・34→35・35→36・38→39・39→40・40→42・42→43・43→44）。毎回、
+    // **これまで 5 回ずれました**（16→15・29→30・30→34・34→35・35→36・38→39・39→40・40→42・42→43・43→44・44→46）。毎回、
     // **足したときに表を直していない**のが原因です。
     //
     // ここで数えておけば、**足した本人がその場で気づきます。**
@@ -230,7 +234,7 @@ async fn the_server_advertises_only_the_phase_zero_tools() {
     // `inputSchema` は 1 本につきちょうど 1 つです。
     let counted = listed.matches("inputSchema").count();
     assert_eq!(
-        counted, 44,
+        counted, 46,
         "**MCP のツールが {counted} 本になりました。**足した／消したなら、\
          手元の記録の表と `CLAUDE.md` の本数も同じ commit で直してください\
          （product-baseline §10）。直したら、ここの数字も合わせてください"
@@ -238,7 +242,8 @@ async fn the_server_advertises_only_the_phase_zero_tools() {
 
     // **ここが D3 の見張り。**引数で任意の文字列をシェルへ渡す口を 1 つも作らない。
     // **Phase 2 へ回した書き込みが、うっかり生えていないこと**（PRD §3）。
-    // 上げるのは入れたが、消す・動かす・権限を変えるは入れていない。
+    // 上げる・作るに加えて、**囲いの中のファイル 1 つの改名と削除**だけは入れた（Issue #27）。
+    // ディレクトリごと消す・囲いの外へ動かす・権限を変える口は入れていない。
     //
     // **`sudo` という名前の口も作りません**（D48 で `become = "ask"` を入れたあとも）。
     // 権限を上げられるのは `run_operation` の中だけで、**渡せるのは id**、
@@ -246,7 +251,8 @@ async fn the_server_advertises_only_the_phase_zero_tools() {
     // **しかも人が画面で許可するまで走りません。**
     for forbidden in [
         "delete_file",
-        "remove_file",
+        "remove_dir",
+        "delete_directory",
         "rename",
         "move_file",
         "chmod",

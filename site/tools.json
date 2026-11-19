@@ -1,5 +1,5 @@
 {
- "total": 44,
+ "total": 46,
  "groups": [
   {
    "key": "connect",
@@ -97,6 +97,14 @@
     {
      "name": "write_file",
      "line": "Write text to a file on the connected server."
+    },
+    {
+     "name": "rename_file",
+     "line": "Rename or move one file on the connected server, e.g."
+    },
+    {
+     "name": "remove_file",
+     "line": "Delete one file on the connected server."
     }
    ]
   },

@@ -42,7 +42,7 @@ GROUPS = [
     ("look", ["list_directory", "stat", "read_file", "search", "read_log",
               "disk_usage", "process_list", "network_listen", "service_status",
               "runtime_versions"]),
-    ("write", ["make_directory", "upload_file", "write_file"]),
+    ("write", ["make_directory", "upload_file", "write_file", "rename_file", "remove_file"]),
     # `propose_operation` は**走らせる口ではありません**（2026-10-23）——
     # 人へ「これを足してよいか」と出すだけで、**書くのは画面**です。
     # それでも `cmds` に置きます: 人が読むときの関心は「コマンドの話」で同じだからです。

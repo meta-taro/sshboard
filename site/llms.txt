@@ -19,7 +19,8 @@ from an allow-list a human wrote in `readonly.toml`, which **starts empty** —
 out of the box you cannot run a single command.
 
 **Writes are fenced to directories a human listed**, per connection, and that
-list also starts empty. Upload and mkdir only: no delete, rename, move, chmod,
+list also starts empty. Upload, mkdir, and renaming or deleting one file at a time inside
+them: no deleting directories, no moving across the fence, no chmod,
 service restart or package install. There is **no download-to-my-machine
 tool** — the fence does not protect the human's laptop, so no door is opened
 onto it.
@@ -54,7 +55,7 @@ touches no remote server and puts nothing on the human's screen.
 
 ## What you can do
 
-44 tools over MCP, in seven groups: connecting and choosing where operations
+46 tools over MCP, in seven groups: connecting and choosing where operations
 go; looking at the server (listing, stat, reading files, search, disk usage,
 processes, listening ports, service status, runtime versions); writing inside
 the fence; running commands from the human's allow-lists; the shared terminal;

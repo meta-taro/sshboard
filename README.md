@@ -52,8 +52,9 @@ Filesystem      Size  Used Avail Use% Mounted on
 
 The agent may write **only** inside directories you listed, one connection at a time.
 **The list starts empty, so it cannot write a single byte until you say where.**
-Delete, rename, move, chmod, restart, package installs, sudo — **none of them exist for
-the agent.** You are not restricted anywhere.
+Inside them it can also rename or delete one file at a time (setting a file aside as
+`.bak`, say). Deleting directories, moving anything across the fence, chmod, restart,
+package installs, sudo — **none of them exist for the agent.** You are not restricted anywhere.
 
 ![The two-pane file browser; the agent's writable directory is shown at the top](site/shots/en/files.png)
 

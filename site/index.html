@@ -90,7 +90,7 @@
         "name": "Where can the agent write files?",
         "acceptedAnswer": {
           "@type": "Answer",
-          "text": "Only inside the directories you list for each connection. The list is empty by default, so it writes nothing until you add one. It cannot delete, rename or download files to your machine."
+          "text": "Only inside the directories you list for each connection. The list is empty by default, so it writes nothing until you add one. Inside them it can rename or delete one file at a time, never a directory; it cannot carry files out or download them to your machine."
         }
       },
       {
@@ -167,7 +167,7 @@
           <ul class="facts">
           <li data-t="fence.1"><b>There is no <code>run_command(cmd)</code> tool.</b> Not a filtered one, not a clever one. An agent cannot hand an arbitrary string to a shell.</li>
           <li data-t="fence.2"><b>Read-only commands come from a list you wrote.</b> <code>readonly.toml</code> starts empty, so out of the box the agent cannot run a single command.</li>
-          <li data-t="fence.3"><b>Writes are fenced to directories you listed,</b> per connection. That list also starts empty. Upload and mkdir only — no delete, rename, move, chmod, service restart or package install.</li>
+          <li data-t="fence.3"><b>Writes are fenced to directories you listed,</b> per connection. That list also starts empty. Upload, mkdir, and renaming or deleting one file at a time inside them — no deleting directories, no moving across the fence, no chmod, service restart or package install.</li>
           <li data-t="fence.4"><b>There is no download-to-my-machine tool.</b> The fence does not protect your laptop, so the agent doesn't get a door onto it.</li>
           <li data-t="fence.5"><b>State-changing operations need a human press,</b> and the first attempt is always refused so the screen can show you exactly what would run. You choose: <b>allow until you take it away</b>, or <b>once</b> (for five minutes).</li>
           <li data-t="fence.6"><b>Keys stay in the OS credential store and ssh-agent.</b> sshboard does not implement a key store, and the tool that lists connections returns identifiers, never credentials.</li>
@@ -446,7 +446,7 @@ claude mcp add --scope user sshboard -- "%LOCALAPPDATA%\\sshboard\\sshboard.exe"
           <div class="section-head"><h2 data-t="h.faq">Frequently asked questions</h2></div>
         <details><summary data-t="faq.q1">What is sshboard?</summary><p data-t="faq.a1">A desktop SSH client with an MCP server built in. You and your AI agent look at the same server, on the same screen, over one SSH connection, and everything the agent does appears in your window as it happens.</p></details>
         <details><summary data-t="faq.q2">Can the agent run any command it likes?</summary><p data-t="faq.a2">No. There is no tool that takes a command line. The agent can use read-only tools, run commands a person listed in readonly.toml by id, and ask to run operations a person listed in operations.toml — each of those asks you on screen first.</p></details>
-        <details><summary data-t="faq.q3">Where can the agent write files?</summary><p data-t="faq.a3">Only inside the directories you list for each connection. The list is empty by default, so it writes nothing until you add one. It cannot delete, rename or download files to your machine.</p></details>
+        <details><summary data-t="faq.q3">Where can the agent write files?</summary><p data-t="faq.a3">Only inside the directories you list for each connection. The list is empty by default, so it writes nothing until you add one. Inside them it can rename or delete one file at a time, never a directory; it cannot carry files out or download them to your machine.</p></details>
         <details><summary data-t="faq.q4">Does sshboard store my keys or passwords?</summary><p data-t="faq.a4">No. Keys stay in your OS keychain and ssh-agent. A sudo password is typed once and kept only in memory for that connection, until you quit the app or press Stop AI. It is never written to disk.</p></details>
         <details><summary data-t="faq.q5">Which agents and systems does it work with?</summary><p data-t="faq.a5">Any MCP client; Claude Code is the one it is tested with. The app runs on macOS (Apple Silicon and Intel) and Windows (x64 and ARM64).</p></details>
         </div>

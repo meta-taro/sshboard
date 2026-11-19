@@ -806,6 +806,58 @@ impl SshboardMcp {
         Ok(format!("wrote {written} bytes to {}", request.remote_path))
     }
 
+    /// ファイルを 1 つ別の名前へ（Issue #27）。**移動元・移動先とも囲いの中だけ。**
+    #[tool(
+        description = "Rename or move one file on the connected server, e.g. to set it aside as \
+                       `.bak`. Both `from` and `to` must be inside the write directories a human \
+                       configured for that connection. Directories are refused, and an existing \
+                       `to` is never overwritten."
+    )]
+    pub async fn rename_file(
+        &self,
+        Parameters(request): Parameters<RenameFile>,
+        ct: CancellationToken,
+    ) -> Result<String, ErrorData> {
+        let engine = self.engine()?;
+        until_cancelled(
+            &ct,
+            engine.on(&request.connection_id, async {
+                engine
+                    .rename_file(Actor::Ai, &request.from, &request.to)
+                    .await
+                    .map_err(refuse)
+            }),
+        )
+        .await?;
+        Ok(format!("renamed {} to {}", request.from, request.to))
+    }
+
+    /// ファイルを 1 つ消す（Issue #27）。**囲いの中だけ・ディレクトリは消さない。**
+    #[tool(
+        description = "Delete one file on the connected server. Only inside the write directories \
+                       a human configured for that connection. Directories are refused; there is \
+                       no recursive delete. This cannot be undone - if you might need the file \
+                       again, use rename_file to set it aside instead."
+    )]
+    pub async fn remove_file(
+        &self,
+        Parameters(request): Parameters<RemotePath>,
+        ct: CancellationToken,
+    ) -> Result<String, ErrorData> {
+        let engine = self.engine()?;
+        until_cancelled(
+            &ct,
+            engine.on(&request.connection_id, async {
+                engine
+                    .remove_file(Actor::Ai, &request.path)
+                    .await
+                    .map_err(refuse)
+            }),
+        )
+        .await?;
+        Ok(format!("removed {}", request.path))
+    }
+
     // --- 許可リストのコマンド（D3） -----------------------------------------
 
     /// 人が許したコマンドの一覧。**サーバーへは触りません。**
@@ -1311,6 +1363,17 @@ pub struct WriteFile {
     pub content: String,
 }
 
+#[derive(Debug, Deserialize, rmcp::schemars::JsonSchema)]
+#[schemars(crate = "rmcp::schemars")]
+pub struct RenameFile {
+    /// どの接続で動かすか。`list_connections` / `session_status` の識別子。
+    pub connection_id: String,
+    /// 今の絶対パス。**書き込み許可ディレクトリの下だけ。**
+    pub from: String,
+    /// 新しい絶対パス。**書き込み許可ディレクトリの下だけ。既にあれば断る。**
+    pub to: String,
+}
+
 // --- 端末（D29） -------------------------------------------------------------
 
 /// 一度に打てる上限。**貼り付け事故を小さくする。**
@@ -1355,8 +1418,9 @@ There is no tool that takes a shell command string - by design. You pass ids fro
 a person wrote; you never compose the command. Both lists ship EMPTY, so until someone \
 writes them you can run nothing: that is the intended state, not a fault - say which id \
 you wanted and let them decide. You cannot write outside the listed directories, and \
-that list is empty by default too. You cannot delete, rename, move, chmod, chown, or \
-restart services. You cannot download to the person's machine. You cannot read or set \
+that list is empty by default too. Inside them you may rename or delete one file at a \
+time (never a directory, never across the fence). You cannot chmod, chown, or restart \
+services. You cannot download to the person's machine. You cannot read or set \
 any passphrase, password, or token - if one is needed, ask the person and it goes \
 straight from their screen to the server. You never see host names, IP addresses, user \
 names, or key paths: connections have ids and names only, and it must stay that way in \
