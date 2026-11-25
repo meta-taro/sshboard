@@ -8,6 +8,9 @@ repository.workspace = true
 
 [dependencies]
 tokio = { workspace = true }
+# 控え（`journal.rs`）を 1 行 1 件の JSON で書くため。**引用符や改行を手で逃がさない。**
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
 
 [dev-dependencies]
 tokio = { version = "1", features = ["sync", "time", "macros", "rt", "rt-multi-thread"] }

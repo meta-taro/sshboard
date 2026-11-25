@@ -97,6 +97,11 @@ it did.
 
 ![The activity band: one line per operation, with [AI] marking the agent's](site/shots/en/band.png)
 
+**The band outlives the window.** The app keeps it on this computer, one file per day, for
+14 days, and **Past band** in the menu reads any of those days back — so "what did the agent
+do yesterday?" has an answer even if you closed the app. It holds who did what, with
+connection names and paths; **no passwords and no command output.** Older days are removed.
+
 When something fails, the same log the agent reads over MCP is on your screen — which
 stage it reached, why it stopped, and what to do next. **It carries no hostnames, no
 usernames and no secrets.**

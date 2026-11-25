@@ -13,6 +13,7 @@ mod check_cmd;
 mod commands;
 mod connections_cmd;
 mod console_grant_cmd;
+mod journal_cmd;
 mod mcp_host;
 mod menu;
 mod pending;
@@ -157,6 +158,8 @@ pub fn run() {
             session_cmd::host_key_refuse,
             session_cmd::console_answer,
             session_cmd::diagnostics_recent,
+            journal_cmd::journal_days,
+            journal_cmd::journal_read,
             menu::set_menu_labels
         ])
         .setup(|app| {
@@ -165,6 +168,18 @@ pub fn run() {
             // **購読は MCP を立てる前に済ませる。**
             // 逆にすると、画面が繋がる前に来た呼び出しが帯へ出ないまま通ってしまう。
             let subscriber = band.subscribe();
+
+            // **帯の控え**（Phase 2「監査ログの永続化」）。画面と同じく、
+            // MCP を立てる前に購読する。後にすると、最初の呼び出しが控えに残らない。
+            // 置き場所が分からないときは、**仮の場所に書かず、控えだけを諦める。**
+            match journal_cmd::default_dir() {
+                Some(dir) => {
+                    let journal = sshboard_band::Journal::new(dir, journal_cmd::KEEP_DAYS);
+                    journal_cmd::spawn_writer(journal.clone(), band.subscribe());
+                    app.manage(journal);
+                }
+                None => eprintln!("[sshboard] 帯の控えの置き場所が分かりません"),
+            }
 
             // 接続一覧が変わったことを配る口。**人と AI の両方が書き換える**ので、
             // 画面へ押し出さないと、AI が足した接続を人が知らないままになる（PRD §4-2）。

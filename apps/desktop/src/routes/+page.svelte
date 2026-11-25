@@ -36,6 +36,7 @@
 	import { save as saveDialog } from '@tauri-apps/plugin-dialog';
 
 	import BandExportDialog from '$lib/components/BandExportDialog.svelte';
+	import BandJournalDialog from '$lib/components/BandJournalDialog.svelte';
 	import BandPanel from '$lib/components/BandPanel.svelte';
 	import ConnectionRail from '$lib/components/ConnectionRail.svelte';
 	import DiagPanel from '$lib/components/DiagPanel.svelte';
@@ -182,6 +183,8 @@
 	 * D27 で「手元へ落とす口は AI に作らない」と決めたのと同じ性質です。
 	 */
 	let bandExportOpen = $state(false);
+	/** **過去の帯**（Phase 2「監査ログの永続化」）。実行体が 14 日分を手元に控えています。 */
+	let bandJournalOpen = $state(false);
 
 	/**
 	 * **問いが出たことに気づけるように**（Issue #30）。
@@ -1854,6 +1857,16 @@
 							>
 								{i18n.t('band.export.title')}
 							</button>
+							<!-- **過去の帯**。帯はアプリを閉じると消えていました。 -->
+							<button
+								type="button"
+								onclick={() => {
+									viewMenuOpen = false;
+									bandJournalOpen = true;
+								}}
+							>
+								{i18n.t('journal.title')}
+							</button>
 							<button type="button" onclick={() => { viewMenuOpen = false; void openStanding(); }}>
 								{i18n.t('standing.title')}
 							</button>
@@ -2333,6 +2346,10 @@
 			onclose={() => (bandExportOpen = false)}
 			onsave={(payload) => void saveBand(payload)}
 		/>
+	{/if}
+
+	{#if bandJournalOpen}
+		<BandJournalDialog onclose={() => (bandJournalOpen = false)} />
 	{/if}
 
 	{#if allowlistOpen && allowlist !== null}

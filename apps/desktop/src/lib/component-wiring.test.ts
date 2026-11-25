@@ -525,6 +525,32 @@ describe('AI に渡す（案・1 枚目）', () => {
 	});
 });
 
+describe('過去の帯（Phase 2「監査ログの永続化」・2026-11-25）', () => {
+	/**
+	 * 帯はアプリを閉じると消えていました。実行体が 14 日分を手元に控え、
+	 * **人はメニューから日を選んで読み戻せます。**
+	 */
+	test('is reachable from the menu', () => {
+		const text = pageSource();
+		expect(text).toContain('bandJournalOpen = true');
+		expect(text).toContain('<BandJournalDialog');
+	});
+
+	test('says what is kept and for how long before showing it', () => {
+		const dialog = components['./components/BandJournalDialog.svelte'];
+		expect(dialog, 'BandJournalDialog.svelte が無い').toBeTruthy();
+		for (const key of ['journal.note', 'journal.where', 'journal_days', 'journal_read']) {
+			expect(dialog.includes(key), `${key} が出ていません`).toBe(true);
+		}
+	});
+
+	test('hides with the screen, like the live band', () => {
+		// **伏せているのに過去の帯だけ読める、を作りません。**接続の名前とパスが入っています。
+		const dialog = components['./components/BandJournalDialog.svelte'];
+		expect(dialog).toContain('data-secret');
+	});
+});
+
 describe('帯の書き出し（案・4 枚目）', () => {
 	/**
 	 * **囲い（D22）は落とし先を守りません。**
