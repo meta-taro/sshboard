@@ -56,9 +56,9 @@
 </script>
 
 <div class="backdrop" role="presentation">
-	<div class="dialog" role="alertdialog" aria-modal="true" aria-label={i18n.t('hostkey.title')}>
+	<div class="dialog consent" role="alertdialog" aria-modal="true" aria-label={i18n.t('hostkey.title')}>
 		<header>
-			<h2><Icon name={mismatch ? 'warning' : 'lock'} size={15} /> {mismatch ? i18n.t('hostkey.title.mismatch') : i18n.t('hostkey.title')}</h2>
+			<h2><Icon name={mismatch ? 'warning' : 'lock'} size={18} /> {mismatch ? i18n.t('hostkey.title.mismatch') : i18n.t('hostkey.title')}</h2>
 		</header>
 
 		<p class="note">
@@ -106,7 +106,7 @@
 	}
 
 	.dialog {
-		width: min(30rem, 92vw);
+		width: min(36rem, 92vw);
 		padding: 1.1rem;
 		background: var(--surface);
 		/* **色だけを手がかりにしない**（DESIGN.md）。枠でも分かるようにします。 */
@@ -131,7 +131,7 @@
 	 */
 	header h2 {
 		margin: 0;
-		font-size: 1rem;
+		font-size: var(--consent-title);
 		font-weight: 600;
 		/* アイコンを文字と同じ行に置く（`Icon` は inline-block） */
 		display: block;
@@ -145,7 +145,7 @@
 	.note,
 	.how {
 		margin: 0.7rem 0 0;
-		font-size: var(--text-control);
+		font-size: var(--consent-text);
 		color: var(--fg-muted);
 		line-height: 1.6;
 	}
@@ -155,7 +155,7 @@
 		grid-template-columns: auto 1fr;
 		gap: 0.25rem 0.7rem;
 		margin: 0.7rem 0 0;
-		font-size: var(--text-control);
+		font-size: var(--consent-text);
 	}
 
 	dt {
@@ -172,7 +172,7 @@
 	/* **指紋は等幅で。**1 文字違いを目で追える形にします。 */
 	.print {
 		font-family: var(--font-mono);
-		font-size: var(--text-control);
+		font-size: var(--consent-text);
 	}
 
 	.was {
@@ -186,7 +186,7 @@
 		gap: 0.5rem;
 	}
 
-	button.cta.danger {
+	.consent .actions button.cta.danger {
 		/* **食い違いのときは、承認そのものが危ない。**色でもそう見せます。 */
 		background: var(--danger);
 		border-color: transparent;

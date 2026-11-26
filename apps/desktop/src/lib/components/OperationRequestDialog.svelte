@@ -120,13 +120,13 @@
 
 <div class="backdrop" role="presentation">
 	<div
-		class="dialog"
+		class="dialog consent"
 		role="alertdialog"
 		aria-modal="true"
 		aria-label={i18n.t('operation.request.title')}
 	>
 		<header>
-			<h2><Icon name="warning" size={15} /> {i18n.t('operation.request.title')}</h2>
+			<h2><Icon name="warning" size={18} /> {i18n.t('operation.request.title')}</h2>
 		</header>
 
 		<p class="what">{id}</p>
@@ -200,7 +200,7 @@
 		gap: 0.5rem;
 		align-items: baseline;
 		margin: 0;
-		font-size: var(--text-sm);
+		font-size: var(--consent-text);
 		color: var(--fg-muted);
 	}
 
@@ -222,7 +222,7 @@
 	}
 
 	.dialog {
-		width: min(30rem, 92vw);
+		width: min(36rem, 92vw);
 		padding: 1.1rem;
 		background: var(--surface);
 		/* **色だけを手がかりにしない**（DESIGN.md）。枠でも分かるように。 */
@@ -247,7 +247,7 @@
 	 */
 	header h2 {
 		margin: 0;
-		font-size: 1rem;
+		font-size: var(--consent-title);
 		font-weight: 600;
 		/* アイコンを文字と同じ行に置く（`Icon` は inline-block） */
 		display: block;
@@ -261,13 +261,13 @@
 	.what {
 		margin: 0.7rem 0 0;
 		font-family: var(--font-mono);
-		font-size: var(--text-body);
+		font-size: var(--consent-text);
 	}
 
 	.lead,
 	.note {
 		margin: 0.7rem 0 0;
-		font-size: var(--text-control);
+		font-size: var(--consent-text);
 		color: var(--fg-muted);
 		line-height: 1.6;
 	}
@@ -280,7 +280,7 @@
 		border: 0;
 		border-radius: var(--r-item, 6px);
 		font-family: var(--font-mono);
-		font-size: var(--text-control);
+		font-size: var(--consent-text);
 		line-height: 1.5;
 		white-space: pre-wrap;
 		word-break: break-all;
@@ -292,7 +292,7 @@
 		display: flex;
 		flex-direction: column;
 		gap: 0.3rem;
-		font-size: var(--text-control);
+		font-size: var(--consent-text);
 	}
 
 	.secret input {

@@ -51,13 +51,13 @@
 -->
 <div class="backdrop" role="presentation">
 	<div
-		class="dialog"
+		class="dialog consent"
 		role="alertdialog"
 		aria-modal="true"
 		aria-label={i18n.t('console.request.title')}
 	>
 		<header>
-			<h2><Icon name="lock" size={15} /> {i18n.t('console.request.title')}</h2>
+			<h2><Icon name="lock" size={18} /> {i18n.t('console.request.title')}</h2>
 		</header>
 
 		<p class="note">{i18n.t('console.request.body')}</p>
@@ -100,7 +100,7 @@
 	}
 
 	.dialog {
-		width: min(26rem, 92vw);
+		width: min(32rem, 92vw);
 		padding: 1.1rem;
 		background: var(--surface);
 		/* **色だけを手がかりにしない**（DESIGN.md）。枠でも分かるようにします。 */
@@ -125,7 +125,7 @@
 	 */
 	header h2 {
 		margin: 0;
-		font-size: 1rem;
+		font-size: var(--consent-title);
 		font-weight: 600;
 		/* アイコンを文字と同じ行に置く（`Icon` は inline-block） */
 		display: block;
@@ -138,7 +138,7 @@
 
 	.note {
 		margin: 0.7rem 0 0;
-		font-size: var(--text-control);
+		font-size: var(--consent-text);
 		color: var(--fg-muted);
 		line-height: 1.6;
 	}

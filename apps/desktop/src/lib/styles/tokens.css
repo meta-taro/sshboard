@@ -167,6 +167,15 @@
 	 * （そして気づくのは撮ったあと）。名前を 1 つにしておきます。
 	 */
 	--r-pill: 999px;
+	/*
+	 * **許可の窓は一回り大きく**（2026-11-26・実機の指摘「字が小さくて読めず、ボタンも押しづらい」）。
+	 *
+	 * 許可の窓は、人が始めていない問いです。**読めない同意は、同意ではありません。**
+	 * `rem` で書くので、文字サイズの設定にも一緒に付いてきます。
+	 */
+	--consent-text: 1rem;
+	--consent-title: 1.15rem;
+	--consent-control-h: 2.75rem;
 
 	/* 動き — 既定の ease を使わない。質量のある動きにする */
 	--ease: cubic-bezier(0.32, 0.72, 0, 1);
@@ -511,4 +520,50 @@ input[type='checkbox']:disabled {
 	background: var(--accent);
 	z-index: 9999;
 	pointer-events: none;
+}
+
+/*
+ * **許可の窓のボタン**（`.consent`）。
+ *
+ * それまでの許可の窓は、ボタンの形をどこにも書いておらず、
+ * **ブラウザの既定（高さ 18px・字 11px 前後）のまま**でした。
+ * 3 つの窓（操作・端末・ホスト鍵）で同じ形にするため、ここに 1 か所で書きます。
+ */
+.consent .actions {
+	gap: 0.6rem;
+	margin-top: 1.1rem;
+}
+
+.consent .actions button {
+	font: inherit;
+	font-size: var(--consent-text);
+	color: var(--fg-control);
+	background: var(--shell-bg);
+	border: 0;
+	border-radius: var(--r-pill);
+	min-height: var(--consent-control-h);
+	padding: 0 1.2rem;
+	cursor: pointer;
+	box-shadow: inset 0 0 0 1px var(--hairline-strong);
+}
+
+.consent .actions button:hover:not(:disabled) {
+	background: var(--surface-2);
+}
+
+.consent .actions button.cta {
+	color: var(--accent-fg);
+	background: var(--accent);
+	box-shadow: none;
+	font-weight: 700;
+}
+
+.consent .actions button:disabled {
+	cursor: default;
+	opacity: 0.55;
+}
+
+.consent .actions button:focus-visible {
+	outline: 2px solid var(--accent);
+	outline-offset: 2px;
 }
